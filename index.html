@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Hawaii Natural Clean — CRM</title>
 <style>
@@ -1117,6 +1118,279 @@ textarea{font-family:inherit;}
 </div>
 
 <script>
+const SUPABASE_URL = 'https://hehfecnjmgsthxjxlvpz.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_ltr-mBfRLkdcUQzPtza8HQ_kfXad1wh';
+const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// ── DB HELPERS ────────────────────────────────────────────────────────
+async function dbSaveClient(data){
+  const {error}=await db.from('clients').insert([{
+    name:data.name, type:data.type||'Residential',
+    phone:data.phone||null, email:data.email||null,
+    address:data.address||null, payment_type:data.paytype||null,
+    payment_last4:data.last4||null, service:data.service||null,
+    frequency:data.freq||null, sqft:data.sqft||null,
+    beds:parseInt(data.beds)||null, baths:parseFloat(data.baths)||null,
+    preferred_cleaner:data.cleaner||null, status:'New',
+    notes:data.notes||null,
+    since:new Date().toLocaleDateString('en-US',{month:'long',year:'numeric'}),
+    mrr:0, ltv:0
+  }]);
+  if(error)console.error('Save client error:',error);
+  return !error;
+}
+
+async function dbLoadClients(){
+  const {data,error}=await db.from('clients').select('*').order('created_at',{ascending:false});
+  if(error){console.error('Load clients error:',error);return[];}
+  return data||[];
+}
+
+async function dbSaveCleaner(data){
+  const {error}=await db.from('cleaners').insert([{
+    name:data.name, role:data.role||'Cleaner',
+    island:data.island||'Oahu', phone:data.phone||null,
+    email:data.email||null, location:data.loc||null,
+    hourly_rate:parseFloat(data.rate)||16,
+    start_date:data.startDate||null,
+    background_check:data.bgcheck||'Not started',
+    status:'Active', notes:data.notes||null
+  }]);
+  if(error)console.error('Save cleaner error:',error);
+  return !error;
+}
+
+async function dbLoadCleaners(){
+  const {data,error}=await db.from('cleaners').select('*').order('created_at',{ascending:false});
+  if(error){console.error('Load cleaners error:',error);return[];}
+  return data||[];
+}
+
+async function dbSaveAppointment(data){
+  const {error}=await db.from('appointments').insert([{
+    client_name:data.clientName, service:data.service||'Standard clean',
+    frequency:data.freq||'One-time', date:data.date,
+    time:data.time||'8am', address:data.address||null,
+    beds:parseInt(data.beds)||null, baths:parseFloat(data.baths)||null,
+    condition:parseInt(data.condition)||7,
+    cleaner_name:data.cleanerName||'Unassigned',
+    status:data.cleanerName&&data.cleanerName!=='Unassigned'?'assigned':'unassigned',
+    base_price:parseFloat(data.basePrice)||0,
+    tax:parseFloat(data.tax)||0,
+    total_price:parseFloat(data.totalPrice)||0,
+    cleaner_pay:parseFloat(data.cleanerPay)||0,
+    notes:data.notes||null,
+    recurring:data.recurring||false
+  }]);
+  if(error)console.error('Save appointment error:',error);
+  return !error;
+}
+
+async function dbLoadAppointments(){
+  const {data,error}=await db.from('appointments').select('*').order('date',{ascending:true});
+  if(error){console.error('Load appointments error:',error);return[];}
+  return data||[];
+}
+
+async function dbSaveLead(data){
+  const {error}=await db.from('leads').insert([{
+    name:data.name, contact_name:data.contact||data.name,
+    phone:data.phone||null, email:data.email||null,
+    address:data.address||null, service:data.service||null,
+    sqft:data.sqft||null, estimated_value:data.value||null,
+    source:data.source||'Google SEO', stage:data.stage||'New inquiry',
+    next_action:data.action||null,
+    due_date:data.due||null,
+    assigned_to:data.assigned||'VA',
+    notes:data.notes||null
+  }]);
+  if(error)console.error('Save lead error:',error);
+  return !error;
+}
+
+async function dbLoadLeads(){
+  const {data,error}=await db.from('leads').select('*').order('created_at',{ascending:false});
+  if(error){console.error('Load leads error:',error);return[];}
+  return data||[];
+}
+
+async function dbSaveInvoice(data){
+  const {error}=await db.from('invoices').insert([{
+    client_name:data.clientName, service:data.service||null,
+    amount:parseFloat(data.amount)||0, tax:parseFloat(data.tax)||0,
+    total:parseFloat(data.total)||0, payment_method:data.method||null,
+    payment_terms:data.terms||'Due now', status:data.status||'Unpaid',
+    notes:data.notes||null
+  }]);
+  if(error)console.error('Save invoice error:',error);
+  return !error;
+}
+
+async function dbLoadInvoices(){
+  const {data,error}=await db.from('invoices').select('*').order('created_at',{ascending:false});
+  if(error){console.error('Load invoices error:',error);return[];}
+  return data||[];
+}
+
+// Load all data on startup
+async function loadAllData(){
+  showLoadingState(true);
+  try{
+    // Load appointments into calendar
+    const appts=await dbLoadAppointments();
+    appts.forEach(function(a){
+      const d=new Date(a.date+'T12:00:00');
+      const key=d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate();
+      if(!apptData[key])apptData[key]=[];
+      const exists=apptData[key].some(function(x){return x.dbId===a.id;});
+      if(!exists){
+        apptData[key].push({
+          n:a.client_name, s:a.status||'unassigned',
+          t:a.time||'8am', cleaner:a.cleaner_name||'Unassigned',
+          recurring:a.recurring||false, dbId:a.id
+        });
+      }
+    });
+
+    // Load clients into clientDB
+    const clients=await dbLoadClients();
+    clients.forEach(function(c){
+      const id=c.id;
+      clientDB[id]={
+        name:c.name, type:c.type||'Residential',
+        phone:c.phone||'—', email:c.email||'—',
+        address:c.address||'—',
+        payment:(c.payment_type||'—')+(c.payment_last4?' · ****'+c.payment_last4:''),
+        since:c.since||'—', ltv:'$'+(c.ltv||0),
+        mrr:c.mrr>0?'$'+c.mrr:'—', jobs:'0', avg:'—',
+        service:c.service||'Standard clean',
+        freq:c.frequency||'—',
+        sqft:c.sqft||'—',
+        bedbath:(c.beds||'?')+' bed / '+(c.baths||'?')+' bath',
+        cleaner:c.preferred_cleaner||'No preference',
+        lastjob:'None yet', nextjob:'Not scheduled',
+        status:c.status||'New', notes:c.notes||'—', history:[]
+      };
+    });
+
+    // Load cleaners into cleanerDB
+    const cleaners=await dbLoadCleaners();
+    cleaners.forEach(function(c){
+      const initials=c.name.split(' ').map(function(w){return w[0]||'';}).join('').slice(0,2).toUpperCase();
+      const colors=[['#9FE1CB','#085041'],['#B5D4F4','#0C447C'],['#CECBF6','#3C3489'],['#FAC775','#633806'],['#F5C4B3','#712B13'],['#F4C0D1','#72243E']];
+      const col=colors[Object.keys(cleanerDB).length%colors.length];
+      cleanerDB[c.id]={
+        name:c.name, role:(c.role||'Cleaner')+' · '+(c.island||'Oahu'),
+        initials:initials, bg:col[0], fg:col[1],
+        phone:c.phone||'—', email:c.email||'—',
+        loc:c.location||'—',
+        start:c.start_date?new Date(c.start_date+'T12:00:00').toLocaleDateString('en-US',{month:'short',year:'numeric'}):'—',
+        rate:'$'+(c.hourly_rate||16)+'/hr',
+        week:'0 hrs', month:'0 hrs', paid:'$0',
+        jobs:'0', alltime:'0', islands:c.island||'Oahu',
+        bgcheck:c.background_check||'Not started',
+        notes:c.notes||'—'
+      };
+    });
+
+    // Load leads into leadDB
+    const leads=await dbLoadLeads();
+    leads.forEach(function(l){
+      leadDB[l.id]={
+        name:l.name, contact:l.contact_name||l.name,
+        phone:l.phone||'—', email:l.email||'—',
+        address:l.address||'—', value:l.estimated_value||'TBD',
+        service:l.service||'—', sqft:l.sqft||'—',
+        source:l.source||'—',
+        date:new Date(l.created_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}),
+        stage:l.stage||'New inquiry',
+        action:l.next_action||'Follow up',
+        due:l.due_date||'TBD',
+        assigned:l.assigned_to||'VA',
+        notes:l.notes||'—'
+      };
+    });
+
+    renderCal();
+    renderClientsTable();
+    renderCleanersGrid();
+    renderLeadsPipeline();
+    console.log('Data loaded from Supabase');
+  } catch(err){
+    console.error('Load error:',err);
+  }
+  showLoadingState(false);
+}
+
+function showLoadingState(loading){
+  var title=document.getElementById('page-title');
+  if(title)title.textContent=loading?'Loading...':currentView.charAt(0).toUpperCase()+currentView.slice(1);
+}
+
+function renderClientsTable(){
+  var tbody=document.querySelector('#view-clients tbody');
+  if(!tbody)return;
+  // Clear db-loaded rows (keep hardcoded ones for now)
+  var dbRows=tbody.querySelectorAll('tr.db-row');
+  dbRows.forEach(function(r){r.remove();});
+  Object.entries(clientDB).forEach(function(entry){
+    var id=entry[0];var c=entry[1];
+    // Only render uuid-style IDs (from DB)
+    if(id.length<30)return;
+    var tr=document.createElement('tr');
+    tr.className='clickable db-row';
+    tr.innerHTML='<td>'+c.name+'</td><td><span class="badge '+(c.type==='Commercial'?'bc':'br')+'">'+c.type+'</span></td><td>'+(c.lastjob||'—')+'</td><td>'+(c.mrr||'—')+'</td><td>'+(c.freq||'—')+'</td><td><span class="sd '+(c.status==='Active'?'sa':c.status==='New'?'sn':'si')+'"></span>'+c.status+'</td>';
+    (function(cid){tr.addEventListener('click',function(){openClient(cid);});})(id);
+    tbody.insertBefore(tr,tbody.firstChild);
+  });
+}
+
+function renderCleanersGrid(){
+  var grid=document.querySelector('.cleaner-grid');
+  if(!grid)return;
+  var dbCards=grid.querySelectorAll('.cleaner-card.db-card');
+  dbCards.forEach(function(c){c.remove();});
+  Object.entries(cleanerDB).forEach(function(entry){
+    var id=entry[0];var c=entry[1];
+    if(id.length<30)return;
+    var card=document.createElement('div');
+    card.className='cleaner-card db-card';
+    card.innerHTML='<div class="cleaner-top"><div class="avatar" style="background:'+c.bg+';color:'+c.fg+';">'+c.initials+'</div><div><div class="cleaner-name">'+c.name+'</div><div class="cleaner-role">'+c.role+'</div></div></div>'
+      +'<div class="cleaner-stats"><div class="cs"><div class="cs-label">This week</div><div class="cs-val">'+c.week+'</div></div><div class="cs"><div class="cs-label">Rate</div><div class="cs-val">'+c.rate+'</div></div>'
+      +'<div class="cs"><div class="cs-label">Jobs this mo</div><div class="cs-val">'+c.jobs+'</div></div><div class="cs"><div class="cs-label">Status</div><div class="cs-val"><span class="badge bac">Active</span></div></div></div>'
+      +'<div class="pb"><div class="pf" style="width:0%"></div></div>';
+    (function(cid){card.addEventListener('click',function(){openCleaner(cid);});})(id);
+    grid.appendChild(card);
+  });
+}
+
+function renderLeadsPipeline(){
+  // Add DB leads to pipeline in both views
+  Object.entries(leadDB).forEach(function(entry){
+    var id=entry[0];var l=entry[1];
+    if(id.length<30)return;
+    var stageMap={'New inquiry':0,'Quoted':1,'Follow-up':2,'Closed won':3};
+    var colIdx=stageMap[l.stage]||0;
+    ['view-dashboard','view-pipeline'].forEach(function(viewId){
+      var view=document.getElementById(viewId);
+      if(!view)return;
+      var cols=view.querySelectorAll('.pipe-col');
+      if(!cols[colIdx])return;
+      // Check if already rendered
+      var existing=cols[colIdx].querySelector('[data-lead-id="'+id+'"]');
+      if(existing)return;
+      var card=document.createElement('div');
+      card.className='deal-card';
+      card.dataset.leadId=id;
+      var svc=l.service||'Service';
+      var badgeCls=svc.toLowerCase().indexOf('commercial')>=0?'bc':'br';
+      card.innerHTML='<div class="deal-name">'+l.name+'</div><div class="deal-type"><span class="badge '+badgeCls+'">'+svc+'</span></div><div class="deal-val">'+(l.value||'TBD')+'</div>';
+      (function(lid){card.addEventListener('click',function(){openLead(lid);});})(id);
+      cols[colIdx].appendChild(card);
+    });
+  });
+}
+
 var MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
 var curYear=2026,curMonth=4;
 var currentView='calendar';
@@ -1556,6 +1830,26 @@ function saveNewAppt(){
     recurringAppts.push({name:name,freq:freq,startYear:yr,startMonth:mo,startDay:dy,dayOfWeek:new Date(yr,mo-1,dy).getDay(),timeStr:timeStr,cleaner:cleanerName,status:apptStatus,active:true});
     populateRecurringMonth(curYear,curMonth);
   }
+  // Save to Supabase
+  var priceEl=document.getElementById('price-val');
+  var basePrice=0;var tax=0;var total=0;
+  if(priceEl){
+    total=parseFloat(priceEl.textContent.replace('$',''))||0;
+    tax=Math.round(total*0.04712*100)/100;
+    basePrice=Math.round((total-tax)*100)/100;
+  }
+  dbSaveAppointment({
+    clientName:name, service:document.getElementById('na-service').options[document.getElementById('na-service').selectedIndex].text,
+    freq:freq, date:dateVal, time:timeStr,
+    address:document.getElementById('na-address').value,
+    beds:document.getElementById('na-beds').value,
+    baths:document.getElementById('na-baths').value,
+    condition:document.getElementById('na-cond').value,
+    cleanerName:cleanerName, basePrice:basePrice, tax:tax, totalPrice:total,
+    cleanerPay:Math.round(hrs*rate*100)/100,
+    notes:document.getElementById('na-notes').value,
+    recurring:freq!=='One-time'
+  });
   var success=document.getElementById('na-success');
   success.textContent='Booked! '+name+' added as '+(freq==='One-time'?'a one-time appointment':'a '+freq.toLowerCase()+' recurring appointment')+'. Will auto-populate future months.';
   success.classList.add('show');
@@ -1621,6 +1915,7 @@ function sv(view,el){
 function setPeriod(btn){document.querySelectorAll('.pbtn').forEach(function(b){b.classList.remove('active');});btn.classList.add('active');}
 
 renderCal();
+loadAllData();
 </script>
 
 <!-- NEW LEAD OVERLAY -->
@@ -1805,6 +2100,21 @@ function saveNewLead(){
       cols[colIdx].appendChild(card);
     }
   });
+  // Save to Supabase
+  dbSaveLead({
+    name:name, contact:document.getElementById('nl-contact').value,
+    phone:document.getElementById('nl-phone').value,
+    email:document.getElementById('nl-email').value,
+    address:document.getElementById('nl-address').value,
+    service:document.getElementById('nl-service').value,
+    sqft:document.getElementById('nl-sqft').value,
+    value:document.getElementById('nl-value').value,
+    source:document.getElementById('nl-source').value,
+    stage:stage, action:document.getElementById('nl-action').value,
+    due:document.getElementById('nl-due').value,
+    assigned:document.getElementById('nl-assigned').value,
+    notes:document.getElementById('nl-notes').value
+  });
   var s=document.getElementById('nl-success');s.textContent='Lead "'+name+'" added to pipeline!';s.classList.add('show');
   setTimeout(function(){s.classList.remove('show');closeOverlay('new-lead-overlay');
     ['nl-name','nl-contact','nl-phone','nl-email','nl-address','nl-value','nl-sqft','nl-action','nl-notes'].forEach(function(id){var el=document.getElementById(id);if(el)el.value='';});
@@ -1845,6 +2155,16 @@ function saveNewClient(){
     tr.innerHTML='<td>'+name+'</td><td><span class="badge '+badgeCls+'">'+type+'</span></td><td>—</td><td>—</td><td>'+freq+'</td><td><span class="sd sn"></span>New</td>';
     (function(capturedId){tr.addEventListener('click',function(){openClient(capturedId);});})(id);
     tbody.insertBefore(tr,tbody.firstChild);
+  });
+  // Save to Supabase
+  dbSaveClient({
+    name:name, type:type, phone:document.getElementById('nc-phone').value,
+    email:document.getElementById('nc-email').value, address:document.getElementById('nc-address').value,
+    paytype:document.getElementById('nc-paytype').value, last4:document.getElementById('nc-last4').value,
+    service:document.getElementById('nc-service').value, freq:freq,
+    sqft:document.getElementById('nc-sqft').value, beds:beds, baths:baths,
+    cleaner:document.getElementById('nc-cleaner').value,
+    notes:document.getElementById('nc-notes').value
   });
   var s=document.getElementById('nc-success');s.textContent='Client "'+name+'" added successfully!';s.classList.add('show');
   setTimeout(function(){s.classList.remove('show');closeOverlay('new-client-overlay');
@@ -1893,6 +2213,16 @@ function saveNewCleaner(){
     tr.innerHTML='<td>'+name+'</td><td>'+island+'</td><td>0</td><td>$'+rate+'</td><td>$0</td><td>$0</td><td><span class="badge bpn">Pending</span></td>';
     ptbody.appendChild(tr);
   }
+  // Save to Supabase
+  dbSaveCleaner({
+    name:name, role:role, island:island, rate:rate,
+    phone:document.getElementById('ncl-phone').value,
+    email:document.getElementById('ncl-email').value,
+    loc:document.getElementById('ncl-loc').value,
+    startDate:document.getElementById('ncl-start').value,
+    bgcheck:bgcheck,
+    notes:document.getElementById('ncl-notes').value
+  });
   var s=document.getElementById('ncl-success');s.textContent='Cleaner "'+name+'" added to the roster!';s.classList.add('show');
   setTimeout(function(){s.classList.remove('show');closeOverlay('new-cleaner-overlay');
     ['ncl-name','ncl-phone','ncl-email','ncl-loc','ncl-notes'].forEach(function(fid){var el=document.getElementById(fid);if(el)el.value='';});

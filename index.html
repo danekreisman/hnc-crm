@@ -871,22 +871,29 @@ function renderCal(){
     const d=dipm-first+1+i;
     const el=document.createElement('div');
     el.className='cal-day om';
-    el.innerHTML='<div class="dn2">'+d+'</div>';
+    const dn=document.createElement('div');dn.className='dn2';dn.textContent=d;el.appendChild(dn);
     c.appendChild(el);
   }
   for(let d=1;d<=dim;d++){
     const el=document.createElement('div');
     el.className='cal-day'+(isT(curYear,curMonth,d)?' today':'');
-    let h='<div class="dn2">'+d+'</div>';
     const k=curYear+'-'+curMonth+'-'+d;
     const da=apptData[k]||[];
+    const dn=document.createElement('div');
+    dn.className='dn2';
+    dn.textContent=d;
+    el.appendChild(dn);
     da.slice(0,2).forEach(function(a){
       const sc=a.s.charAt(0);
-      const aData=JSON.stringify(a).replace(/'/g,'&#39;');
-      h+='<button class="appt a'+sc+'" onclick="openAppt(event,'+aData+',\''+k+'\')">'+a.t+' '+a.n+'</button>';
+      var btn=document.createElement('button');
+      btn.className='appt a'+sc;
+      btn.textContent=a.t+' '+a.n;
+      btn.dataset.appt=JSON.stringify(a);
+      btn.dataset.key=k;
+      btn.addEventListener('click',function(ev){ev.stopPropagation();var ap=JSON.parse(this.dataset.appt);openAppt(ap,this.dataset.key);});
+      el.appendChild(btn);
     });
-    if(da.length>2)h+='<div class="more-appts">+'+(da.length-2)+' more</div>';
-    el.innerHTML=h;
+    if(da.length>2){var more=document.createElement('div');more.className='more-appts';more.textContent='+'+(da.length-2)+' more';el.appendChild(more);}
     c.appendChild(el);
   }
   const tot=first+dim;
@@ -894,7 +901,7 @@ function renderCal(){
   for(let i=1;i<=rem;i++){
     const el=document.createElement('div');
     el.className='cal-day om';
-    el.innerHTML='<div class="dn2">'+i+'</div>';
+    const dn=document.createElement('div');dn.className='dn2';dn.textContent=i;el.appendChild(dn);
     c.appendChild(el);
   }
 }
@@ -909,8 +916,7 @@ function changeMonth(d){
   renderCal();
 }
 
-function openAppt(e,a,dateKey){
-  e.stopPropagation();
+function openAppt(a,dateKey){
   const parts=dateKey.split('-');
   const mo=MONTHS[parseInt(parts[1])-1];
   document.getElementById('appt-title').textContent=a.n;

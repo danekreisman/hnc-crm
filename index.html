@@ -2229,7 +2229,8 @@ var automations=[
   {id:4,name:'Review request',trigger:'2h-after',triggerLabel:'2h after job complete',action:'sms-client',actionLabel:'SMS to client',msg:'Hi {{client_name}}! We hope you love how your home looks. Would you mind leaving us a quick Google review? It helps a lot! hawaiinaturalclean.com/review — Thank you!',active:true,fired:31},
   {id:5,name:'Dormant client reactivation',trigger:'60-dormant',triggerLabel:'Client inactive 60 days',action:'sms-client',actionLabel:'SMS to client',msg:'Hi {{client_name}}! It has been a while. We would love to have you back — we are offering 10% off your next booking this month. Reply to schedule! — Hawaii Natural Clean',active:true,fired:8},
   {id:6,name:'Auto-invoice on completion',trigger:'on-complete',triggerLabel:'Job marked complete',action:'send-invoice',actionLabel:'Send invoice',msg:'Invoice for cleaning services — {{date}}',active:true,fired:38},
-  {id:7,name:'Unpaid invoice reminder',trigger:'invoice-unpaid',triggerLabel:'Invoice unpaid 3 days',action:'sms-client',actionLabel:'SMS to client',msg:'Hi {{client_name}}! Just a reminder your invoice of {{amount}} is still outstanding. You can pay at hawaiinaturalclean.com/pay — Thank you!',active:false,fired:0}
+  {id:7,name:'Unpaid invoice reminder',trigger:'invoice-unpaid',triggerLabel:'Invoice unpaid 3 days',action:'sms-client',actionLabel:'SMS to client',msg:'Hi {{client_name}}! Just a reminder your invoice of {{amount}} is still outstanding. You can pay at hawaiinaturalclean.com/pay — Thank you!',active:false,fired:0},
+  {id:8,name:'Daily jobs summary to cleaners',trigger:'daily-6pm-before',triggerLabel:'Day before at 6:00 PM',action:'sms-cleaner-all',actionLabel:'SMS to each cleaner',msg:'Aloha {{cleaner}}! Here are your jobs for tomorrow:\n\n{{jobs_list}}\n\nReply if you have any questions. See you tomorrow! — Hawaii Natural Clean',active:true,fired:12}
 ];
 
 function renderAutomations(){
@@ -2718,6 +2719,7 @@ function sendCleanerInvites(){
       <div class="form-row"><label>Automation name</label><input type="text" id="na2-name" placeholder="e.g. 24hr appointment reminder"></div>
       <div class="form-row"><label>Trigger</label>
         <select id="na2-trigger">
+          <option value="daily-6pm-before">Day before at 6:00 PM (cleaner summary)</option>
           <option value="24h-before">24 hours before appointment</option>
           <option value="2h-before">2 hours before appointment</option>
           <option value="on-complete">When job marked complete</option>
@@ -2732,6 +2734,7 @@ function sendCleanerInvites(){
           <option value="sms-client">Send SMS to client</option>
           <option value="email-client">Send email to client</option>
           <option value="sms-cleaner">Send SMS to assigned cleaner</option>
+          <option value="sms-cleaner-all">Send SMS to each cleaner (daily summary)</option>
           <option value="send-invoice">Send invoice to client</option>
           <option value="charge-card">Charge card on file</option>
         </select>
@@ -2745,6 +2748,7 @@ function sendCleanerInvites(){
         <button class="tone-btn" onclick="insertVar(this,'{{time}}')">+ Time</button>
         <button class="tone-btn" onclick="insertVar(this,'{{cleaner}}')">+ Cleaner</button>
         <button class="tone-btn" onclick="insertVar(this,'{{amount}}')">+ Amount</button>
+        <button class="tone-btn" onclick="insertVar(this,'{{jobs_list}}')">+ Jobs list</button>
       </div>
       <div class="form-row"><label>Active</label>
         <select id="na2-active"><option value="true">Yes — run this automation</option><option value="false">No — save as draft</option></select>

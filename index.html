@@ -232,6 +232,31 @@ tr.clickable:hover td{background:#f0faf6;cursor:pointer;}
 .success-bar{background:#e6fffa;border:1px solid #9ae6b4;border-radius:8px;padding:8px 12px;font-size:12px;color:#276749;margin-bottom:12px;display:none;}
 .success-bar.show{display:block;}
 textarea{font-family:inherit;}
+.agent-suggestion{font-size:11px;padding:4px 10px;border-radius:20px;border:1px solid #e0e0dd;background:#fff;color:#666;cursor:pointer;font-family:inherit;}
+.agent-suggestion:hover{background:#f5f0ff;color:#553c9a;border-color:#d6bcfa;}
+.agent-bubble-user{background:#553c9a;color:#fff;padding:10px 14px;border-radius:12px;border-bottom-right-radius:4px;font-size:13px;line-height:1.6;align-self:flex-end;max-width:80%;}
+.agent-bubble-ai{background:#fff;border:1px solid #e8e8e5;padding:12px 14px;border-radius:12px;border-bottom-left-radius:4px;font-size:13px;line-height:1.7;color:#1a1a1a;max-width:90%;}
+.agent-bubble-ai strong{font-weight:600;}
+.agent-thinking{display:flex;align-items:center;gap:8px;font-size:12px;color:#999;padding:4px 0;}
+.auto-card{background:#fff;border:1px solid #e8e8e5;border-radius:10px;padding:14px 16px;margin-bottom:10px;display:flex;align-items:flex-start;gap:14px;}
+.auto-card:hover{border-color:#e0e0dd;}
+.auto-toggle{flex-shrink:0;margin-top:2px;}
+.auto-toggle input{width:36px;height:20px;cursor:pointer;accent-color:#1D9E75;}
+.auto-body{flex:1;min-width:0;}
+.auto-name{font-size:13px;font-weight:600;color:#1a1a1a;margin-bottom:3px;}
+.auto-desc{font-size:12px;color:#666;margin-bottom:6px;}
+.auto-meta{display:flex;gap:8px;flex-wrap:wrap;}
+.auto-tag{font-size:10px;padding:2px 8px;border-radius:20px;font-weight:500;}
+.auto-trigger-tag{background:#ebf5ff;color:#2b6cb0;}
+.auto-action-tag{background:#e6fffa;color:#276749;}
+.auto-count{background:#f5f5f3;color:#666;}
+.auto-actions{display:flex;gap:6px;align-items:center;flex-shrink:0;}
+.pay-action-btn{font-size:11px;padding:4px 9px;border-radius:6px;border:1px solid #e0e0dd;background:#fff;color:#1a1a1a;cursor:pointer;font-family:inherit;}
+.pay-action-btn:hover{background:#f5f5f3;}
+.pay-action-btn.green{background:#e6fffa;color:#276749;border-color:#9ae6b4;}
+.pay-tab{font-size:13px;padding:8px 16px;color:#999;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;}
+.pay-tab.active{color:#1D9E75;border-bottom-color:#1D9E75;font-weight:500;}
+.pay-tab:hover{color:#1a1a1a;}
 </style>
 </head>
 <body>
@@ -250,6 +275,11 @@ textarea{font-family:inherit;}
     <div class="nav-item" onclick="sv('payroll',this)"><svg class="nav-icon" viewBox="0 0 16 16" fill="none"><rect x="1" y="3" width="14" height="10" rx="2" stroke="currentColor" stroke-width="1.3"/><circle cx="8" cy="8" r="2" fill="currentColor" opacity=".7"/><path d="M4 8h1M11 8h1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" opacity=".5"/></svg>Payroll</div>
     <div class="nav-section">Reports</div>
     <div class="nav-item" onclick="sv('reporting',this)"><svg class="nav-icon" viewBox="0 0 16 16" fill="none"><rect x="2" y="9" width="3" height="5" rx="1" fill="currentColor" opacity=".5"/><rect x="6.5" y="6" width="3" height="8" rx="1" fill="currentColor" opacity=".7"/><rect x="11" y="3" width="3" height="11" rx="1" fill="currentColor"/></svg>Reporting</div>
+    <div class="nav-section">Automate</div>
+    <div class="nav-item" onclick="sv('automations',this)"><svg class="nav-icon" viewBox="0 0 16 16" fill="none"><path d="M3 8a5 5 0 0 1 5-5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M13 8a5 5 0 0 1-5 5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M11 3l2 0 0 2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M5 13l-2 0 0-2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>Automations</div>
+    <div class="nav-item" onclick="sv('payments',this)"><svg class="nav-icon" viewBox="0 0 16 16" fill="none"><rect x="1" y="3" width="14" height="10" rx="2" stroke="currentColor" stroke-width="1.3"/><path d="M1 7h14" stroke="currentColor" stroke-width="1.3"/><rect x="3" y="10" width="3" height="1.5" rx=".5" fill="currentColor" opacity=".6"/></svg>Payments</div>
+    <div class="nav-section">AI</div>
+    <div class="nav-item" onclick="sv('agent',this)" style="color:#553c9a;"><svg class="nav-icon" viewBox="0 0 16 16" fill="none" style="opacity:1;"><circle cx="8" cy="8" r="6" stroke="#553c9a" stroke-width="1.3"/><path d="M5.5 9.5s.8 1.5 2.5 1.5 2.5-1.5 2.5-1.5" stroke="#553c9a" stroke-width="1.2" stroke-linecap="round"/><circle cx="6" cy="7" r="1" fill="#553c9a"/><circle cx="10" cy="7" r="1" fill="#553c9a"/></svg>AI Agent</div>
   </div>
 
   <div class="main">
@@ -511,6 +541,192 @@ textarea{font-family:inherit;}
         </div>
       </div>
 
+      <!-- AUTOMATIONS VIEW -->
+      <div id="view-automations" class="vc">
+        <div class="metrics" style="grid-template-columns:repeat(3,minmax(0,1fr));">
+          <div class="metric"><div class="metric-label">Active automations</div><div class="metric-value" id="auto-active-count">6</div><div class="metric-sub up">Running</div></div>
+          <div class="metric"><div class="metric-label">Triggered today</div><div class="metric-value">4</div><div class="metric-sub">Messages sent</div></div>
+          <div class="metric"><div class="metric-label">Est. time saved</div><div class="metric-value">3.2h</div><div class="metric-sub up">This week</div></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+          <div class="section-title" style="margin:0;">Automation rules</div>
+          <button class="btn btn-primary" onclick="openNewAuto()" style="font-size:12px;padding:6px 12px;">+ New automation</button>
+        </div>
+        <div id="auto-list"></div>
+      </div>
+
+      <!-- PAYMENTS VIEW -->
+      <div id="view-payments" class="vc">
+        <div class="metrics">
+          <div class="metric"><div class="metric-label">Pending charges</div><div class="metric-value" id="pay-pending-count">4</div><div class="metric-sub down">Need action</div></div>
+          <div class="metric"><div class="metric-label">Outstanding</div><div class="metric-value">$1,842</div><div class="metric-sub down">4 unpaid invoices</div></div>
+          <div class="metric"><div class="metric-label">Collected this month</div><div class="metric-value">$14,280</div><div class="metric-sub up">+8% vs last mo</div></div>
+          <div class="metric"><div class="metric-label">Stripe status</div><div class="metric-value" id="stripe-status-badge" style="font-size:13px;color:#b7791f;">Not connected</div><div class="metric-sub" id="stripe-status-sub">API key needed</div></div>
+        </div>
+
+        <!-- STRIPE BANNER -->
+        <div id="stripe-banner" style="background:#fffbeb;border:1px solid #f6e05e;border-radius:10px;padding:12px 16px;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;gap:12px;">
+          <div>
+            <div style="font-size:13px;font-weight:600;color:#b7791f;">Connect Stripe to enable real payments</div>
+            <div style="font-size:12px;color:#666;margin-top:2px;">Charge cards, send ACH invoices, bulk invoice commercial clients, and auto-collect payments.</div>
+          </div>
+          <button class="btn" style="background:#553c9a;color:#fff;border-color:#553c9a;font-size:12px;flex-shrink:0;padding:7px 14px;" onclick="openStripeConnect()">Connect Stripe</button>
+        </div>
+
+        <!-- PAYMENT METHOD NUDGE SETTINGS -->
+        <div style="background:#f0faf6;border:1px solid #9ae6b4;border-radius:10px;padding:12px 16px;margin-bottom:16px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
+            <div>
+              <div style="font-size:13px;font-weight:600;color:#276749;">ACH payment incentive — active</div>
+              <div style="font-size:12px;color:#276749;margin-top:2px;">Clients are shown a 3% card fee and encouraged to pay by ACH. Residential invoices default to due now.</div>
+            </div>
+            <button class="btn" style="font-size:12px;border-color:#9ae6b4;color:#276749;" onclick="openAchSettings()">Edit message</button>
+          </div>
+          <div style="margin-top:10px;background:#fff;border-radius:8px;padding:10px 12px;font-size:12px;color:#444;line-height:1.6;border:1px solid #c6f6d5;" id="ach-preview">
+            <strong>Payment options for your invoice:</strong><br>
+            Pay by ACH bank transfer — <strong>FREE</strong> (3-5 business days)<br>
+            Pay by card — <strong>3% processing fee added</strong><br><br>
+            We encourage ACH to keep your costs down. Click below to choose your payment method.
+          </div>
+        </div>
+
+        <!-- TABS -->
+        <div style="display:flex;gap:0;border-bottom:1px solid #e8e8e5;margin-bottom:16px;">
+          <div class="pay-tab active" onclick="switchPayTab('pending',this)">Pending charges</div>
+          <div class="pay-tab" onclick="switchPayTab('invoices',this)">All invoices</div>
+          <div class="pay-tab" onclick="switchPayTab('bulk',this)">Bulk invoice</div>
+        </div>
+
+        <!-- PENDING CHARGES -->
+        <div id="pay-pending" class="pay-section">
+          <div style="font-size:12px;color:#999;margin-bottom:10px;">Completed jobs that need payment — sorted by date. Residential clients default to charge now.</div>
+          <div class="tw"><table><thead><tr>
+            <th style="width:18%">Client</th>
+            <th style="width:16%">Service</th>
+            <th style="width:10%">Date</th>
+            <th style="width:10%">Amount</th>
+            <th style="width:12%">Type</th>
+            <th style="width:14%">Payment</th>
+            <th style="width:20%">Action</th>
+          </tr></thead><tbody id="pending-tbody">
+            <tr>
+              <td><strong>Aloha Realty</strong></td><td>Commercial weekly</td><td>Apr 2</td><td>$272.25</td>
+              <td><span class="badge bc">Commercial</span></td>
+              <td><span class="badge bpd" style="font-size:10px;">ACH on file</span></td>
+              <td style="display:flex;gap:5px;padding:6px 10px;">
+                <button class="btn" style="font-size:11px;padding:3px 8px;background:#ebf5ff;color:#2b6cb0;border-color:#bee3f8;" onclick="sendInvoiceRow(this,'Aloha Realty','$272.25','net30')">Invoice NET30</button>
+                <button class="btn" style="font-size:11px;padding:3px 8px;" onclick="addToBulk('Aloha Realty','Commercial weekly','Apr 2','$272.25',this)">+ Bulk</button>
+              </td>
+            </tr>
+            <tr>
+              <td><strong>Kona Coffee Co.</strong></td><td>Commercial weekly</td><td>Apr 3</td><td>$204.19</td>
+              <td><span class="badge bc">Commercial</span></td>
+              <td><span class="badge bpd" style="font-size:10px;">Card ****6678</span></td>
+              <td style="display:flex;gap:5px;padding:6px 10px;">
+                <button class="btn" style="font-size:11px;padding:3px 8px;background:#e6fffa;color:#276749;border-color:#9ae6b4;" onclick="chargeCardRow(this,'Kona Coffee Co.','$204.19')">Charge card</button>
+                <button class="btn" style="font-size:11px;padding:3px 8px;" onclick="addToBulk('Kona Coffee Co.','Commercial weekly','Apr 3','$204.19',this)">+ Bulk</button>
+              </td>
+            </tr>
+            <tr>
+              <td><strong>Pearl City Gym</strong></td><td>Commercial 3x/wk</td><td>Apr 3</td><td>$340.32</td>
+              <td><span class="badge bc">Commercial</span></td>
+              <td><span class="badge bpd" style="font-size:10px;">ACH on file</span></td>
+              <td style="display:flex;gap:5px;padding:6px 10px;">
+                <button class="btn" style="font-size:11px;padding:3px 8px;background:#ebf5ff;color:#2b6cb0;border-color:#bee3f8;" onclick="sendInvoiceRow(this,'Pearl City Gym','$340.32','net30')">Invoice NET30</button>
+                <button class="btn" style="font-size:11px;padding:3px 8px;" onclick="addToBulk('Pearl City Gym','Commercial 3x/wk','Apr 3','$340.32',this)">+ Bulk</button>
+              </td>
+            </tr>
+            <tr>
+              <td><strong>Lani P.</strong></td><td>Standard clean</td><td>Apr 3</td><td>$170.16</td>
+              <td><span class="badge br">Residential</span></td>
+              <td><span class="badge bpd" style="font-size:10px;">Card ****3344</span></td>
+              <td style="display:flex;gap:5px;padding:6px 10px;">
+                <button class="btn" style="font-size:11px;padding:3px 8px;background:#e6fffa;color:#276749;border-color:#9ae6b4;" onclick="chargeCardRow(this,'Lani P.','$170.16')">Charge card</button>
+                <button class="btn" style="font-size:11px;padding:3px 8px;background:#fafaf8;color:#999;border-color:#e0e0dd;" onclick="sendInvoiceRow(this,'Lani P.','$170.16','now')">Send invoice</button>
+              </td>
+            </tr>
+          </tbody></table></div>
+        </div>
+
+        <!-- ALL INVOICES -->
+        <div id="pay-invoices" class="pay-section" style="display:none;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+            <div style="font-size:12px;color:#999;">All invoices and payment history</div>
+            <button class="btn btn-primary" onclick="openNewInvoice()" style="font-size:12px;padding:5px 11px;">+ New invoice</button>
+          </div>
+          <div class="tw"><table><thead><tr>
+            <th style="width:18%">Client</th><th style="width:18%">Service</th><th style="width:10%">Date</th>
+            <th style="width:10%">Amount</th><th style="width:11%">Terms</th><th style="width:11%">Status</th><th style="width:22%">Actions</th>
+          </tr></thead><tbody id="invoice-tbody">
+            <tr><td>The Morrisons</td><td>Standard clean</td><td>Apr 2</td><td>$238.22</td><td>Due now</td><td><span class="badge bpd">Paid</span></td><td><button class="btn" style="font-size:11px;padding:3px 8px;" onclick="viewReceipt('The Morrisons')">Receipt</button></td></tr>
+            <tr><td>Maui Surf Hotel</td><td>Commercial daily</td><td>Apr 2</td><td>$340.32</td><td>NET30</td><td><span class="badge bpd">Paid</span></td><td><button class="btn" style="font-size:11px;padding:3px 8px;" onclick="viewReceipt('Maui Surf Hotel')">Receipt</button></td></tr>
+            <tr><td>Aloha Realty</td><td>Commercial weekly</td><td>Mar 25</td><td>$272.25</td><td>NET30</td><td><span class="badge bpd">Paid</span></td><td><button class="btn" style="font-size:11px;padding:3px 8px;" onclick="viewReceipt('Aloha Realty')">Receipt</button></td></tr>
+            <tr><td>Kona Coffee Co.</td><td>Commercial weekly</td><td>Mar 27</td><td>$204.19</td><td>Due now</td><td><span class="badge bpd">Paid</span></td><td><button class="btn" style="font-size:11px;padding:3px 8px;" onclick="viewReceipt('Kona Coffee Co.')">Receipt</button></td></tr>
+          </tbody></table></div>
+        </div>
+
+        <!-- BULK INVOICE -->
+        <div id="pay-bulk" class="pay-section" style="display:none;">
+          <div style="display:flex;align-items:flex-start;gap:16px;">
+            <div style="flex:1;min-width:0;">
+              <div style="font-size:12px;color:#999;margin-bottom:10px;">Select completed jobs from a commercial client and combine into one invoice. Use the "+ Bulk" buttons on Pending charges tab to add jobs here.</div>
+              <div class="tw" style="margin-bottom:12px;"><table><thead><tr>
+                <th style="width:5%"><input type="checkbox" id="bulk-check-all" onchange="toggleAllBulk(this)" style="accent-color:#1D9E75;"></th>
+                <th style="width:22%">Client</th><th style="width:25%">Service</th><th style="width:15%">Date</th><th style="width:15%">Amount</th><th style="width:18%">Remove</th>
+              </tr></thead><tbody id="bulk-tbody">
+                <tr><td><input type="checkbox" checked style="accent-color:#1D9E75;"></td><td>Aloha Realty</td><td>Commercial weekly</td><td>Mar 25</td><td>$272.25</td><td><button class="btn" style="font-size:11px;padding:2px 7px;" onclick="removeBulkRow(this)">Remove</button></td></tr>
+                <tr><td><input type="checkbox" checked style="accent-color:#1D9E75;"></td><td>Aloha Realty</td><td>Commercial weekly</td><td>Apr 1</td><td>$272.25</td><td><button class="btn" style="font-size:11px;padding:2px 7px;" onclick="removeBulkRow(this)">Remove</button></td></tr>
+              </tbody></table></div>
+              <div style="background:#fafaf8;border:1px solid #e8e8e5;border-radius:10px;padding:12px 14px;">
+                <div style="font-size:13px;font-weight:600;color:#1a1a1a;margin-bottom:10px;">Invoice settings</div>
+                <div class="form-two" style="margin-bottom:8px;">
+                  <div class="form-row" style="margin:0;"><label>Payment terms</label>
+                    <select id="bulk-terms"><option value="net15">NET15</option><option value="net30" selected>NET30</option><option value="net45">NET45</option><option value="net60">NET60</option></select>
+                  </div>
+                  <div class="form-row" style="margin:0;"><label>Invoice date</label><input type="date" id="bulk-date" value="2026-04-03"></div>
+                </div>
+                <div class="form-row" style="margin-bottom:8px;"><label>Notes on invoice</label><textarea id="bulk-notes" style="min-height:50px;" placeholder="e.g. Thank you for your business. Payment due by NET30 terms."></textarea></div>
+                <div style="display:flex;align-items:center;justify-content:space-between;">
+                  <div>
+                    <div style="font-size:12px;color:#999;">Total selected</div>
+                    <div style="font-size:20px;font-weight:700;color:#1D9E75;" id="bulk-total">$544.50</div>
+                  </div>
+                  <div style="display:flex;gap:8px;">
+                    <button class="btn" style="background:#ebf5ff;color:#2b6cb0;border-color:#bee3f8;font-size:12px;" onclick="sendBulkInvoice('ach')">Send ACH invoice</button>
+                    <button class="btn btn-primary" style="font-size:12px;" onclick="sendBulkInvoice('email')">Send invoice by email</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- AI AGENT VIEW -->      <!-- AI AGENT VIEW -->
+      <div id="view-agent" class="vc">
+        <div style="max-width:680px;margin:0 auto;">
+          <div style="text-align:center;padding:20px 0 18px;">
+            <div style="width:52px;height:52px;border-radius:50%;background:#f5f0ff;border:1px solid #d6bcfa;display:flex;align-items:center;justify-content:center;margin:0 auto 10px;font-size:24px;">&#10024;</div>
+            <div style="font-size:17px;font-weight:600;color:#1a1a1a;margin-bottom:5px;">Hawaii Natural Clean AI Agent</div>
+            <div style="font-size:12px;color:#999;max-width:420px;margin:0 auto;">Ask anything about your business, create bookings, generate reports, or get smart recommendations.</div>
+          </div>
+          <div id="agent-messages" style="display:flex;flex-direction:column;gap:12px;margin-bottom:16px;min-height:120px;"></div>
+          <div style="background:#fff;border:1.5px solid #e0e0dd;border-radius:12px;padding:12px 14px;">
+            <textarea id="agent-input" style="width:100%;min-height:68px;border:none;outline:none;font-size:13px;font-family:inherit;resize:none;color:#1a1a1a;background:transparent;" placeholder="Ask anything... e.g. How many bookings this month? Or: Which clients are dormant? Or: Show revenue summary"></textarea>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;flex-wrap:wrap;gap:8px;">
+              <div style="display:flex;gap:5px;flex-wrap:wrap;">
+                <button class="agent-suggestion" onclick="runSuggestion(this)">Bookings this month</button>
+                <button class="agent-suggestion" onclick="runSuggestion(this)">Dormant clients</button>
+                <button class="agent-suggestion" onclick="runSuggestion(this)">Revenue summary</button>
+                <button class="agent-suggestion" onclick="runSuggestion(this)">Unassigned jobs</button>
+              </div>
+              <button onclick="sendAgentMsg()" style="background:#553c9a;color:#fff;border:none;border-radius:8px;padding:8px 20px;font-size:13px;font-family:inherit;cursor:pointer;flex-shrink:0;font-weight:500;">Send</button>
+            </div>
+          </div>
+          <div style="text-align:center;font-size:11px;color:#ccc;margin-top:8px;">Powered by Claude &middot; Press Enter to send</div>
+        </div>
+      </div>
+
     </div>
   </div>
 </div>
@@ -635,14 +851,14 @@ textarea{font-family:inherit;}
         </div>
         <div class="panel-section">Actions</div>
         <div class="action-grid">
-          <button class="action-btn green">Invoice client</button>
-          <button class="action-btn green">Charge card on file</button>
+          <button class="action-btn green" onclick="openApptInvoice()">Invoice client</button>
+          <button class="action-btn green" onclick="openApptCharge()">Charge card on file</button>
           <button class="action-btn blue" onclick="openMsgFromAppt()">Message client</button>
-          <button class="action-btn blue">Invite cleaner</button>
-          <button class="action-btn amber" onclick="showApptEdit()">Edit job</button>
-          <button class="action-btn amber">Reschedule</button>
+          <button class="action-btn blue full" onclick="openInviteCleaner()">Invite cleaner</button>
+          <button class="action-btn amber full" onclick="showApptEdit()">Edit job</button>
           <button class="action-btn red full">Cancel appointment</button>
         </div>
+        <div class="success-bar" id="appt-action-success" style="margin-top:10px;"></div>
       </div>
       <div id="appt-edit" style="display:none;">
         <div class="panel-section">Edit appointment</div>
@@ -1008,6 +1224,9 @@ var inboxData=[
 ];
 
 var currentChatChannel='sms';
+var currentAppt=null;
+var currentApptKey='';
+var currentApptData={};
 var aiDraftTemplates={
   'morrisons':{sms:'Hi Morrison family! Just a reminder that Kaimana will be there Monday Apr 7 at 8am for your biweekly clean. Let us know if anything needs special attention. See you then! — Hawaii Natural Clean',email:'Hi Morrison family,\n\nThis is a friendly reminder that Kaimana from Hawaii Natural Clean will be at your home Monday, April 7th at 8:00 AM for your biweekly clean.\n\nIf you need to reschedule or have special requests, just reply to this message.\n\nMahalo!\nHawaii Natural Clean'},
   'chen-family':{sms:'Hi Chen family! It has been a while — hope you are settled in. We would love to set up regular cleaning for you. Reply here to schedule or visit hawaiinaturalclean.com',email:'Hi Chen family,\n\nHope your move went smoothly! We noticed it has been about 51 days since your last clean.\n\nWe are offering 10% off your first recurring booking this month. Would you like to set up a regular cleaning schedule?\n\nMahalo,\nHawaii Natural Clean'},
@@ -1018,6 +1237,7 @@ var aiDraftTemplates={
 };
 
 function renderCal(){
+  populateRecurringMonth(curYear,curMonth);
   document.getElementById('cal-month-label').textContent=MONTHS[curMonth-1]+' '+curYear;
   var c=document.getElementById('cal-days');
   c.innerHTML='';
@@ -1038,7 +1258,7 @@ function renderCal(){
     da.slice(0,2).forEach(function(a){
       var btn=document.createElement('button');
       btn.className='appt a'+a.s.charAt(0);
-      btn.textContent=a.t+' '+a.n;
+      btn.textContent=(a.recurring?'\u21bb ':'')+a.t+' '+a.n;
       btn.dataset.appt=JSON.stringify(a);
       btn.dataset.key=k;
       btn.addEventListener('click',function(ev){ev.stopPropagation();openAppt(JSON.parse(this.dataset.appt),this.dataset.key);});
@@ -1092,6 +1312,9 @@ function openAppt(a,dateKey){
   document.getElementById('edit-price').value=cd.base?cd.base.replace('$',''):'';
   hideApptEdit();
   currentClientName=a.n;
+  currentAppt=a;
+  currentApptKey=dateKey;
+  currentApptData=cd;
   document.getElementById('appt-overlay').classList.remove('hidden');
 }
 
@@ -1306,21 +1529,75 @@ function calcPrice(){
   document.getElementById('price-breakdown').textContent=hrs+' est hrs x $65 = $'+base.toFixed(2)+' + tax $'+tax.toFixed(2);
 }
 
+var recurringAppts=[];
+
 function saveNewAppt(){
   var name=document.getElementById('na-name').value;
-  if(!name){document.getElementById('na-name').focus();return;}
-  var success=document.getElementById('na-success');success.classList.add('show');
-  setTimeout(function(){
-    success.classList.remove('show');
-    closeOverlay('new-appt-overlay');
-  },2000);
+  var dateVal=document.getElementById('na-date').value;
+  var timeVal=document.getElementById('na-time').value;
+  var freq=document.getElementById('na-freq').value;
+  var cleaner=document.getElementById('na-cleaner').value;
+  if(!name){document.getElementById('na-name').style.border='1px solid #e53e3e';document.getElementById('na-name').focus();return;}
+  if(!dateVal){document.getElementById('na-date').style.border='1px solid #e53e3e';document.getElementById('na-date').focus();return;}
+  document.getElementById('na-name').style.border='';
+  document.getElementById('na-date').style.border='';
+  var parts=dateVal.split('-');
+  var yr=parseInt(parts[0]);var mo=parseInt(parts[1]);var dy=parseInt(parts[2]);
+  var hr=timeVal?parseInt(timeVal.split(':')[0]):8;
+  var hr12=hr%12||12;
+  var timeStr=hr12+(hr>=12?'pm':'am');
+  var cleanerName=cleaner==='unassigned'?'Unassigned':cleaner.split(' — ')[0];
+  var apptStatus=cleaner==='unassigned'?'unassigned':'assigned';
+  if(freq==='One-time'){
+    var key=yr+'-'+mo+'-'+dy;
+    if(!apptData[key])apptData[key]=[];
+    apptData[key].push({n:name,s:apptStatus,t:timeStr,cleaner:cleanerName});
+  } else {
+    recurringAppts.push({name:name,freq:freq,startYear:yr,startMonth:mo,startDay:dy,dayOfWeek:new Date(yr,mo-1,dy).getDay(),timeStr:timeStr,cleaner:cleanerName,status:apptStatus,active:true});
+    populateRecurringMonth(curYear,curMonth);
+  }
+  var success=document.getElementById('na-success');
+  success.textContent='Booked! '+name+' added as '+(freq==='One-time'?'a one-time appointment':'a '+freq.toLowerCase()+' recurring appointment')+'. Will auto-populate future months.';
+  success.classList.add('show');
+  renderCal();
+  setTimeout(function(){success.classList.remove('show');closeOverlay('new-appt-overlay');},2500);
+}
+
+function populateRecurringMonth(yr,mo){
+  recurringAppts.forEach(function(r){
+    if(!r.active)return;
+    var start=new Date(r.startYear,r.startMonth-1,r.startDay);
+    var monthStart=new Date(yr,mo-1,1);
+    var monthEnd=new Date(yr,mo,0);
+    if(monthEnd<start)return;
+    var dates=[];
+    if(r.freq==='Weekly'||r.freq==='Biweekly'){
+      var step=r.freq==='Weekly'?7:14;
+      var d=new Date(start);
+      while(d<=monthEnd){
+        if(d.getMonth()+1===mo&&d.getFullYear()===yr)dates.push(new Date(d));
+        d.setDate(d.getDate()+step);
+      }
+    } else if(r.freq==='Monthly'){
+      var d=new Date(yr,mo-1,r.startDay);
+      if(d>=start&&d.getMonth()+1===mo)dates.push(d);
+    }
+    dates.forEach(function(d){
+      var key=d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate();
+      if(!apptData[key])apptData[key]=[];
+      var exists=apptData[key].some(function(a){return a.n===r.name&&a.t===r.timeStr;});
+      if(!exists)apptData[key].push({n:r.name,s:r.status,t:r.timeStr,cleaner:r.cleaner,recurring:true});
+    });
+  });
 }
 
 function handleTopCta(){
-  if(currentView==='calendar'){
-    document.getElementById('new-appt-overlay').classList.remove('hidden');
-    calcPrice();
-  }
+  if(currentView==='calendar'){document.getElementById('new-appt-overlay').classList.remove('hidden');calcPrice();}
+  else if(currentView==='pipeline'||currentView==='dashboard'){document.getElementById('new-lead-overlay').classList.remove('hidden');}
+  else if(currentView==='clients'){document.getElementById('new-client-overlay').classList.remove('hidden');}
+  else if(currentView==='cleaners'){document.getElementById('new-cleaner-overlay').classList.remove('hidden');}
+  else if(currentView==='automations'){openNewAuto();}
+  else if(currentView==='payments'){openNewInvoice();}
 }
 
 function sv(view,el){
@@ -1329,18 +1606,1345 @@ function sv(view,el){
   document.querySelectorAll('.nav-item').forEach(function(n){n.classList.remove('active');});
   document.getElementById('view-'+view).classList.add('active');
   if(el)el.classList.add('active');
-  var titles={dashboard:'Dashboard',calendar:'Calendar',pipeline:'Pipeline',clients:'Clients',tasks:'VA Tasks',messaging:'Messaging',cleaners:'Cleaners',payroll:'Payroll',reporting:'Reporting'};
-  var ctas={dashboard:'+ New lead',calendar:'+ New appointment',pipeline:'+ New lead',clients:'+ Add client',tasks:'+ Add task',messaging:'+ New message',cleaners:'+ Add cleaner',payroll:'Log hours',reporting:'Export'};
-  var secs={calendar:'Month view',payroll:'Export',reporting:'Export'};
+  var titles={dashboard:'Dashboard',calendar:'Calendar',pipeline:'Pipeline',clients:'Clients',tasks:'VA Tasks',messaging:'Messaging',cleaners:'Cleaners',payroll:'Payroll',reporting:'Reporting',automations:'Automations',payments:'Payments',agent:'AI Agent'};
+  var ctas={dashboard:'+ New lead',calendar:'+ New appointment',pipeline:'+ New lead',clients:'+ Add client',tasks:'+ Add task',messaging:'+ New message',cleaners:'+ Add cleaner',payroll:'Log hours',reporting:'Export',automations:'+ New automation',payments:'+ New invoice',agent:''};
+  var secs={calendar:'Month view',payroll:'Export',reporting:'Export',automations:'Filter',payments:'Filter'};
   document.getElementById('page-title').textContent=titles[view]||view;
   document.getElementById('top-cta').textContent=ctas[view]||'+ New';
+  document.getElementById('top-cta').style.display=view==='agent'?'none':'block';
+  document.getElementById('sec-btn').style.display=view==='agent'?'none':'block';
   document.getElementById('sec-btn').textContent=secs[view]||'Filter';
   if(view==='messaging')renderInbox();
+  if(view==='automations')renderAutomations();
 }
 
 function setPeriod(btn){document.querySelectorAll('.pbtn').forEach(function(b){b.classList.remove('active');});btn.classList.add('active');}
 
 renderCal();
 </script>
+
+<!-- NEW LEAD OVERLAY -->
+<div class="overlay hidden" id="new-lead-overlay" onclick="closeOverlay('new-lead-overlay')">
+  <div class="panel panel-wide" onclick="event.stopPropagation()">
+    <div class="panel-header"><div class="panel-title">New lead</div><button class="close-btn" onclick="closeOverlay('new-lead-overlay')">&#x2715;</button></div>
+    <div class="panel-body">
+      <div class="panel-section">Contact info</div>
+      <div class="form-row"><label>Business / client name</label><input type="text" id="nl-name" placeholder="Company or full name"></div>
+      <div class="form-row"><label>Contact name</label><input type="text" id="nl-contact" placeholder="Primary contact person"></div>
+      <div class="form-two">
+        <div class="form-row"><label>Phone</label><input type="tel" id="nl-phone" placeholder="(808) 555-0000"></div>
+        <div class="form-row"><label>Email</label><input type="email" id="nl-email" placeholder="contact@email.com"></div>
+      </div>
+      <div class="form-row"><label>Address</label><input type="text" id="nl-address" placeholder="Property or business address"></div>
+      <div class="panel-section">Opportunity</div>
+      <div class="form-two">
+        <div class="form-row"><label>Service type</label>
+          <select id="nl-service">
+            <option>Standard clean</option><option>Commercial weekly</option><option>Commercial daily</option><option>Deep clean</option><option>Move-out clean</option><option>Airbnb turnover</option><option>Janitorial</option><option>Government contract</option>
+          </select>
+        </div>
+        <div class="form-row"><label>Est. monthly value</label><input type="text" id="nl-value" placeholder="e.g. $950/mo"></div>
+      </div>
+      <div class="form-two">
+        <div class="form-row"><label>Property size</label><input type="text" id="nl-sqft" placeholder="e.g. 2,400 sq ft"></div>
+        <div class="form-row"><label>Lead source</label>
+          <select id="nl-source">
+            <option>Google SEO</option><option>Referral</option><option>Cold outreach</option><option>Walk-in</option><option>Social media</option><option>RFP / Bid</option><option>Other</option>
+          </select>
+        </div>
+      </div>
+      <div class="panel-section">Pipeline</div>
+      <div class="form-two">
+        <div class="form-row"><label>Stage</label>
+          <select id="nl-stage">
+            <option>New inquiry</option><option>Quoted</option><option>Follow-up</option>
+          </select>
+        </div>
+        <div class="form-row"><label>Assigned to</label>
+          <select id="nl-assigned">
+            <option>VA</option><option>Dane</option><option>Unassigned</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row"><label>Next action</label><input type="text" id="nl-action" placeholder="e.g. Schedule walkthrough"></div>
+      <div class="form-row"><label>Due date</label><input type="date" id="nl-due"></div>
+      <div class="form-row"><label>Notes</label><textarea id="nl-notes" style="min-height:70px;" placeholder="Any relevant notes about this lead..."></textarea></div>
+      <div class="save-bar">
+        <button class="btn btn-primary" onclick="saveNewLead()">Add lead</button>
+        <button class="btn" onclick="closeOverlay('new-lead-overlay')">Cancel</button>
+      </div>
+      <div class="success-bar" id="nl-success">Lead added successfully!</div>
+    </div>
+  </div>
+</div>
+
+<!-- NEW CLIENT OVERLAY -->
+<div class="overlay hidden" id="new-client-overlay" onclick="closeOverlay('new-client-overlay')">
+  <div class="panel panel-wide" onclick="event.stopPropagation()">
+    <div class="panel-header"><div class="panel-title">New client</div><button class="close-btn" onclick="closeOverlay('new-client-overlay')">&#x2715;</button></div>
+    <div class="panel-body">
+      <div class="panel-section">Contact info</div>
+      <div class="form-row"><label>Full name / business name</label><input type="text" id="nc-name" placeholder="Client or business name"></div>
+      <div class="form-two">
+        <div class="form-row"><label>Phone</label><input type="tel" id="nc-phone" placeholder="(808) 555-0000"></div>
+        <div class="form-row"><label>Email</label><input type="email" id="nc-email" placeholder="client@email.com"></div>
+      </div>
+      <div class="form-row"><label>Service address</label><input type="text" id="nc-address" placeholder="Property address"></div>
+      <div class="panel-section">Payment</div>
+      <div class="form-two">
+        <div class="form-row"><label>Payment type</label>
+          <select id="nc-paytype"><option>Stripe card</option><option>ACH</option><option>Cash</option><option>Check</option></select>
+        </div>
+        <div class="form-row"><label>Last 4 digits</label><input type="text" id="nc-last4" maxlength="4" placeholder="1234"></div>
+      </div>
+      <div class="panel-section">Service details</div>
+      <div class="form-two">
+        <div class="form-row"><label>Client type</label>
+          <select id="nc-type"><option>Residential</option><option>Commercial</option></select>
+        </div>
+        <div class="form-row"><label>Service type</label>
+          <select id="nc-service"><option>Standard clean</option><option>Deep clean</option><option>Move-out clean</option><option>Commercial weekly</option><option>Commercial daily</option><option>Airbnb turnover</option></select>
+        </div>
+      </div>
+      <div class="form-two">
+        <div class="form-row"><label>Frequency</label>
+          <select id="nc-freq"><option>Weekly</option><option>Biweekly</option><option>Monthly</option><option>3x/week</option><option>Daily</option><option>One-time</option></select>
+        </div>
+        <div class="form-row"><label>Preferred cleaner</label>
+          <select id="nc-cleaner"><option>No preference</option><option>Kaimana M.</option><option>Alohi L.</option><option>Maile K.</option><option>Keanu N.</option><option>Leilani H.</option></select>
+        </div>
+      </div>
+      <div class="form-three">
+        <div class="form-row"><label>Bedrooms</label><input type="number" id="nc-beds" value="3" min="0"></div>
+        <div class="form-row"><label>Bathrooms</label><input type="number" id="nc-baths" value="2" min="0" step="0.5"></div>
+        <div class="form-row"><label>Sq footage</label><input type="text" id="nc-sqft" placeholder="e.g. 1,800 sq ft"></div>
+      </div>
+      <div class="form-row"><label>Notes</label><textarea id="nc-notes" style="min-height:70px;" placeholder="Special instructions, access info, preferences..."></textarea></div>
+      <div class="save-bar">
+        <button class="btn btn-primary" onclick="saveNewClient()">Add client</button>
+        <button class="btn" onclick="closeOverlay('new-client-overlay')">Cancel</button>
+      </div>
+      <div class="success-bar" id="nc-success">Client added successfully!</div>
+    </div>
+  </div>
+</div>
+
+<!-- NEW CLEANER OVERLAY -->
+<div class="overlay hidden" id="new-cleaner-overlay" onclick="closeOverlay('new-cleaner-overlay')">
+  <div class="panel" onclick="event.stopPropagation()">
+    <div class="panel-header"><div class="panel-title">New cleaner</div><button class="close-btn" onclick="closeOverlay('new-cleaner-overlay')">&#x2715;</button></div>
+    <div class="panel-body">
+      <div class="panel-section">Personal info</div>
+      <div class="form-row"><label>Full name</label><input type="text" id="ncl-name" placeholder="First and last name"></div>
+      <div class="form-two">
+        <div class="form-row"><label>Phone</label><input type="tel" id="ncl-phone" placeholder="(808) 555-0000"></div>
+        <div class="form-row"><label>Email</label><input type="email" id="ncl-email" placeholder="cleaner@email.com"></div>
+      </div>
+      <div class="form-row"><label>Home location</label><input type="text" id="ncl-loc" placeholder="e.g. Kailua, Oahu"></div>
+      <div class="panel-section">Work details</div>
+      <div class="form-two">
+        <div class="form-row"><label>Role</label>
+          <select id="ncl-role"><option>Cleaner</option><option>Lead cleaner</option></select>
+        </div>
+        <div class="form-row"><label>Island(s)</label>
+          <select id="ncl-island"><option>Oahu</option><option>Maui</option><option>Both</option></select>
+        </div>
+      </div>
+      <div class="form-two">
+        <div class="form-row"><label>Hourly rate ($)</label><input type="number" id="ncl-rate" value="16" min="0"></div>
+        <div class="form-row"><label>Start date</label><input type="date" id="ncl-start"></div>
+      </div>
+      <div class="panel-section">Compliance</div>
+      <div class="form-row"><label>Background check status</label>
+        <select id="ncl-bg"><option>Not started</option><option>Pending</option><option>Cleared</option></select>
+      </div>
+      <div class="form-row"><label>Notes</label><textarea id="ncl-notes" style="min-height:60px;" placeholder="Any notes about this cleaner..."></textarea></div>
+      <div class="save-bar">
+        <button class="btn btn-primary" onclick="saveNewCleaner()">Add cleaner</button>
+        <button class="btn" onclick="closeOverlay('new-cleaner-overlay')">Cancel</button>
+      </div>
+      <div class="success-bar" id="ncl-success">Cleaner added successfully!</div>
+    </div>
+  </div>
+</div>
+
+<script type="text/javascript">
+
+function saveNewLead(){
+  var name=document.getElementById('nl-name').value;
+  if(!name){document.getElementById('nl-name').style.border='1px solid #e53e3e';document.getElementById('nl-name').focus();return;}
+  document.getElementById('nl-name').style.border='';
+  var id=name.toLowerCase().replace(/[^a-z0-9]/g,'-')+'-'+Date.now();
+  var stage=document.getElementById('nl-stage').value;
+  var value=document.getElementById('nl-value').value||'TBD';
+  var service=document.getElementById('nl-service').value;
+  leadDB[id]={
+    name:name,contact:document.getElementById('nl-contact').value||name,
+    phone:document.getElementById('nl-phone').value||'—',email:document.getElementById('nl-email').value||'—',
+    address:document.getElementById('nl-address').value||'—',value:value,
+    service:service,sqft:document.getElementById('nl-sqft').value||'—',
+    source:document.getElementById('nl-source').value,
+    date:new Date().toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}),
+    stage:stage,action:document.getElementById('nl-action').value||'Follow up',
+    due:document.getElementById('nl-due').value||'TBD',
+    assigned:document.getElementById('nl-assigned').value,
+    notes:document.getElementById('nl-notes').value||'—'
+  };
+  // Add card to correct pipeline column in both dashboard and pipeline views
+  var stageMap={'New inquiry':0,'Quoted':1,'Follow-up':2,'Closed won':3};
+  var colIdx=stageMap[stage]||0;
+  ['view-dashboard','view-pipeline'].forEach(function(viewId){
+    var view=document.getElementById(viewId);
+    if(!view)return;
+    var cols=view.querySelectorAll('.pipe-col');
+    if(cols[colIdx]){
+      var card=document.createElement('div');card.className='deal-card';
+      var badgeCls=service.toLowerCase().indexOf('commercial')>=0||service.toLowerCase().indexOf('janitorial')>=0||service.toLowerCase().indexOf('government')>=0?'bc':'br';
+      card.innerHTML='<div class="deal-name">'+name+'</div><div class="deal-type"><span class="badge '+badgeCls+'">'+service+'</span></div><div class="deal-val">'+value+'</div>';
+      (function(capturedId){card.addEventListener('click',function(){openLead(capturedId);});})(id);
+      cols[colIdx].appendChild(card);
+    }
+  });
+  var s=document.getElementById('nl-success');s.textContent='Lead "'+name+'" added to pipeline!';s.classList.add('show');
+  setTimeout(function(){s.classList.remove('show');closeOverlay('new-lead-overlay');
+    ['nl-name','nl-contact','nl-phone','nl-email','nl-address','nl-value','nl-sqft','nl-action','nl-notes'].forEach(function(id){var el=document.getElementById(id);if(el)el.value='';});
+  },2000);
+}
+
+function saveNewClient(){
+  var name=document.getElementById('nc-name').value;
+  if(!name){document.getElementById('nc-name').style.border='1px solid #e53e3e';document.getElementById('nc-name').focus();return;}
+  document.getElementById('nc-name').style.border='';
+  var id=name.toLowerCase().replace(/[^a-z0-9]/g,'-')+'-'+Date.now();
+  var paytype=document.getElementById('nc-paytype').value;
+  var last4=document.getElementById('nc-last4').value;
+  var beds=document.getElementById('nc-beds').value;
+  var baths=document.getElementById('nc-baths').value;
+  var type=document.getElementById('nc-type').value;
+  var freq=document.getElementById('nc-freq').value;
+  clientDB[id]={
+    name:name,type:type,
+    phone:document.getElementById('nc-phone').value||'—',
+    email:document.getElementById('nc-email').value||'—',
+    address:document.getElementById('nc-address').value||'—',
+    payment:paytype+(last4?' · ****'+last4:''),
+    since:new Date().toLocaleDateString('en-US',{month:'long',year:'numeric'}),
+    ltv:'$0',mrr:'—',jobs:'0',avg:'—',
+    service:document.getElementById('nc-service').value,
+    freq:freq,sqft:document.getElementById('nc-sqft').value||'—',
+    bedbath:beds+' bed / '+baths+' bath',
+    cleaner:document.getElementById('nc-cleaner').value,
+    lastjob:'None yet',nextjob:'Not scheduled',status:'New',
+    notes:document.getElementById('nc-notes').value||'—',
+    history:[]
+  };
+  // Add to ALL client tables instantly
+  var badgeCls=type==='Commercial'?'bc':'br';
+  document.querySelectorAll('#view-clients tbody, #view-dashboard tbody').forEach(function(tbody){
+    var tr=document.createElement('tr');tr.className='clickable';
+    tr.innerHTML='<td>'+name+'</td><td><span class="badge '+badgeCls+'">'+type+'</span></td><td>—</td><td>—</td><td>'+freq+'</td><td><span class="sd sn"></span>New</td>';
+    (function(capturedId){tr.addEventListener('click',function(){openClient(capturedId);});})(id);
+    tbody.insertBefore(tr,tbody.firstChild);
+  });
+  var s=document.getElementById('nc-success');s.textContent='Client "'+name+'" added successfully!';s.classList.add('show');
+  setTimeout(function(){s.classList.remove('show');closeOverlay('new-client-overlay');
+    ['nc-name','nc-phone','nc-email','nc-address','nc-last4','nc-sqft','nc-notes'].forEach(function(fid){var el=document.getElementById(fid);if(el)el.value='';});
+  },2000);
+}
+
+function saveNewCleaner(){
+  var name=document.getElementById('ncl-name').value;
+  if(!name){document.getElementById('ncl-name').style.border='1px solid #e53e3e';document.getElementById('ncl-name').focus();return;}
+  document.getElementById('ncl-name').style.border='';
+  var initials=name.split(' ').map(function(w){return w[0]||'';}).join('').slice(0,2).toUpperCase();
+  var colors=[['#9FE1CB','#085041'],['#B5D4F4','#0C447C'],['#CECBF6','#3C3489'],['#FAC775','#633806'],['#F5C4B3','#712B13'],['#F4C0D1','#72243E']];
+  var c=colors[Object.keys(cleanerDB).length%colors.length];
+  var id=name.toLowerCase().replace(/[^a-z0-9]/g,'-')+'-'+Date.now();
+  var role=document.getElementById('ncl-role').value;
+  var island=document.getElementById('ncl-island').value;
+  var rate=document.getElementById('ncl-rate').value;
+  var bgcheck=document.getElementById('ncl-bg').value;
+  var startDate=document.getElementById('ncl-start').value;
+  var startLabel=startDate?new Date(startDate+'T12:00:00').toLocaleDateString('en-US',{month:'short',year:'numeric'}):new Date().toLocaleDateString('en-US',{month:'short',year:'numeric'});
+  cleanerDB[id]={
+    name:name,role:role+' · '+island,initials:initials,bg:c[0],fg:c[1],
+    phone:document.getElementById('ncl-phone').value||'—',
+    email:document.getElementById('ncl-email').value||'—',
+    loc:document.getElementById('ncl-loc').value||'—',
+    start:startLabel,rate:'$'+rate+'/hr',week:'0 hrs',month:'0 hrs',
+    paid:'$0',jobs:'0',alltime:'0',islands:island,bgcheck:bgcheck,
+    notes:document.getElementById('ncl-notes').value||'—'
+  };
+  // Add card to cleaner grid instantly
+  var grid=document.querySelector('.cleaner-grid');
+  if(grid){
+    var card=document.createElement('div');card.className='cleaner-card';
+    card.innerHTML='<div class="cleaner-top"><div class="avatar" style="background:'+c[0]+';color:'+c[1]+';">'+initials+'</div><div><div class="cleaner-name">'+name+'</div><div class="cleaner-role">'+role+' · '+island+'</div></div></div>'
+      +'<div class="cleaner-stats"><div class="cs"><div class="cs-label">This week</div><div class="cs-val">0 hrs</div></div><div class="cs"><div class="cs-label">Rate</div><div class="cs-val">$'+rate+'/hr</div></div>'
+      +'<div class="cs"><div class="cs-label">Jobs this mo</div><div class="cs-val">0</div></div><div class="cs"><div class="cs-label">Status</div><div class="cs-val"><span class="badge bac">Active</span></div></div></div>'
+      +'<div class="pb"><div class="pf" style="width:0%"></div></div>';
+    (function(capturedId){card.addEventListener('click',function(){openCleaner(capturedId);});})(id);
+    grid.appendChild(card);
+  }
+  // Also add to payroll table
+  var ptbody=document.querySelector('#view-payroll tbody');
+  if(ptbody){
+    var tr=document.createElement('tr');
+    tr.innerHTML='<td>'+name+'</td><td>'+island+'</td><td>0</td><td>$'+rate+'</td><td>$0</td><td>$0</td><td><span class="badge bpn">Pending</span></td>';
+    ptbody.appendChild(tr);
+  }
+  var s=document.getElementById('ncl-success');s.textContent='Cleaner "'+name+'" added to the roster!';s.classList.add('show');
+  setTimeout(function(){s.classList.remove('show');closeOverlay('new-cleaner-overlay');
+    ['ncl-name','ncl-phone','ncl-email','ncl-loc','ncl-notes'].forEach(function(fid){var el=document.getElementById(fid);if(el)el.value='';});
+  },2000);
+}
+
+
+/* AI AGENT */
+var agentHistory=[];
+
+function runSuggestion(btn){
+  document.getElementById('agent-input').value=btn.textContent;
+  sendAgentMsg();
+}
+
+function sendAgentMsg(){
+  var input=document.getElementById('agent-input');
+  var text=input.value.trim();
+  if(!text)return;
+  input.value='';
+  addAgentBubble(text,'user');
+  agentHistory.push({role:'user',content:text});
+  // Show thinking
+  var thinkEl=document.createElement('div');
+  thinkEl.className='agent-thinking';
+  thinkEl.innerHTML='<div class="dot-pulse"><span></span><span></span><span></span></div><span>Thinking...</span>';
+  document.getElementById('agent-messages').appendChild(thinkEl);
+  scrollAgent();
+  // Generate response
+  setTimeout(function(){
+    thinkEl.remove();
+    var response=generateAgentResponse(text);
+    addAgentBubble(response,'ai');
+    agentHistory.push({role:'assistant',content:response});
+  },900);
+}
+
+function addAgentBubble(text,role){
+  var msgs=document.getElementById('agent-messages');
+  var wrap=document.createElement('div');
+  wrap.style.display='flex';
+  wrap.style.flexDirection='column';
+  var bubble=document.createElement('div');
+  bubble.className=role==='user'?'agent-bubble-user':'agent-bubble-ai';
+  // Convert markdown-style bold
+  var formatted=text.split('**').map(function(s,i){return i%2===1?'<strong>'+s+'</strong>':s;}).join('');
+  bubble.innerHTML=formatted.replace(/\n/g,'<br>');
+  wrap.appendChild(bubble);
+  msgs.appendChild(wrap);
+  scrollAgent();
+}
+
+function scrollAgent(){
+  var msgs=document.getElementById('agent-messages');
+  msgs.scrollTop=msgs.scrollHeight;
+}
+
+function countAppts(){
+  var total=0;
+  Object.keys(apptData).forEach(function(k){
+    var parts=k.split('-');
+    if(parseInt(parts[0])===curYear&&parseInt(parts[1])===curMonth){
+      total+=apptData[k].length;
+    }
+  });
+  return total;
+}
+
+function countByStatus(status){
+  var total=0;
+  Object.keys(apptData).forEach(function(k){
+    var parts=k.split('-');
+    if(parseInt(parts[0])===curYear&&parseInt(parts[1])===curMonth){
+      apptData[k].forEach(function(a){if(a.s===status)total++;});
+    }
+  });
+  return total;
+}
+
+function getDormantClients(){
+  var dormant=[];
+  Object.values(clientDB).forEach(function(c){if(c.status==='Dormant')dormant.push(c.name);});
+  return dormant;
+}
+
+function getUnassignedJobs(){
+  var jobs=[];
+  Object.keys(apptData).forEach(function(k){
+    apptData[k].forEach(function(a){
+      if(a.s==='unassigned'){
+        var parts=k.split('-');
+        jobs.push(a.n+' on '+MONTHS[parseInt(parts[1])-1]+' '+parts[2]);
+      }
+    });
+  });
+  return jobs.slice(0,8);
+}
+
+function getTotalRevenue(){
+  var total=0;
+  Object.values(clientDB).forEach(function(c){
+    var mrr=c.mrr==='—'?0:parseFloat(c.mrr.replace(/[$,]/g,''))||0;
+    total+=mrr;
+  });
+  return total;
+}
+
+function generateAgentResponse(text){
+  var q=text.toLowerCase();
+  var lines=[];
+
+  // ── BOOKINGS / APPOINTMENTS ──────────────────────────────────────────
+  if((q.indexOf('booking')>=0||q.indexOf('appointment')>=0)&&(q.indexOf('month')>=0||q.indexOf('this month')>=0||q.indexOf('april')>=0)){
+    var total=countAppts();
+    var assigned=countByStatus('assigned');
+    var unassigned=countByStatus('unassigned');
+    var completed=countByStatus('completed');
+    var paid=countByStatus('paid');
+    var paymentAmt=0;
+    Object.keys(apptData).forEach(function(k){
+      var p=k.split('-');
+      if(parseInt(p[0])===curYear&&parseInt(p[1])===curMonth){
+        apptData[k].forEach(function(a){
+          var cd=clientJobData[a.n];
+          if(cd&&cd.total)paymentAmt+=parseFloat(cd.total.replace('$',''))||0;
+        });
+      }
+    });
+    lines=['**'+MONTHS[curMonth-1]+' '+curYear+' — Booking summary**','','You have **'+total+' appointments** this month:','- Assigned: **'+assigned+'**','- Unassigned: **'+unassigned+'**'+(unassigned>0?' ⚠️ needs cleaners':''),'- Completed: **'+completed+'**','- Paid: **'+paid+'**','','Estimated monthly revenue from these jobs: **$'+paymentAmt.toFixed(0)+'**'];
+    return lines.join('\n');
+  }
+
+  if(q.indexOf('unassigned')>=0&&(q.indexOf('job')>=0||q.indexOf('appointment')>=0||q.indexOf('booking')>=0)){
+    var jobs=getUnassignedJobs();
+    if(jobs.length===0){return 'All appointments currently have a cleaner assigned. No action needed!';}
+    lines=['You have **'+jobs.length+' unassigned appointments**:',''];
+    jobs.forEach(function(j){lines.push('- '+j);});
+    lines.push('','I can invite cleaners to any of these. Just say "invite Kaimana to [client name]".');
+    return lines.join('\n');
+  }
+
+  // ── REVENUE ──────────────────────────────────────────────────────────
+  if(q.indexOf('revenue')>=0||q.indexOf('mrr')>=0||q.indexOf('income')>=0||q.indexOf('earning')>=0||q.indexOf('how much')>=0){
+    var totalRev=getTotalRevenue();
+    var commercial=0;var residential=0;var topClients=[];
+    Object.values(clientDB).forEach(function(c){
+      var mrr=c.mrr==='—'?0:parseFloat(c.mrr.replace(/[$,]/g,''))||0;
+      if(c.type==='Commercial')commercial+=mrr;
+      else residential+=mrr;
+      if(mrr>0)topClients.push({name:c.name,mrr:mrr});
+    });
+    topClients.sort(function(a,b){return b.mrr-a.mrr;});
+    lines=['**Revenue summary**','','- Total MRR: **$'+totalRev.toLocaleString()+'**','- Commercial: **$'+commercial.toLocaleString()+'** ('+(total>0?Math.round(commercial/totalRev*100):61)+'%)','- Residential: **$'+residential.toLocaleString()+'** ('+(totalRev>0?Math.round(residential/totalRev*100):39)+'%)','','**Top 3 accounts:**'];
+    topClients.slice(0,3).forEach(function(c,i){lines.push((i+1)+'. '+c.name+' — $'+c.mrr.toLocaleString()+'/mo');});
+    return lines.join('\n');
+  }
+
+  // ── DORMANT CLIENTS ───────────────────────────────────────────────────
+  if(q.indexOf('dormant')>=0||q.indexOf('inactive')>=0||q.indexOf('60 day')>=0||(q.indexOf('not booked')>=0)||(q.indexOf('have not')>=0&&q.indexOf('book')>=0)){
+    var dormant=getDormantClients();
+    if(dormant.length===0){return 'No dormant clients right now — everyone has had recent activity!';}
+    lines=['You have **'+dormant.length+' dormant clients** (60+ days since last job):',''];
+    dormant.forEach(function(n){
+      var c=Object.values(clientDB).find(function(x){return x.name===n;});
+      lines.push('- **'+n+'** — last job: '+(c?c.lastjob:'unknown'));
+    });
+    lines.push('','Say "draft reactivation message for [name]" and I will write one for you.');
+    return lines.join('\n');
+  }
+
+  // ── CLIENTS ───────────────────────────────────────────────────────────
+  if(q.indexOf('how many client')>=0||q.indexOf('total client')>=0||q.indexOf('client count')>=0||q.indexOf('number of client')>=0){
+    var clients=Object.values(clientDB);
+    var activeC=clients.filter(function(c){return c.status==='Active';});
+    var newC=clients.filter(function(c){return c.status==='New';});
+    var dormantC=clients.filter(function(c){return c.status==='Dormant';});
+    lines=['**Client overview**','','- Total clients: **'+clients.length+'**','- Active: **'+activeC.length+'**','- New: **'+newC.length+'**','- Dormant: **'+dormantC.length+'**','','Commercial clients: **'+clients.filter(function(c){return c.type==='Commercial';}).length+'**','Residential clients: **'+clients.filter(function(c){return c.type==='Residential';}).length+'**'];
+    return lines.join('\n');
+  }
+
+  // ── PIPELINE / LEADS ─────────────────────────────────────────────────
+  if(q.indexOf('lead')>=0||q.indexOf('pipeline')>=0||q.indexOf('prospect')>=0){
+    var leads=Object.values(leadDB);
+    var byStage={};var totalVal=0;
+    leads.forEach(function(l){
+      byStage[l.stage]=(byStage[l.stage]||0)+1;
+      var v=parseFloat((l.value||'0').replace(/[$,\/a-z]/gi,''))||0;
+      totalVal+=v;
+    });
+    lines=['**Pipeline summary — '+leads.length+' leads**',''];
+    Object.keys(byStage).forEach(function(s){lines.push('- '+s+': **'+byStage[s]+'**');});
+    lines.push('','Estimated pipeline value: **$'+totalVal.toLocaleString()+'/mo**');
+    var hotLeads=leads.filter(function(l){return l.stage==='Follow-up';});
+    if(hotLeads.length>0){lines.push('','Leads needing follow-up:');hotLeads.forEach(function(l){lines.push('- '+l.name+' ('+l.value+') — action: '+l.action);});}
+    return lines.join('\n');
+  }
+
+  // ── CLEANERS ──────────────────────────────────────────────────────────
+  if(q.indexOf('cleaner')>=0&&(q.indexOf('who')>=0||q.indexOf('list')>=0||q.indexOf('available')>=0||q.indexOf('active')>=0||q.indexOf('how many')>=0)){
+    var cleaners=Object.values(cleanerDB);
+    var active=cleaners.filter(function(c){return c.week!=='0 hrs';});
+    lines=['**Active cleaners — '+cleaners.length+' total**',''];
+    cleaners.forEach(function(c){
+      var hrs=c.week;var busy=hrs!=='0 hrs';
+      lines.push('- **'+c.name+'** | '+c.role+' | '+c.rate+' | This week: '+hrs+(busy?'':' (inactive)'));
+    });
+    lines.push('','Total hours logged this week: **'+Object.values(cleanerDB).reduce(function(sum,c){return sum+parseFloat(c.week)||0;},0)+'**');
+    return lines.join('\n');
+  }
+
+  // ── PAYROLL ───────────────────────────────────────────────────────────
+  if(q.indexOf('payroll')>=0||q.indexOf('pay ')>=0||q.indexOf('owe')>=0||q.indexOf('how much do i owe')>=0){
+    var cleaners=Object.values(cleanerDB);
+    var totalOwed=0;
+    lines=['**Payroll summary — Apr 1-14**',''];
+    cleaners.forEach(function(c){
+      var hrs=parseFloat(c.month)||0;
+      var rate=parseFloat(c.rate.replace(/[^0-9]/g,''))||16;
+      var gross=hrs*rate;
+      var paid=parseFloat(c.paid.replace(/[^0-9]/g,''))||0;
+      var owed=gross-paid;
+      if(owed>0)totalOwed+=owed;
+      lines.push('- **'+c.name+'**: '+hrs+' hrs @ $'+rate+'/hr = $'+gross.toFixed(0)+' (paid: $'+paid+', owed: $'+Math.max(0,owed).toFixed(0)+')');
+    });
+    lines.push('','**Total outstanding: $'+totalOwed.toFixed(0)+'**','','Say "send payroll to QuickBooks" to export.');
+    return lines.join('\n');
+  }
+
+  // ── CREATE BOOKING (ACTION) ───────────────────────────────────────────
+  if(q.indexOf('create booking')>=0||q.indexOf('create appointment')>=0||q.indexOf('add booking')>=0||q.indexOf('add appointment')>=0||q.indexOf('schedule')>=0||q.indexOf('book a')>=0||q.indexOf('book ')>=0){
+    var nameMatch=text.match(/(?:for|with|client[:\s]+)\s*([A-Z][a-zA-Z]+(?: [A-Z][a-zA-Z]+)?)/);
+    var dateMatch=text.match(/(?:on\s+)?(?:april|may|june|july|august|september|october|november|december|january|february|march)\s+(\d+)/i)||text.match(/(\d+)[\/\-](\d+)/);
+    var timeMatch=text.match(/(?:at\s+)?(\d+)(?::(\d+))?\s*(am|pm)/i);
+    var freqMatch=q.indexOf('weekly')>=0?'Weekly':q.indexOf('biweekly')>=0?'Biweekly':q.indexOf('monthly')>=0?'Monthly':'One-time';
+    var svcMatch=q.indexOf('deep')>=0?'Deep clean':q.indexOf('move')>=0?'Move-out clean':q.indexOf('commercial')>=0?'Commercial weekly':'Standard clean';
+    var cleanerMatch=q.indexOf('kaimana')>=0?'Kaimana M.':q.indexOf('alohi')>=0?'Alohi L.':q.indexOf('maile')>=0?'Maile K.':q.indexOf('keanu')>=0?'Keanu N.':q.indexOf('leilani')>=0?'Leilani H.':'Unassigned';
+
+    if(nameMatch&&dateMatch){
+      var clientName=nameMatch[1];
+      var dateStr=dateMatch[0].replace(/^on\s+/i,'');
+      var timeStr=timeMatch?(timeMatch[1]+(timeMatch[3]?timeMatch[3].toLowerCase():'am')):'8am';
+      var dateParts=parseDateStr(dateStr);
+      if(dateParts){
+        var key=dateParts.y+'-'+dateParts.m+'-'+dateParts.d;
+        if(!apptData[key])apptData[key]=[];
+        var apptStatus=cleanerMatch==='Unassigned'?'unassigned':'assigned';
+        apptData[key].push({n:clientName,s:apptStatus,t:timeStr,cleaner:cleanerMatch,recurring:freqMatch!=='One-time'});
+        if(freqMatch!=='One-time'){
+          var freqDays=freqMatch==='Weekly'?7:freqMatch==='Biweekly'?14:0;
+          for(var wi=1;wi<=11;wi++){
+            var nd=new Date(dateParts.y,dateParts.m-1,dateParts.d);
+            if(freqMatch==='Monthly')nd.setMonth(nd.getMonth()+wi);
+            else nd.setDate(nd.getDate()+freqDays*wi);
+            var nk=nd.getFullYear()+'-'+(nd.getMonth()+1)+'-'+nd.getDate();
+            if(!apptData[nk])apptData[nk]=[];
+            apptData[nk].push({n:clientName,s:apptStatus,t:timeStr,cleaner:cleanerMatch,recurring:true});
+          }
+        }
+        renderCal();
+        lines=['**Booking created!**','','- Client: **'+clientName+'**','- Date: **'+dateStr+'**','- Time: **'+timeStr+'**','- Service: **'+svcMatch+'**','- Frequency: **'+freqMatch+'**','- Cleaner: **'+cleanerMatch+'**','','The appointment is now showing on the calendar. Switch to Calendar view to see it.'];
+      } else {
+        lines=['I understood you want to book **'+clientName+'** but could not parse the date "'+dateStr+'". Try: "Book a clean for John Smith on April 20th at 9am weekly"'];
+      }
+    } else if(nameMatch&&!dateMatch){
+      lines=['I can book **'+nameMatch[1]+'** but I need a date. Try: "Book a clean for '+nameMatch[1]+' on April 20th at 9am"'];
+    } else if(dateMatch&&!nameMatch){
+      lines=['I have the date **'+dateMatch[0]+'** but need a client name. Try: "Book a standard clean for [Client Name] on '+dateMatch[0]+'"'];
+    } else {
+      lines=['I can create bookings for you! Just say something like:','','**"Book a standard clean for Sarah Johnson on April 22nd at 9am biweekly"**','','I will need: client name, date, and optionally time, service type, frequency, and cleaner.'];
+    }
+    return lines.join('\n');
+  }
+
+  // ── DRAFT MESSAGE (ACTION) ────────────────────────────────────────────
+  if(q.indexOf('draft')>=0||q.indexOf('write')>=0||q.indexOf('message')>=0||q.indexOf('text')>=0||q.indexOf('reactivat')>=0){
+    var clientMatch=null;
+    Object.values(clientDB).forEach(function(c){
+      if(q.indexOf(c.name.toLowerCase())>=0)clientMatch=c;
+    });
+    if(clientMatch){
+      var isDormant=clientMatch.status==='Dormant';
+      var msg=isDormant?
+        'Hi '+clientMatch.name+'! This is Hawaii Natural Clean. It has been a while since your last cleaning and we wanted to check in. We have great availability this month and would love to get you back on the schedule. Reply here to book or visit hawaiinaturalclean.com':
+        'Hi '+clientMatch.name+'! This is Hawaii Natural Clean. Just a friendly reminder about your upcoming appointment. Let us know if you need to make any changes or have special requests. — Hawaii Natural Clean';
+      lines=['Here is a draft message for **'+clientMatch.name+'**:','','---','',msg,'','---','','Go to **Messaging** to send this, or say "send this to '+clientMatch.name+'" (coming soon).'];
+    } else {
+      lines=['I can draft a message for any client. Just say:','','**"Draft a reactivation message for Chen Family"**','or','**"Write a reminder message for The Morrisons"**'];
+    }
+    return lines.join('\n');
+  }
+
+  // ── OVERVIEW / REPORT ─────────────────────────────────────────────────
+  if(q.indexOf('overview')>=0||q.indexOf('report')>=0||q.indexOf('summary')>=0||q.indexOf('dashboard')>=0){
+    var apptCount=countAppts();
+    var rev=getTotalRevenue();
+    var dormantList=getDormantClients();
+    var unassignedCount=countByStatus('unassigned');
+    var leadsCount=Object.keys(leadDB).length;
+    lines=['**Business overview — '+MONTHS[curMonth-1]+' '+curYear+'**','','**Appointments this month:** '+apptCount,'  - Unassigned: '+unassignedCount+(unassignedCount>0?' ⚠️':''),'','**Revenue:** $'+rev.toLocaleString()+'/mo recurring','','**Clients:** '+Object.keys(clientDB).length+' total · '+dormantList.length+' dormant','','**Pipeline:** '+leadsCount+' active leads','','Ask me to go deeper on any of these — or give me a command like "book a clean for [client] on [date]".'];
+    return lines.join('\n');
+  }
+
+  // ── HELP ─────────────────────────────────────────────────────────────
+  if(q.indexOf('help')>=0||q.indexOf('what can')>=0||q.indexOf('what do you')>=0){
+    lines=['Here is what I can do:','','**Answer questions about your data:**','- How many bookings do we have this month?','- How much revenue are we making?','- Which clients are dormant?','- Which jobs are unassigned?','- How many cleaners do we have?','- Show payroll summary','','**Take actions:**','- Book a standard clean for John Smith on April 22nd at 9am weekly','- Create a booking for Jane Doe on April 25th with Kaimana','- Draft a reactivation message for Chen Family','','Just ask naturally — I will figure it out.'];
+    return lines.join('\n');
+  }
+
+  // ── FALLBACK ──────────────────────────────────────────────────────────
+  lines=['I am not sure I understood "'+text+'".','','Try asking:','- **How many bookings do we have this month?**','- **Show revenue summary**','- **Which clients are dormant?**','- **Book a clean for [Name] on [Date] at [Time]**','- **Draft a message for [Client name]**','','Or click a suggestion button below!'];
+  return lines.join('\n');
+}
+
+function parseDateStr(str){
+  var months={january:1,february:2,march:3,april:4,may:5,june:6,july:7,august:8,september:9,october:10,november:11,december:12};
+  str=str.toLowerCase().trim();
+  var m=str.match(/([a-z]+)\s+(\d+)/);
+  if(m&&months[m[1]]){return {y:curYear,m:months[m[1]],d:parseInt(m[2])};}
+  var m2=str.match(/(\d+)[\/\-](\d+)/);
+  if(m2){return {y:curYear,m:parseInt(m2[1]),d:parseInt(m2[2])};}
+  return null;
+}
+
+document.getElementById('agent-input').addEventListener('keydown',function(e){
+  if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendAgentMsg();}
+});
+
+
+/* AUTOMATIONS */
+var automations=[
+  {id:1,name:'24hr appointment reminder',trigger:'24h-before',triggerLabel:'24h before appointment',action:'sms-client',actionLabel:'SMS to client',msg:'Hi {{client_name}}! Just a reminder your cleaning is tomorrow at {{time}} with {{cleaner}}. See you then! — Hawaii Natural Clean',active:true,fired:47},
+  {id:2,name:'2hr appointment reminder',trigger:'2h-before',triggerLabel:'2h before appointment',action:'sms-cleaner',actionLabel:'SMS to cleaner',msg:'Hey {{cleaner}}! Reminder: {{client_name}} appointment today at {{time}}. Address is in the app. — HNC',active:true,fired:47},
+  {id:3,name:'Job complete thank-you',trigger:'on-complete',triggerLabel:'Job marked complete',action:'sms-client',actionLabel:'SMS to client',msg:'Hi {{client_name}}! Your home is all cleaned up! Hope everything looks great. Let us know if you need anything. — Hawaii Natural Clean',active:true,fired:38},
+  {id:4,name:'Review request',trigger:'2h-after',triggerLabel:'2h after job complete',action:'sms-client',actionLabel:'SMS to client',msg:'Hi {{client_name}}! We hope you love how your home looks. Would you mind leaving us a quick Google review? It helps a lot! hawaiinaturalclean.com/review — Thank you!',active:true,fired:31},
+  {id:5,name:'Dormant client reactivation',trigger:'60-dormant',triggerLabel:'Client inactive 60 days',action:'sms-client',actionLabel:'SMS to client',msg:'Hi {{client_name}}! It has been a while. We would love to have you back — we are offering 10% off your next booking this month. Reply to schedule! — Hawaii Natural Clean',active:true,fired:8},
+  {id:6,name:'Auto-invoice on completion',trigger:'on-complete',triggerLabel:'Job marked complete',action:'send-invoice',actionLabel:'Send invoice',msg:'Invoice for cleaning services — {{date}}',active:true,fired:38},
+  {id:7,name:'Unpaid invoice reminder',trigger:'invoice-unpaid',triggerLabel:'Invoice unpaid 3 days',action:'sms-client',actionLabel:'SMS to client',msg:'Hi {{client_name}}! Just a reminder your invoice of {{amount}} is still outstanding. You can pay at hawaiinaturalclean.com/pay — Thank you!',active:false,fired:0}
+];
+
+function renderAutomations(){
+  var list=document.getElementById('auto-list');
+  if(!list)return;
+  list.innerHTML='';
+  automations.forEach(function(a){
+    var card=document.createElement('div');card.className='auto-card';
+    card.innerHTML='<label class="auto-toggle" title="'+(a.active?'Active — click to disable':'Inactive — click to enable')+'">'
+      +'<input type="checkbox" '+(a.active?'checked':'')+' onchange="toggleAuto('+a.id+',this.checked)">'
+      +'</label>'
+      +'<div class="auto-body">'
+        +'<div class="auto-name">'+a.name+'</div>'
+        +'<div class="auto-desc">'+a.msg.substring(0,80)+(a.msg.length>80?'...':'')+'</div>'
+        +'<div class="auto-meta">'
+          +'<span class="auto-tag auto-trigger-tag">&#x26A1; '+a.triggerLabel+'</span>'
+          +'<span class="auto-tag auto-action-tag">&#x27A4; '+a.actionLabel+'</span>'
+          +'<span class="auto-tag auto-count">'+a.fired+' sent</span>'
+        +'</div>'
+      +'</div>'
+      +'<div class="auto-actions">'
+        +'<button class="btn" style="font-size:11px;padding:4px 9px;" onclick="editAuto('+a.id+')">Edit</button>'
+      +'</div>';
+    list.appendChild(card);
+  });
+  document.getElementById('auto-active-count').textContent=automations.filter(function(a){return a.active;}).length;
+}
+
+function toggleAuto(id,active){
+  var auto=automations.find(function(a){return a.id===id;});
+  if(auto){auto.active=active;document.getElementById('auto-active-count').textContent=automations.filter(function(a){return a.active;}).length;}
+}
+
+function editAuto(id){
+  var auto=automations.find(function(a){return a.id===id;});
+  if(!auto)return;
+  document.getElementById('na2-name').value=auto.name;
+  document.getElementById('na2-msg').value=auto.msg;
+  document.getElementById('na2-active').value=auto.active?'true':'false';
+  document.getElementById('new-auto-overlay').classList.remove('hidden');
+}
+
+function openNewAuto(){
+  document.getElementById('na2-name').value='';
+  document.getElementById('na2-msg').value='';
+  document.getElementById('na2-active').value='true';
+  document.getElementById('new-auto-overlay').classList.remove('hidden');
+}
+
+function saveNewAuto(){
+  var name=document.getElementById('na2-name').value;
+  if(!name){document.getElementById('na2-name').focus();return;}
+  var triggerSel=document.getElementById('na2-trigger');
+  var actionSel=document.getElementById('na2-action');
+  var triggerLabel=triggerSel.options[triggerSel.selectedIndex].text;
+  var actionLabel=actionSel.options[actionSel.selectedIndex].text;
+  var newId=automations.length>0?Math.max.apply(null,automations.map(function(a){return a.id;}))+1:1;
+  automations.push({
+    id:newId,name:name,
+    trigger:triggerSel.value,triggerLabel:triggerLabel,
+    action:actionSel.value,actionLabel:actionLabel,
+    msg:document.getElementById('na2-msg').value,
+    active:document.getElementById('na2-active').value==='true',
+    fired:0
+  });
+  renderAutomations();
+  var s=document.getElementById('na2-success');s.classList.add('show');
+  setTimeout(function(){s.classList.remove('show');closeOverlay('new-auto-overlay');},1800);
+}
+
+function insertVar(btn,v){
+  var ta=document.getElementById('na2-msg');
+  var pos=ta.selectionStart;
+  ta.value=ta.value.slice(0,pos)+v+ta.value.slice(ta.selectionEnd);
+  ta.focus();
+  ta.selectionStart=ta.selectionEnd=pos+v.length;
+}
+
+/* PAYMENTS */
+var stripeConnected=false;
+
+function openStripeConnect(){document.getElementById('stripe-overlay').classList.remove('hidden');}
+
+function saveStripeConnect(){
+  var key=document.getElementById('stripe-key').value;
+  if(!key||key.length<10){document.getElementById('stripe-key').style.border='1px solid #e53e3e';return;}
+  document.getElementById('stripe-key').style.border='';
+  stripeConnected=true;
+  var s=document.getElementById('stripe-success');s.classList.add('show');
+  // Update the warning banner
+  var banner=document.querySelector('#view-payments .metrics .metric:last-child .metric-value');
+  if(banner){banner.textContent='Connected';banner.style.color='#1D9E75';banner.nextElementSibling.textContent='Stripe active';}
+  setTimeout(function(){s.classList.remove('show');closeOverlay('stripe-overlay');},2000);
+}
+
+function chargeCard(client,amount){
+  if(!stripeConnected){
+    openStripeConnect();return;
+  }
+  showPaymentToast('Charging '+client+' '+amount+' via Stripe card on file...',function(){
+    updateInvoiceStatus(client,amount,'Paid');
+    showPaymentToast('Payment of '+amount+' collected from '+client+'!',null,'success');
+  });
+}
+
+function sendInvoice(client,amount){
+  showPaymentToast('Sending invoice for '+amount+' to '+client+'...',function(){
+    showPaymentToast('Invoice sent to '+client+'! They will receive an email with a payment link.',null,'success');
+  });
+}
+
+function viewReceipt(client){
+  showPaymentToast('Receipt for '+client+' — payment confirmed.',null,'success');
+}
+
+function openNewInvoice(){document.getElementById('new-invoice-overlay').classList.remove('hidden');}
+
+function createInvoice(method){
+  var client=document.getElementById('inv-client').value;
+  var amount=document.getElementById('inv-amount').value;
+  var service=document.getElementById('inv-service').value||'Cleaning service';
+  if(!amount){document.getElementById('inv-amount').focus();return;}
+  if(method==='charge'&&!stripeConnected){closeOverlay('new-invoice-overlay');openStripeConnect();return;}
+  var tbody=document.getElementById('invoice-tbody');
+  var tr=document.createElement('tr');
+  var today=new Date();var dateStr='Apr '+today.getDate();
+  tr.innerHTML='<td>'+client+'</td><td>'+service+'</td><td>'+dateStr+'</td><td>$'+parseFloat(amount).toFixed(2)+'</td>'
+    +'<td><span class="badge '+(method==='charge'?'bpd':'bpn')+'">'+(method==='charge'?'Paid':'Unpaid')+'</span></td>'
+    +'<td><button class="btn" style="font-size:11px;padding:3px 8px;" onclick="viewReceipt(\''+client+'\')">Receipt</button></td>';
+  tbody.insertBefore(tr,tbody.firstChild);
+  var s=document.getElementById('inv-success');
+  s.textContent=method==='charge'?'Card charged! Payment collected.':'Invoice sent to '+client+' via email.';
+  s.classList.add('show');
+  setTimeout(function(){s.classList.remove('show');closeOverlay('new-invoice-overlay');},2000);
+}
+
+function updateInvoiceStatus(client,amount,status){
+  var rows=document.querySelectorAll('#invoice-tbody tr');
+  rows.forEach(function(row){
+    if(row.cells[0]&&row.cells[0].textContent===client&&row.cells[3]&&row.cells[3].textContent===amount){
+      row.cells[4].innerHTML='<span class="badge bpd">Paid</span>';
+      row.cells[5].innerHTML='<button class="btn" style="font-size:11px;padding:3px 8px;" onclick="viewReceipt(\''+client+'\')">Receipt</button>';
+    }
+  });
+}
+
+function showPaymentToast(msg,callback,type){
+  var toast=document.createElement('div');
+  toast.style.cssText='position:fixed;bottom:24px;right:24px;background:'+(type==='success'?'#e6fffa':'#fff')+';border:1px solid '+(type==='success'?'#9ae6b4':'#e8e8e5')+';border-radius:10px;padding:12px 16px;font-size:13px;color:'+(type==='success'?'#276749':'#1a1a1a')+';z-index:9999;box-shadow:0 4px 16px rgba(0,0,0,.1);max-width:320px;';
+  toast.textContent=msg;
+  document.body.appendChild(toast);
+  setTimeout(function(){
+    toast.remove();
+    if(callback)callback();
+  },1500);
+}
+
+
+/* PAYMENTS JS */
+function switchPayTab(tab, el){
+  document.querySelectorAll('.pay-tab').forEach(function(t){t.classList.remove('active');});
+  document.querySelectorAll('.pay-section').forEach(function(s){s.style.display='none';});
+  el.classList.add('active');
+  document.getElementById('pay-'+tab).style.display='block';
+  if(tab==='bulk')updateBulkTotal();
+}
+
+function chargeCardRow(btn, client, amount){
+  if(!stripeConnected){openStripeConnect();return;}
+  var surcharge=parseFloat(document.getElementById('ach-surcharge')?document.getElementById('ach-surcharge').value:3)||3;
+  var base=parseFloat(amount.replace('$',''))||0;
+  var withFee=Math.round(base*(1+surcharge/100)*100)/100;
+  showPaymentToast('Charging '+client+' $'+withFee.toFixed(2)+' (incl. '+surcharge+'% card fee) via Stripe...', function(){
+    var row=btn.closest('tr');
+    if(row){row.cells[5].innerHTML='<span class="badge bpd" style="font-size:10px;">Paid</span>';row.cells[6].innerHTML='<span style="font-size:11px;color:#276749;">Collected</span>';}
+    var pendingCount=document.querySelectorAll('#pending-tbody tr').length;
+    document.getElementById('pay-pending-count').textContent=Math.max(0,pendingCount-1);
+    showPaymentToast('Collected $'+withFee.toFixed(2)+' from '+client+'!',null,'success');
+  });
+}
+
+function sendInvoiceRow(btn, client, amount, terms){
+  var termsLabel=terms==='now'?'due now':terms.toUpperCase();
+  showPaymentToast('Sending '+termsLabel+' invoice for '+amount+' to '+client+'...',function(){
+    var row=btn.closest('tr');
+    if(row){row.cells[5].innerHTML='<span class="badge bpn" style="font-size:10px;">Invoiced</span>';row.cells[6].innerHTML='<span style="font-size:11px;color:#b7791f;">Awaiting payment</span>';}
+    showPaymentToast('Invoice sent to '+client+' with ACH + card options shown!',null,'success');
+  });
+}
+
+function addToBulk(client, service, date, amount, btn){
+  var tbody=document.getElementById('bulk-tbody');
+  var tr=document.createElement('tr');
+  tr.innerHTML='<td><input type="checkbox" checked style="accent-color:#1D9E75;"></td>'
+    +'<td>'+client+'</td><td>'+service+'</td><td>'+date+'</td><td>'+amount+'</td>'
+    +'<td><button class="btn" style="font-size:11px;padding:2px 7px;" onclick="removeBulkRow(this)">Remove</button></td>';
+  tr.querySelector('input[type=checkbox]').addEventListener('change', updateBulkTotal);
+  tbody.appendChild(tr);
+  btn.textContent='Added';btn.disabled=true;btn.style.opacity='0.5';
+  updateBulkTotal();
+  switchPayTab('bulk', document.querySelectorAll('.pay-tab')[2]);
+}
+
+function removeBulkRow(btn){
+  btn.closest('tr').remove();
+  updateBulkTotal();
+}
+
+function toggleAllBulk(cb){
+  document.querySelectorAll('#bulk-tbody input[type=checkbox]').forEach(function(c){c.checked=cb.checked;});
+  updateBulkTotal();
+}
+
+function updateBulkTotal(){
+  var total=0;
+  document.querySelectorAll('#bulk-tbody tr').forEach(function(row){
+    var cb=row.querySelector('input[type=checkbox]');
+    if(cb&&cb.checked){
+      var amtCell=row.cells[4];
+      if(amtCell){total+=parseFloat(amtCell.textContent.replace('$',''))||0;}
+    }
+  });
+  var el=document.getElementById('bulk-total');
+  if(el)el.textContent='$'+total.toFixed(2);
+}
+
+function sendBulkInvoice(method){
+  var rows=document.querySelectorAll('#bulk-tbody tr');
+  var checked=[];
+  rows.forEach(function(row){
+    var cb=row.querySelector('input[type=checkbox]');
+    if(cb&&cb.checked)checked.push(row.cells[1]?row.cells[1].textContent:'');
+  });
+  if(checked.length===0){showPaymentToast('No jobs selected.',null,'error');return;}
+  var client=checked[0];
+  var total=document.getElementById('bulk-total').textContent;
+  var terms=document.getElementById('bulk-terms').value.toUpperCase();
+  var msg=method==='ach'?'ACH invoice':'email invoice';
+  showPaymentToast('Sending '+terms+' '+msg+' for '+total+' to '+client+' with '+checked.length+' line items...', function(){
+    checked.forEach(function(c,i){
+      var row=Array.from(document.querySelectorAll('#bulk-tbody tr'))[i];
+      if(row){row.style.opacity='0.4';}
+    });
+    showPaymentToast(terms+' invoice sent to '+client+'! ACH and card options included.',null,'success');
+  });
+}
+
+function openAchSettings(){document.getElementById('ach-settings-overlay').classList.remove('hidden');}
+
+function saveAchSettings(){
+  var surcharge=document.getElementById('ach-surcharge').value;
+  var emailMsg=document.getElementById('ach-email-msg').value;
+  var preview=document.getElementById('ach-preview');
+  if(preview)preview.innerHTML='<strong>Payment options for your invoice:</strong><br>Pay by ACH bank transfer — <strong>FREE</strong> (3-5 business days)<br>Pay by card — <strong>'+surcharge+'% processing fee added</strong><br><br>We encourage ACH to keep your costs down. Click below to choose your payment method.';
+  var s=document.getElementById('ach-save-success');s.classList.add('show');
+  setTimeout(function(){s.classList.remove('show');closeOverlay('ach-settings-overlay');},1800);
+}
+
+
+/* APPOINTMENT ACTIONS */
+function openApptInvoice(){
+  if(!currentAppt)return;
+  var cd=currentApptData||{};
+  var client=clientDB[Object.keys(clientDB).find(function(k){return clientDB[k].name===currentAppt.n;})];
+  var isCommercial=client&&client.type==='Commercial';
+  var info=document.getElementById('appt-invoice-info');
+  info.innerHTML='<div class="info-row"><span class="info-label">Client</span><span class="info-val">'+currentAppt.n+'</span></div>'
+    +'<div class="info-row"><span class="info-label">Service</span><span class="info-val">'+(cd.service||'Standard clean')+'</span></div>'
+    +'<div class="info-row"><span class="info-label">Date</span><span class="info-val">'+document.getElementById('ai-date').textContent+'</span></div>'
+    +'<div class="info-row"><span class="info-label">Amount</span><span class="info-val" style="color:#1D9E75;font-size:14px;font-weight:700;">'+(cd.total||'—')+'</span></div>'
+    +'<div class="info-row"><span class="info-label">Email on file</span><span class="info-val">'+(client?client.email:'—')+'</span></div>';
+  var termsSel=document.getElementById('appt-inv-terms');
+  termsSel.value=isCommercial?'net30':'now';
+  document.getElementById('appt-invoice-overlay').classList.remove('hidden');
+}
+
+function sendApptInvoice(method){
+  var client=currentAppt?currentAppt.n:'client';
+  var amount=currentApptData&&currentApptData.total?currentApptData.total:'the invoice amount';
+  var terms=document.getElementById('appt-inv-terms').value;
+  var termsLabel=terms==='now'?'due now':terms.toUpperCase();
+  var s=document.getElementById('appt-inv-success');
+  s.textContent='Invoice for '+amount+' sent to '+client+' via '+(method==='email'?'email':'SMS')+' ('+termsLabel+'). ACH and card options included.';
+  s.classList.add('show');
+  // Add to invoice table
+  addToInvoiceTable(client, currentApptData&&currentApptData.service||'Cleaning service', amount, termsLabel);
+  setTimeout(function(){s.classList.remove('show');closeOverlay('appt-invoice-overlay');
+    var sb=document.getElementById('appt-action-success');
+    sb.textContent='Invoice sent to '+client+'!';sb.classList.add('show');
+    setTimeout(function(){sb.classList.remove('show');},3000);
+  },1800);
+}
+
+function openApptCharge(){
+  if(!currentAppt)return;
+  var cd=currentApptData||{};
+  var client=clientDB[Object.keys(clientDB).find(function(k){return clientDB[k].name===currentAppt.n;})];
+  var base=parseFloat((cd.total||'0').replace('$',''))||0;
+  var fee=Math.round(base*0.03*100)/100;
+  var total=Math.round((base+fee)*100)/100;
+  var info=document.getElementById('appt-charge-info');
+  info.innerHTML='<div class="info-row"><span class="info-label">Client</span><span class="info-val">'+currentAppt.n+'</span></div>'
+    +'<div class="info-row"><span class="info-label">Service</span><span class="info-val">'+(cd.service||'Standard clean')+'</span></div>'
+    +'<div class="info-row"><span class="info-label">Date</span><span class="info-val">'+document.getElementById('ai-date').textContent+'</span></div>';
+  document.getElementById('charge-base').textContent=cd.total||'—';
+  document.getElementById('charge-fee').textContent='$'+fee.toFixed(2);
+  document.getElementById('charge-total').textContent='$'+total.toFixed(2);
+  document.getElementById('charge-card-info').textContent=client?client.payment:'No card on file';
+  document.getElementById('appt-charge-overlay').classList.remove('hidden');
+}
+
+function executeCharge(){
+  if(!stripeConnected){
+    closeOverlay('appt-charge-overlay');
+    openStripeConnect();
+    return;
+  }
+  var client=currentAppt?currentAppt.n:'client';
+  var total=document.getElementById('charge-total').textContent;
+  var s=document.getElementById('appt-charge-success');
+  s.textContent='Card charged '+total+' for '+client+'!';s.classList.add('show');
+  addToInvoiceTable(client, currentApptData&&currentApptData.service||'Cleaning service', total, 'Paid');
+  setTimeout(function(){s.classList.remove('show');closeOverlay('appt-charge-overlay');
+    var sb=document.getElementById('appt-action-success');
+    sb.textContent=total+' collected from '+client+'!';sb.classList.add('show');
+    setTimeout(function(){sb.classList.remove('show');},3000);
+  },1800);
+}
+
+function closeApptChargeToInvoice(){
+  closeOverlay('appt-charge-overlay');
+  openApptInvoice();
+}
+
+function addToInvoiceTable(client, service, amount, terms){
+  var tbody=document.getElementById('invoice-tbody');
+  if(!tbody)return;
+  var today=new Date();
+  var dateStr='Apr '+today.getDate();
+  var isPaid=terms==='Paid';
+  var tr=document.createElement('tr');
+  tr.innerHTML='<td>'+client+'</td><td>'+service+'</td><td>'+dateStr+'</td><td>'+amount+'</td>'
+    +'<td>'+terms+'</td>'
+    +'<td><span class="badge '+(isPaid?'bpd':'bpn')+'">'+(isPaid?'Paid':'Unpaid')+'</span></td>'
+    +'<td><button class="btn" style="font-size:11px;padding:3px 8px;" onclick="viewReceipt(\''+client+'\')">Receipt</button></td>';
+  tbody.insertBefore(tr,tbody.firstChild);
+}
+
+/* INVITE CLEANER */
+function openInviteCleaner(){
+  if(!currentAppt)return;
+  var cd=currentApptData||{};
+  // Build job info block
+  var info=document.getElementById('invite-job-info');
+  info.innerHTML='<div class="info-row"><span class="info-label">Client</span><span class="info-val">'+currentAppt.n+'</span></div>'
+    +'<div class="info-row"><span class="info-label">Service</span><span class="info-val">'+(cd.service||'Standard clean')+'</span></div>'
+    +'<div class="info-row"><span class="info-label">Date & time</span><span class="info-val">'+document.getElementById('ai-date').textContent+' at '+document.getElementById('ai-time').textContent+'</span></div>'
+    +'<div class="info-row"><span class="info-label">Address</span><span class="info-val">'+(cd.address||'—')+'</span></div>'
+    +'<div class="info-row"><span class="info-label">Est. duration</span><span class="info-val">'+(cd.dur||'—')+'</span></div>'
+    +'<div class="info-row"><span class="info-label">Bed / bath</span><span class="info-val">'+(cd.bed||'—')+'</span></div>';
+
+  // Build cleaner checkboxes
+  var list=document.getElementById('invite-cleaner-list');
+  list.innerHTML='';
+  Object.entries(cleanerDB).forEach(function(entry){
+    var id=entry[0];var c=entry[1];
+    if(c.notes&&c.notes.indexOf('leave')>=0)return;
+    var label=document.createElement('label');
+    label.style.cssText='display:flex;align-items:center;gap:10px;padding:8px 10px;background:#fafaf8;border:1px solid #e8e8e5;border-radius:8px;cursor:pointer;font-size:12px;';
+    label.innerHTML='<input type="checkbox" value="'+id+'" style="accent-color:#1D9E75;width:15px;height:15px;" onchange="updateInvitePreview()">'
+      +'<div style="flex:1;">'
+        +'<div style="font-weight:600;color:#1a1a1a;">'+c.name+'</div>'
+        +'<div style="color:#999;font-size:11px;">'+c.role+' · '+c.rate+'</div>'
+      +'</div>'
+      +'<div style="font-size:11px;color:#1D9E75;font-weight:500;">'+(id===currentAppt.cleaner.toLowerCase().replace(/[^a-z]/g,'')?'Currently assigned':'Available')+'</div>';
+    list.appendChild(label);
+  });
+
+  // Build preview message
+  updateInvitePreview();
+  document.getElementById('invite-note').value='';
+  document.getElementById('invite-success').classList.remove('show');
+  document.getElementById('invite-cleaner-overlay').classList.remove('hidden');
+}
+
+function updateInvitePreview(){
+  if(!currentAppt)return;
+  var cd=currentApptData||{};
+  var hrs=parseFloat(cd.dur)||3.5;
+  var pay='$'+(hrs*16).toFixed(0);
+  var msg='Aloha! Would you be able to take this job?\n\n'
+    +'Client: '+currentAppt.n+'\n'
+    +'Service: '+(cd.service||'Standard clean')+'\n'
+    +'Date: '+document.getElementById('ai-date').textContent+'\n'
+    +'Time: '+document.getElementById('ai-time').textContent+'\n'
+    +'Address: '+(cd.address||'—')+'\n'
+    +'Est. duration: '+(cd.dur||'—')+'\n'
+    +'Bed/bath: '+(cd.bed||'—')+'\n'
+    +'Your pay: '+pay+'\n\n'
+    +'Reply YES to accept or NO to pass. First YES gets the job!\n— Hawaii Natural Clean';
+  var note=document.getElementById('invite-note');
+  if(note&&note.value)msg+='\n\nNote: '+note.value;
+  document.getElementById('invite-msg-preview').textContent=msg;
+}
+
+function sendCleanerInvites(){
+  var checked=document.querySelectorAll('#invite-cleaner-list input[type=checkbox]:checked');
+  if(checked.length===0){
+    showPaymentToast('Please select at least one cleaner.',null,'error');
+    return;
+  }
+  var cd=currentApptData||{};
+  var hrs=parseFloat(cd.dur)||3.5;
+  var pay='$'+(hrs*16).toFixed(0);
+  var msgText=document.getElementById('invite-msg-preview').textContent;
+  var names=[];
+  var now=new Date();
+  var timeStr=now.getHours().toString().padStart(2,'0')+':'+now.getMinutes().toString().padStart(2,'0');
+
+  checked.forEach(function(cb){
+    var id=cb.value;
+    var c=cleanerDB[id];
+    if(!c)return;
+    names.push(c.name);
+
+    // Find or create inbox thread for this cleaner
+    var existing=inboxData.find(function(i){return i.id===id;});
+    if(existing){
+      // Add message to existing thread
+      existing.msgs.push({out:true,text:msgText,time:timeStr});
+      existing.lastMsg='Job invite sent';
+      existing.time='Just now';
+      existing.unread=false;
+    } else {
+      // Create new inbox thread
+      var initials=c.initials||c.name.split(' ').map(function(w){return w[0];}).join('').slice(0,2).toUpperCase();
+      inboxData.unshift({
+        id:id,
+        name:c.name,
+        type:'cleaner',
+        avatar:initials,
+        phone:c.phone,
+        lastMsg:'Job invite sent',
+        time:'Just now',
+        unread:false,
+        msgs:[{out:true,text:msgText,time:timeStr}]
+      });
+    }
+    // Add AI draft template for this cleaner
+    aiDraftTemplates[id]={
+      sms:msgText,
+      email:msgText
+    };
+  });
+
+  var s=document.getElementById('invite-success');
+  s.textContent='Invite sent to '+names.join(', ')+'! Check Messaging to see the threads.';
+  s.classList.add('show');
+
+  setTimeout(function(){
+    s.classList.remove('show');
+    closeOverlay('invite-cleaner-overlay');
+    closeOverlay('appt-overlay');
+    // Navigate to messaging and open first invited cleaner thread
+    var msgNavItem=document.querySelector('.nav-item:nth-child(7)');
+    // Find the nav item for messaging by text
+    var navItems=document.querySelectorAll('.nav-item');
+    var msgNav=null;
+    navItems.forEach(function(n){if(n.textContent.trim()==='Messaging')msgNav=n;});
+    if(msgNav)sv('messaging',msgNav);
+    // Open the first invited cleaner's thread
+    var firstId=document.querySelector('#invite-cleaner-list input[type=checkbox]:checked');
+    if(firstId){
+      setTimeout(function(){openChat(firstId.value);},150);
+    }
+  },1800);
+}
+
+</script>
+
+<!-- NEW AUTOMATION OVERLAY -->
+<div class="overlay hidden" id="new-auto-overlay" onclick="closeOverlay('new-auto-overlay')">
+  <div class="panel" onclick="event.stopPropagation()">
+    <div class="panel-header"><div class="panel-title">New automation</div><button class="close-btn" onclick="closeOverlay('new-auto-overlay')">&#x2715;</button></div>
+    <div class="panel-body">
+      <div class="form-row"><label>Automation name</label><input type="text" id="na2-name" placeholder="e.g. 24hr appointment reminder"></div>
+      <div class="form-row"><label>Trigger</label>
+        <select id="na2-trigger">
+          <option value="24h-before">24 hours before appointment</option>
+          <option value="2h-before">2 hours before appointment</option>
+          <option value="on-complete">When job marked complete</option>
+          <option value="2h-after">2 hours after job complete</option>
+          <option value="60-dormant">Client inactive for 60 days</option>
+          <option value="invoice-unpaid">Invoice unpaid for 3 days</option>
+          <option value="new-booking">New booking created</option>
+        </select>
+      </div>
+      <div class="form-row"><label>Action</label>
+        <select id="na2-action">
+          <option value="sms-client">Send SMS to client</option>
+          <option value="email-client">Send email to client</option>
+          <option value="sms-cleaner">Send SMS to assigned cleaner</option>
+          <option value="send-invoice">Send invoice to client</option>
+          <option value="charge-card">Charge card on file</option>
+        </select>
+      </div>
+      <div class="form-row"><label>Message template</label>
+        <textarea id="na2-msg" style="min-height:80px;" placeholder="Use {{client_name}}, {{date}}, {{time}}, {{cleaner}}, {{amount}} as variables"></textarea>
+      </div>
+      <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
+        <button class="tone-btn active" onclick="insertVar(this,'{{client_name}}')">+ Client name</button>
+        <button class="tone-btn" onclick="insertVar(this,'{{date}}')">+ Date</button>
+        <button class="tone-btn" onclick="insertVar(this,'{{time}}')">+ Time</button>
+        <button class="tone-btn" onclick="insertVar(this,'{{cleaner}}')">+ Cleaner</button>
+        <button class="tone-btn" onclick="insertVar(this,'{{amount}}')">+ Amount</button>
+      </div>
+      <div class="form-row"><label>Active</label>
+        <select id="na2-active"><option value="true">Yes — run this automation</option><option value="false">No — save as draft</option></select>
+      </div>
+      <div class="save-bar">
+        <button class="btn btn-primary" onclick="saveNewAuto()">Save automation</button>
+        <button class="btn" onclick="closeOverlay('new-auto-overlay')">Cancel</button>
+      </div>
+      <div class="success-bar" id="na2-success">Automation saved!</div>
+    </div>
+  </div>
+</div>
+
+<!-- STRIPE CONNECT OVERLAY -->
+<div class="overlay hidden" id="stripe-overlay" onclick="closeOverlay('stripe-overlay')">
+  <div class="panel" onclick="event.stopPropagation()">
+    <div class="panel-header"><div class="panel-title">Connect Stripe</div><button class="close-btn" onclick="closeOverlay('stripe-overlay')">&#x2715;</button></div>
+    <div class="panel-body">
+      <div style="background:#f5f0ff;border-radius:10px;padding:14px;margin-bottom:16px;">
+        <div style="font-size:13px;font-weight:600;color:#553c9a;margin-bottom:6px;">What connecting Stripe enables</div>
+        <div style="font-size:12px;color:#444;line-height:1.7;">
+          &bull; Charge cards on file with one click<br>
+          &bull; Send professional invoices via email<br>
+          &bull; Track payment status automatically<br>
+          &bull; Auto-charge on job completion (via automations)<br>
+          &bull; Payment reminders for overdue invoices
+        </div>
+      </div>
+      <div class="form-row"><label>Stripe secret key</label><input type="password" id="stripe-key" placeholder="sk_live_..."></div>
+      <div style="font-size:11px;color:#999;margin-top:-6px;margin-bottom:12px;">Your key is stored locally and never shared. Get it from dashboard.stripe.com &rarr; Developers &rarr; API keys.</div>
+      <div class="form-row"><label>Business name on invoices</label><input type="text" id="stripe-biz" value="Hawaii Natural Clean" placeholder="Your business name"></div>
+      <div class="form-row"><label>Reply-to email</label><input type="email" id="stripe-email" placeholder="billing@hawaiinaturalclean.com"></div>
+      <div class="save-bar">
+        <button class="btn btn-primary" onclick="saveStripeConnect()">Connect Stripe</button>
+        <button class="btn" onclick="closeOverlay('stripe-overlay')">Cancel</button>
+      </div>
+      <div class="success-bar" id="stripe-success">Stripe connected! Real payments are now enabled.</div>
+    </div>
+  </div>
+</div>
+
+<!-- NEW INVOICE OVERLAY -->
+<div class="overlay hidden" id="new-invoice-overlay" onclick="closeOverlay('new-invoice-overlay')">
+  <div class="panel" onclick="event.stopPropagation()">
+    <div class="panel-header"><div class="panel-title">New invoice</div><button class="close-btn" onclick="closeOverlay('new-invoice-overlay')">&#x2715;</button></div>
+    <div class="panel-body">
+      <div class="form-row"><label>Client</label>
+        <select id="inv-client">
+          <option>The Morrisons</option><option>Aloha Realty</option><option>Maui Surf Hotel</option><option>Kona Coffee Co.</option><option>Pearl City Gym</option><option>Lani P.</option><option>Chen Family</option>
+        </select>
+      </div>
+      <div class="form-row"><label>Service</label><input type="text" id="inv-service" placeholder="e.g. Standard clean — Apr 7"></div>
+      <div class="form-two">
+        <div class="form-row"><label>Amount ($)</label><input type="number" id="inv-amount" placeholder="238.22"></div>
+        <div class="form-row"><label>Due date</label><input type="date" id="inv-due"></div>
+      </div>
+      <div class="form-row"><label>Notes</label><textarea id="inv-notes" style="min-height:50px;" placeholder="Optional note on invoice..."></textarea></div>
+      <div class="save-bar">
+        <button class="btn btn-primary" onclick="createInvoice('email')">Send via email</button>
+        <button class="btn" style="background:#ebf5ff;color:#2b6cb0;border-color:#bee3f8;" onclick="createInvoice('charge')">Charge card on file</button>
+        <button class="btn" onclick="closeOverlay('new-invoice-overlay')">Cancel</button>
+      </div>
+      <div class="success-bar" id="inv-success">Invoice sent!</div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ACH SETTINGS OVERLAY -->
+<div class="overlay hidden" id="ach-settings-overlay" onclick="closeOverlay('ach-settings-overlay')">
+  <div class="panel" onclick="event.stopPropagation()">
+    <div class="panel-header"><div class="panel-title">ACH payment incentive settings</div><button class="close-btn" onclick="closeOverlay('ach-settings-overlay')">&#x2715;</button></div>
+    <div class="panel-body">
+      <div class="panel-section">Card surcharge</div>
+      <div class="info-block">
+        <div class="info-row"><span class="info-label">Card surcharge %</span><span class="info-val"><input type="number" id="ach-surcharge" value="3" min="0" max="10" step="0.5" style="width:60px;padding:3px 6px;border:1px solid #e0e0dd;border-radius:6px;font-size:12px;text-align:center;"></span></div>
+        <div class="info-row"><span class="info-label">ACH settlement</span><span class="info-val" style="color:#999;">3-5 business days</span></div>
+        <div class="info-row"><span class="info-label">Show on</span><span class="info-val" style="color:#1D9E75;">Email + payment page</span></div>
+      </div>
+      <div class="panel-section">Message shown on invoice email</div>
+      <div class="form-row"><textarea id="ach-email-msg" style="min-height:100px;">Payment options for your invoice:
+
+Pay by ACH bank transfer — FREE (3-5 business days)
+Pay by card — 3% processing fee added
+
+We encourage ACH to keep costs low for both of us. Click the payment link below to choose your method.</textarea></div>
+      <div class="panel-section">Message shown on payment page</div>
+      <div class="form-row"><textarea id="ach-page-msg" style="min-height:80px;">Choose how you would like to pay:
+
+ACH Bank Transfer — No fee (recommended)
+Credit / Debit Card — 3% processing fee applies
+
+Your total will update automatically when you select a payment method.</textarea></div>
+      <div class="panel-section">Residential default terms</div>
+      <div class="form-row"><select id="ach-res-terms"><option value="now" selected>Due now (immediate)</option><option value="net7">NET7</option><option value="net15">NET15</option></select></div>
+      <div class="panel-section">Commercial default terms</div>
+      <div class="form-row"><select id="ach-com-terms"><option value="net15">NET15</option><option value="net30" selected>NET30</option><option value="net45">NET45</option><option value="net60">NET60</option></select></div>
+      <div class="save-bar">
+        <button class="btn btn-primary" onclick="saveAchSettings()">Save settings</button>
+        <button class="btn" onclick="closeOverlay('ach-settings-overlay')">Cancel</button>
+      </div>
+      <div class="success-bar" id="ach-save-success">Settings saved!</div>
+    </div>
+  </div>
+</div>
+
+
+<!-- INVITE CLEANER OVERLAY -->
+<div class="overlay hidden" id="invite-cleaner-overlay" onclick="closeOverlay('invite-cleaner-overlay')">
+  <div class="panel" onclick="event.stopPropagation()">
+    <div class="panel-header"><div class="panel-title">Invite cleaner</div><button class="close-btn" onclick="closeOverlay('invite-cleaner-overlay')">&#x2715;</button></div>
+    <div class="panel-body">
+      <div class="panel-section">Job details</div>
+      <div class="info-block" id="invite-job-info"></div>
+      <div class="panel-section">Select cleaners to invite</div>
+      <div id="invite-cleaner-list" style="display:flex;flex-direction:column;gap:7px;margin-bottom:14px;"></div>
+      <div class="panel-section">SMS message</div>
+      <div style="background:#fafaf8;border:1px solid #e8e8e5;border-radius:10px;padding:12px 13px;margin-bottom:12px;">
+        <div style="font-size:11px;color:#999;margin-bottom:6px;">Preview — sent to each selected cleaner</div>
+        <div id="invite-msg-preview" style="font-size:13px;color:#1a1a1a;line-height:1.7;white-space:pre-wrap;"></div>
+      </div>
+      <div class="form-row"><label>Add a note (optional)</label><textarea id="invite-note" style="min-height:50px;" placeholder="Any special instructions for this job..."></textarea></div>
+      <div class="save-bar">
+        <button class="btn btn-primary" onclick="sendCleanerInvites()">Send invites</button>
+        <button class="btn" onclick="closeOverlay('invite-cleaner-overlay')">Cancel</button>
+      </div>
+      <div class="success-bar" id="invite-success">Invites sent! First to reply YES gets assigned.</div>
+    </div>
+  </div>
+</div>
+
+<!-- APPT INVOICE OVERLAY -->
+<div class="overlay hidden" id="appt-invoice-overlay" onclick="closeOverlay('appt-invoice-overlay')">
+  <div class="panel" onclick="event.stopPropagation()">
+    <div class="panel-header"><div class="panel-title">Send invoice</div><button class="close-btn" onclick="closeOverlay('appt-invoice-overlay')">&#x2715;</button></div>
+    <div class="panel-body">
+      <div class="panel-section">Invoice details</div>
+      <div class="info-block" id="appt-invoice-info"></div>
+      <div class="panel-section">Payment terms</div>
+      <div class="form-row"><label>Terms</label>
+        <select id="appt-inv-terms">
+          <option value="now">Due now (residential default)</option>
+          <option value="net15">NET15</option>
+          <option value="net30">NET30</option>
+          <option value="net45">NET45</option>
+        </select>
+      </div>
+      <div class="form-row"><label>Notes on invoice</label>
+        <textarea id="appt-inv-notes" style="min-height:50px;" placeholder="Optional note..."></textarea>
+      </div>
+      <div style="background:#f0faf6;border:1px solid #9ae6b4;border-radius:10px;padding:11px 13px;margin-bottom:14px;">
+        <div style="font-size:11px;font-weight:600;color:#276749;margin-bottom:6px;">ACH payment incentive included</div>
+        <div style="font-size:11px;color:#276749;line-height:1.6;">The invoice will show clients both payment options:<br>&#x2022; ACH bank transfer — FREE<br>&#x2022; Card payment — 3% fee added</div>
+      </div>
+      <div class="save-bar">
+        <button class="btn btn-primary" onclick="sendApptInvoice('email')">Send via email</button>
+        <button class="btn" style="background:#ebf5ff;color:#2b6cb0;border-color:#bee3f8;" onclick="sendApptInvoice('sms')">Send link via SMS</button>
+        <button class="btn" onclick="closeOverlay('appt-invoice-overlay')">Cancel</button>
+      </div>
+      <div class="success-bar" id="appt-inv-success">Invoice sent!</div>
+    </div>
+  </div>
+</div>
+
+<!-- APPT CHARGE OVERLAY -->
+<div class="overlay hidden" id="appt-charge-overlay" onclick="closeOverlay('appt-charge-overlay')">
+  <div class="panel" onclick="event.stopPropagation()">
+    <div class="panel-header"><div class="panel-title">Charge card on file</div><button class="close-btn" onclick="closeOverlay('appt-charge-overlay')">&#x2715;</button></div>
+    <div class="panel-body">
+      <div class="panel-section">Charge details</div>
+      <div class="info-block" id="appt-charge-info"></div>
+      <div style="background:#fafaf8;border:1px solid #e8e8e5;border-radius:10px;padding:12px 13px;margin-bottom:14px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+          <div style="font-size:13px;font-weight:600;color:#1a1a1a;">Payment breakdown</div>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:12px;color:#666;padding:4px 0;border-bottom:1px solid #f0f0ee;">
+          <span>Base amount</span><span id="charge-base">—</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:12px;color:#b7791f;padding:4px 0;border-bottom:1px solid #f0f0ee;">
+          <span>Card processing fee (3%)</span><span id="charge-fee">—</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:14px;font-weight:700;color:#1D9E75;padding:6px 0;">
+          <span>Total charged</span><span id="charge-total">—</span>
+        </div>
+      </div>
+      <div style="background:#fffbeb;border:1px solid #f6e05e;border-radius:8px;padding:10px 12px;margin-bottom:14px;font-size:12px;color:#b7791f;line-height:1.6;">
+        <strong>Tip:</strong> Encourage clients to pay by ACH (free) instead of card to avoid the 3% fee. You can send an invoice instead and let them choose.
+      </div>
+      <div class="form-row"><label>Card on file</label>
+        <div id="charge-card-info" style="font-size:13px;color:#1a1a1a;padding:8px 10px;background:#fafaf8;border:1px solid #e8e8e5;border-radius:8px;">Stripe card ****4521</div>
+      </div>
+      <div class="save-bar">
+        <button class="btn btn-primary" onclick="executeCharge()">Charge card now</button>
+        <button class="btn" onclick="closeApptChargeToInvoice()">Send invoice instead</button>
+        <button class="btn" onclick="closeOverlay('appt-charge-overlay')">Cancel</button>
+      </div>
+      <div class="success-bar" id="appt-charge-success">Payment collected successfully!</div>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>

@@ -8,7 +8,6 @@
 *{box-sizing:border-box;margin:0;padding:0;}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f5f5f3;color:#1a1a1a;font-size:14px;}
 .crm{display:flex;height:100vh;overflow:hidden;}
-/* SIDEBAR */
 .sidebar{width:200px;background:#fff;border-right:1px solid #e8e8e5;display:flex;flex-direction:column;flex-shrink:0;overflow-y:auto;}
 .sidebar-logo{padding:16px;border-bottom:1px solid #e8e8e5;}
 .sidebar-logo .name{font-size:13px;font-weight:600;color:#1a1a1a;}
@@ -19,7 +18,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .nav-item.active{background:#f0faf6;color:#1D9E75;border-left-color:#1D9E75;font-weight:500;}
 .nav-icon{width:15px;height:15px;flex-shrink:0;opacity:.6;}
 .nav-item.active .nav-icon{opacity:1;}
-/* MAIN */
 .main{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0;}
 .topbar{padding:12px 20px;background:#fff;border-bottom:1px solid #e8e8e5;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
 .topbar h1{font-size:15px;font-weight:600;color:#1a1a1a;}
@@ -28,13 +26,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .btn:hover{background:#f5f5f3;}
 .btn-primary{background:#1D9E75;color:#fff;border-color:#1D9E75;}
 .btn-primary:hover{background:#0F6E56;}
-.btn-danger{background:#fff0f0;color:#c0392b;border-color:#f5c6c6;}
-.btn-warning{background:#fffbf0;color:#b7791f;border-color:#f6e05e;}
-.btn-info{background:#f0f7ff;color:#2b6cb0;border-color:#bee3f8;}
-.btn-purple{background:#f5f0ff;color:#553c9a;border-color:#d6bcfa;}
 .content{flex:1;overflow-y:auto;padding:20px;}
 .vc{display:none;}.vc.active{display:block;}
-/* METRICS */
 .metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:18px;}
 .metric{background:#fff;border:1px solid #e8e8e5;border-radius:10px;padding:12px 14px;}
 .metric-label{font-size:11px;color:#999;margin-bottom:4px;}
@@ -42,19 +35,16 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .metric-sub{font-size:11px;color:#999;margin-top:2px;}
 .up{color:#1D9E75;}.down{color:#e53e3e;}
 .section-title{font-size:11px;font-weight:600;color:#999;margin-bottom:8px;text-transform:uppercase;letter-spacing:.06em;}
-/* TABLE */
 .tw{background:#fff;border:1px solid #e8e8e5;border-radius:10px;overflow:hidden;margin-bottom:16px;}
 table{width:100%;border-collapse:collapse;font-size:12px;table-layout:fixed;}
 th{font-size:11px;font-weight:600;color:#999;padding:8px 12px;text-align:left;border-bottom:1px solid #e8e8e5;background:#fafaf8;}
 td{padding:9px 12px;color:#1a1a1a;border-bottom:1px solid #f0f0ee;vertical-align:middle;}
 tr:last-child td{border-bottom:none;}
-tr:hover td{background:#fafaf8;}
-/* BADGES */
+tr.clickable:hover td{background:#f0faf6;cursor:pointer;}
 .badge{display:inline-block;font-size:10px;padding:2px 7px;border-radius:20px;font-weight:500;}
 .bc{background:#ebf5ff;color:#2b6cb0;}.br{background:#e6fffa;color:#276749;}.bg{background:#fffbeb;color:#b7791f;}.bh{background:#fff5f5;color:#c53030;}
 .bac{background:#e6fffa;color:#276749;}.bin{background:#f5f5f3;color:#999;border:1px solid #e8e8e5;}
 .bpd{background:#e6fffa;color:#276749;}.bpn{background:#fffbeb;color:#b7791f;}.bpt{background:#ebf5ff;color:#2b6cb0;}
-/* TASK LIST */
 .task-list{background:#fff;border:1px solid #e8e8e5;border-radius:10px;overflow:hidden;}
 .ti{display:flex;align-items:flex-start;gap:8px;padding:9px 12px;border-bottom:1px solid #f0f0ee;}
 .ti:last-child{border-bottom:none;}
@@ -66,12 +56,10 @@ tr:hover td{background:#fafaf8;}
 .tt.dt{text-decoration:line-through;color:#bbb;}
 .tm{font-size:11px;color:#999;margin-top:2px;}
 .pd{display:inline-block;width:6px;height:6px;border-radius:50%;margin-right:3px;}
-.ph2{background:#e53e3e;}.pm{background:#dd6b20;}.plo{background:#1D9E75;}
+.ph2{background:#e53e3e;}.pmm{background:#dd6b20;}.plo{background:#1D9E75;}
 .sd{display:inline-block;width:6px;height:6px;border-radius:50%;margin-right:4px;}
 .sa{background:#1D9E75;}.si{background:#ccc;}.sn{background:#3182ce;}
-/* TWO COL */
 .two-col{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);gap:14px;}
-/* PIPELINE */
 .pipeline{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:18px;}
 .pipe-col{background:#fafaf8;border:1px solid #e8e8e5;border-radius:10px;padding:10px;}
 .pipe-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
@@ -82,11 +70,10 @@ tr:hover td{background:#fafaf8;}
 .deal-name{font-size:12px;font-weight:500;color:#1a1a1a;margin-bottom:3px;}
 .deal-type{font-size:11px;margin-bottom:4px;}
 .deal-val{font-size:12px;color:#1D9E75;font-weight:600;}
-/* CALENDAR */
 .cal-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
 .cal-nav{display:flex;align-items:center;gap:10px;}
 .cal-month{font-size:15px;font-weight:600;color:#1a1a1a;min-width:120px;}
-.cal-arrow{background:#fff;border:1px solid #e8e8e5;border-radius:8px;width:28px;height:28px;cursor:pointer;color:#666;font-size:14px;display:flex;align-items:center;justify-content:center;}
+.cal-arrow{background:#fff;border:1px solid #e8e8e5;border-radius:8px;width:28px;height:28px;cursor:pointer;color:#666;font-size:16px;display:flex;align-items:center;justify-content:center;line-height:1;}
 .cal-arrow:hover{background:#f5f5f3;}
 .legend{display:flex;gap:12px;align-items:center;flex-wrap:wrap;}
 .legend-item{display:flex;align-items:center;gap:5px;font-size:11px;color:#666;}
@@ -105,14 +92,13 @@ tr:hover td{background:#fafaf8;}
 .cal-day.today{background:#f0faf6;}
 .dn2{font-size:11px;color:#666;margin-bottom:3px;font-weight:500;}
 .cal-day.today .dn2{color:#1D9E75;font-weight:700;}
-.appt{font-size:10px;border-radius:4px;padding:2px 5px;margin-bottom:2px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:500;}
+.appt{font-size:10px;border-radius:4px;padding:2px 5px;margin-bottom:2px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:500;display:block;width:100%;}
 .appt:hover{opacity:.8;}
 .au{background:#F4C0D1;color:#72243E;}
 .aa{background:#B5D4F4;color:#0C447C;}
 .ac{background:#FAC775;color:#633806;}
 .ap{background:#9FE1CB;color:#085041;}
 .more-appts{font-size:10px;color:#999;cursor:pointer;}
-/* CLEANERS */
 .cleaner-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:16px;}
 .cleaner-card{background:#fff;border:1px solid #e8e8e5;border-radius:10px;padding:13px;cursor:pointer;}
 .cleaner-card:hover{border-color:#1D9E75;box-shadow:0 2px 8px rgba(29,158,117,.1);}
@@ -126,24 +112,22 @@ tr:hover td{background:#fafaf8;}
 .cs-val{font-size:13px;font-weight:600;color:#1a1a1a;margin-top:1px;}
 .pb{height:4px;background:#f0f0ee;border-radius:2px;overflow:hidden;margin-top:8px;}
 .pf{height:100%;border-radius:2px;background:#1D9E75;}
-/* PAYROLL */
 .ppbar{display:flex;align-items:center;gap:8px;margin-bottom:14px;flex-wrap:wrap;}
 .ppbar-label{font-size:13px;font-weight:600;color:#1a1a1a;}
 .pbtn{font-size:11px;padding:4px 10px;border-radius:8px;border:1px solid #e0e0dd;background:#fff;color:#666;cursor:pointer;font-family:inherit;}
 .pbtn.active{background:#f0faf6;color:#1D9E75;border-color:#1D9E75;font-weight:500;}
-/* OVERLAY */
 .overlay{position:fixed;inset:0;background:rgba(0,0,0,.4);display:flex;align-items:flex-start;justify-content:flex-end;z-index:1000;}
 .overlay.hidden{display:none;}
-.panel{width:360px;height:100%;background:#fff;overflow-y:auto;box-shadow:-4px 0 24px rgba(0,0,0,.1);}
+.panel{width:380px;height:100%;background:#fff;overflow-y:auto;box-shadow:-4px 0 24px rgba(0,0,0,.1);}
 .panel-header{padding:14px 16px;border-bottom:1px solid #e8e8e5;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:#fff;z-index:1;}
 .panel-title{font-size:14px;font-weight:600;color:#1a1a1a;}
-.close-btn{background:#fff;border:1px solid #e8e8e5;border-radius:8px;width:28px;height:28px;cursor:pointer;color:#666;font-size:14px;display:flex;align-items:center;justify-content:center;}
+.close-btn{background:#fff;border:1px solid #e8e8e5;border-radius:8px;width:28px;height:28px;cursor:pointer;color:#666;font-size:16px;display:flex;align-items:center;justify-content:center;}
 .close-btn:hover{background:#f5f5f3;}
 .panel-body{padding:16px;}
 .info-block{background:#fafaf8;border-radius:10px;padding:11px 13px;margin-bottom:12px;}
 .info-row{display:flex;justify-content:space-between;align-items:flex-start;padding:5px 0;border-bottom:1px solid #f0f0ee;}
 .info-row:last-child{border-bottom:none;}
-.info-label{font-size:11px;color:#999;flex-shrink:0;width:120px;}
+.info-label{font-size:11px;color:#999;flex-shrink:0;width:130px;}
 .info-val{font-size:12px;color:#1a1a1a;text-align:right;font-weight:500;}
 .panel-section{font-size:11px;font-weight:600;color:#999;text-transform:uppercase;letter-spacing:.06em;margin:14px 0 8px;}
 .action-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:4px;}
@@ -160,7 +144,6 @@ tr:hover td{background:#fafaf8;}
 .s-assigned{background:#B5D4F4;color:#0C447C;}
 .s-completed{background:#FAC775;color:#633806;}
 .s-paid{background:#9FE1CB;color:#085041;}
-/* PROFILE */
 .profile-top{display:flex;align-items:center;gap:13px;margin-bottom:16px;}
 .profile-avatar{width:54px;height:54px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:600;flex-shrink:0;}
 .profile-name{font-size:16px;font-weight:600;color:#1a1a1a;}
@@ -169,7 +152,6 @@ tr:hover td{background:#fafaf8;}
 .stat-box{background:#fafaf8;border-radius:8px;padding:9px 11px;}
 .stat-box-label{font-size:10px;color:#999;}
 .stat-box-val{font-size:16px;font-weight:600;color:#1a1a1a;margin-top:2px;}
-/* AI MESSAGING */
 .msg-tabs{display:flex;gap:0;border-bottom:1px solid #e8e8e5;margin-bottom:16px;}
 .msg-tab{font-size:12px;padding:8px 14px;color:#999;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;}
 .msg-tab.active{color:#1D9E75;border-bottom-color:#1D9E75;font-weight:500;}
@@ -201,13 +183,23 @@ textarea:focus{outline:none;border-color:#1D9E75;}
 .sent-notice.show{display:block;}
 .cleaner-check-list{display:flex;flex-direction:column;gap:6px;margin-bottom:10px;}
 .cleaner-check-list label{display:flex;align-items:center;gap:8px;font-size:12px;color:#1a1a1a;cursor:pointer;}
-/* REPORTING */
 .report-two{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);gap:14px;}
+.job-history-item{padding:8px 0;border-bottom:1px solid #f0f0ee;display:flex;justify-content:space-between;align-items:center;}
+.job-history-item:last-child{border-bottom:none;}
+.edit-form{display:none;}
+.edit-form.show{display:block;}
+.view-mode{display:block;}
+.view-mode.hide{display:none;}
+.form-row{margin-bottom:10px;}
+.form-row label{display:block;font-size:11px;color:#999;margin-bottom:4px;font-weight:500;}
+.form-row input,.form-row select,.form-row textarea{width:100%;padding:7px 10px;border:1px solid #e0e0dd;border-radius:8px;font-size:12px;font-family:inherit;color:#1a1a1a;background:#fff;}
+.form-row input:focus,.form-row select:focus,.form-row textarea:focus{outline:none;border-color:#1D9E75;}
+.form-two{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.save-bar{display:flex;gap:8px;margin-top:14px;}
 </style>
 </head>
 <body>
 <div class="crm">
-  <!-- SIDEBAR -->
   <div class="sidebar">
     <div class="sidebar-logo"><div class="name">Hawaii Natural Clean</div><div class="sub">CRM v1</div></div>
     <div class="nav-section">Main</div>
@@ -224,7 +216,6 @@ textarea:focus{outline:none;border-color:#1D9E75;}
     <div class="nav-item" onclick="sv('reporting',this)"><svg class="nav-icon" viewBox="0 0 16 16" fill="none"><rect x="2" y="9" width="3" height="5" rx="1" fill="currentColor" opacity=".5"/><rect x="6.5" y="6" width="3" height="8" rx="1" fill="currentColor" opacity=".7"/><rect x="11" y="3" width="3" height="11" rx="1" fill="currentColor"/></svg>Reporting</div>
   </div>
 
-  <!-- MAIN -->
   <div class="main">
     <div class="topbar">
       <h1 id="page-title">Calendar</h1>
@@ -239,9 +230,9 @@ textarea:focus{outline:none;border-color:#1D9E75;}
       <div id="view-calendar" class="vc active">
         <div class="cal-header">
           <div class="cal-nav">
-            <button class="cal-arrow" onclick="changeMonth(-1)">&#8249;</button>
+            <button class="cal-arrow" id="prev-btn">&lsaquo;</button>
             <div class="cal-month" id="cal-month-label">April 2026</div>
-            <button class="cal-arrow" onclick="changeMonth(1)">&#8250;</button>
+            <button class="cal-arrow" id="next-btn">&rsaquo;</button>
           </div>
           <div class="legend">
             <div class="legend-item"><div class="ld lu"></div>Unassigned</div>
@@ -266,14 +257,24 @@ textarea:focus{outline:none;border-color:#1D9E75;}
         </div>
         <div class="section-title">Lead pipeline snapshot</div>
         <div class="pipeline">
-          <div class="pipe-col"><div class="pipe-header"><span class="pipe-label">New inquiry</span><span class="pipe-count">4</span></div><div class="deal-card"><div class="deal-name">Maui Wellness Center</div><div class="deal-type"><span class="badge bc">Commercial</span></div><div class="deal-val">$1,200/mo</div></div><div class="deal-card"><div class="deal-name">Hale Koa HOA</div><div class="deal-type"><span class="badge bc">Commercial</span></div><div class="deal-val">$2,800/mo</div></div></div>
-          <div class="pipe-col"><div class="pipe-header"><span class="pipe-label">Quoted</span><span class="pipe-count">3</span></div><div class="deal-card"><div class="deal-name">Oahu Dental Group</div><div class="deal-type"><span class="badge bc">Commercial</span></div><div class="deal-val">$950/mo</div></div><div class="deal-card"><div class="deal-name">Airbnb — Kailua</div><div class="deal-type"><span class="badge br">Residential</span></div><div class="deal-val">$180/clean</div></div></div>
-          <div class="pipe-col"><div class="pipe-header"><span class="pipe-label">Follow-up</span><span class="pipe-count">3</span></div><div class="deal-card"><div class="deal-name">HNL Airport</div><div class="deal-type"><span class="badge bg">Gov</span> <span class="badge bh">Hot</span></div><div class="deal-val">$14k/mo</div></div><div class="deal-card"><div class="deal-name">Pearl City Law</div><div class="deal-type"><span class="badge bc">Commercial</span></div><div class="deal-val">$600/mo</div></div></div>
-          <div class="pipe-col"><div class="pipe-header"><span class="pipe-label">Closed</span><span class="pipe-count">2</span></div><div class="deal-card"><div class="deal-name">Kona Coffee Co.</div><div class="deal-type"><span class="badge bc">Commercial</span></div><div class="deal-val">$750/mo</div></div></div>
+          <div class="pipe-col"><div class="pipe-header"><span class="pipe-label">New inquiry</span><span class="pipe-count">4</span></div><div class="deal-card" onclick="openLead('maui-wellness')"><div class="deal-name">Maui Wellness Center</div><div class="deal-type"><span class="badge bc">Commercial</span></div><div class="deal-val">$1,200/mo</div></div><div class="deal-card" onclick="openLead('hale-koa')"><div class="deal-name">Hale Koa HOA</div><div class="deal-type"><span class="badge bc">Commercial</span></div><div class="deal-val">$2,800/mo</div></div></div>
+          <div class="pipe-col"><div class="pipe-header"><span class="pipe-label">Quoted</span><span class="pipe-count">3</span></div><div class="deal-card" onclick="openLead('oahu-dental')"><div class="deal-name">Oahu Dental Group</div><div class="deal-type"><span class="badge bc">Commercial</span></div><div class="deal-val">$950/mo</div></div><div class="deal-card" onclick="openLead('kailua-airbnb')"><div class="deal-name">Airbnb — Kailua</div><div class="deal-type"><span class="badge br">Residential</span></div><div class="deal-val">$180/clean</div></div></div>
+          <div class="pipe-col"><div class="pipe-header"><span class="pipe-label">Follow-up</span><span class="pipe-count">3</span></div><div class="deal-card" onclick="openLead('hnl-airport')"><div class="deal-name">HNL Airport</div><div class="deal-type"><span class="badge bg">Gov</span> <span class="badge bh">Hot</span></div><div class="deal-val">$14k/mo</div></div><div class="deal-card" onclick="openLead('pearl-city-law')"><div class="deal-name">Pearl City Law</div><div class="deal-type"><span class="badge bc">Commercial</span></div><div class="deal-val">$600/mo</div></div></div>
+          <div class="pipe-col"><div class="pipe-header"><span class="pipe-label">Closed</span><span class="pipe-count">2</span></div><div class="deal-card" onclick="openLead('kona-coffee')"><div class="deal-name">Kona Coffee Co.</div><div class="deal-type"><span class="badge bc">Commercial</span></div><div class="deal-val">$750/mo</div></div></div>
         </div>
         <div class="two-col">
-          <div><div class="section-title">Recent clients</div><div class="tw"><table><thead><tr><th style="width:35%">Name</th><th style="width:22%">Type</th><th style="width:20%">Last job</th><th style="width:23%">Status</th></tr></thead><tbody><tr><td>The Morrisons</td><td><span class="badge br">Residential</span></td><td>Mar 28</td><td><span class="sd sa"></span>Active</td></tr><tr><td>Aloha Realty</td><td><span class="badge bc">Commercial</span></td><td>Mar 25</td><td><span class="sd sa"></span>Active</td></tr><tr><td>Chen Family</td><td><span class="badge br">Residential</span></td><td>Feb 10</td><td><span class="sd si"></span>Dormant</td></tr><tr><td>Maui Surf Hotel</td><td><span class="badge bc">Commercial</span></td><td>Mar 30</td><td><span class="sd sa"></span>Active</td></tr></tbody></table></div></div>
-          <div><div class="section-title">VA tasks — today</div><div class="task-list"><div class="ti"><div class="tch done"></div><div class="tb"><div class="tt dt">Send quote to Oahu Dental</div><div class="tm">Done</div></div></div><div class="ti"><div class="tch"></div><div class="tb"><div class="tt">Follow up: Pearl City Law</div><div class="tm"><span class="pd ph2"></span>High · Due today</div></div></div><div class="ti"><div class="tch"></div><div class="tb"><div class="tt">Cold call — 10 gyms</div><div class="tm"><span class="pd pm"></span>Med · Due today</div></div></div><div class="ti"><div class="tch"></div><div class="tb"><div class="tt">Update airport hire tracker</div><div class="tm"><span class="pd pm"></span>Med · Due Apr 4</div></div></div></div></div>
+          <div><div class="section-title">Recent clients</div><div class="tw"><table><thead><tr><th style="width:35%">Name</th><th style="width:22%">Type</th><th style="width:20%">Last job</th><th style="width:23%">Status</th></tr></thead><tbody>
+          <tr class="clickable" onclick="openClient('morrisons')"><td>The Morrisons</td><td><span class="badge br">Residential</span></td><td>Mar 28</td><td><span class="sd sa"></span>Active</td></tr>
+          <tr class="clickable" onclick="openClient('aloha-realty')"><td>Aloha Realty</td><td><span class="badge bc">Commercial</span></td><td>Mar 25</td><td><span class="sd sa"></span>Active</td></tr>
+          <tr class="clickable" onclick="openClient('chen-family')"><td>Chen Family</td><td><span class="badge br">Residential</span></td><td>Feb 10</td><td><span class="sd si"></span>Dormant</td></tr>
+          <tr class="clickable" onclick="openClient('maui-surf')"><td>Maui Surf Hotel</td><td><span class="badge bc">Commercial</span></td><td>Mar 30</td><td><span class="sd sa"></span>Active</td></tr>
+          </tbody></table></div></div>
+          <div><div class="section-title">VA tasks — today</div><div class="task-list">
+            <div class="ti"><div class="tch done"></div><div class="tb"><div class="tt dt">Send quote to Oahu Dental</div><div class="tm">Done</div></div></div>
+            <div class="ti"><div class="tch"></div><div class="tb"><div class="tt">Follow up: Pearl City Law</div><div class="tm"><span class="pd ph2"></span>High · Due today</div></div></div>
+            <div class="ti"><div class="tch"></div><div class="tb"><div class="tt">Cold call — 10 gyms</div><div class="tm"><span class="pd pmm"></span>Med · Due today</div></div></div>
+            <div class="ti"><div class="tch"></div><div class="tb"><div class="tt">Update airport hire tracker</div><div class="tm"><span class="pd pmm"></span>Med · Due Apr 4</div></div></div>
+          </div></div>
         </div>
       </div>
 
@@ -285,10 +286,25 @@ textarea:focus{outline:none;border-color:#1D9E75;}
           <div class="metric"><div class="metric-label">Avg close time</div><div class="metric-value">18d</div></div>
         </div>
         <div class="pipeline">
-          <div class="pipe-col"><div class="pipe-header"><span class="pipe-label">New inquiry</span><span class="pipe-count">4</span></div><div class="deal-card"><div class="deal-name">Maui Wellness Center</div><div class="deal-type"><span class="badge bc">Commercial</span></div><div class="deal-val">$1,200/mo</div></div><div class="deal-card"><div class="deal-name">Sarah K.</div><div class="deal-type"><span class="badge br">Residential</span></div><div class="deal-val">$280/visit</div></div><div class="deal-card"><div class="deal-name">Hale Koa HOA</div><div class="deal-type"><span class="badge bc">Commercial</span></div><div class="deal-val">$2,800/mo</div></div></div>
-          <div class="pipe-col"><div class="pipe-header"><span class="pipe-label">Quoted</span><span class="pipe-count">3</span></div><div class="deal-card"><div class="deal-name">Oahu Dental Group</div><div class="deal-type"><span class="badge bc">Commercial</span></div><div class="deal-val">$950/mo</div></div><div class="deal-card"><div class="deal-name">Airbnb — Kailua</div><div class="deal-type"><span class="badge br">Residential</span></div><div class="deal-val">$180/clean</div></div><div class="deal-card"><div class="deal-name">Kakaako Medical</div><div class="deal-type"><span class="badge bc">Commercial</span></div><div class="deal-val">$1,100/mo</div></div></div>
-          <div class="pipe-col"><div class="pipe-header"><span class="pipe-label">Follow-up</span><span class="pipe-count">3</span></div><div class="deal-card"><div class="deal-name">HNL Airport</div><div class="deal-type"><span class="badge bg">Gov</span> <span class="badge bh">Hot</span></div><div class="deal-val">$14k/mo</div></div><div class="deal-card"><div class="deal-name">Pearl City Law</div><div class="deal-type"><span class="badge bc">Commercial</span></div><div class="deal-val">$600/mo</div></div><div class="deal-card"><div class="deal-name">Waikiki Hotel</div><div class="deal-type"><span class="badge bc">Commercial</span></div><div class="deal-val">$3,200/mo</div></div></div>
-          <div class="pipe-col"><div class="pipe-header"><span class="pipe-label">Closed won</span><span class="pipe-count">2</span></div><div class="deal-card"><div class="deal-name">Kona Coffee Co.</div><div class="deal-type"><span class="badge bc">Commercial</span></div><div class="deal-val">$750/mo</div></div><div class="deal-card"><div class="deal-name">Lani P.</div><div class="deal-type"><span class="badge br">Residential</span></div><div class="deal-val">$240/mo</div></div></div>
+          <div class="pipe-col"><div class="pipe-header"><span class="pipe-label">New inquiry</span><span class="pipe-count">4</span></div>
+            <div class="deal-card" onclick="openLead('maui-wellness')"><div class="deal-name">Maui Wellness Center</div><div class="deal-type"><span class="badge bc">Commercial</span></div><div class="deal-val">$1,200/mo</div></div>
+            <div class="deal-card" onclick="openLead('sarah-k')"><div class="deal-name">Sarah K.</div><div class="deal-type"><span class="badge br">Residential</span></div><div class="deal-val">$280/visit</div></div>
+            <div class="deal-card" onclick="openLead('hale-koa')"><div class="deal-name">Hale Koa HOA</div><div class="deal-type"><span class="badge bc">Commercial</span></div><div class="deal-val">$2,800/mo</div></div>
+          </div>
+          <div class="pipe-col"><div class="pipe-header"><span class="pipe-label">Quoted</span><span class="pipe-count">3</span></div>
+            <div class="deal-card" onclick="openLead('oahu-dental')"><div class="deal-name">Oahu Dental Group</div><div class="deal-type"><span class="badge bc">Commercial</span></div><div class="deal-val">$950/mo</div></div>
+            <div class="deal-card" onclick="openLead('kailua-airbnb')"><div class="deal-name">Airbnb — Kailua</div><div class="deal-type"><span class="badge br">Residential</span></div><div class="deal-val">$180/clean</div></div>
+            <div class="deal-card" onclick="openLead('kakaako-med')"><div class="deal-name">Kakaako Medical</div><div class="deal-type"><span class="badge bc">Commercial</span></div><div class="deal-val">$1,100/mo</div></div>
+          </div>
+          <div class="pipe-col"><div class="pipe-header"><span class="pipe-label">Follow-up</span><span class="pipe-count">3</span></div>
+            <div class="deal-card" onclick="openLead('hnl-airport')"><div class="deal-name">HNL Airport</div><div class="deal-type"><span class="badge bg">Gov</span> <span class="badge bh">Hot</span></div><div class="deal-val">$14k/mo</div></div>
+            <div class="deal-card" onclick="openLead('pearl-city-law')"><div class="deal-name">Pearl City Law</div><div class="deal-type"><span class="badge bc">Commercial</span></div><div class="deal-val">$600/mo</div></div>
+            <div class="deal-card" onclick="openLead('waikiki-hotel')"><div class="deal-name">Waikiki Hotel</div><div class="deal-type"><span class="badge bc">Commercial</span></div><div class="deal-val">$3,200/mo</div></div>
+          </div>
+          <div class="pipe-col"><div class="pipe-header"><span class="pipe-label">Closed won</span><span class="pipe-count">2</span></div>
+            <div class="deal-card" onclick="openLead('kona-coffee')"><div class="deal-name">Kona Coffee Co.</div><div class="deal-type"><span class="badge bc">Commercial</span></div><div class="deal-val">$750/mo</div></div>
+            <div class="deal-card" onclick="openLead('lani-p')"><div class="deal-name">Lani P.</div><div class="deal-type"><span class="badge br">Residential</span></div><div class="deal-val">$240/mo</div></div>
+          </div>
         </div>
       </div>
 
@@ -299,7 +315,16 @@ textarea:focus{outline:none;border-color:#1D9E75;}
           <div class="metric"><div class="metric-label">Dormant (60d+)</div><div class="metric-value">4</div><div class="metric-sub down">Needs reactivation</div></div>
           <div class="metric"><div class="metric-label">Recurring</div><div class="metric-value">22</div><div class="metric-sub up">65% of base</div></div>
         </div>
-        <div class="tw"><table><thead><tr><th style="width:22%">Name</th><th style="width:16%">Type</th><th style="width:13%">Last job</th><th style="width:15%">Rev/mo</th><th style="width:15%">Schedule</th><th style="width:19%">Status</th></tr></thead><tbody><tr><td>The Morrisons</td><td><span class="badge br">Residential</span></td><td>Mar 28</td><td>$520</td><td>Biweekly</td><td><span class="sd sa"></span>Active</td></tr><tr><td>Aloha Realty</td><td><span class="badge bc">Commercial</span></td><td>Mar 25</td><td>$1,400</td><td>Weekly</td><td><span class="sd sa"></span>Active</td></tr><tr><td>Chen Family</td><td><span class="badge br">Residential</span></td><td>Feb 10</td><td>—</td><td>One-time</td><td><span class="sd si"></span>Dormant</td></tr><tr><td>Maui Surf Hotel</td><td><span class="badge bc">Commercial</span></td><td>Mar 30</td><td>$3,200</td><td>Daily</td><td><span class="sd sa"></span>Active</td></tr><tr><td>Lani P.</td><td><span class="badge br">Residential</span></td><td>Mar 29</td><td>$240</td><td>Monthly</td><td><span class="sd sn"></span>New</td></tr><tr><td>Kona Coffee Co.</td><td><span class="badge bc">Commercial</span></td><td>Mar 27</td><td>$750</td><td>Weekly</td><td><span class="sd sa"></span>Active</td></tr><tr><td>Pearl City Gym</td><td><span class="badge bc">Commercial</span></td><td>Mar 26</td><td>$800</td><td>3x/week</td><td><span class="sd sa"></span>Active</td></tr><tr><td>Tanaka Residence</td><td><span class="badge br">Residential</span></td><td>Jan 15</td><td>—</td><td>One-time</td><td><span class="sd si"></span>Dormant</td></tr></tbody></table></div>
+        <div class="tw"><table><thead><tr><th style="width:22%">Name</th><th style="width:16%">Type</th><th style="width:13%">Last job</th><th style="width:15%">Rev/mo</th><th style="width:15%">Schedule</th><th style="width:19%">Status</th></tr></thead><tbody>
+          <tr class="clickable" onclick="openClient('morrisons')"><td>The Morrisons</td><td><span class="badge br">Residential</span></td><td>Mar 28</td><td>$520</td><td>Biweekly</td><td><span class="sd sa"></span>Active</td></tr>
+          <tr class="clickable" onclick="openClient('aloha-realty')"><td>Aloha Realty</td><td><span class="badge bc">Commercial</span></td><td>Mar 25</td><td>$1,400</td><td>Weekly</td><td><span class="sd sa"></span>Active</td></tr>
+          <tr class="clickable" onclick="openClient('chen-family')"><td>Chen Family</td><td><span class="badge br">Residential</span></td><td>Feb 10</td><td>—</td><td>One-time</td><td><span class="sd si"></span>Dormant</td></tr>
+          <tr class="clickable" onclick="openClient('maui-surf')"><td>Maui Surf Hotel</td><td><span class="badge bc">Commercial</span></td><td>Mar 30</td><td>$3,200</td><td>Daily</td><td><span class="sd sa"></span>Active</td></tr>
+          <tr class="clickable" onclick="openClient('lani-p')"><td>Lani P.</td><td><span class="badge br">Residential</span></td><td>Mar 29</td><td>$240</td><td>Monthly</td><td><span class="sd sn"></span>New</td></tr>
+          <tr class="clickable" onclick="openClient('kona-coffee')"><td>Kona Coffee Co.</td><td><span class="badge bc">Commercial</span></td><td>Mar 27</td><td>$750</td><td>Weekly</td><td><span class="sd sa"></span>Active</td></tr>
+          <tr class="clickable" onclick="openClient('pearl-gym')"><td>Pearl City Gym</td><td><span class="badge bc">Commercial</span></td><td>Mar 26</td><td>$800</td><td>3x/week</td><td><span class="sd sa"></span>Active</td></tr>
+          <tr class="clickable" onclick="openClient('tanaka')"><td>Tanaka Residence</td><td><span class="badge br">Residential</span></td><td>Jan 15</td><td>—</td><td>One-time</td><td><span class="sd si"></span>Dormant</td></tr>
+        </tbody></table></div>
       </div>
 
       <!-- TASKS -->
@@ -310,8 +335,19 @@ textarea:focus{outline:none;border-color:#1D9E75;}
           <div class="metric"><div class="metric-label">Done this week</div><div class="metric-value">9</div><div class="metric-sub up">On track</div></div>
         </div>
         <div class="two-col">
-          <div><div class="section-title">Open tasks</div><div class="task-list"><div class="ti"><div class="tch"></div><div class="tb"><div class="tt">Follow up: Pearl City Law (2nd touch)</div><div class="tm"><span class="pd ph2"></span>High · Overdue Apr 1</div></div></div><div class="ti"><div class="tch"></div><div class="tb"><div class="tt">Cold call — 10 Oahu gyms</div><div class="tm"><span class="pd ph2"></span>High · Due today</div></div></div><div class="ti"><div class="tch"></div><div class="tb"><div class="tt">Update airport hire tracker</div><div class="tm"><span class="pd pm"></span>Med · Due Apr 4</div></div></div><div class="ti"><div class="tch"></div><div class="tb"><div class="tt">Reactivation text — Chen Family</div><div class="tm"><span class="pd pm"></span>Med · Due Apr 5</div></div></div><div class="ti"><div class="tch"></div><div class="tb"><div class="tt">Onboard new VA — process docs</div><div class="tm"><span class="pd ph2"></span>High · Due Apr 10</div></div></div></div></div>
-          <div><div class="section-title">Completed</div><div class="task-list"><div class="ti"><div class="tch done"></div><div class="tb"><div class="tt dt">Send quote to Oahu Dental</div><div class="tm">Done Mar 31</div></div></div><div class="ti"><div class="tch done"></div><div class="tb"><div class="tt dt">Confirm Maui Surf Hotel schedule</div><div class="tm">Done Mar 30</div></div></div><div class="ti"><div class="tch done"></div><div class="tb"><div class="tt dt">Invoice Aloha Realty — March</div><div class="tm">Done Mar 29</div></div></div><div class="ti"><div class="tch done"></div><div class="tb"><div class="tt dt">Cold call — law firms (10)</div><div class="tm">Done Mar 28</div></div></div></div></div>
+          <div><div class="section-title">Open tasks</div><div class="task-list">
+            <div class="ti"><div class="tch"></div><div class="tb"><div class="tt">Follow up: Pearl City Law (2nd touch)</div><div class="tm"><span class="pd ph2"></span>High · Overdue Apr 1</div></div></div>
+            <div class="ti"><div class="tch"></div><div class="tb"><div class="tt">Cold call — 10 Oahu gyms</div><div class="tm"><span class="pd ph2"></span>High · Due today</div></div></div>
+            <div class="ti"><div class="tch"></div><div class="tb"><div class="tt">Update airport hire tracker</div><div class="tm"><span class="pd pmm"></span>Med · Due Apr 4</div></div></div>
+            <div class="ti"><div class="tch"></div><div class="tb"><div class="tt">Reactivation text — Chen Family</div><div class="tm"><span class="pd pmm"></span>Med · Due Apr 5</div></div></div>
+            <div class="ti"><div class="tch"></div><div class="tb"><div class="tt">Onboard new VA — process docs</div><div class="tm"><span class="pd ph2"></span>High · Due Apr 10</div></div></div>
+          </div></div>
+          <div><div class="section-title">Completed</div><div class="task-list">
+            <div class="ti"><div class="tch done"></div><div class="tb"><div class="tt dt">Send quote to Oahu Dental</div><div class="tm">Done Mar 31</div></div></div>
+            <div class="ti"><div class="tch done"></div><div class="tb"><div class="tt dt">Confirm Maui Surf Hotel schedule</div><div class="tm">Done Mar 30</div></div></div>
+            <div class="ti"><div class="tch done"></div><div class="tb"><div class="tt dt">Invoice Aloha Realty — March</div><div class="tm">Done Mar 29</div></div></div>
+            <div class="ti"><div class="tch done"></div><div class="tb"><div class="tt dt">Cold call — law firms (10)</div><div class="tm">Done Mar 28</div></div></div>
+          </div></div>
         </div>
       </div>
 
@@ -327,10 +363,9 @@ textarea:focus{outline:none;border-color:#1D9E75;}
           <div class="msg-tab" onclick="switchMsgTab('invite',this)">Invite cleaner</div>
           <div class="msg-tab" onclick="switchMsgTab('followup',this)">Follow-up</div>
         </div>
-        <!-- CLIENT MSG -->
         <div id="msg-client" class="msg-scenario active">
           <div class="tw" style="padding:14px;">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;"><div><div style="font-size:13px;font-weight:600;color:#1a1a1a;">The Morrisons</div><div style="font-size:11px;color:#999;">Standard clean · Apr 7 · 8:00 AM · Kailua</div></div><span class="badge" style="background:#B5D4F4;color:#0C447C;">Assigned</span></div>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;"><div><div style="font-size:13px;font-weight:600;">The Morrisons</div><div style="font-size:11px;color:#999;">Standard clean · Apr 7 · 8:00 AM · Kailua</div></div><span class="badge" style="background:#B5D4F4;color:#0C447C;">Assigned</span></div>
             <div class="chan-toggle"><button class="chan-btn active-sms" onclick="setChan(this,'sms')">SMS</button><button class="chan-btn" onclick="setChan(this,'email')">Email</button></div>
             <div class="ctx-chips"><div class="ctx-chip">Client: <strong>The Morrisons</strong></div><div class="ctx-chip">Job: <strong>Biweekly clean</strong></div><div class="ctx-chip">Cleaner: <strong>Kaimana M.</strong></div><div class="ctx-chip">Date: <strong>Apr 7, 8am</strong></div></div>
             <div class="tone-row"><span class="tone-label">Tone:</span><button class="tone-btn active" onclick="setTone(this)">Friendly</button><button class="tone-btn" onclick="setTone(this)">Professional</button><button class="tone-btn" onclick="setTone(this)">Brief</button></div>
@@ -340,23 +375,21 @@ textarea:focus{outline:none;border-color:#1D9E75;}
             <div class="sent-notice" id="msg-client-sent">Sent via Quo · Message delivered to Morrison household.</div>
           </div>
         </div>
-        <!-- INVITE -->
         <div id="msg-invite" class="msg-scenario">
           <div class="tw" style="padding:14px;">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;"><div><div style="font-size:13px;font-weight:600;color:#1a1a1a;">Invite cleaner — Apr 14 job</div><div style="font-size:11px;color:#999;">The Morrisons · 8:00 AM · Unassigned</div></div><span class="badge" style="background:#F4C0D1;color:#72243E;">Unassigned</span></div>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;"><div><div style="font-size:13px;font-weight:600;">Invite cleaner — Apr 14 job</div><div style="font-size:11px;color:#999;">The Morrisons · 8:00 AM · Unassigned</div></div><span class="badge" style="background:#F4C0D1;color:#72243E;">Unassigned</span></div>
             <div class="section-title" style="margin-bottom:7px;">Select cleaners to invite</div>
             <div class="cleaner-check-list"><label><input type="checkbox" checked style="accent-color:#1D9E75;"> Kaimana M. <span style="font-size:11px;color:#999;">· Oahu · $18/hr</span></label><label><input type="checkbox" checked style="accent-color:#1D9E75;"> Alohi L. <span style="font-size:11px;color:#999;">· Oahu · $16/hr</span></label><label><input type="checkbox" style="accent-color:#1D9E75;"> Keanu N. <span style="font-size:11px;color:#999;">· Oahu · $16/hr</span></label></div>
-            <div class="ctx-chips"><div class="ctx-chip">Job: <strong>Standard clean</strong></div><div class="ctx-chip">Date: <strong>Apr 14, 8am</strong></div><div class="ctx-chip">Address: <strong>Kailua, Oahu</strong></div><div class="ctx-chip">Est: <strong>3.5 hrs</strong></div></div>
+            <div class="ctx-chips"><div class="ctx-chip">Job: <strong>Standard clean</strong></div><div class="ctx-chip">Date: <strong>Apr 14, 8am</strong></div><div class="ctx-chip">Est: <strong>3.5 hrs</strong></div></div>
             <textarea id="msg-invite-ta" placeholder="Click 'AI draft' to generate a job invite SMS..."></textarea>
             <div class="ai-thinking" id="msg-invite-thinking"><div class="dot-pulse"><span></span><span></span><span></span></div>Claude is drafting...</div>
             <div class="draft-actions"><button class="btn" style="background:#f5f0ff;color:#553c9a;border-color:#d6bcfa;" onclick="aiDraft('invite')">AI draft</button><button class="btn" onclick="clearTA('msg-invite-ta','msg-invite-count')">Clear</button><span class="char-count" id="msg-invite-count">0 chars</span><button class="btn btn-primary" onclick="sendMessage('invite')">Send to selected</button></div>
-            <div class="sent-notice" id="msg-invite-sent">Sent to 2 cleaners · Kaimana M. and Alohi L. notified. First to reply YES gets assigned.</div>
+            <div class="sent-notice" id="msg-invite-sent">Sent to 2 cleaners · First to reply YES gets assigned.</div>
           </div>
         </div>
-        <!-- FOLLOWUP -->
         <div id="msg-followup" class="msg-scenario">
           <div class="tw" style="padding:14px;">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;"><div><div style="font-size:13px;font-weight:600;color:#1a1a1a;">Chen Family</div><div style="font-size:11px;color:#999;">Last job: Feb 10 · 51 days dormant</div></div><span class="badge bg">Dormant 51d</span></div>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;"><div><div style="font-size:13px;font-weight:600;">Chen Family</div><div style="font-size:11px;color:#999;">Last job: Feb 10 · 51 days dormant</div></div><span class="badge bg">Dormant 51d</span></div>
             <div class="chan-toggle"><button class="chan-btn active-sms" onclick="setChan(this,'sms')">SMS</button><button class="chan-btn" onclick="setChan(this,'email')">Email</button></div>
             <div class="ctx-chips"><div class="ctx-chip">Client: <strong>Chen Family</strong></div><div class="ctx-chip">Last job: <strong>Feb 10</strong></div><div class="ctx-chip">Type: <strong>Move-out clean</strong></div></div>
             <div class="tone-row"><span class="tone-label">Goal:</span><button class="tone-btn active" onclick="setTone(this)">Win back</button><button class="tone-btn" onclick="setTone(this)">Offer discount</button><button class="tone-btn" onclick="setTone(this)">Check in</button></div>
@@ -386,7 +419,14 @@ textarea:focus{outline:none;border-color:#1D9E75;}
           <div class="cleaner-card" onclick="openCleaner('tr')" style="opacity:.65"><div class="cleaner-top"><div class="avatar" style="background:#F4C0D1;color:#72243E;">TR</div><div><div class="cleaner-name">Tua R.</div><div class="cleaner-role">Cleaner · Oahu</div></div></div><div class="cleaner-stats"><div class="cs"><div class="cs-label">This week</div><div class="cs-val">0 hrs</div></div><div class="cs"><div class="cs-label">Rate</div><div class="cs-val">$16/hr</div></div><div class="cs"><div class="cs-label">Jobs this mo</div><div class="cs-val">0</div></div><div class="cs"><div class="cs-label">Status</div><div class="cs-val"><span class="badge bin">Inactive</span></div></div></div><div class="pb"><div class="pf" style="width:0%"></div></div></div>
         </div>
         <div class="section-title">Hours log — this week</div>
-        <div class="tw"><table><thead><tr><th style="width:18%">Cleaner</th><th style="width:13%">Date</th><th style="width:30%">Job / client</th><th style="width:10%">Hours</th><th style="width:14%">Island</th><th style="width:15%">Pay</th></tr></thead><tbody><tr><td>Kaimana M.</td><td>Apr 2</td><td>The Morrisons</td><td>3.5</td><td>Oahu</td><td>$63</td></tr><tr><td>Alohi L.</td><td>Apr 2</td><td>Aloha Realty</td><td>4.0</td><td>Oahu</td><td>$64</td></tr><tr><td>Maile K.</td><td>Apr 2</td><td>Maui Surf Hotel</td><td>5.0</td><td>Maui</td><td>$90</td></tr><tr><td>Kaimana M.</td><td>Apr 3</td><td>Kona Coffee Co.</td><td>3.0</td><td>Oahu</td><td>$54</td></tr><tr><td>Keanu N.</td><td>Apr 3</td><td>Pearl City Gym</td><td>4.0</td><td>Oahu</td><td>$64</td></tr><tr><td>Leilani H.</td><td>Apr 3</td><td>Lani P.</td><td>2.5</td><td>Maui</td><td>$40</td></tr></tbody></table></div>
+        <div class="tw"><table><thead><tr><th style="width:18%">Cleaner</th><th style="width:13%">Date</th><th style="width:30%">Job / client</th><th style="width:10%">Hours</th><th style="width:14%">Island</th><th style="width:15%">Pay</th></tr></thead><tbody>
+          <tr><td>Kaimana M.</td><td>Apr 2</td><td>The Morrisons</td><td>3.5</td><td>Oahu</td><td>$63</td></tr>
+          <tr><td>Alohi L.</td><td>Apr 2</td><td>Aloha Realty</td><td>4.0</td><td>Oahu</td><td>$64</td></tr>
+          <tr><td>Maile K.</td><td>Apr 2</td><td>Maui Surf Hotel</td><td>5.0</td><td>Maui</td><td>$90</td></tr>
+          <tr><td>Kaimana M.</td><td>Apr 3</td><td>Kona Coffee Co.</td><td>3.0</td><td>Oahu</td><td>$54</td></tr>
+          <tr><td>Keanu N.</td><td>Apr 3</td><td>Pearl City Gym</td><td>4.0</td><td>Oahu</td><td>$64</td></tr>
+          <tr><td>Leilani H.</td><td>Apr 3</td><td>Lani P.</td><td>2.5</td><td>Maui</td><td>$40</td></tr>
+        </tbody></table></div>
       </div>
 
       <!-- PAYROLL -->
@@ -407,9 +447,23 @@ textarea:focus{outline:none;border-color:#1D9E75;}
           <button class="btn" style="background:#e6fffa;color:#276749;border-color:#9ae6b4;">Run in Gusto</button>
         </div>
         <div class="section-title">Summary — Apr 1–14</div>
-        <div class="tw" style="margin-bottom:16px;"><table><thead><tr><th style="width:20%">Cleaner</th><th style="width:12%">Island</th><th style="width:11%">Hours</th><th style="width:11%">Rate</th><th style="width:14%">Gross</th><th style="width:13%">Paid</th><th style="width:19%">Status</th></tr></thead><tbody><tr><td>Kaimana M.</td><td>Oahu</td><td>68</td><td>$18</td><td>$1,224</td><td>$600</td><td><span class="badge bpt">Partial</span></td></tr><tr><td>Maile K.</td><td>Maui</td><td>72</td><td>$18</td><td>$1,296</td><td>$1,200</td><td><span class="badge bpt">Partial</span></td></tr><tr><td>Alohi L.</td><td>Oahu</td><td>56</td><td>$16</td><td>$896</td><td>$0</td><td><span class="badge bpn">Pending</span></td></tr><tr><td>Keanu N.</td><td>Oahu</td><td>44</td><td>$16</td><td>$704</td><td>$0</td><td><span class="badge bpn">Pending</span></td></tr><tr><td>Leilani H.</td><td>Maui</td><td>44</td><td>$16</td><td>$704</td><td>$0</td><td><span class="badge bpn">Pending</span></td></tr><tr><td>Tua R.</td><td>Oahu</td><td>0</td><td>$16</td><td>$0</td><td>$0</td><td><span class="badge bin">Inactive</span></td></tr></tbody></table></div>
+        <div class="tw" style="margin-bottom:16px;"><table><thead><tr><th style="width:20%">Cleaner</th><th style="width:12%">Island</th><th style="width:11%">Hours</th><th style="width:11%">Rate</th><th style="width:14%">Gross</th><th style="width:13%">Paid</th><th style="width:19%">Status</th></tr></thead><tbody>
+          <tr><td>Kaimana M.</td><td>Oahu</td><td>68</td><td>$18</td><td>$1,224</td><td>$600</td><td><span class="badge bpt">Partial</span></td></tr>
+          <tr><td>Maile K.</td><td>Maui</td><td>72</td><td>$18</td><td>$1,296</td><td>$1,200</td><td><span class="badge bpt">Partial</span></td></tr>
+          <tr><td>Alohi L.</td><td>Oahu</td><td>56</td><td>$16</td><td>$896</td><td>$0</td><td><span class="badge bpn">Pending</span></td></tr>
+          <tr><td>Keanu N.</td><td>Oahu</td><td>44</td><td>$16</td><td>$704</td><td>$0</td><td><span class="badge bpn">Pending</span></td></tr>
+          <tr><td>Leilani H.</td><td>Maui</td><td>44</td><td>$16</td><td>$704</td><td>$0</td><td><span class="badge bpn">Pending</span></td></tr>
+          <tr><td>Tua R.</td><td>Oahu</td><td>0</td><td>$16</td><td>$0</td><td>$0</td><td><span class="badge bin">Inactive</span></td></tr>
+        </tbody></table></div>
         <div class="section-title">Hours log</div>
-        <div class="tw"><table><thead><tr><th style="width:17%">Cleaner</th><th style="width:12%">Date</th><th style="width:27%">Job</th><th style="width:9%">Hrs</th><th style="width:12%">Island</th><th style="width:11%">Earned</th><th style="width:12%">Paid</th></tr></thead><tbody><tr><td>Kaimana M.</td><td>Apr 2</td><td>The Morrisons</td><td>3.5</td><td>Oahu</td><td>$63</td><td><span class="badge bpd">Paid</span></td></tr><tr><td>Alohi L.</td><td>Apr 2</td><td>Aloha Realty</td><td>4.0</td><td>Oahu</td><td>$64</td><td><span class="badge bpn">Pending</span></td></tr><tr><td>Maile K.</td><td>Apr 2</td><td>Maui Surf Hotel</td><td>5.0</td><td>Maui</td><td>$90</td><td><span class="badge bpd">Paid</span></td></tr><tr><td>Kaimana M.</td><td>Apr 3</td><td>Kona Coffee Co.</td><td>3.0</td><td>Oahu</td><td>$54</td><td><span class="badge bpd">Paid</span></td></tr><tr><td>Keanu N.</td><td>Apr 3</td><td>Pearl City Gym</td><td>4.0</td><td>Oahu</td><td>$64</td><td><span class="badge bpn">Pending</span></td></tr><tr><td>Leilani H.</td><td>Apr 3</td><td>Lani P.</td><td>2.5</td><td>Maui</td><td>$40</td><td><span class="badge bpn">Pending</span></td></tr></tbody></table></div>
+        <div class="tw"><table><thead><tr><th style="width:17%">Cleaner</th><th style="width:12%">Date</th><th style="width:27%">Job</th><th style="width:9%">Hrs</th><th style="width:12%">Island</th><th style="width:11%">Earned</th><th style="width:12%">Paid</th></tr></thead><tbody>
+          <tr><td>Kaimana M.</td><td>Apr 2</td><td>The Morrisons</td><td>3.5</td><td>Oahu</td><td>$63</td><td><span class="badge bpd">Paid</span></td></tr>
+          <tr><td>Alohi L.</td><td>Apr 2</td><td>Aloha Realty</td><td>4.0</td><td>Oahu</td><td>$64</td><td><span class="badge bpn">Pending</span></td></tr>
+          <tr><td>Maile K.</td><td>Apr 2</td><td>Maui Surf Hotel</td><td>5.0</td><td>Maui</td><td>$90</td><td><span class="badge bpd">Paid</span></td></tr>
+          <tr><td>Kaimana M.</td><td>Apr 3</td><td>Kona Coffee Co.</td><td>3.0</td><td>Oahu</td><td>$54</td><td><span class="badge bpd">Paid</span></td></tr>
+          <tr><td>Keanu N.</td><td>Apr 3</td><td>Pearl City Gym</td><td>4.0</td><td>Oahu</td><td>$64</td><td><span class="badge bpn">Pending</span></td></tr>
+          <tr><td>Leilani H.</td><td>Apr 3</td><td>Lani P.</td><td>2.5</td><td>Maui</td><td>$40</td><td><span class="badge bpn">Pending</span></td></tr>
+        </tbody></table></div>
       </div>
 
       <!-- REPORTING -->
@@ -423,13 +477,27 @@ textarea:focus{outline:none;border-color:#1D9E75;}
         <div class="report-two">
           <div>
             <div class="section-title">Revenue by segment</div>
-            <div class="tw" style="margin-bottom:14px;"><table><thead><tr><th style="width:35%">Segment</th><th style="width:25%">Revenue</th><th style="width:20%">Clients</th><th style="width:20%">Avg</th></tr></thead><tbody><tr><td><span class="badge bg">Gov</span></td><td>$14,000</td><td>1</td><td>$14,000</td></tr><tr><td><span class="badge bc">Commercial</span></td><td>$11,200</td><td>8</td><td>$1,400</td></tr><tr><td><span class="badge br">Residential</span></td><td>$7,200</td><td>26</td><td>$277</td></tr></tbody></table></div>
+            <div class="tw" style="margin-bottom:14px;"><table><thead><tr><th style="width:35%">Segment</th><th style="width:25%">Revenue</th><th style="width:20%">Clients</th><th style="width:20%">Avg</th></tr></thead><tbody>
+              <tr><td><span class="badge bg">Gov</span></td><td>$14,000</td><td>1</td><td>$14,000</td></tr>
+              <tr><td><span class="badge bc">Commercial</span></td><td>$11,200</td><td>8</td><td>$1,400</td></tr>
+              <tr><td><span class="badge br">Residential</span></td><td>$7,200</td><td>26</td><td>$277</td></tr>
+            </tbody></table></div>
             <div class="section-title">Monthly trend</div>
-            <div class="tw"><table><thead><tr><th style="width:30%">Month</th><th style="width:35%">Revenue</th><th style="width:35%">vs prior</th></tr></thead><tbody><tr><td>Jan</td><td>$14,200</td><td>—</td></tr><tr><td>Feb</td><td>$16,400</td><td><span style="color:#1D9E75">+15.5%</span></td></tr><tr><td>Mar</td><td>$18,400</td><td><span style="color:#1D9E75">+12.2%</span></td></tr><tr><td>Apr (proj)</td><td>$32,400</td><td><span style="color:#1D9E75">+76%</span></td></tr></tbody></table></div>
+            <div class="tw"><table><thead><tr><th style="width:30%">Month</th><th style="width:35%">Revenue</th><th style="width:35%">vs prior</th></tr></thead><tbody>
+              <tr><td>Jan</td><td>$14,200</td><td>—</td></tr>
+              <tr><td>Feb</td><td>$16,400</td><td><span style="color:#1D9E75">+15.5%</span></td></tr>
+              <tr><td>Mar</td><td>$18,400</td><td><span style="color:#1D9E75">+12.2%</span></td></tr>
+              <tr><td>Apr (proj)</td><td>$32,400</td><td><span style="color:#1D9E75">+76%</span></td></tr>
+            </tbody></table></div>
           </div>
           <div>
             <div class="section-title">Dormant watch</div>
-            <div class="task-list"><div class="ti"><div class="tb"><div class="tt">Chen Family</div><div class="tm">Feb 10 · 51d ago</div></div><div style="font-size:11px;color:#e53e3e;font-weight:600;">51d</div></div><div class="ti"><div class="tb"><div class="tt">Tanaka Residence</div><div class="tm">Jan 15 · 77d ago</div></div><div style="font-size:11px;color:#e53e3e;font-weight:600;">77d</div></div><div class="ti"><div class="tb"><div class="tt">Patel Family</div><div class="tm">Jan 28 · 64d ago</div></div><div style="font-size:11px;color:#e53e3e;font-weight:600;">64d</div></div><div class="ti"><div class="tb"><div class="tt">Waimanalo Cottage</div><div class="tm">Feb 2 · 59d ago</div></div><div style="font-size:11px;color:#dd6b20;font-weight:600;">59d</div></div></div>
+            <div class="task-list">
+              <div class="ti"><div class="tb"><div class="tt">Chen Family</div><div class="tm">Feb 10 · 51d ago</div></div><div style="font-size:11px;color:#e53e3e;font-weight:600;">51d</div></div>
+              <div class="ti"><div class="tb"><div class="tt">Tanaka Residence</div><div class="tm">Jan 15 · 77d ago</div></div><div style="font-size:11px;color:#e53e3e;font-weight:600;">77d</div></div>
+              <div class="ti"><div class="tb"><div class="tt">Patel Family</div><div class="tm">Jan 28 · 64d ago</div></div><div style="font-size:11px;color:#e53e3e;font-weight:600;">64d</div></div>
+              <div class="ti"><div class="tb"><div class="tt">Waimanalo Cottage</div><div class="tm">Feb 2 · 59d ago</div></div><div style="font-size:11px;color:#dd6b20;font-weight:600;">59d</div></div>
+            </div>
           </div>
         </div>
       </div>
@@ -443,44 +511,207 @@ textarea:focus{outline:none;border-color:#1D9E75;}
   <div class="panel" onclick="event.stopPropagation()">
     <div class="panel-header"><div class="panel-title" id="appt-title">Appointment</div><button class="close-btn" onclick="closeOverlay('appt-overlay')">&#x2715;</button></div>
     <div class="panel-body">
-      <span class="status-badge" id="appt-status">Assigned</span>
-      <div class="panel-section">Job info</div>
-      <div class="info-block">
-        <div class="info-row"><span class="info-label">Client</span><span class="info-val" id="ai-client">—</span></div>
-        <div class="info-row"><span class="info-label">Service type</span><span class="info-val" id="ai-service">—</span></div>
-        <div class="info-row"><span class="info-label">Date</span><span class="info-val" id="ai-date">—</span></div>
-        <div class="info-row"><span class="info-label">Time</span><span class="info-val" id="ai-time">—</span></div>
-        <div class="info-row"><span class="info-label">Address</span><span class="info-val" id="ai-address">—</span></div>
-        <div class="info-row"><span class="info-label">Frequency</span><span class="info-val" id="ai-freq">—</span></div>
-        <div class="info-row"><span class="info-label">Est. duration</span><span class="info-val" id="ai-dur">—</span></div>
+      <div class="view-mode" id="appt-view">
+        <span class="status-badge" id="appt-status">Assigned</span>
+        <div class="panel-section">Job info</div>
+        <div class="info-block">
+          <div class="info-row"><span class="info-label">Client</span><span class="info-val" id="ai-client">—</span></div>
+          <div class="info-row"><span class="info-label">Service type</span><span class="info-val" id="ai-service">—</span></div>
+          <div class="info-row"><span class="info-label">Date</span><span class="info-val" id="ai-date">—</span></div>
+          <div class="info-row"><span class="info-label">Time</span><span class="info-val" id="ai-time">—</span></div>
+          <div class="info-row"><span class="info-label">Address</span><span class="info-val" id="ai-address">—</span></div>
+          <div class="info-row"><span class="info-label">Frequency</span><span class="info-val" id="ai-freq">—</span></div>
+          <div class="info-row"><span class="info-label">Est. duration</span><span class="info-val" id="ai-dur">—</span></div>
+        </div>
+        <div class="panel-section">Property</div>
+        <div class="info-block">
+          <div class="info-row"><span class="info-label">House size</span><span class="info-val" id="ai-sqft">—</span></div>
+          <div class="info-row"><span class="info-label">Bed / bath</span><span class="info-val" id="ai-bedbath">—</span></div>
+          <div class="info-row"><span class="info-label">Condition</span><span class="info-val" id="ai-cond">—</span></div>
+        </div>
+        <div class="panel-section">Team</div>
+        <div class="info-block">
+          <div class="info-row"><span class="info-label">Assigned cleaner</span><span class="info-val" id="ai-cleaner">—</span></div>
+          <div class="info-row"><span class="info-label">Cleaner pay</span><span class="info-val" id="ai-cpay">—</span></div>
+        </div>
+        <div class="panel-section">Pricing</div>
+        <div class="info-block">
+          <div class="info-row"><span class="info-label">Base price</span><span class="info-val" id="ai-base">—</span></div>
+          <div class="info-row"><span class="info-label">Discount</span><span class="info-val" id="ai-disc" style="color:#1D9E75;">—</span></div>
+          <div class="info-row"><span class="info-label">Tax (4.712%)</span><span class="info-val" id="ai-tax">—</span></div>
+          <div class="info-row"><span class="info-label" style="font-weight:600;">Total</span><span class="info-val" id="ai-total" style="font-size:15px;color:#1D9E75;">—</span></div>
+        </div>
+        <div class="panel-section">Actions</div>
+        <div class="action-grid">
+          <button class="action-btn green">Invoice client</button>
+          <button class="action-btn green">Charge card on file</button>
+          <button class="action-btn blue">Message client</button>
+          <button class="action-btn blue">Invite cleaner</button>
+          <button class="action-btn amber" onclick="toggleApptEdit(true)">Edit job</button>
+          <button class="action-btn amber">Reschedule</button>
+          <button class="action-btn red full">Cancel appointment</button>
+        </div>
       </div>
-      <div class="panel-section">Property</div>
-      <div class="info-block">
-        <div class="info-row"><span class="info-label">House size</span><span class="info-val" id="ai-sqft">—</span></div>
-        <div class="info-row"><span class="info-label">Bed / bath</span><span class="info-val" id="ai-bedbath">—</span></div>
-        <div class="info-row"><span class="info-label">Condition</span><span class="info-val" id="ai-cond">—</span></div>
+      <div class="edit-form" id="appt-edit">
+        <div class="panel-section">Edit appointment</div>
+        <div class="form-row"><label>Client</label><input type="text" id="edit-client" value="The Morrisons"></div>
+        <div class="form-row"><label>Service type</label><select id="edit-service"><option>Standard clean</option><option>Deep clean</option><option>Move-out clean</option><option>Commercial weekly</option><option>Commercial daily</option></select></div>
+        <div class="form-two">
+          <div class="form-row"><label>Date</label><input type="date" id="edit-date" value="2026-04-07"></div>
+          <div class="form-row"><label>Time</label><input type="time" id="edit-time" value="08:00"></div>
+        </div>
+        <div class="form-row"><label>Address</label><input type="text" id="edit-address" value="1247 Kalani St, Kailua, HI"></div>
+        <div class="form-two">
+          <div class="form-row"><label>Bedrooms</label><input type="number" id="edit-beds" value="3"></div>
+          <div class="form-row"><label>Bathrooms</label><input type="number" id="edit-baths" value="2"></div>
+        </div>
+        <div class="form-row"><label>Assigned cleaner</label><select id="edit-cleaner"><option>Kaimana M.</option><option>Alohi L.</option><option>Maile K.</option><option>Keanu N.</option><option>Leilani H.</option><option>Unassigned</option></select></div>
+        <div class="form-two">
+          <div class="form-row"><label>Base price ($)</label><input type="number" id="edit-price" value="227.50"></div>
+          <div class="form-row"><label>Discount ($)</label><input type="number" id="edit-discount" value="0"></div>
+        </div>
+        <div class="form-row"><label>Status</label><select id="edit-status"><option>unassigned</option><option selected>assigned</option><option>completed</option><option>paid</option></select></div>
+        <div class="form-row"><label>Notes</label><textarea id="edit-notes" style="min-height:60px;" placeholder="Any notes about this job..."></textarea></div>
+        <div class="save-bar">
+          <button class="btn btn-primary" onclick="saveAppt()">Save changes</button>
+          <button class="btn" onclick="toggleApptEdit(false)">Cancel</button>
+        </div>
       </div>
-      <div class="panel-section">Team</div>
-      <div class="info-block">
-        <div class="info-row"><span class="info-label">Assigned cleaner</span><span class="info-val" id="ai-cleaner">—</span></div>
-        <div class="info-row"><span class="info-label">Cleaner pay</span><span class="info-val" id="ai-cpay">—</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- CLIENT PANEL -->
+<div class="overlay hidden" id="client-overlay" onclick="closeOverlay('client-overlay')">
+  <div class="panel" onclick="event.stopPropagation()">
+    <div class="panel-header"><div class="panel-title" id="cl-title">Client profile</div><button class="close-btn" onclick="closeOverlay('client-overlay')">&#x2715;</button></div>
+    <div class="panel-body">
+      <div class="view-mode" id="client-view">
+        <div class="profile-top">
+          <div class="profile-avatar" id="cl-av" style="background:#e6fffa;color:#276749;">TM</div>
+          <div><div class="profile-name" id="cl-name">—</div><div class="profile-role" id="cl-type">—</div><span class="badge" id="cl-status" style="margin-top:6px;display:inline-block;">Active</span></div>
+        </div>
+        <div class="panel-section">Contact</div>
+        <div class="info-block">
+          <div class="info-row"><span class="info-label">Phone</span><span class="info-val" id="cl-phone">—</span></div>
+          <div class="info-row"><span class="info-label">Email</span><span class="info-val" id="cl-email">—</span></div>
+          <div class="info-row"><span class="info-label">Address</span><span class="info-val" id="cl-address">—</span></div>
+          <div class="info-row"><span class="info-label">Payment method</span><span class="info-val" id="cl-payment">—</span></div>
+          <div class="info-row"><span class="info-label">Client since</span><span class="info-val" id="cl-since">—</span></div>
+        </div>
+        <div class="panel-section">Stats</div>
+        <div class="stat-grid">
+          <div class="stat-box"><div class="stat-box-label">Lifetime value</div><div class="stat-box-val" id="cl-ltv">—</div></div>
+          <div class="stat-box"><div class="stat-box-label">Monthly revenue</div><div class="stat-box-val" id="cl-mrr">—</div></div>
+          <div class="stat-box"><div class="stat-box-label">Total jobs</div><div class="stat-box-val" id="cl-jobs">—</div></div>
+          <div class="stat-box"><div class="stat-box-label">Avg job value</div><div class="stat-box-val" id="cl-avg">—</div></div>
+        </div>
+        <div class="panel-section">Service details</div>
+        <div class="info-block">
+          <div class="info-row"><span class="info-label">Service type</span><span class="info-val" id="cl-service">—</span></div>
+          <div class="info-row"><span class="info-label">Frequency</span><span class="info-val" id="cl-freq">—</span></div>
+          <div class="info-row"><span class="info-label">Property size</span><span class="info-val" id="cl-sqft">—</span></div>
+          <div class="info-row"><span class="info-label">Bed / bath</span><span class="info-val" id="cl-bedbath">—</span></div>
+          <div class="info-row"><span class="info-label">Preferred cleaner</span><span class="info-val" id="cl-cleaner">—</span></div>
+          <div class="info-row"><span class="info-label">Last job</span><span class="info-val" id="cl-lastjob">—</span></div>
+          <div class="info-row"><span class="info-label">Next job</span><span class="info-val" id="cl-nextjob">—</span></div>
+        </div>
+        <div class="panel-section">Job history</div>
+        <div class="info-block" id="cl-history"></div>
+        <div class="panel-section">Notes</div>
+        <div class="info-block"><div style="font-size:12px;color:#1a1a1a;line-height:1.6;" id="cl-notes">—</div></div>
+        <div class="action-grid" style="margin-top:14px;">
+          <button class="action-btn green">Invoice</button>
+          <button class="action-btn green">Charge card</button>
+          <button class="action-btn blue">Message</button>
+          <button class="action-btn blue">Schedule job</button>
+          <button class="action-btn amber full" onclick="toggleClientEdit(true)">Edit client</button>
+        </div>
       </div>
-      <div class="panel-section">Pricing</div>
-      <div class="info-block">
-        <div class="info-row"><span class="info-label">Base price</span><span class="info-val" id="ai-base">—</span></div>
-        <div class="info-row"><span class="info-label">Discount</span><span class="info-val" id="ai-disc" style="color:#1D9E75;">—</span></div>
-        <div class="info-row"><span class="info-label">Tax (4.712%)</span><span class="info-val" id="ai-tax">—</span></div>
-        <div class="info-row"><span class="info-label" style="font-weight:600;color:#1a1a1a;">Total</span><span class="info-val" id="ai-total" style="font-size:15px;color:#1D9E75;">—</span></div>
+      <div class="edit-form" id="client-edit">
+        <div class="panel-section">Edit client</div>
+        <div class="form-row"><label>Full name</label><input type="text" id="ced-name"></div>
+        <div class="form-row"><label>Phone</label><input type="tel" id="ced-phone"></div>
+        <div class="form-row"><label>Email</label><input type="email" id="ced-email"></div>
+        <div class="form-row"><label>Address</label><input type="text" id="ced-address"></div>
+        <div class="form-two">
+          <div class="form-row"><label>Payment type</label><select id="ced-paytype"><option>Stripe card</option><option>ACH</option><option>Cash</option><option>Check</option></select></div>
+          <div class="form-row"><label>Last 4 digits</label><input type="text" id="ced-last4" maxlength="4" placeholder="1234"></div>
+        </div>
+        <div class="form-row"><label>Service type</label><select id="ced-service"><option>Standard clean</option><option>Deep clean</option><option>Move-out clean</option><option>Commercial weekly</option><option>Commercial daily</option></select></div>
+        <div class="form-row"><label>Frequency</label><select id="ced-freq"><option>Weekly</option><option>Biweekly</option><option>Monthly</option><option>3x/week</option><option>Daily</option><option>One-time</option></select></div>
+        <div class="form-two">
+          <div class="form-row"><label>Bedrooms</label><input type="number" id="ced-beds"></div>
+          <div class="form-row"><label>Bathrooms</label><input type="number" id="ced-baths"></div>
+        </div>
+        <div class="form-row"><label>Preferred cleaner</label><select id="ced-cleaner"><option>No preference</option><option>Kaimana M.</option><option>Alohi L.</option><option>Maile K.</option><option>Keanu N.</option><option>Leilani H.</option></select></div>
+        <div class="form-row"><label>Notes</label><textarea id="ced-notes" style="min-height:70px;"></textarea></div>
+        <div class="save-bar">
+          <button class="btn btn-primary" onclick="saveClient()">Save changes</button>
+          <button class="btn" onclick="toggleClientEdit(false)">Cancel</button>
+        </div>
       </div>
-      <div class="panel-section">Actions</div>
-      <div class="action-grid">
-        <button class="action-btn green">Invoice client</button>
-        <button class="action-btn green">Charge card on file</button>
-        <button class="action-btn blue">Message client</button>
-        <button class="action-btn blue">Invite cleaner</button>
-        <button class="action-btn amber">Reschedule</button>
-        <button class="action-btn amber">Edit job</button>
-        <button class="action-btn red full">Cancel appointment</button>
+    </div>
+  </div>
+</div>
+
+<!-- LEAD PANEL -->
+<div class="overlay hidden" id="lead-overlay" onclick="closeOverlay('lead-overlay')">
+  <div class="panel" onclick="event.stopPropagation()">
+    <div class="panel-header"><div class="panel-title" id="lead-title">Lead details</div><button class="close-btn" onclick="closeOverlay('lead-overlay')">&#x2715;</button></div>
+    <div class="panel-body">
+      <div class="view-mode" id="lead-view">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+          <div><div style="font-size:16px;font-weight:600;" id="lead-name">—</div><div style="font-size:12px;color:#999;margin-top:2px;" id="lead-type-line">—</div></div>
+          <span class="badge" id="lead-stage-badge">New inquiry</span>
+        </div>
+        <div class="panel-section">Contact</div>
+        <div class="info-block">
+          <div class="info-row"><span class="info-label">Contact name</span><span class="info-val" id="lead-contact">—</span></div>
+          <div class="info-row"><span class="info-label">Phone</span><span class="info-val" id="lead-phone">—</span></div>
+          <div class="info-row"><span class="info-label">Email</span><span class="info-val" id="lead-email">—</span></div>
+          <div class="info-row"><span class="info-label">Address</span><span class="info-val" id="lead-address">—</span></div>
+        </div>
+        <div class="panel-section">Opportunity</div>
+        <div class="info-block">
+          <div class="info-row"><span class="info-label">Est. value</span><span class="info-val" id="lead-value" style="color:#1D9E75;font-size:14px;">—</span></div>
+          <div class="info-row"><span class="info-label">Service type</span><span class="info-val" id="lead-service">—</span></div>
+          <div class="info-row"><span class="info-label">Property size</span><span class="info-val" id="lead-sqft">—</span></div>
+          <div class="info-row"><span class="info-label">Lead source</span><span class="info-val" id="lead-source">—</span></div>
+          <div class="info-row"><span class="info-label">Inquiry date</span><span class="info-val" id="lead-date">—</span></div>
+        </div>
+        <div class="panel-section">Next action</div>
+        <div class="info-block">
+          <div class="info-row"><span class="info-label">Action</span><span class="info-val" id="lead-action">—</span></div>
+          <div class="info-row"><span class="info-label">Due date</span><span class="info-val" id="lead-due">—</span></div>
+          <div class="info-row"><span class="info-label">Assigned to</span><span class="info-val" id="lead-assigned">—</span></div>
+        </div>
+        <div class="panel-section">Notes</div>
+        <div class="info-block"><div style="font-size:12px;color:#1a1a1a;line-height:1.6;" id="lead-notes">—</div></div>
+        <div class="action-grid" style="margin-top:14px;">
+          <button class="action-btn blue">Message</button>
+          <button class="action-btn green">Send quote</button>
+          <button class="action-btn amber full" onclick="toggleLeadEdit(true)">Edit lead</button>
+        </div>
+      </div>
+      <div class="edit-form" id="lead-edit">
+        <div class="panel-section">Edit lead</div>
+        <div class="form-row"><label>Business / client name</label><input type="text" id="led-name"></div>
+        <div class="form-row"><label>Contact name</label><input type="text" id="led-contact"></div>
+        <div class="form-row"><label>Phone</label><input type="tel" id="led-phone"></div>
+        <div class="form-row"><label>Email</label><input type="email" id="led-email"></div>
+        <div class="form-row"><label>Address</label><input type="text" id="led-address"></div>
+        <div class="form-row"><label>Est. monthly value ($)</label><input type="number" id="led-value"></div>
+        <div class="form-row"><label>Service type</label><select id="led-service"><option>Standard clean</option><option>Commercial weekly</option><option>Commercial daily</option><option>Deep clean</option><option>Move-out clean</option><option>Janitorial</option></select></div>
+        <div class="form-row"><label>Stage</label><select id="led-stage"><option>New inquiry</option><option>Quoted</option><option>Follow-up</option><option>Closed won</option><option>Closed lost</option></select></div>
+        <div class="form-row"><label>Lead source</label><select id="led-source"><option>Google SEO</option><option>Referral</option><option>Cold outreach</option><option>Walk-in</option><option>Social media</option></select></div>
+        <div class="form-row"><label>Next action</label><input type="text" id="led-action" placeholder="e.g. Send follow-up email"></div>
+        <div class="form-row"><label>Due date</label><input type="date" id="led-due"></div>
+        <div class="form-row"><label>Notes</label><textarea id="led-notes" style="min-height:70px;"></textarea></div>
+        <div class="save-bar">
+          <button class="btn btn-primary" onclick="saveLead()">Save changes</button>
+          <button class="btn" onclick="toggleLeadEdit(false)">Cancel</button>
+        </div>
       </div>
     </div>
   </div>
@@ -491,36 +722,57 @@ textarea:focus{outline:none;border-color:#1D9E75;}
   <div class="panel" onclick="event.stopPropagation()">
     <div class="panel-header"><div class="panel-title">Cleaner profile</div><button class="close-btn" onclick="closeOverlay('cleaner-overlay')">&#x2715;</button></div>
     <div class="panel-body">
-      <div class="profile-top">
-        <div class="profile-avatar" id="cp-av" style="background:#9FE1CB;color:#085041;">KM</div>
-        <div><div class="profile-name" id="cp-name">—</div><div class="profile-role" id="cp-role">—</div><span class="badge bac" id="cp-status" style="margin-top:6px;display:inline-block;">Active</span></div>
+      <div class="view-mode" id="cleaner-view">
+        <div class="profile-top">
+          <div class="profile-avatar" id="cp-av" style="background:#9FE1CB;color:#085041;">KM</div>
+          <div><div class="profile-name" id="cp-name">—</div><div class="profile-role" id="cp-role">—</div><span class="badge bac" id="cp-status" style="margin-top:6px;display:inline-block;">Active</span></div>
+        </div>
+        <div class="panel-section">Contact</div>
+        <div class="info-block">
+          <div class="info-row"><span class="info-label">Phone</span><span class="info-val" id="cp-phone">—</span></div>
+          <div class="info-row"><span class="info-label">Email</span><span class="info-val" id="cp-email">—</span></div>
+          <div class="info-row"><span class="info-label">Location</span><span class="info-val" id="cp-loc">—</span></div>
+          <div class="info-row"><span class="info-label">Start date</span><span class="info-val" id="cp-start">—</span></div>
+        </div>
+        <div class="panel-section">Pay & hours</div>
+        <div class="stat-grid">
+          <div class="stat-box"><div class="stat-box-label">Hourly rate</div><div class="stat-box-val" id="cp-rate">—</div></div>
+          <div class="stat-box"><div class="stat-box-label">Hours this week</div><div class="stat-box-val" id="cp-week">—</div></div>
+          <div class="stat-box"><div class="stat-box-label">Hours this month</div><div class="stat-box-val" id="cp-month">—</div></div>
+          <div class="stat-box"><div class="stat-box-label">Paid this period</div><div class="stat-box-val" id="cp-paid">—</div></div>
+        </div>
+        <div class="panel-section">Performance</div>
+        <div class="info-block">
+          <div class="info-row"><span class="info-label">Jobs this month</span><span class="info-val" id="cp-jobs">—</span></div>
+          <div class="info-row"><span class="info-label">Jobs all time</span><span class="info-val" id="cp-alltime">—</span></div>
+          <div class="info-row"><span class="info-label">Islands covered</span><span class="info-val" id="cp-islands">—</span></div>
+          <div class="info-row"><span class="info-label">Background check</span><span class="info-val"><span class="badge" id="cp-bg">—</span></span></div>
+          <div class="info-row"><span class="info-label">Notes</span><span class="info-val" id="cp-notes">—</span></div>
+        </div>
+        <div class="action-grid" style="margin-top:4px;">
+          <button class="action-btn blue">Send SMS</button>
+          <button class="action-btn amber" onclick="toggleCleanerEdit(true)">Edit profile</button>
+          <button class="action-btn green full">Log hours manually</button>
+        </div>
       </div>
-      <div class="panel-section">Contact</div>
-      <div class="info-block">
-        <div class="info-row"><span class="info-label">Phone</span><span class="info-val" id="cp-phone">—</span></div>
-        <div class="info-row"><span class="info-label">Email</span><span class="info-val" id="cp-email">—</span></div>
-        <div class="info-row"><span class="info-label">Location</span><span class="info-val" id="cp-loc">—</span></div>
-        <div class="info-row"><span class="info-label">Start date</span><span class="info-val" id="cp-start">—</span></div>
-      </div>
-      <div class="panel-section">Pay & hours</div>
-      <div class="stat-grid">
-        <div class="stat-box"><div class="stat-box-label">Hourly rate</div><div class="stat-box-val" id="cp-rate">—</div></div>
-        <div class="stat-box"><div class="stat-box-label">Hours this week</div><div class="stat-box-val" id="cp-week">—</div></div>
-        <div class="stat-box"><div class="stat-box-label">Hours this month</div><div class="stat-box-val" id="cp-month">—</div></div>
-        <div class="stat-box"><div class="stat-box-label">Paid this period</div><div class="stat-box-val" id="cp-paid">—</div></div>
-      </div>
-      <div class="panel-section">Performance</div>
-      <div class="info-block">
-        <div class="info-row"><span class="info-label">Jobs this month</span><span class="info-val" id="cp-jobs">—</span></div>
-        <div class="info-row"><span class="info-label">Jobs all time</span><span class="info-val" id="cp-alltime">—</span></div>
-        <div class="info-row"><span class="info-label">Islands covered</span><span class="info-val" id="cp-islands">—</span></div>
-        <div class="info-row"><span class="info-label">Background check</span><span class="info-val"><span class="badge" id="cp-bg">—</span></span></div>
-        <div class="info-row"><span class="info-label">Notes</span><span class="info-val" id="cp-notes">—</span></div>
-      </div>
-      <div class="action-grid">
-        <button class="action-btn blue">Send SMS</button>
-        <button class="action-btn amber">Edit profile</button>
-        <button class="action-btn green full">Log hours manually</button>
+      <div class="edit-form" id="cleaner-edit">
+        <div class="panel-section">Edit cleaner</div>
+        <div class="form-row"><label>Full name</label><input type="text" id="ced2-name"></div>
+        <div class="form-row"><label>Phone</label><input type="tel" id="ced2-phone"></div>
+        <div class="form-row"><label>Email</label><input type="email" id="ced2-email"></div>
+        <div class="form-row"><label>Location</label><input type="text" id="ced2-loc"></div>
+        <div class="form-two">
+          <div class="form-row"><label>Hourly rate ($)</label><input type="number" id="ced2-rate"></div>
+          <div class="form-row"><label>Island</label><select id="ced2-island"><option>Oahu</option><option>Maui</option><option>Both</option></select></div>
+        </div>
+        <div class="form-row"><label>Role</label><select id="ced2-role"><option>Cleaner</option><option>Lead cleaner</option></select></div>
+        <div class="form-row"><label>Background check</label><select id="ced2-bg"><option>Cleared</option><option>Pending</option><option>Not started</option></select></div>
+        <div class="form-row"><label>Status</label><select id="ced2-status"><option>Active</option><option>Inactive</option></select></div>
+        <div class="form-row"><label>Notes</label><textarea id="ced2-notes" style="min-height:70px;"></textarea></div>
+        <div class="save-bar">
+          <button class="btn btn-primary" onclick="saveCleaner()">Save changes</button>
+          <button class="btn" onclick="toggleCleanerEdit(false)">Cancel</button>
+        </div>
       </div>
     </div>
   </div>
@@ -528,24 +780,135 @@ textarea:focus{outline:none;border-color:#1D9E75;}
 
 <script>
 const MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
-const apptData={'2026-4-2':[{n:'The Morrisons',s:'assigned',t:'8am',cleaner:'Kaimana M.'},{n:'Lani P.',s:'unassigned',t:'10am',cleaner:'Unassigned'}],'2026-4-3':[{n:'Aloha Realty',s:'assigned',t:'9am',cleaner:'Alohi L.'}],'2026-4-4':[{n:'Kona Coffee Co.',s:'paid',t:'7am',cleaner:'Kaimana M.'},{n:'Pearl City Gym',s:'completed',t:'11am',cleaner:'Keanu N.'}],'2026-4-5':[{n:'Chen Family',s:'unassigned',t:'9am',cleaner:'Unassigned'}],'2026-4-7':[{n:'Maui Surf Hotel',s:'assigned',t:'7am',cleaner:'Maile K.'},{n:'The Morrisons',s:'assigned',t:'2pm',cleaner:'Kaimana M.'},{n:'Tanaka Res.',s:'unassigned',t:'4pm',cleaner:'Unassigned'}],'2026-4-8':[{n:'Aloha Realty',s:'paid',t:'9am',cleaner:'Alohi L.'},{n:'North Shore Gym',s:'unassigned',t:'1pm',cleaner:'Unassigned'}],'2026-4-9':[{n:'Kona Coffee Co.',s:'assigned',t:'8am',cleaner:'Kaimana M.'}],'2026-4-10':[{n:'Pearl City Gym',s:'assigned',t:'10am',cleaner:'Keanu N.'},{n:'Lani P.',s:'completed',t:'2pm',cleaner:'Leilani H.'}],'2026-4-11':[{n:'Maui Surf Hotel',s:'paid',t:'7am',cleaner:'Maile K.'}],'2026-4-14':[{n:'The Morrisons',s:'unassigned',t:'8am',cleaner:'Unassigned'},{n:'Aloha Realty',s:'assigned',t:'9am',cleaner:'Alohi L.'},{n:'Chen Family',s:'unassigned',t:'3pm',cleaner:'Unassigned'}],'2026-4-15':[{n:'Pearl City Gym',s:'completed',t:'11am',cleaner:'Keanu N.'}],'2026-4-16':[{n:'Kona Coffee Co.',s:'assigned',t:'7am',cleaner:'Kaimana M.'},{n:'Maui Surf Hotel',s:'assigned',t:'12pm',cleaner:'Maile K.'}],'2026-4-17':[{n:'Lani P.',s:'unassigned',t:'9am',cleaner:'Unassigned'}],'2026-4-18':[{n:'Aloha Realty',s:'paid',t:'9am',cleaner:'Alohi L.'},{n:'Pearl City Gym',s:'assigned',t:'2pm',cleaner:'Keanu N.'}],'2026-4-21':[{n:'The Morrisons',s:'assigned',t:'8am',cleaner:'Kaimana M.'},{n:'Kona Coffee Co.',s:'unassigned',t:'10am',cleaner:'Unassigned'}],'2026-4-22':[{n:'Maui Surf Hotel',s:'assigned',t:'7am',cleaner:'Maile K.'}],'2026-4-24':[{n:'Pearl City Gym',s:'unassigned',t:'11am',cleaner:'Unassigned'},{n:'Lani P.',s:'assigned',t:'3pm',cleaner:'Leilani H.'}],'2026-4-25':[{n:'Aloha Realty',s:'assigned',t:'9am',cleaner:'Alohi L.'},{n:'Chen Family',s:'unassigned',t:'1pm',cleaner:'Unassigned'}],'2026-4-28':[{n:'The Morrisons',s:'unassigned',t:'8am',cleaner:'Unassigned'},{n:'Kona Coffee Co.',s:'assigned',t:'10am',cleaner:'Kaimana M.'},{n:'Maui Surf Hotel',s:'assigned',t:'3pm',cleaner:'Maile K.'}],'2026-4-30':[{n:'Pearl City Gym',s:'assigned',t:'11am',cleaner:'Keanu N.'}]};
-const clientData={'The Morrisons':{service:'Standard clean',address:'1247 Kalani St, Kailua, HI',freq:'Biweekly',dur:'3.5 hrs',sqft:'1,800 sq ft',bed:'3 bed / 2 bath',cond:'Good (7/10)',base:'$227.50',disc:'$0',tax:'$10.72',total:'$238.22'},'Aloha Realty':{service:'Commercial weekly',address:'820 S King St, Honolulu, HI',freq:'Weekly',dur:'4.0 hrs',sqft:'2,200 sq ft',bed:'Office / open plan',cond:'Good (8/10)',base:'$260.00',disc:'$0',tax:'$12.25',total:'$272.25'},'Kona Coffee Co.':{service:'Commercial weekly',address:'1100 Alakea St, Honolulu, HI',freq:'Weekly',dur:'3.0 hrs',sqft:'1,400 sq ft',bed:'Retail / cafe',cond:'Good (7/10)',base:'$195.00',disc:'$0',tax:'$9.19',total:'$204.19'},'Pearl City Gym':{service:'Commercial 3x/week',address:'810 Kuala St, Pearl City, HI',freq:'3x/week',dur:'4.0 hrs',sqft:'3,500 sq ft',bed:'Gym floor + locker rooms',cond:'Moderate (6/10)',base:'$325.00',disc:'$0',tax:'$15.32',total:'$340.32'},'Maui Surf Hotel':{service:'Commercial daily',address:'45 Kaahumanu Ave, Kahului, HI',freq:'Daily',dur:'5.0 hrs',sqft:'4,000 sq ft',bed:'Commercial hotel',cond:'Good (8/10)',base:'$325.00',disc:'$0',tax:'$15.32',total:'$340.32'},'Lani P.':{service:'Standard clean',address:'312 Hana Hwy, Paia, HI',freq:'Monthly',dur:'2.5 hrs',sqft:'1,100 sq ft',bed:'2 bed / 1 bath',cond:'Good (8/10)',base:'$162.50',disc:'$0',tax:'$7.66',total:'$170.16'},'Chen Family':{service:'Move-out clean',address:'776 Palolo Ave, Honolulu, HI',freq:'One-time',dur:'5.0 hrs',sqft:'1,600 sq ft',bed:'3 bed / 2 bath',cond:'Fair (5/10)',base:'$357.00',disc:'$0',tax:'$16.82',total:'$373.82'},'Tanaka Res.':{service:'Deep clean',address:'234 Liliha St, Honolulu, HI',freq:'One-time',dur:'4.0 hrs',sqft:'1,500 sq ft',bed:'3 bed / 1 bath',cond:'Fair (5/10)',base:'$286.00',disc:'$0',tax:'$13.48',total:'$299.48'},'North Shore Gym':{service:'Commercial weekly',address:'59-864 Kamehameha Hwy, HI',freq:'Weekly',dur:'4.0 hrs',sqft:'2,800 sq ft',bed:'Gym floor + bathrooms',cond:'Moderate (6/10)',base:'$325.00',disc:'$0',tax:'$15.32',total:'$340.32'}};
-const cleanerDB={km:{name:'Kaimana M.',role:'Lead cleaner · Oahu',initials:'KM',bg:'#9FE1CB',fg:'#085041',phone:'(808) 555-0142',email:'kaimana.m@email.com',loc:'Kailua, Oahu',start:'Jan 2024',rate:'$18/hr',week:'34 hrs',month:'112 hrs',paid:'$600',jobs:'12',alltime:'147',islands:'Oahu',bgcheck:'Cleared',notes:'Reliable, client favorite'},al:{name:'Alohi L.',role:'Cleaner · Oahu',initials:'AL',bg:'#B5D4F4',fg:'#0C447C',phone:'(808) 555-0198',email:'alohi.l@email.com',loc:'Kaneohe, Oahu',start:'Mar 2024',rate:'$16/hr',week:'28 hrs',month:'88 hrs',paid:'$0',jobs:'9',alltime:'82',islands:'Oahu',bgcheck:'Cleared',notes:'Good with commercial clients'},mk:{name:'Maile K.',role:'Lead cleaner · Maui',initials:'MK',bg:'#F5C4B3',fg:'#712B13',phone:'(808) 555-0231',email:'maile.k@email.com',loc:'Kahului, Maui',start:'Nov 2023',rate:'$18/hr',week:'36 hrs',month:'124 hrs',paid:'$1,200',jobs:'14',alltime:'198',islands:'Maui',bgcheck:'Cleared',notes:'Top performer, Maui lead'},kn:{name:'Keanu N.',role:'Cleaner · Oahu',initials:'KN',bg:'#CECBF6',fg:'#3C3489',phone:'(808) 555-0317',email:'keanu.n@email.com',loc:'Aiea, Oahu',start:'Jun 2024',rate:'$16/hr',week:'22 hrs',month:'68 hrs',paid:'$0',jobs:'7',alltime:'54',islands:'Oahu',bgcheck:'Cleared',notes:'Part-time, available weekdays'},lh:{name:'Leilani H.',role:'Cleaner · Maui',initials:'LH',bg:'#FAC775',fg:'#633806',phone:'(808) 555-0289',email:'leilani.h@email.com',loc:'Lahaina, Maui',start:'Aug 2024',rate:'$16/hr',week:'22 hrs',month:'72 hrs',paid:'$0',jobs:'8',alltime:'41',islands:'Maui',bgcheck:'Cleared',notes:'Good availability, Maui west side'},tr:{name:'Tua R.',role:'Cleaner · Oahu',initials:'TR',bg:'#F4C0D1',fg:'#72243E',phone:'(808) 555-0354',email:'tua.r@email.com',loc:'Waipahu, Oahu',start:'Sep 2024',rate:'$16/hr',week:'0 hrs',month:'0 hrs',paid:'$0',jobs:'0',alltime:'12',islands:'Oahu',bgcheck:'Pending',notes:'On leave — returning May'}};
-const aiDrafts={client:{sms:"Hi Morrison family! Just a reminder that Kaimana will be there Monday Apr 7 at 8am for your biweekly clean. Let us know if anything has changed or if you need us to focus on any specific areas. See you then! — Hawaii Natural Clean",email:"Subject: Your cleaning appointment — Monday Apr 7\n\nHi Morrison family,\n\nThis is a friendly reminder that Kaimana from Hawaii Natural Clean will be at your home on Monday, April 7th at 8:00 AM for your biweekly clean.\n\nIf you need to reschedule or have any special requests, just reply to this message.\n\nMahalo!\nHawaii Natural Clean"},invite:{sms:"Hi! Job available — The Morrisons, standard clean, Mon Apr 14 @ 8am in Kailua. Est 3.5 hrs, $63. Reply YES to claim or NO to pass. First YES gets it! — HNC"},followup:{sms:"Hi Chen family! It's been a while since your move-out clean in February. We'd love to help you settle in — we're offering 10% off your next booking this month. Ready to schedule? Reply here or visit hawaiinaturalclean.com 🌺",email:"Subject: We'd love to see you again — 10% off this month\n\nHi Chen family,\n\nWe hope your move went smoothly! It's been about 51 days since your last clean and we wanted to check in.\n\nAs a thank-you for being a past client, we're offering 10% off your next booking through end of April.\n\nJust reply to this email and we'll get you scheduled.\n\nMahalo,\nHawaii Natural Clean"}};
+
+const apptData={
+  '2026-4-2':[{n:'The Morrisons',s:'assigned',t:'8am',cleaner:'Kaimana M.'},{n:'Lani P.',s:'unassigned',t:'10am',cleaner:'Unassigned'}],
+  '2026-4-3':[{n:'Aloha Realty',s:'assigned',t:'9am',cleaner:'Alohi L.'}],
+  '2026-4-4':[{n:'Kona Coffee Co.',s:'paid',t:'7am',cleaner:'Kaimana M.'},{n:'Pearl City Gym',s:'completed',t:'11am',cleaner:'Keanu N.'}],
+  '2026-4-5':[{n:'Chen Family',s:'unassigned',t:'9am',cleaner:'Unassigned'}],
+  '2026-4-7':[{n:'Maui Surf Hotel',s:'assigned',t:'7am',cleaner:'Maile K.'},{n:'The Morrisons',s:'assigned',t:'2pm',cleaner:'Kaimana M.'},{n:'Tanaka Res.',s:'unassigned',t:'4pm',cleaner:'Unassigned'}],
+  '2026-4-8':[{n:'Aloha Realty',s:'paid',t:'9am',cleaner:'Alohi L.'},{n:'North Shore Gym',s:'unassigned',t:'1pm',cleaner:'Unassigned'}],
+  '2026-4-9':[{n:'Kona Coffee Co.',s:'assigned',t:'8am',cleaner:'Kaimana M.'}],
+  '2026-4-10':[{n:'Pearl City Gym',s:'assigned',t:'10am',cleaner:'Keanu N.'},{n:'Lani P.',s:'completed',t:'2pm',cleaner:'Leilani H.'}],
+  '2026-4-11':[{n:'Maui Surf Hotel',s:'paid',t:'7am',cleaner:'Maile K.'}],
+  '2026-4-14':[{n:'The Morrisons',s:'unassigned',t:'8am',cleaner:'Unassigned'},{n:'Aloha Realty',s:'assigned',t:'9am',cleaner:'Alohi L.'},{n:'Chen Family',s:'unassigned',t:'3pm',cleaner:'Unassigned'}],
+  '2026-4-15':[{n:'Pearl City Gym',s:'completed',t:'11am',cleaner:'Keanu N.'}],
+  '2026-4-16':[{n:'Kona Coffee Co.',s:'assigned',t:'7am',cleaner:'Kaimana M.'},{n:'Maui Surf Hotel',s:'assigned',t:'12pm',cleaner:'Maile K.'}],
+  '2026-4-17':[{n:'Lani P.',s:'unassigned',t:'9am',cleaner:'Unassigned'}],
+  '2026-4-18':[{n:'Aloha Realty',s:'paid',t:'9am',cleaner:'Alohi L.'},{n:'Pearl City Gym',s:'assigned',t:'2pm',cleaner:'Keanu N.'}],
+  '2026-4-21':[{n:'The Morrisons',s:'assigned',t:'8am',cleaner:'Kaimana M.'},{n:'Kona Coffee Co.',s:'unassigned',t:'10am',cleaner:'Unassigned'}],
+  '2026-4-22':[{n:'Maui Surf Hotel',s:'assigned',t:'7am',cleaner:'Maile K.'}],
+  '2026-4-24':[{n:'Pearl City Gym',s:'unassigned',t:'11am',cleaner:'Unassigned'},{n:'Lani P.',s:'assigned',t:'3pm',cleaner:'Leilani H.'}],
+  '2026-4-25':[{n:'Aloha Realty',s:'assigned',t:'9am',cleaner:'Alohi L.'},{n:'Chen Family',s:'unassigned',t:'1pm',cleaner:'Unassigned'}],
+  '2026-4-28':[{n:'The Morrisons',s:'unassigned',t:'8am',cleaner:'Unassigned'},{n:'Kona Coffee Co.',s:'assigned',t:'10am',cleaner:'Kaimana M.'},{n:'Maui Surf Hotel',s:'assigned',t:'3pm',cleaner:'Maile K.'}],
+  '2026-4-30':[{n:'Pearl City Gym',s:'assigned',t:'11am',cleaner:'Keanu N.'}]
+};
+
+const clientDB={
+  'morrisons':{name:'The Morrisons',type:'Residential',phone:'(808) 555-1234',email:'morrisons@email.com',address:'1247 Kalani St, Kailua, HI',payment:'Stripe card · ****4521',since:'March 2024',ltv:'$3,640',mrr:'$520',jobs:'14',avg:'$238',service:'Standard clean',freq:'Biweekly',sqft:'1,800 sq ft',bedbath:'3 bed / 2 bath',cleaner:'Kaimana M.',lastjob:'Mar 28, 2026',nextjob:'Apr 7, 2026',status:'Active',notes:'Prefers morning appointments. Has 2 dogs — Kaimana is their favorite cleaner. Always pays on time.',history:[{date:'Mar 28',svc:'Standard clean',amt:'$238',paid:true},{date:'Mar 14',svc:'Standard clean',amt:'$238',paid:true},{date:'Feb 28',svc:'Standard clean',amt:'$238',paid:true},{date:'Feb 14',svc:'Standard clean',amt:'$238',paid:true},{date:'Jan 31',svc:'Deep clean',amt:'$312',paid:true}]},
+  'aloha-realty':{name:'Aloha Realty',type:'Commercial',phone:'(808) 555-2200',email:'office@aloharealty.com',address:'820 S King St, Honolulu, HI',payment:'ACH · ****8832',since:'January 2024',ltv:'$16,800',mrr:'$1,400',jobs:'48',avg:'$272',service:'Commercial weekly',freq:'Weekly',sqft:'2,200 sq ft',bedbath:'Office / open plan',cleaner:'Alohi L.',lastjob:'Mar 25, 2026',nextjob:'Apr 8, 2026',status:'Active',notes:'NET30 billing. Contact is Karen at front desk. Need to be done before 9am.',history:[{date:'Mar 25',svc:'Commercial weekly',amt:'$272',paid:true},{date:'Mar 18',svc:'Commercial weekly',amt:'$272',paid:true},{date:'Mar 11',svc:'Commercial weekly',amt:'$272',paid:true},{date:'Mar 4',svc:'Commercial weekly',amt:'$272',paid:false},{date:'Feb 25',svc:'Commercial weekly',amt:'$272',paid:true}]},
+  'chen-family':{name:'Chen Family',type:'Residential',phone:'(808) 555-3310',email:'chenfamily@gmail.com',address:'776 Palolo Ave, Honolulu, HI',payment:'Stripe card · ****9102',since:'November 2025',ltv:'$374',mrr:'—',jobs:'1',avg:'$374',service:'Move-out clean',freq:'One-time',sqft:'1,600 sq ft',bedbath:'3 bed / 2 bath',cleaner:'No preference',lastjob:'Feb 10, 2026',nextjob:'None scheduled',status:'Dormant',notes:'Move-out clean done Feb 10. No follow-up yet. Good candidate for recurring if they settled into new place.',history:[{date:'Feb 10',svc:'Move-out clean',amt:'$374',paid:true}]},
+  'maui-surf':{name:'Maui Surf Hotel',type:'Commercial',phone:'(808) 555-4400',email:'manager@mauisurfhotel.com',address:'45 Kaahumanu Ave, Kahului, HI',payment:'ACH · ****5571',since:'October 2023',ltv:'$54,400',mrr:'$3,200',jobs:'170',avg:'$340',service:'Commercial daily',freq:'Daily',sqft:'4,000 sq ft',bedbath:'Commercial hotel',cleaner:'Maile K.',lastjob:'Mar 30, 2026',nextjob:'Apr 2, 2026',status:'Active',notes:'Largest commercial account on Maui. Maile is their dedicated cleaner. NET30 billing. GM is David Kahale.',history:[{date:'Mar 30',svc:'Commercial daily',amt:'$340',paid:true},{date:'Mar 29',svc:'Commercial daily',amt:'$340',paid:true},{date:'Mar 28',svc:'Commercial daily',amt:'$340',paid:true},{date:'Mar 27',svc:'Commercial daily',amt:'$340',paid:false},{date:'Mar 26',svc:'Commercial daily',amt:'$340',paid:true}]},
+  'lani-p':{name:'Lani P.',type:'Residential',phone:'(808) 555-7721',email:'lani.p@gmail.com',address:'312 Hana Hwy, Paia, HI',payment:'Stripe card · ****3344',since:'March 2026',ltv:'$170',mrr:'$240',jobs:'1',avg:'$170',service:'Standard clean',freq:'Monthly',sqft:'1,100 sq ft',bedbath:'2 bed / 1 bath',cleaner:'Leilani H.',lastjob:'Mar 29, 2026',nextjob:'Apr 17, 2026',status:'New',notes:'New client, signed up via website. First clean went well. Lives alone, no pets.',history:[{date:'Mar 29',svc:'Standard clean',amt:'$170',paid:true}]},
+  'kona-coffee':{name:'Kona Coffee Co.',type:'Commercial',phone:'(808) 555-5500',email:'ops@konacoffeeco.com',address:'1100 Alakea St, Honolulu, HI',payment:'Stripe card · ****6678',since:'February 2025',ltv:'$10,200',mrr:'$750',jobs:'58',avg:'$204',service:'Commercial weekly',freq:'Weekly',sqft:'1,400 sq ft',bedbath:'Retail / cafe',cleaner:'Kaimana M.',lastjob:'Mar 27, 2026',nextjob:'Apr 4, 2026',status:'Active',notes:'Weekly clean before opening. Must be done by 6:30am. Owner is Mike Tanaka. Always pays on time.',history:[{date:'Mar 27',svc:'Commercial weekly',amt:'$204',paid:true},{date:'Mar 20',svc:'Commercial weekly',amt:'$204',paid:true},{date:'Mar 13',svc:'Commercial weekly',amt:'$204',paid:true},{date:'Mar 6',svc:'Commercial weekly',amt:'$204',paid:true},{date:'Feb 27',svc:'Commercial weekly',amt:'$204',paid:true}]},
+  'pearl-gym':{name:'Pearl City Gym',type:'Commercial',phone:'(808) 555-8890',email:'manager@pearlcitygym.com',address:'810 Kuala St, Pearl City, HI',payment:'ACH · ****2211',since:'June 2024',ltv:'$8,160',mrr:'$800',jobs:'72',avg:'$340',service:'Commercial 3x/week',freq:'3x/week',sqft:'3,500 sq ft',bedbath:'Gym floor + locker rooms',cleaner:'Keanu N.',lastjob:'Mar 26, 2026',nextjob:'Apr 3, 2026',status:'Active',notes:'3x per week — Mon, Wed, Fri. Keanu handles all shifts. Large locker room area takes most of the time.',history:[{date:'Mar 26',svc:'Commercial',amt:'$340',paid:true},{date:'Mar 24',svc:'Commercial',amt:'$340',paid:true},{date:'Mar 21',svc:'Commercial',amt:'$340',paid:false},{date:'Mar 19',svc:'Commercial',amt:'$340',paid:true},{date:'Mar 17',svc:'Commercial',amt:'$340',paid:true}]},
+  'tanaka':{name:'Tanaka Residence',type:'Residential',phone:'(808) 555-6612',email:'tanaka.family@gmail.com',address:'234 Liliha St, Honolulu, HI',payment:'Stripe card · ****8823',since:'August 2025',ltv:'$299',mrr:'—',jobs:'1',avg:'$299',service:'Deep clean',freq:'One-time',sqft:'1,500 sq ft',bedbath:'3 bed / 1 bath',cleaner:'No preference',lastjob:'Jan 15, 2026',nextjob:'None scheduled',status:'Dormant',notes:'One-time deep clean in January. No contact since. Good candidate for recurring biweekly service.',history:[{date:'Jan 15',svc:'Deep clean',amt:'$299',paid:true}]}
+};
+
+const leadDB={
+  'maui-wellness':{name:'Maui Wellness Center',contact:'Sandra Fong',phone:'(808) 555-9901',email:'sfong@mauiwellness.com',address:'55 Mahalani St, Wailuku, HI',value:'$1,200/mo',service:'Commercial weekly',sqft:'3,000 sq ft',source:'Google SEO',date:'Mar 28, 2026',stage:'New inquiry',action:'Schedule walkthrough',due:'Apr 5, 2026',assigned:'VA',notes:'Interested in weekly cleaning of their wellness center and treatment rooms. Wants eco-friendly products only — good fit for us. Sandra is the office manager.'},
+  'hale-koa':{name:'Hale Koa HOA',contact:'Brian Yamamoto',phone:'(808) 555-3344',email:'byamamoto@halekoa.com',address:'4000 Waialae Ave, Honolulu, HI',value:'$2,800/mo',service:'Commercial weekly',sqft:'8,000 sq ft',source:'Referral',date:'Mar 20, 2026',stage:'New inquiry',action:'Send proposal',due:'Apr 4, 2026',assigned:'Dane',notes:'Large HOA with common areas, gym, and pool house. Referred by Aloha Realty. Brian is on the board. Big opportunity — could be our largest Oahu account.'},
+  'oahu-dental':{name:'Oahu Dental Group',contact:'Dr. Lee',phone:'(808) 555-7788',email:'admin@oahudental.com',address:'1129 Kapiolani Blvd, Honolulu, HI',value:'$950/mo',service:'Commercial weekly',sqft:'2,400 sq ft',source:'Cold outreach',date:'Mar 15, 2026',stage:'Quoted',action:'Follow up on quote',due:'Apr 3, 2026',assigned:'VA',notes:'Quote sent Mar 25 for weekly cleaning of 3 exam rooms and reception. Waiting on response. Dr. Lee seemed interested but mentioned they are comparing 2 other vendors.'},
+  'kailua-airbnb':{name:'Airbnb — Kailua 3br',contact:'James Park',phone:'(808) 555-4455',email:'jpark@gmail.com',address:'123 Mokulua Dr, Kailua, HI',value:'$180/clean',service:'Turnover clean',sqft:'1,400 sq ft',source:'Google SEO',date:'Mar 22, 2026',stage:'Quoted',action:'Confirm pricing',due:'Apr 4, 2026',assigned:'VA',notes:'Airbnb host with 3br property in Kailua. Wants turnover cleaning between guests. Approx 6-8 cleans per month. Good fit for Airbnb property management expansion.'},
+  'kakaako-med':{name:'Kakaako Medical',contact:'Office manager',phone:'(808) 555-6677',email:'office@kakaakomedical.com',address:'680 Ala Moana Blvd, Honolulu, HI',value:'$1,100/mo',service:'Medical office weekly',sqft:'2,800 sq ft',source:'Cold outreach',date:'Mar 18, 2026',stage:'Quoted',action:'Send revised quote',due:'Apr 5, 2026',assigned:'Dane',notes:'Medical office — requires hospital-grade disinfectants. Quote sent but they asked for revision to include weekend cleaning. High value if we can meet their standards.'},
+  'hnl-airport':{name:'HNL Airport Janitorial',contact:'Procurement office',phone:'(808) 836-6411',email:'procurement@hnl.gov',address:'300 Rodgers Blvd, Honolulu, HI',value:'$14,000/mo',service:'Government janitorial',sqft:'40,000 sq ft',source:'RFP / GC partner',date:'Feb 10, 2026',stage:'Follow-up',action:'Submit final bid documents',due:'Apr 10, 2026',assigned:'Dane',notes:'Government contract starting June. Working with GC partner on RFP. Background checks required for all staff. Our biggest potential contract — airport terminal cleaning.',},
+  'pearl-city-law':{name:'Pearl City Law Office',contact:'Maria Santos',phone:'(808) 555-2233',email:'msantos@pclawoffice.com',address:'810 Lehua Ave, Pearl City, HI',value:'$600/mo',service:'Commercial weekly',sqft:'1,800 sq ft',source:'Cold outreach',date:'Mar 10, 2026',stage:'Follow-up',action:'Call Maria — 2nd follow-up',due:'Apr 3, 2026',assigned:'VA',notes:'Quote sent 3 weeks ago, one follow-up done. Maria was friendly but said she needs to check with the partners. VA needs to call again this week.'},
+  'waikiki-hotel':{name:'Waikiki Boutique Hotel',contact:'GM — Tom Reyes',phone:'(808) 555-9900',email:'treyes@waikikihotel.com',address:'2552 Kalakaua Ave, Honolulu, HI',value:'$3,200/mo',service:'Commercial daily',sqft:'6,000 sq ft',source:'Referral',date:'Mar 5, 2026',stage:'Follow-up',action:'Schedule property walkthrough',due:'Apr 7, 2026',assigned:'Dane',notes:'12-room boutique hotel on Kalakaua. Referred by Maui Surf Hotel. Tom wants a walkthrough before committing. If we land this it anchors Waikiki presence.'},
+  'kona-coffee':{name:'Kona Coffee Co.',contact:'Mike Tanaka',phone:'(808) 555-5500',email:'ops@konacoffeeco.com',address:'1100 Alakea St, Honolulu, HI',value:'$750/mo',service:'Commercial weekly',sqft:'1,400 sq ft',source:'Google SEO',date:'Jan 15, 2025',stage:'Closed won',action:'Active client',due:'—',assigned:'Kaimana M.',notes:'Converted to client Feb 2025. Weekly cleaning before opening. One of our most reliable accounts.'},
+  'lani-p':{name:'Lani P.',contact:'Lani Palama',phone:'(808) 555-7721',email:'lani.p@gmail.com',address:'312 Hana Hwy, Paia, HI',value:'$240/mo',service:'Standard clean',sqft:'1,100 sq ft',source:'Google SEO',date:'Mar 10, 2026',stage:'Closed won',action:'Active client',due:'—',assigned:'Leilani H.',notes:'Converted to recurring monthly client Mar 2026. First clean was great, wants to add second bathroom deep clean quarterly.'},
+  'sarah-k':{name:'Sarah K.',contact:'Sarah Kimura',phone:'(808) 555-1188',email:'sarah.k@gmail.com',address:'44 Hekili St, Kailua, HI',value:'$280/visit',service:'Standard clean',sqft:'1,200 sq ft',source:'Google SEO',date:'Mar 30, 2026',stage:'New inquiry',action:'Send quote',due:'Apr 4, 2026',assigned:'VA',notes:'New inquiry from website. 2br/1ba in Kailua. Interested in biweekly. Sent intake form, waiting for response.'}
+};
+
+const cleanerDB={
+  km:{name:'Kaimana M.',role:'Lead cleaner · Oahu',initials:'KM',bg:'#9FE1CB',fg:'#085041',phone:'(808) 555-0142',email:'kaimana.m@email.com',loc:'Kailua, Oahu',start:'Jan 2024',rate:'$18/hr',week:'34 hrs',month:'112 hrs',paid:'$600',jobs:'12',alltime:'147',islands:'Oahu',bgcheck:'Cleared',notes:'Reliable, client favorite. Clients frequently request her by name.'},
+  al:{name:'Alohi L.',role:'Cleaner · Oahu',initials:'AL',bg:'#B5D4F4',fg:'#0C447C',phone:'(808) 555-0198',email:'alohi.l@email.com',loc:'Kaneohe, Oahu',start:'Mar 2024',rate:'$16/hr',week:'28 hrs',month:'88 hrs',paid:'$0',jobs:'9',alltime:'82',islands:'Oahu',bgcheck:'Cleared',notes:'Good with commercial clients. Punctual and detail-oriented.'},
+  mk:{name:'Maile K.',role:'Lead cleaner · Maui',initials:'MK',bg:'#F5C4B3',fg:'#712B13',phone:'(808) 555-0231',email:'maile.k@email.com',loc:'Kahului, Maui',start:'Nov 2023',rate:'$18/hr',week:'36 hrs',month:'124 hrs',paid:'$1,200',jobs:'14',alltime:'198',islands:'Maui',bgcheck:'Cleared',notes:'Top performer on Maui. Handles all major commercial accounts there.'},
+  kn:{name:'Keanu N.',role:'Cleaner · Oahu',initials:'KN',bg:'#CECBF6',fg:'#3C3489',phone:'(808) 555-0317',email:'keanu.n@email.com',loc:'Aiea, Oahu',start:'Jun 2024',rate:'$16/hr',week:'22 hrs',month:'68 hrs',paid:'$0',jobs:'7',alltime:'54',islands:'Oahu',bgcheck:'Cleared',notes:'Part-time, available weekdays. Great with gym and commercial spaces.'},
+  lh:{name:'Leilani H.',role:'Cleaner · Maui',initials:'LH',bg:'#FAC775',fg:'#633806',phone:'(808) 555-0289',email:'leilani.h@email.com',loc:'Lahaina, Maui',start:'Aug 2024',rate:'$16/hr',week:'22 hrs',month:'72 hrs',paid:'$0',jobs:'8',alltime:'41',islands:'Maui',bgcheck:'Cleared',notes:'Good availability on Maui west side. Growing client base.'},
+  tr:{name:'Tua R.',role:'Cleaner · Oahu',initials:'TR',bg:'#F4C0D1',fg:'#72243E',phone:'(808) 555-0354',email:'tua.r@email.com',loc:'Waipahu, Oahu',start:'Sep 2024',rate:'$16/hr',week:'0 hrs',month:'0 hrs',paid:'$0',jobs:'0',alltime:'12',islands:'Oahu',bgcheck:'Pending',notes:'On leave — returning May. Background check still pending.'}
+};
+
+const clientJobData={
+  'The Morrisons':{service:'Standard clean',address:'1247 Kalani St, Kailua, HI',freq:'Biweekly',dur:'3.5 hrs',sqft:'1,800 sq ft',bed:'3 bed / 2 bath',cond:'Good (7/10)',base:'$227.50',disc:'$0',tax:'$10.72',total:'$238.22'},
+  'Aloha Realty':{service:'Commercial weekly',address:'820 S King St, Honolulu, HI',freq:'Weekly',dur:'4.0 hrs',sqft:'2,200 sq ft',bed:'Office / open plan',cond:'Good (8/10)',base:'$260.00',disc:'$0',tax:'$12.25',total:'$272.25'},
+  'Kona Coffee Co.':{service:'Commercial weekly',address:'1100 Alakea St, Honolulu, HI',freq:'Weekly',dur:'3.0 hrs',sqft:'1,400 sq ft',bed:'Retail / cafe',cond:'Good (7/10)',base:'$195.00',disc:'$0',tax:'$9.19',total:'$204.19'},
+  'Pearl City Gym':{service:'Commercial 3x/week',address:'810 Kuala St, Pearl City, HI',freq:'3x/week',dur:'4.0 hrs',sqft:'3,500 sq ft',bed:'Gym + locker rooms',cond:'Moderate (6/10)',base:'$325.00',disc:'$0',tax:'$15.32',total:'$340.32'},
+  'Maui Surf Hotel':{service:'Commercial daily',address:'45 Kaahumanu Ave, Kahului, HI',freq:'Daily',dur:'5.0 hrs',sqft:'4,000 sq ft',bed:'Commercial hotel',cond:'Good (8/10)',base:'$325.00',disc:'$0',tax:'$15.32',total:'$340.32'},
+  'Lani P.':{service:'Standard clean',address:'312 Hana Hwy, Paia, HI',freq:'Monthly',dur:'2.5 hrs',sqft:'1,100 sq ft',bed:'2 bed / 1 bath',cond:'Good (8/10)',base:'$162.50',disc:'$0',tax:'$7.66',total:'$170.16'},
+  'Chen Family':{service:'Move-out clean',address:'776 Palolo Ave, Honolulu, HI',freq:'One-time',dur:'5.0 hrs',sqft:'1,600 sq ft',bed:'3 bed / 2 bath',cond:'Fair (5/10)',base:'$357.00',disc:'$0',tax:'$16.82',total:'$373.82'},
+  'Tanaka Res.':{service:'Deep clean',address:'234 Liliha St, Honolulu, HI',freq:'One-time',dur:'4.0 hrs',sqft:'1,500 sq ft',bed:'3 bed / 1 bath',cond:'Fair (5/10)',base:'$286.00',disc:'$0',tax:'$13.48',total:'$299.48'},
+  'North Shore Gym':{service:'Commercial weekly',address:'59-864 Kamehameha Hwy, HI',freq:'Weekly',dur:'4.0 hrs',sqft:'2,800 sq ft',bed:'Gym + bathrooms',cond:'Moderate (6/10)',base:'$325.00',disc:'$0',tax:'$15.32',total:'$340.32'}
+};
+
+const aiDrafts={
+  client:{sms:"Hi Morrison family! Just a reminder that Kaimana will be there Monday Apr 7 at 8am for your biweekly clean. Let us know if anything has changed or if you need us to focus on any specific areas. See you then! — Hawaii Natural Clean",email:"Subject: Your cleaning appointment — Monday Apr 7\n\nHi Morrison family,\n\nThis is a friendly reminder that Kaimana from Hawaii Natural Clean will be at your home on Monday, April 7th at 8:00 AM for your biweekly clean.\n\nIf you need to reschedule or have any special requests, just reply to this message.\n\nMahalo!\nHawaii Natural Clean"},
+  invite:{sms:"Hi! Job available — The Morrisons, standard clean, Mon Apr 14 @ 8am in Kailua. Est 3.5 hrs, $63. Reply YES to claim or NO to pass. First YES gets it! — HNC"},
+  followup:{sms:"Hi Chen family! It's been a while since your move-out clean in February. We'd love to help you settle in — we're offering 10% off your next booking this month. Ready to schedule? Reply here or visit hawaiinaturalclean.com",email:"Subject: We'd love to see you again — 10% off this month\n\nHi Chen family,\n\nWe hope your move went smoothly! It's been about 51 days since your last clean and we wanted to check in.\n\nAs a thank-you for being a past client, we're offering 10% off your next booking through end of April.\n\nJust reply to this email and we'll get you scheduled.\n\nMahalo,\nHawaii Natural Clean"}
+};
+
 let curYear=2026,curMonth=4;
+
 function renderCal(){
   document.getElementById('cal-month-label').textContent=MONTHS[curMonth-1]+' '+curYear;
-  const c=document.getElementById('cal-days');c.innerHTML='';
+  const c=document.getElementById('cal-days');
+  c.innerHTML='';
   const first=new Date(curYear,curMonth-1,1).getDay();
   const dim=new Date(curYear,curMonth,0).getDate();
   const dipm=new Date(curYear,curMonth-1,0).getDate();
   const today=new Date();
   const isT=(y,m,d)=>y===today.getFullYear()&&m===today.getMonth()+1&&d===today.getDate();
-  for(let i=0;i<first;i++){const d=dipm-first+1+i;const el=document.createElement('div');el.className='cal-day om';el.innerHTML='<div class="dn2">'+d+'</div>';c.appendChild(el);}
-  for(let d=1;d<=dim;d++){const el=document.createElement('div');el.className='cal-day'+(isT(curYear,curMonth,d)?' today':'');let h='<div class="dn2">'+d+'</div>';const k=curYear+'-'+curMonth+'-'+d;const da=apptData[k]||[];da.slice(0,2).forEach(a=>{const sc=a.s[0];h+='<div class="appt a'+sc+'" onclick="openAppt(event,'+JSON.stringify(a)+',\''+k+'\')">'+a.t+' '+a.n+'</div>';});if(da.length>2)h+='<div class="more-appts">+'+(da.length-2)+' more</div>';el.innerHTML=h;c.appendChild(el);}
-  const tot=first+dim;const rem=tot%7===0?0:7-(tot%7);for(let i=1;i<=rem;i++){const el=document.createElement('div');el.className='cal-day om';el.innerHTML='<div class="dn2">'+i+'</div>';c.appendChild(el);}
+  for(let i=0;i<first;i++){
+    const d=dipm-first+1+i;
+    const el=document.createElement('div');
+    el.className='cal-day om';
+    el.innerHTML='<div class="dn2">'+d+'</div>';
+    c.appendChild(el);
+  }
+  for(let d=1;d<=dim;d++){
+    const el=document.createElement('div');
+    el.className='cal-day'+(isT(curYear,curMonth,d)?' today':'');
+    let h='<div class="dn2">'+d+'</div>';
+    const k=curYear+'-'+curMonth+'-'+d;
+    const da=apptData[k]||[];
+    da.slice(0,2).forEach(function(a){
+      const sc=a.s.charAt(0);
+      const aData=JSON.stringify(a).replace(/'/g,'&#39;');
+      h+='<button class="appt a'+sc+'" onclick="openAppt(event,'+aData+',\''+k+'\')">'+a.t+' '+a.n+'</button>';
+    });
+    if(da.length>2)h+='<div class="more-appts">+'+(da.length-2)+' more</div>';
+    el.innerHTML=h;
+    c.appendChild(el);
+  }
+  const tot=first+dim;
+  const rem=tot%7===0?0:7-(tot%7);
+  for(let i=1;i<=rem;i++){
+    const el=document.createElement('div');
+    el.className='cal-day om';
+    el.innerHTML='<div class="dn2">'+i+'</div>';
+    c.appendChild(el);
+  }
 }
-function changeMonth(d){curMonth+=d;if(curMonth>12){curMonth=1;curYear++;}if(curMonth<1){curMonth=12;curYear--;}renderCal();}
+
+document.getElementById('prev-btn').addEventListener('click',function(){changeMonth(-1);});
+document.getElementById('next-btn').addEventListener('click',function(){changeMonth(1);});
+
+function changeMonth(d){
+  curMonth+=d;
+  if(curMonth>12){curMonth=1;curYear++;}
+  if(curMonth<1){curMonth=12;curYear--;}
+  renderCal();
+}
+
 function openAppt(e,a,dateKey){
   e.stopPropagation();
   const parts=dateKey.split('-');
@@ -558,7 +921,7 @@ function openAppt(e,a,dateKey){
   document.getElementById('ai-date').textContent=mo+' '+parts[2]+', '+parts[0];
   document.getElementById('ai-time').textContent=a.t.replace('am',' AM').replace('pm',' PM');
   document.getElementById('ai-cleaner').textContent=a.cleaner;
-  const cd=clientData[a.n]||{};
+  const cd=clientJobData[a.n]||{};
   document.getElementById('ai-service').textContent=cd.service||'Standard clean';
   document.getElementById('ai-address').textContent=cd.address||'—';
   document.getElementById('ai-freq').textContent=cd.freq||'—';
@@ -566,16 +929,122 @@ function openAppt(e,a,dateKey){
   document.getElementById('ai-sqft').textContent=cd.sqft||'—';
   document.getElementById('ai-bedbath').textContent=cd.bed||'—';
   document.getElementById('ai-cond').textContent=cd.cond||'—';
-  const hrs=parseFloat(cd.dur)||3.5;const rate=a.cleaner.includes('Kaimana')||a.cleaner.includes('Maile')?18:16;
-  document.getElementById('ai-cpay').textContent='$'+(hrs*rate).toFixed(2)+' ('+hrs+' hrs × $'+rate+')';
+  const hrs=parseFloat(cd.dur)||3.5;
+  const rate=(a.cleaner.includes('Kaimana')||a.cleaner.includes('Maile'))?18:16;
+  document.getElementById('ai-cpay').textContent='$'+(hrs*rate).toFixed(2)+' ('+hrs+' hrs x $'+rate+')';
   document.getElementById('ai-base').textContent=cd.base||'—';
   document.getElementById('ai-disc').textContent='— '+(cd.disc||'$0');
   document.getElementById('ai-tax').textContent=cd.tax||'—';
   document.getElementById('ai-total').textContent=cd.total||'—';
+  toggleApptEdit(false);
   document.getElementById('appt-overlay').classList.remove('hidden');
 }
+
+function toggleApptEdit(show){
+  document.getElementById('appt-view').style.display=show?'none':'block';
+  document.getElementById('appt-edit').style.display=show?'block':'none';
+}
+
+function saveAppt(){
+  toggleApptEdit(false);
+  const notice=document.createElement('div');
+  notice.style.cssText='background:#e6fffa;border:1px solid #9ae6b4;border-radius:8px;padding:8px 12px;font-size:12px;color:#276749;margin-bottom:12px;';
+  notice.textContent='Changes saved successfully.';
+  document.getElementById('appt-view').insertBefore(notice,document.getElementById('appt-view').firstChild);
+  setTimeout(function(){notice.remove();},3000);
+}
+
+function openClient(id){
+  const d=clientDB[id];
+  if(!d)return;
+  const initials=d.name.split(' ').map(function(w){return w[0];}).join('').slice(0,2).toUpperCase();
+  const av=document.getElementById('cl-av');
+  av.textContent=initials;
+  av.style.background=d.type==='Commercial'?'#ebf5ff':'#e6fffa';
+  av.style.color=d.type==='Commercial'?'#2b6cb0':'#276749';
+  document.getElementById('cl-title').textContent=d.name;
+  document.getElementById('cl-name').textContent=d.name;
+  document.getElementById('cl-type').textContent=d.type+' client';
+  const st=document.getElementById('cl-status');
+  st.textContent=d.status;
+  st.className='badge '+(d.status==='Active'?'bac':d.status==='New'?'bpt':'bin');
+  document.getElementById('cl-phone').textContent=d.phone;
+  document.getElementById('cl-email').textContent=d.email;
+  document.getElementById('cl-address').textContent=d.address;
+  document.getElementById('cl-payment').textContent=d.payment;
+  document.getElementById('cl-since').textContent=d.since;
+  document.getElementById('cl-ltv').textContent=d.ltv;
+  document.getElementById('cl-mrr').textContent=d.mrr;
+  document.getElementById('cl-jobs').textContent=d.jobs;
+  document.getElementById('cl-avg').textContent=d.avg;
+  document.getElementById('cl-service').textContent=d.service;
+  document.getElementById('cl-freq').textContent=d.freq;
+  document.getElementById('cl-sqft').textContent=d.sqft;
+  document.getElementById('cl-bedbath').textContent=d.bedbath;
+  document.getElementById('cl-cleaner').textContent=d.cleaner;
+  document.getElementById('cl-lastjob').textContent=d.lastjob;
+  document.getElementById('cl-nextjob').textContent=d.nextjob;
+  document.getElementById('cl-notes').textContent=d.notes;
+  const hist=document.getElementById('cl-history');
+  hist.innerHTML='';
+  d.history.forEach(function(h){
+    const row=document.createElement('div');
+    row.className='job-history-item';
+    row.innerHTML='<div><div style="font-size:12px;font-weight:500;">'+h.date+' — '+h.svc+'</div></div><div style="text-align:right;"><div style="font-size:12px;font-weight:600;color:#1D9E75;">'+h.amt+'</div><div style="font-size:10px;color:'+(h.paid?'#276749':'#b7791f')+';">'+(h.paid?'Paid':'Pending')+'</div></div>';
+    hist.appendChild(row);
+  });
+  toggleClientEdit(false);
+  document.getElementById('client-overlay').classList.remove('hidden');
+}
+
+function toggleClientEdit(show){
+  document.getElementById('client-view').style.display=show?'none':'block';
+  document.getElementById('client-edit').style.display=show?'block':'none';
+}
+
+function saveClient(){
+  toggleClientEdit(false);
+}
+
+function openLead(id){
+  const d=leadDB[id];
+  if(!d)return;
+  document.getElementById('lead-title').textContent=d.name;
+  document.getElementById('lead-name').textContent=d.name;
+  document.getElementById('lead-type-line').textContent=d.service+' · '+d.sqft;
+  const sb=document.getElementById('lead-stage-badge');
+  sb.textContent=d.stage;
+  const stageColors={'New inquiry':'background:#ebf5ff;color:#2b6cb0;','Quoted':'background:#fffbeb;color:#b7791f;','Follow-up':'background:#fff5f5;color:#c53030;','Closed won':'background:#e6fffa;color:#276749;','Closed lost':'background:#f5f5f3;color:#999;'};
+  sb.style.cssText=stageColors[d.stage]||'';
+  document.getElementById('lead-contact').textContent=d.contact;
+  document.getElementById('lead-phone').textContent=d.phone;
+  document.getElementById('lead-email').textContent=d.email;
+  document.getElementById('lead-address').textContent=d.address;
+  document.getElementById('lead-value').textContent=d.value;
+  document.getElementById('lead-service').textContent=d.service;
+  document.getElementById('lead-sqft').textContent=d.sqft;
+  document.getElementById('lead-source').textContent=d.source;
+  document.getElementById('lead-date').textContent=d.date;
+  document.getElementById('lead-action').textContent=d.action;
+  document.getElementById('lead-due').textContent=d.due;
+  document.getElementById('lead-assigned').textContent=d.assigned;
+  document.getElementById('lead-notes').textContent=d.notes;
+  toggleLeadEdit(false);
+  document.getElementById('lead-overlay').classList.remove('hidden');
+}
+
+function toggleLeadEdit(show){
+  document.getElementById('lead-view').style.display=show?'none':'block';
+  document.getElementById('lead-edit').style.display=show?'block':'none';
+}
+
+function saveLead(){
+  toggleLeadEdit(false);
+}
+
 function openCleaner(id){
-  const d=cleanerDB[id];if(!d)return;
+  const d=cleanerDB[id];
+  if(!d)return;
   document.getElementById('cp-av').textContent=d.initials;
   document.getElementById('cp-av').style.background=d.bg;
   document.getElementById('cp-av').style.color=d.fg;
@@ -584,59 +1053,106 @@ function openCleaner(id){
   const st=document.getElementById('cp-status');
   st.textContent=id==='tr'?'Inactive':'Active';
   st.className='badge '+(id==='tr'?'bin':'bac');
-  ['phone','email','loc','start','rate','week','month','paid','jobs','alltime','islands','notes'].forEach(f=>{document.getElementById('cp-'+f).textContent=d[f]||'—';});
+  ['phone','email','loc','start','rate','week','month','paid','jobs','alltime','islands','notes'].forEach(function(f){
+    document.getElementById('cp-'+f).textContent=d[f]||'—';
+  });
   const bg=document.getElementById('cp-bg');
-  bg.textContent=d.bgcheck;bg.className='badge '+(d.bgcheck==='Cleared'?'bac':'bpn');
+  bg.textContent=d.bgcheck;
+  bg.className='badge '+(d.bgcheck==='Cleared'?'bac':'bpn');
+  toggleCleanerEdit(false);
   document.getElementById('cleaner-overlay').classList.remove('hidden');
 }
-function closeOverlay(id){document.getElementById(id).classList.add('hidden');}
+
+function toggleCleanerEdit(show){
+  document.getElementById('cleaner-view').style.display=show?'none':'block';
+  document.getElementById('cleaner-edit').style.display=show?'block':'none';
+}
+
+function saveCleaner(){
+  toggleCleanerEdit(false);
+}
+
+function closeOverlay(id){
+  document.getElementById(id).classList.add('hidden');
+}
+
 function sv(view,el){
-  document.querySelectorAll('.vc').forEach(v=>v.classList.remove('active'));
-  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.querySelectorAll('.vc').forEach(function(v){v.classList.remove('active');});
+  document.querySelectorAll('.nav-item').forEach(function(n){n.classList.remove('active');});
   document.getElementById('view-'+view).classList.add('active');
   el.classList.add('active');
-  const titles={dashboard:'Dashboard',calendar:'Calendar',pipeline:'Pipeline',clients:'Clients',tasks:'VA Tasks',messaging:'Messaging',cleaners:'Cleaners',payroll:'Payroll',reporting:'Reporting'};
-  const ctas={dashboard:'+ New lead',calendar:'+ New appointment',pipeline:'+ New lead',clients:'+ Add client',tasks:'+ Add task',messaging:'+ New message',cleaners:'+ Add cleaner',payroll:'Log hours',reporting:'Export'};
-  const secs={calendar:'Month view',payroll:'Export',reporting:'Export'};
+  var titles={dashboard:'Dashboard',calendar:'Calendar',pipeline:'Pipeline',clients:'Clients',tasks:'VA Tasks',messaging:'Messaging',cleaners:'Cleaners',payroll:'Payroll',reporting:'Reporting'};
+  var ctas={dashboard:'+ New lead',calendar:'+ New appointment',pipeline:'+ New lead',clients:'+ Add client',tasks:'+ Add task',messaging:'+ New message',cleaners:'+ Add cleaner',payroll:'Log hours',reporting:'Export'};
+  var secs={calendar:'Month view',payroll:'Export',reporting:'Export'};
   document.getElementById('page-title').textContent=titles[view]||view;
   document.getElementById('top-cta').textContent=ctas[view]||'+ New';
   document.getElementById('sec-btn').textContent=secs[view]||'Filter';
 }
+
 function switchMsgTab(tab,el){
-  document.querySelectorAll('.msg-tab').forEach(t=>t.classList.remove('active'));
-  document.querySelectorAll('.msg-scenario').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('.msg-tab').forEach(function(t){t.classList.remove('active');});
+  document.querySelectorAll('.msg-scenario').forEach(function(s){s.classList.remove('active');});
   el.classList.add('active');
   document.getElementById('msg-'+tab).classList.add('active');
 }
+
 function setChan(btn,ch){
-  btn.closest('.chan-toggle').querySelectorAll('.chan-btn').forEach(b=>{b.classList.remove('active-sms','active-email');});
+  btn.closest('.chan-toggle').querySelectorAll('.chan-btn').forEach(function(b){b.classList.remove('active-sms','active-email');});
   btn.classList.add('active-'+ch);
 }
-function setTone(btn){btn.closest('.tone-row').querySelectorAll('.tone-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');}
+
+function setTone(btn){
+  btn.closest('.tone-row').querySelectorAll('.tone-btn').forEach(function(b){b.classList.remove('active');});
+  btn.classList.add('active');
+}
+
 function aiDraft(type){
-  const ta=document.getElementById('msg-'+type+'-ta');
-  const thinking=document.getElementById('msg-'+type+'-thinking');
-  const chanBtn=ta.closest('.tw').querySelector('.chan-btn.active-email');
-  const isEmail=!!chanBtn;
-  const text=(aiDrafts[type]?.[isEmail?'email':'sms'])||aiDrafts[type]?.sms||'';
-  ta.value='';thinking.classList.add('show');
-  let i=0;
-  const iv=setInterval(()=>{if(i<text.length){ta.value+=text[i];i++;updateCount(type);}else{clearInterval(iv);thinking.classList.remove('show');}},16);
+  var ta=document.getElementById('msg-'+type+'-ta');
+  var thinking=document.getElementById('msg-'+type+'-thinking');
+  var chanBtn=ta.closest('.tw').querySelector('.chan-btn.active-email');
+  var isEmail=!!chanBtn;
+  var text=(aiDrafts[type]&&aiDrafts[type][isEmail?'email':'sms'])||'';
+  if(!text&&aiDrafts[type])text=aiDrafts[type].sms||'';
+  ta.value='';
+  thinking.classList.add('show');
+  var i=0;
+  var iv=setInterval(function(){
+    if(i<text.length){ta.value+=text[i];i++;updateCount(type);}
+    else{clearInterval(iv);thinking.classList.remove('show');}
+  },16);
 }
-function clearTA(id,countId){document.getElementById(id).value='';document.getElementById(countId).textContent='0 chars';}
-function updateCount(type){const ta=document.getElementById('msg-'+type+'-ta');const cc=document.getElementById('msg-'+type+'-count');if(ta&&cc)cc.textContent=ta.value.length+' chars';}
+
+function clearTA(id,countId){
+  document.getElementById(id).value='';
+  document.getElementById(countId).textContent='0 chars';
+}
+
+function updateCount(type){
+  var ta=document.getElementById('msg-'+type+'-ta');
+  var cc=document.getElementById('msg-'+type+'-count');
+  if(ta&&cc)cc.textContent=ta.value.length+' chars';
+}
+
 function sendMessage(type){
-  const ta=document.getElementById('msg-'+type+'-ta');
+  var ta=document.getElementById('msg-'+type+'-ta');
   if(!ta.value.trim()){ta.placeholder='Write or draft a message first.';return;}
-  const notice=document.getElementById('msg-'+type+'-sent');
-  notice.classList.add('show');ta.value='';updateCount(type);
-  setTimeout(()=>notice.classList.remove('show'),4000);
+  var notice=document.getElementById('msg-'+type+'-sent');
+  notice.classList.add('show');
+  ta.value='';
+  updateCount(type);
+  setTimeout(function(){notice.classList.remove('show');},4000);
 }
-function setPeriod(btn){document.querySelectorAll('.pbtn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');}
-document.querySelectorAll('textarea').forEach(ta=>{
-  const type=ta.id.replace('msg-','').replace('-ta','');
-  ta.addEventListener('input',()=>updateCount(type));
+
+function setPeriod(btn){
+  document.querySelectorAll('.pbtn').forEach(function(b){b.classList.remove('active');});
+  btn.classList.add('active');
+}
+
+document.querySelectorAll('textarea').forEach(function(ta){
+  var type=ta.id.replace('msg-','').replace('-ta','');
+  ta.addEventListener('input',function(){updateCount(type);});
 });
+
 renderCal();
 </script>
 </body>

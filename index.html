@@ -263,7 +263,7 @@ textarea{font-family:inherit;}
 <body>
 <div class="crm">
   <div class="sidebar">
-    <div class="sidebar-logo"><div class="name">Hawaii Natural Clean</div><div class="sub">CRM v1</div></div>
+    <div class="sidebar-logo"><div class="name">Hawaii Natural Clean</div><div class="sub">CRM v1</div><div id="quo-status" style="font-size:10px;color:#999;margin-top:4px;">Quo: checking...</div></div>
     <div class="nav-section">Main</div>
     <div class="nav-item" onclick="sv('dashboard',this)"><svg class="nav-icon" viewBox="0 0 16 16" fill="none"><rect x="1" y="1" width="6" height="6" rx="1" fill="currentColor"/><rect x="9" y="1" width="6" height="6" rx="1" fill="currentColor"/><rect x="1" y="9" width="6" height="6" rx="1" fill="currentColor" opacity=".4"/><rect x="9" y="9" width="6" height="6" rx="1" fill="currentColor" opacity=".4"/></svg>Dashboard</div>
     <div class="nav-item active" onclick="sv('calendar',this)"><svg class="nav-icon" viewBox="0 0 16 16" fill="none"><rect x="1" y="3" width="14" height="12" rx="2" stroke="currentColor" stroke-width="1.3"/><path d="M5 1v4M11 1v4M1 7h14" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>Calendar</div>
@@ -1122,6 +1122,64 @@ const SUPABASE_URL = 'https://hehfecnjmgsthxjxlvpz.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhlaGZlY25qbWdzdGh4anhsdnB6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUyNDMwOTMsImV4cCI6MjA5MDgxOTA5M30.LRfDNzOjVQYUeldULv-8VFlZl6akxdHVfLBFCZDCa5o';
 const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
+// ── OPENPHONE / QUO CONFIG ───────────────────────────────────────────
+const QUO_API_KEY = '40ad45ce1e1beb6196a5ab5568fb6e090ee14ad62c2b2d846fd47724af586bef';
+const QUO_NUMBER = '+18084685356'; // Your Quo number
+const QUO_BASE = 'https://api.openphone.com/v1';
+
+async function quoSendSMS(toNumber, message) {
+  try {
+    var clean = toNumber.replace(/[^0-9+]/g,'');
+    if(!clean.startsWith('+')) clean = '+1' + clean;
+
+    // Call our Netlify function instead of OpenPhone directly (avoids CORS)
+    const response = await fetch('/.netlify/functions/send-sms', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ to: clean, message: message })
+    });
+    const data = await response.json();
+    console.log('SMS response:', response.status, JSON.stringify(data));
+    if (data.success) {
+      return { success: true, id: data.data && data.data.id };
+    } else {
+      console.error('SMS error:', data.error);
+      showPaymentToast('SMS failed: ' + JSON.stringify(data.error), null, 'error');
+      return { success: false, error: data.error };
+    }
+  } catch (err) {
+    console.error('SMS fetch error:', err);
+    showPaymentToast('SMS error: ' + err.message, null, 'error');
+    return { success: false, error: err.message };
+  }
+}
+
+async function quoGetConversations() {
+  try {
+    const response = await fetch(QUO_BASE + '/conversations?phoneNumberId=' + QUO_NUMBER, {
+      headers: { 'Authorization': 'Bearer ' + QUO_API_KEY }
+    });
+    const data = await response.json();
+    return data.data || [];
+  } catch (err) {
+    console.error('Get conversations error:', err);
+    return [];
+  }
+}
+
+async function quoGetMessages(conversationId) {
+  try {
+    const response = await fetch(QUO_BASE + '/messages?conversationId=' + conversationId, {
+      headers: { 'Authorization': 'Bearer ' + QUO_API_KEY }
+    });
+    const data = await response.json();
+    return data.data || [];
+  } catch (err) {
+    console.error('Get messages error:', err);
+    return [];
+  }
+}
+
 // ── DB HELPERS ────────────────────────────────────────────────────────
 async function dbSaveClient(data){
   const {error}=await db.from('clients').insert([{
@@ -1320,6 +1378,26 @@ async function loadAllData(){
     console.error('Load error:',err);
   }
   showLoadingState(false);
+  checkQuoStatus();
+}
+
+async function checkQuoStatus(){
+  var statusEl=document.getElementById('quo-status');
+  try {
+    // Test by sending a status check via our function
+    var response=await fetch('/.netlify/functions/send-sms',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({to:'+18084685356',message:'__status_check__',statusOnly:true})
+    });
+    if(response.ok){
+      if(statusEl){statusEl.textContent='Quo: connected';statusEl.style.color='#1D9E75';}
+    } else {
+      if(statusEl){statusEl.textContent='Quo: check API key';statusEl.style.color='#e53e3e';}
+    }
+  } catch(err){
+    if(statusEl){statusEl.textContent='Quo: offline';statusEl.style.color='#e53e3e';}
+  }
 }
 
 function showLoadingState(loading){
@@ -1724,28 +1802,65 @@ function openChat(id){
   document.getElementById('chat-compose-ta').value='';
 }
 
+function findMsgNavItem(){
+  var items=document.querySelectorAll('.nav-item');
+  for(var i=0;i<items.length;i++){
+    if(items[i].textContent.trim()==='Messaging')return items[i];
+  }
+  return null;
+}
+
 function openMsgFromClient(){
-  closeOverlay('client-overlay');
-  sv('messaging',document.querySelector('.nav-item:nth-child(7)'));
   var name=currentClientName;
+  var phone='—';
+  // Get phone from clientDB
+  var cdata=Object.values(clientDB).find(function(c){return c.name===name;});
+  if(cdata)phone=cdata.phone||'—';
+  closeOverlay('client-overlay');
+  var navEl=findMsgNavItem();
+  if(navEl)sv('messaging',navEl);
+  // Find or create inbox thread
   var item=inboxData.find(function(i){return i.name===name;});
-  if(item){setTimeout(function(){openChat(item.id);},100);}
+  if(!item){
+    var initials=name.split(' ').map(function(w){return w[0]||'';}).join('').slice(0,2).toUpperCase();
+    item={id:'client-'+name.toLowerCase().replace(/[^a-z0-9]/g,'-'),name:name,type:'client',avatar:initials,phone:phone,lastMsg:'',time:'Now',unread:false,msgs:[]};
+    inboxData.unshift(item);
+  }
+  setTimeout(function(){renderInbox();openChat(item.id);},100);
 }
 
 function openMsgFromAppt(){
-  closeOverlay('appt-overlay');
-  sv('messaging',document.querySelector('.nav-item:nth-child(7)'));
   var name=currentClientName;
+  var phone='—';
+  var cdata=Object.values(clientDB).find(function(c){return c.name===name;});
+  if(cdata)phone=cdata.phone||'—';
+  closeOverlay('appt-overlay');
+  var navEl=findMsgNavItem();
+  if(navEl)sv('messaging',navEl);
   var item=inboxData.find(function(i){return i.name===name;});
-  if(item){setTimeout(function(){openChat(item.id);},100);}
+  if(!item){
+    var initials=name.split(' ').map(function(w){return w[0]||'';}).join('').slice(0,2).toUpperCase();
+    item={id:'client-'+name.toLowerCase().replace(/[^a-z0-9]/g,'-'),name:name,type:'client',avatar:initials,phone:phone,lastMsg:'',time:'Now',unread:false,msgs:[]};
+    inboxData.unshift(item);
+  }
+  setTimeout(function(){renderInbox();openChat(item.id);},100);
 }
 
 function openMsgFromLead(){
-  closeOverlay('lead-overlay');
-  sv('messaging',document.querySelector('.nav-item:nth-child(7)'));
   var name=currentLeadName;
+  var phone='—';
+  var ldata=Object.values(leadDB).find(function(l){return l.name===name;});
+  if(ldata)phone=ldata.phone||'—';
+  closeOverlay('lead-overlay');
+  var navEl=findMsgNavItem();
+  if(navEl)sv('messaging',navEl);
   var item=inboxData.find(function(i){return i.name===name;});
-  if(item){setTimeout(function(){openChat(item.id);},100);}
+  if(!item){
+    var initials=name.split(' ').map(function(w){return w[0]||'';}).join('').slice(0,2).toUpperCase();
+    item={id:'lead-'+name.toLowerCase().replace(/[^a-z0-9]/g,'-'),name:name,type:'lead',avatar:initials,phone:phone,lastMsg:'',time:'Now',unread:false,msgs:[]};
+    inboxData.unshift(item);
+  }
+  setTimeout(function(){renderInbox();openChat(item.id);},100);
 }
 
 function setChatChannel(btn,ch){
@@ -1774,10 +1889,41 @@ function sendChatMsg(){
   var item=inboxData.find(function(i){return i.id===activeChatId;});
   if(!item)return;
   var now=new Date();var timeStr=now.getHours().toString().padStart(2,'0')+':'+now.getMinutes().toString().padStart(2,'0');
+
+  // Add to local inbox immediately
   item.msgs.push({out:true,text:text,time:timeStr});
   item.lastMsg=text;item.time='Just now';
   ta.value='';
   openChat(activeChatId);
+
+  // Send via Quo API if phone number exists
+  var phone=item.phone;
+  if(phone&&phone!=='—'){
+    var cleanPhone=phone.replace(/[^0-9+]/g,'');
+    if(!cleanPhone.startsWith('+'))cleanPhone='+1'+cleanPhone;
+    quoSendSMS(cleanPhone, text).then(function(result){
+      if(result.success){
+        console.log('Sent via Quo to '+cleanPhone);
+        // Save to Supabase messages table
+        db.from('messages').insert([{
+          thread_id:activeChatId,
+          contact_name:item.name,
+          contact_phone:cleanPhone,
+          contact_type:item.type||'client',
+          direction:'outbound',
+          body:text,
+          channel:'sms',
+          read:true,
+          quo_message_id:result.id||null
+        }]);
+      } else {
+        console.warn('Quo send failed - saved locally only');
+        showPaymentToast('Message saved but SMS failed to send. Check Quo API.',null,'error');
+      }
+    });
+  } else {
+    showPaymentToast('No phone number on file for '+item.name+' — message saved locally only.',null,'error');
+  }
 }
 
 /* PRICING CALC */
@@ -1892,6 +2038,7 @@ function handleTopCta(){
   else if(currentView==='cleaners'){document.getElementById('new-cleaner-overlay').classList.remove('hidden');}
   else if(currentView==='automations'){openNewAuto();}
   else if(currentView==='payments'){openNewInvoice();}
+  else if(currentView==='messaging'){openNewMsgOverlay();}
 }
 
 function sv(view,el){
@@ -3014,6 +3161,28 @@ function sendCleanerInvites(){
       sms:msgText,
       email:msgText
     };
+
+    // Actually send via Quo if cleaner has phone
+    if(c.phone&&c.phone!=='—'){
+      var cleanPhone=c.phone.replace(/[^0-9+]/g,'');
+      if(!cleanPhone.startsWith('+'))cleanPhone='+1'+cleanPhone;
+      quoSendSMS(cleanPhone, msgText).then(function(result){
+        if(result.success){
+          console.log('Invite sent to '+c.name+' via Quo');
+          db.from('messages').insert([{
+            thread_id:id,
+            contact_name:c.name,
+            contact_phone:cleanPhone,
+            contact_type:'cleaner',
+            direction:'outbound',
+            body:msgText,
+            channel:'sms',
+            read:true,
+            quo_message_id:result.id||null
+          }]);
+        }
+      });
+    }
   });
 
   var s=document.getElementById('invite-success');
@@ -3037,6 +3206,86 @@ function sendCleanerInvites(){
       setTimeout(function(){openChat(firstId.value);},150);
     }
   },1800);
+}
+
+
+function openNewMsgOverlay(){
+  // Populate contact dropdowns
+  var clientsGrp=document.getElementById('nm-clients-group');
+  var cleanersGrp=document.getElementById('nm-cleaners-group');
+  var leadsGrp=document.getElementById('nm-leads-group');
+  if(clientsGrp){clientsGrp.innerHTML='';
+    Object.entries(clientDB).forEach(function(e){
+      var opt=document.createElement('option');
+      opt.value='client|'+e[0]+'|'+e[1].name+'|'+(e[1].phone||'');
+      opt.textContent=e[1].name;clientsGrp.appendChild(opt);
+    });
+  }
+  if(cleanersGrp){cleanersGrp.innerHTML='';
+    Object.entries(cleanerDB).forEach(function(e){
+      var opt=document.createElement('option');
+      opt.value='cleaner|'+e[0]+'|'+e[1].name+'|'+(e[1].phone||'');
+      opt.textContent=e[1].name;cleanersGrp.appendChild(opt);
+    });
+  }
+  if(leadsGrp){leadsGrp.innerHTML='';
+    Object.entries(leadDB).forEach(function(e){
+      var opt=document.createElement('option');
+      opt.value='lead|'+e[0]+'|'+e[1].name+'|'+(e[1].phone||'');
+      opt.textContent=e[1].name;leadsGrp.appendChild(opt);
+    });
+  }
+  document.getElementById('nm-body').value='';
+  document.getElementById('nm-phone').value='';
+  document.getElementById('nm-contact').value='';
+  document.getElementById('new-msg-overlay').classList.remove('hidden');
+}
+
+function updateNewMsgPhone(){
+  var sel=document.getElementById('nm-contact');
+  var val=sel.value;
+  if(!val)return;
+  var parts=val.split('|');
+  var phone=parts[3]||'';
+  document.getElementById('nm-phone').value=phone;
+}
+
+function sendNewMessage(){
+  var sel=document.getElementById('nm-contact');
+  var val=sel.value;
+  var body=document.getElementById('nm-body').value.trim();
+  if(!body){document.getElementById('nm-body').focus();return;}
+  var parts=val?val.split('|'):[];
+  var type=parts[0]||'client';
+  var id=parts[1]||'unknown';
+  var name=parts[2]||'Contact';
+  var phone=document.getElementById('nm-phone').value||parts[3]||'';
+  var now=new Date();
+  var timeStr=now.getHours().toString().padStart(2,'0')+':'+now.getMinutes().toString().padStart(2,'0');
+  // Find or create thread
+  var item=inboxData.find(function(i){return i.id===id;});
+  if(!item){
+    var initials=name.split(' ').map(function(w){return w[0]||'';}).join('').slice(0,2).toUpperCase();
+    item={id:id,name:name,type:type,avatar:initials,phone:phone,lastMsg:body,time:'Just now',unread:false,msgs:[]};
+    inboxData.unshift(item);
+  }
+  item.msgs.push({out:true,text:body,time:timeStr});
+  item.lastMsg=body;item.time='Just now';
+  // Send via Quo
+  if(phone&&phone!=='—'){
+    var cleanPhone=phone.replace(/[^0-9+]/g,'');
+    if(!cleanPhone.startsWith('+'))cleanPhone='+1'+cleanPhone;
+    quoSendSMS(cleanPhone,body).then(function(r){
+      console.log(r.success?'Sent via Quo':'Quo failed, saved locally');
+    });
+  }
+  var s=document.getElementById('nm-success');s.classList.add('show');
+  setTimeout(function(){
+    s.classList.remove('show');
+    closeOverlay('new-msg-overlay');
+    renderInbox();
+    openChat(item.id);
+  },1500);
 }
 
 </script>
@@ -3276,6 +3525,39 @@ Your total will update automatically when you select a payment method.</textarea
         <button class="btn" onclick="closeOverlay('appt-charge-overlay')">Cancel</button>
       </div>
       <div class="success-bar" id="appt-charge-success">Payment collected successfully!</div>
+    </div>
+  </div>
+</div>
+
+
+<!-- NEW MESSAGE OVERLAY -->
+<div class="overlay hidden" id="new-msg-overlay" onclick="closeOverlay('new-msg-overlay')">
+  <div class="panel" onclick="event.stopPropagation()">
+    <div class="panel-header"><div class="panel-title">New message</div><button class="close-btn" onclick="closeOverlay('new-msg-overlay')">&#x2715;</button></div>
+    <div class="panel-body">
+      <div class="form-row"><label>To</label>
+        <select id="nm-contact" onchange="updateNewMsgPhone()">
+          <option value="">Select a contact...</option>
+          <optgroup label="Clients" id="nm-clients-group"></optgroup>
+          <optgroup label="Cleaners" id="nm-cleaners-group"></optgroup>
+          <optgroup label="Leads" id="nm-leads-group"></optgroup>
+        </select>
+      </div>
+      <div class="form-row"><label>Phone number</label>
+        <input type="tel" id="nm-phone" placeholder="(808) 555-0000">
+      </div>
+      <div class="chan-toggle" style="margin-bottom:12px;">
+        <button class="chan-btn active-sms" onclick="setChan(this,'sms')">SMS</button>
+        <button class="chan-btn" onclick="setChan(this,'email')">Email</button>
+      </div>
+      <div class="form-row"><label>Message</label>
+        <textarea id="nm-body" style="min-height:100px;" placeholder="Type your message..."></textarea>
+      </div>
+      <div class="save-bar">
+        <button class="btn btn-primary" onclick="sendNewMessage()">Send</button>
+        <button class="btn" onclick="closeOverlay('new-msg-overlay')">Cancel</button>
+      </div>
+      <div class="success-bar" id="nm-success">Message sent!</div>
     </div>
   </div>
 </div>

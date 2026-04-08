@@ -2356,16 +2356,20 @@ function saveNewAppt(){
     tax=Math.round(total*0.04712*100)/100;
     basePrice=Math.round((total-tax)*100)/100;
   }
+  var naHrs=parseFloat((document.getElementById('dur-val')||{}).textContent)||3.5;
+  var naRate=16;
+  var naService=document.getElementById('na-service');
+  var naServiceText=naService?naService.options[naService.selectedIndex].text:'Standard clean';
   dbSaveAppointment({
-    clientName:name, service:document.getElementById('na-service').options[document.getElementById('na-service').selectedIndex].text,
+    clientName:name, service:naServiceText,
     freq:freq, date:dateVal, time:timeStr,
-    address:document.getElementById('na-address').value,
-    beds:document.getElementById('na-beds').value,
-    baths:document.getElementById('na-baths').value,
-    condition:document.getElementById('na-cond').value,
+    address:(document.getElementById('na-address')||{}).value||'',
+    beds:(document.getElementById('na-beds')||{}).value||'',
+    baths:(document.getElementById('na-baths')||{}).value||'',
+    condition:(document.getElementById('na-cond')||{}).value||'7',
     cleanerName:cleanerName, basePrice:basePrice, tax:tax, totalPrice:total,
-    cleanerPay:Math.round(hrs*rate*100)/100,
-    notes:document.getElementById('na-notes').value,
+    cleanerPay:Math.round(naHrs*naRate*100)/100,
+    notes:(document.getElementById('na-notes')||{}).value||'',
     recurring:freq!=='One-time'
   });
   var success=document.getElementById('na-success');
@@ -4050,23 +4054,18 @@ function initTemplateEditor() {
 
 /* LEAD ACTIONS */
 function scheduleLeadAppointment(){
-  console.log('scheduleLeadAppointment called');
-  console.log('currentLeadId:', currentLeadId);
-  console.log('currentLeadName:', currentLeadName);
-  console.log('leadDB keys:', Object.keys(leadDB));
   // Get lead - try currentLeadId first, then search by name
   var lead = null;
   var lid = currentLeadId;
   if(lid && leadDB[lid]) {
     lead = leadDB[lid];
-    console.log('Found lead by ID:', lead.name);
   } else {
     // Fallback: search leadDB by currentLeadName
     var keys = Object.keys(leadDB);
     for(var i=0;i<keys.length;i++){
       if(leadDB[keys[i]].name === currentLeadName){ lead=leadDB[keys[i]]; lid=keys[i]; break; }
     }
-    if(lead) console.log('Found lead by name:', lead.name);
+
   }
   if(!lead){ 
     console.error('Lead not found! ID:', currentLeadId, 'Name:', currentLeadName);
@@ -4341,7 +4340,6 @@ scheduleLeadAppointment = function(){
 
 
 function filterLeads(view, btn){
-  console.log('filterLeads called with view:', view);
   document.querySelectorAll('#view-pipeline .template-tab').forEach(function(b){b.classList.remove('active');});
   btn.classList.add('active');
   var board = document.getElementById('pipe-board');

@@ -1138,7 +1138,7 @@ async function quoSendSMS(toNumber, message) {
     if(!clean.startsWith('+')) clean = '+1' + clean;
 
     // Call our Netlify function instead of OpenPhone directly (avoids CORS)
-    const response = await fetch('/.netlify/functions/send-sms', {
+    const response = await fetch('/api/send-sms', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ to: clean, message: message })
@@ -1389,7 +1389,7 @@ async function loadAllData(){
 async function checkQuoStatus(){
   var statusEl=document.getElementById('quo-status');
   try {
-    var response=await fetch('/.netlify/functions/send-sms',{
+    var response=await fetch('/api/send-sms',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify({statusOnly:true})

@@ -1,33 +1,3 @@
-import { createClient } from '@supabase/supabase-js';
-
-const supabase = createClient(
-  process.env.SUPABASE_URL || 'https://hehfecnjmgsthxjxlvpz.supabase.co',
-  process.env.SUPABASE_ANON_KEY
-);
-
-async function findClientByPhone(phone) {
-  if (!phone) return null;
-  // Normalize phone - strip all non-digits
-  const digits = phone.replace(/\D/g, '');
-  const last10 = digits.slice(-10);
-  
-  const { data } = await supabase
-    .from('clients')
-    .select('id, name, phone')
-    .limit(50);
-  
-  if (!data) return null;
-  
-  // Match by last 10 digits
-  const match = data.find(c => {
-    if (!c.phone) return false;
-    const cDigits = c.phone.replace(/\D/g, '').slice(-10);
-    return cDigits === last10;
-  });
-  
-  return match || null;
-}
-
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
 
@@ -39,20 +9,64 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
+  const SUPABASE_URL = 'https://hehfecnjmgsthxjxlvpz.supabase.co';
+  const SUPABASE_KEY = process.env.SUPABASE_ANON_KEY;
+
+  async function supabaseInsert(table, data) {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': SUPABASE_KEY,
+        'Authorization': `Bearer ${SUPABASE_KEY}`,
+        'Prefer': 'return=minimal'
+      },
+      body: JSON.stringify(data)
+    });
+    return res;
+  }
+
+  async function supabaseUpsert(table, data, onConflict) {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?on_conflict=${onConflict}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': SUPABASE_KEY,
+        'Authorization': `Bearer ${SUPABASE_KEY}`,
+        'Prefer': 'resolution=merge-duplicates,return=minimal'
+      },
+      body: JSON.stringify(data)
+    });
+    return res;
+  }
+
+  async function findClientByPhone(phone) {
+    if (!phone) return null;
+    const digits = phone.replace(/\D/g, '').slice(-10);
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/clients?select=id,name,phone&limit=100`, {
+      headers: {
+        'apikey': SUPABASE_KEY,
+        'Authorization': `Bearer ${SUPABASE_KEY}`
+      }
+    });
+    const clients = await res.json();
+    if (!Array.isArray(clients)) return null;
+    return clients.find(c => c.phone && c.phone.replace(/\D/g, '').slice(-10) === digits) || null;
+  }
+
   try {
     const event = req.body;
     const type = event.type;
     const data = event.data?.object;
 
-    console.log('OpenPhone webhook:', type);
+    console.log('OpenPhone webhook received:', type);
 
-    // INCOMING MESSAGE
     if (type === 'message.received' && data) {
       const from = data.from;
       const body = data.body || '';
       const client = await findClientByPhone(from);
 
-      await supabase.from('messages').insert([{
+      await supabaseInsert('messages', {
         thread_id: data.conversationId || from,
         contact_name: client ? client.name : from,
         contact_phone: from,
@@ -62,18 +76,15 @@ export default async function handler(req, res) {
         channel: 'sms',
         read: false,
         quo_message_id: data.id || null
-      }]);
-
-      console.log('Message saved from:', client ? client.name : 'unknown ' + from);
+      });
     }
 
-    // CALL COMPLETED
     if (type === 'call.completed' && data) {
       const direction = data.direction;
       const phone = direction === 'inbound' ? data.from : data.to;
       const client = await findClientByPhone(phone);
 
-      await supabase.from('call_transcripts').upsert([{
+      await supabaseUpsert('call_transcripts', {
         call_id: data.id,
         phone: phone,
         direction: direction,
@@ -81,47 +92,37 @@ export default async function handler(req, res) {
         called_at: data.createdAt || new Date().toISOString(),
         status: 'completed',
         client_id: client ? client.id : null,
-        client_name: client ? client.name : 'Unknown — ' + phone
-      }], { onConflict: 'call_id' });
-
-      console.log('Call saved:', data.id, client ? client.name : 'unknown ' + phone);
+        client_name: client ? client.name : ('Unknown — ' + phone)
+      }, 'call_id');
     }
 
-    // CALL SUMMARY
     if (type === 'call.summary.completed' && data) {
       const summary = Array.isArray(data.summary)
         ? data.summary.join(' ')
         : (data.summary || '');
 
-      await supabase.from('call_transcripts').upsert([{
+      await supabaseUpsert('call_transcripts', {
         call_id: data.callId,
         summary: summary,
         status: 'summary_ready'
-      }], { onConflict: 'call_id' });
-
-      console.log('Summary saved:', data.callId);
+      }, 'call_id');
     }
 
-    // CALL TRANSCRIPT
     if (type === 'call.transcript.completed' && data) {
       const dialogue = data.dialogue || [];
-      const transcript = dialogue.map(function(line) {
-        return (line.identifier || 'Unknown') + ': ' + line.content;
-      }).join('\n');
+      const transcript = dialogue.map(l => (l.identifier || 'Unknown') + ': ' + l.content).join('\n');
 
-      await supabase.from('call_transcripts').upsert([{
+      await supabaseUpsert('call_transcripts', {
         call_id: data.callId,
         transcript: transcript,
         status: 'transcript_ready'
-      }], { onConflict: 'call_id' });
-
-      console.log('Transcript saved:', data.callId);
+      }, 'call_id');
     }
 
     return res.status(200).json({ received: true, type });
 
   } catch (err) {
-    console.error('Webhook error:', err);
+    console.error('Webhook error:', err.message);
     return res.status(500).json({ error: err.message });
   }
 }

@@ -1630,7 +1630,7 @@ async function loadAllData(){
         cleaner:c.preferred_cleaner||'No preference',
         lastjob:'None yet', nextjob:'Not scheduled',
         status:c.status||'New', notes:c.notes||'—', history:[],
-        properties:c.properties||[]
+        properties:Array.isArray(c.properties)?c.properties:(c.properties?JSON.parse(JSON.stringify(c.properties)):[])
       };
     });
 
@@ -4542,6 +4542,7 @@ function scheduleLeadAppointment(){
     var addrEl=document.getElementById('na-address');
     if(nameEl) nameEl.value=lead.name;
     if(addrEl) addrEl.value=lead.address||'';
+    populatePropertySelector(lead.name);
     showPaymentToast(lead.name+' converted to client! Fill in the booking details below.', null, 'success');
   }, 300);
 }
@@ -4920,6 +4921,7 @@ function scheduleFromClient(){
       }
     }
     calcPrice();
+    populatePropertySelector(cdata.name);
     showPaymentToast(cdata.name + ' pre-filled. Pick a date and time to book.', null, 'success');
   }, 300);
 }
@@ -5023,30 +5025,44 @@ function openAddProperty(){
 
 function saveProperty(){
   var address = document.getElementById('prop-address').value;
-  if(!address){ document.getElementById('prop-address').focus(); return; }
+  if(!address){ document.getElementById('prop-address').style.border='1px solid #e53e3e'; document.getElementById('prop-address').focus(); return; }
+  document.getElementById('prop-address').style.border='';
   var cdata = clientDB[currentClientId];
   if(!cdata) return;
   if(!cdata.properties) cdata.properties = [];
   var prop = {
     address: address,
-    beds: document.getElementById('prop-beds').value,
-    baths: document.getElementById('prop-baths').value,
-    sqft: document.getElementById('prop-sqft').value,
-    price: document.getElementById('prop-price').value,
-    notes: document.getElementById('prop-notes').value
+    beds: document.getElementById('prop-beds').value || '—',
+    baths: document.getElementById('prop-baths').value || '—',
+    sqft: document.getElementById('prop-sqft').value || '',
+    price: document.getElementById('prop-price').value || '0',
+    notes: document.getElementById('prop-notes').value || ''
   };
   cdata.properties.push(prop);
+
   // Save to Supabase
+  var savePromise;
   if(currentClientId && currentClientId.length > 20){
-    db.from('clients').update({ properties: cdata.properties }).eq('id', currentClientId);
+    savePromise = db.from('clients').update({ properties: cdata.properties }).eq('id', currentClientId);
+  } else {
+    savePromise = Promise.resolve({error: null});
   }
-  var s = document.getElementById('prop-success');
-  s.classList.add('show');
-  setTimeout(function(){
-    s.classList.remove('show');
-    closeOverlay('add-property-overlay');
-    openClient(currentClientId); // Refresh panel
-  }, 1500);
+
+  savePromise.then(function(res){
+    if(res && res.error){
+      console.error('Property save error:', res.error);
+      showPaymentToast('Error saving property: ' + res.error.message, null, 'error');
+      return;
+    }
+    var s = document.getElementById('prop-success');
+    s.textContent = 'Property at ' + address + ' saved!';
+    s.classList.add('show');
+    setTimeout(function(){
+      s.classList.remove('show');
+      closeOverlay('add-property-overlay');
+      openClient(currentClientId);
+    }, 1500);
+  });
 }
 
 function removeProperty(idx){
@@ -5059,6 +5075,79 @@ function removeProperty(idx){
   }
   openClient(currentClientId);
 }
+
+
+/* PROPERTY SELECTION IN BOOKING FORM */
+function populatePropertySelector(clientName){
+  var propRow = document.getElementById('na-property-row');
+  var propSel = document.getElementById('na-property-select');
+  if(!propRow || !propSel) return;
+
+  // Find client by name
+  var cdata = null;
+  Object.values(clientDB).forEach(function(c){
+    if(c.name === clientName) cdata = c;
+  });
+
+  var props = cdata && cdata.properties ? cdata.properties : [];
+
+  if(props.length > 0){
+    propSel.innerHTML = '<option value="">— Select property —</option>';
+    props.forEach(function(p, idx){
+      var opt = document.createElement('option');
+      opt.value = idx;
+      opt.textContent = p.address + ' (' + p.beds + 'bd/' + p.baths + 'ba — $' + p.price + ')';
+      propSel.appendChild(opt);
+    });
+    propRow.style.display = 'block';
+    // If only one property, auto-select it
+    if(props.length === 1){
+      propSel.value = '0';
+      applyPropertyToBooking();
+    }
+  } else {
+    propRow.style.display = 'none';
+  }
+}
+
+function applyPropertyToBooking(){
+  var propSel = document.getElementById('na-property-select');
+  var idx = parseInt(propSel.value);
+  if(isNaN(idx)) return;
+
+  var nameEl = document.getElementById('na-name');
+  var clientName = nameEl ? nameEl.value : '';
+  var cdata = null;
+  Object.values(clientDB).forEach(function(c){
+    if(c.name === clientName) cdata = c;
+  });
+
+  if(!cdata || !cdata.properties || !cdata.properties[idx]) return;
+  var prop = cdata.properties[idx];
+
+  var addrEl = document.getElementById('na-address');
+  var bedsEl = document.getElementById('na-beds');
+  var bathsEl = document.getElementById('na-baths');
+
+  if(addrEl) addrEl.value = prop.address;
+  if(bedsEl) bedsEl.value = prop.beds;
+  if(bathsEl) bathsEl.value = prop.baths;
+
+  calcPrice();
+}
+
+// Hook into na-name field to show properties when client name is typed/filled
+document.addEventListener('DOMContentLoaded', function(){
+  var nameEl = document.getElementById('na-name');
+  if(nameEl){
+    nameEl.addEventListener('input', function(){
+      populatePropertySelector(this.value);
+    });
+    nameEl.addEventListener('change', function(){
+      populatePropertySelector(this.value);
+    });
+  }
+});
 
 </script>
 

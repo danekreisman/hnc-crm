@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDFWraEDO5b8RqpqNz213WlmkM9Duf3oUk&libraries=places&callback=initAddressAutocomplete" async defer></script>
+<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDFWraEDO5b8RqpqNz213WlmkM9Duf3oUk&libraries=places&callback=onMapsLoaded" async defer></script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Hawaii Natural Clean — CRM</title>
 <style>
@@ -1802,6 +1802,7 @@ function showClientEdit(){
   }
   document.getElementById('client-view').style.display='none';
   document.getElementById('client-edit').style.display='block';
+  initAC(['ced-address']);
 }
 function hideClientEdit(){document.getElementById('client-view').style.display='block';document.getElementById('client-edit').style.display='none';}
 function saveClientEdit(){
@@ -1892,6 +1893,7 @@ function showLeadEdit(){
   }
   document.getElementById('lead-view').style.display='none';
   document.getElementById('lead-edit').style.display='block';
+  initAC(['led-address']);
 }
 function hideLeadEdit(){document.getElementById('lead-view').style.display='block';document.getElementById('lead-edit').style.display='none';}
 function saveLeadEdit(){
@@ -2178,7 +2180,7 @@ function onApptNameInput(val){
   var newItem=document.createElement('div');
   newItem.style.cssText='padding:10px 14px;cursor:pointer;display:flex;align-items:center;gap:8px;color:#1D9E75;font-weight:600;font-size:14px;';
   newItem.innerHTML='<span style="font-size:18px;line-height:1;">+</span> Add as new client';
-  newItem.onmousedown=function(){drop.style.display='none';document.getElementById('new-appt-overlay').classList.add('hidden');document.getElementById('new-client-overlay').classList.remove('hidden');};
+  newItem.onmousedown=function(){drop.style.display='none';document.getElementById('new-appt-overlay').classList.add('hidden');document.getElementById('new-client-overlay').classList.remove('hidden');initAC(['nc-address']);};
   newItem.onmouseover=function(){this.style.background='#f0fdf4';};
   newItem.onmouseout=function(){this.style.background='';};
   drop.appendChild(newItem);
@@ -2240,6 +2242,7 @@ function scheduleFromClient(){
   document.getElementById('na-date').value='';
   calcPrice();
   document.getElementById('new-appt-overlay').classList.remove('hidden');
+  initAC(['na-address']);
 }
 
 function scheduleFromLead(){
@@ -2296,6 +2299,7 @@ function scheduleFromLead(){
   document.getElementById('na-date').value='';
   calcPrice();
   document.getElementById('new-appt-overlay').classList.remove('hidden');
+  initAC(['na-address']);
 }
 
 /* ── PIPELINE FILTER ────────────────────────────────────────── */
@@ -2756,9 +2760,9 @@ function populateRecurringMonth(yr,mo){
 }
 
 function handleTopCta(){
-  if(currentView==='calendar'){document.getElementById('new-appt-overlay').classList.remove('hidden');calcPrice();}
-  else if(currentView==='pipeline'||currentView==='dashboard'){document.getElementById('new-lead-overlay').classList.remove('hidden');}
-  else if(currentView==='clients'){document.getElementById('new-client-overlay').classList.remove('hidden');}
+  if(currentView==='calendar'){document.getElementById('new-appt-overlay').classList.remove('hidden');calcPrice();initAC(['na-address']);}
+  else if(currentView==='pipeline'||currentView==='dashboard'){document.getElementById('new-lead-overlay').classList.remove('hidden');initAC(['nl-address']);}
+  else if(currentView==='clients'){document.getElementById('new-client-overlay').classList.remove('hidden');initAC(['nc-address']);}
   else if(currentView==='cleaners'){document.getElementById('new-cleaner-overlay').classList.remove('hidden');}
   else if(currentView==='automations'){openNewAuto();}
   else if(currentView==='payments'){openNewInvoice();}
@@ -2789,11 +2793,12 @@ renderCal();
 loadAllData();
 
 /* ── GOOGLE PLACES ADDRESS AUTOCOMPLETE ─────────────────────── */
+var _mapsReady=false;
 var _acInitialized={};
-function initAddressAutocomplete(){
-  if(typeof google==='undefined'||!google.maps||!google.maps.places){console.warn('Google Maps Places not available — check API key domain restrictions');return;}
-  var fields=['na-address','nc-address','nl-address','ced-address','led-address'];
-  fields.forEach(function(id){
+function onMapsLoaded(){_mapsReady=true;}
+function initAC(ids){
+  if(!_mapsReady||typeof google==='undefined'||!google.maps||!google.maps.places)return;
+  ids.forEach(function(id){
     if(_acInitialized[id])return;
     var el=document.getElementById(id);
     if(!el)return;

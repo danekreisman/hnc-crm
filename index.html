@@ -234,6 +234,7 @@ tr.clickable:hover td{background:#f0faf6;cursor:pointer;}
 .success-bar{background:#e6fffa;border:1px solid #9ae6b4;border-radius:8px;padding:8px 12px;font-size:12px;color:#276749;margin-bottom:12px;display:none;}
 .success-bar.show{display:block;}
 textarea{font-family:inherit;}
+.pac-container{z-index:2000!important;}
 .agent-suggestion{font-size:11px;padding:4px 10px;border-radius:20px;border:1px solid #e0e0dd;background:#fff;color:#666;cursor:pointer;font-family:inherit;}
 .agent-suggestion:hover{background:#f5f0ff;color:#553c9a;border-color:#d6bcfa;}
 .agent-bubble-user{background:#553c9a;color:#fff;padding:10px 14px;border-radius:12px;border-bottom-right-radius:4px;font-size:13px;line-height:1.6;align-self:flex-end;max-width:80%;}
@@ -2790,7 +2791,7 @@ loadAllData();
 /* ── GOOGLE PLACES ADDRESS AUTOCOMPLETE ─────────────────────── */
 var _acInitialized={};
 function initAddressAutocomplete(){
-  if(typeof google==='undefined'||!google.maps||!google.maps.places)return;
+  if(typeof google==='undefined'||!google.maps||!google.maps.places){console.warn('Google Maps Places not available — check API key domain restrictions');return;}
   var fields=['na-address','nc-address','nl-address','ced-address','led-address'];
   fields.forEach(function(id){
     if(_acInitialized[id])return;

@@ -1739,9 +1739,15 @@ function showApptEdit(){document.getElementById('appt-view').style.display='none
 function hideApptEdit(){document.getElementById('appt-view').style.display='block';document.getElementById('appt-edit').style.display='none';}
 function saveApptEdit(){hideApptEdit();showToast('appt-overlay','Changes saved successfully.');}
 
-function cancelAppt(){
+async function cancelAppt(){
   if(!currentApptKey||!currentAppt)return;
   if(!confirm('Cancel this appointment for '+currentAppt.n+'? This cannot be undone.'))return;
+  // Delete from Supabase if it came from the database
+  if(currentAppt.dbId){
+    const {error}=await db.from('appointments').delete().eq('id',currentAppt.dbId);
+    if(error){alert('Failed to cancel: '+error.message);return;}
+  }
+  // Remove from in-memory store
   var arr=apptData[currentApptKey];
   if(arr){
     var idx=arr.findIndex(function(a){return a.n===currentAppt.n&&a.t===currentAppt.t;});

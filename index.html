@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
+<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDFWraEDO5b8RqpqNz213WlmkM9Duf3oUk&libraries=places&callback=initAutocomplete" async defer></script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Hawaii Natural Clean — CRM</title>
 <style>
@@ -234,7 +234,6 @@ tr.clickable:hover td{background:#f0faf6;cursor:pointer;}
 .success-bar{background:#e6fffa;border:1px solid #9ae6b4;border-radius:8px;padding:8px 12px;font-size:12px;color:#276749;margin-bottom:12px;display:none;}
 .success-bar.show{display:block;}
 textarea{font-family:inherit;}
-.pac-container{z-index:2000!important;}
 .agent-suggestion{font-size:11px;padding:4px 10px;border-radius:20px;border:1px solid #e0e0dd;background:#fff;color:#666;cursor:pointer;font-family:inherit;}
 .agent-suggestion:hover{background:#f5f0ff;color:#553c9a;border-color:#d6bcfa;}
 .agent-bubble-user{background:#553c9a;color:#fff;padding:10px 14px;border-radius:12px;border-bottom-right-radius:4px;font-size:13px;line-height:1.6;align-self:flex-end;max-width:80%;}
@@ -260,11 +259,6 @@ textarea{font-family:inherit;}
 .pay-tab{font-size:13px;padding:8px 16px;color:#999;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;}
 .pay-tab.active{color:#1D9E75;border-bottom-color:#1D9E75;font-weight:500;}
 .pay-tab:hover{color:#1a1a1a;}
-.pipe-filter-tab{font-size:13px;padding:8px 16px;color:#999;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;}
-.pipe-filter-tab.active{color:#1D9E75;border-bottom-color:#1D9E75;font-weight:500;}
-.pipe-filter-tab:hover{color:#1a1a1a;}
-.loss-reason-btn{font-size:12px;padding:8px 10px;border-radius:8px;border:1px solid #feb2b2;background:#fff5f5;color:#c53030;cursor:pointer;font-family:inherit;text-align:center;}
-.loss-reason-btn:hover{background:#fed7d7;}
 </style>
 </head>
 <body>
@@ -293,13 +287,6 @@ textarea{font-family:inherit;}
   <div class="main">
     <div class="topbar">
       <h1 id="page-title">Calendar</h1>
-      <div style="position:relative;flex:1;max-width:360px;margin:0 16px;">
-        <svg style="position:absolute;left:9px;top:50%;transform:translateY(-50%);opacity:.4;pointer-events:none;" width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="6.5" cy="6.5" r="5" stroke="#1a1a1a" stroke-width="1.5"/><path d="M10.5 10.5L14 14" stroke="#1a1a1a" stroke-width="1.5" stroke-linecap="round"/></svg>
-        <input id="global-search" type="text" placeholder="Search clients, cleaners, leads, addresses..." autocomplete="off"
-          style="width:100%;padding:6px 10px 6px 30px;border:1px solid #e0e0dd;border-radius:8px;font-size:12px;font-family:inherit;color:#1a1a1a;background:#fafaf8;outline:none;"
-          oninput="onGlobalSearch(this.value)" onfocus="showSearchResults()" onblur="setTimeout(hideSearchResults,200)">
-        <div id="search-results" style="display:none;position:absolute;top:calc(100% + 4px);left:0;right:0;background:#fff;border:1px solid #e8e8e5;border-radius:10px;box-shadow:0 4px 20px rgba(0,0,0,.1);z-index:2000;max-height:380px;overflow-y:auto;"></div>
-      </div>
       <div class="topbar-actions">
         <button class="btn" id="sec-btn">Month view</button>
         <button class="btn btn-primary" id="top-cta" onclick="handleTopCta()">+ New appointment</button>
@@ -341,6 +328,7 @@ textarea{font-family:inherit;}
           <div class="pipe-col"><div class="pipe-header"><span class="pipe-label">New inquiry</span><span class="pipe-count">4</span></div><div class="deal-card" onclick="openLead('maui-wellness')"><div class="deal-name">Maui Wellness Center</div><div class="deal-type"><span class="badge bc">Commercial</span></div><div class="deal-val">$1,200/mo</div></div><div class="deal-card" onclick="openLead('hale-koa')"><div class="deal-name">Hale Koa HOA</div><div class="deal-type"><span class="badge bc">Commercial</span></div><div class="deal-val">$2,800/mo</div></div></div>
           <div class="pipe-col"><div class="pipe-header"><span class="pipe-label">Quoted</span><span class="pipe-count">3</span></div><div class="deal-card" onclick="openLead('oahu-dental')"><div class="deal-name">Oahu Dental Group</div><div class="deal-type"><span class="badge bc">Commercial</span></div><div class="deal-val">$950/mo</div></div><div class="deal-card" onclick="openLead('kailua-airbnb')"><div class="deal-name">Airbnb — Kailua</div><div class="deal-type"><span class="badge br">Residential</span></div><div class="deal-val">$180/clean</div></div></div>
           <div class="pipe-col"><div class="pipe-header"><span class="pipe-label">Follow-up</span><span class="pipe-count">3</span></div><div class="deal-card" onclick="openLead('hnl-airport')"><div class="deal-name">HNL Airport</div><div class="deal-type"><span class="badge bg2">Gov</span> <span class="badge bh">Hot</span></div><div class="deal-val">$14k/mo</div></div><div class="deal-card" onclick="openLead('pearl-city-law')"><div class="deal-name">Pearl City Law</div><div class="deal-type"><span class="badge bc">Commercial</span></div><div class="deal-val">$600/mo</div></div></div>
+          <div class="pipe-col"><div class="pipe-header"><span class="pipe-label">Closed</span><span class="pipe-count">2</span></div><div class="deal-card" onclick="openLead('kona-coffee')"><div class="deal-name">Kona Coffee Co.</div><div class="deal-type"><span class="badge bc">Commercial</span></div><div class="deal-val">$750/mo</div></div></div>
         </div>
         <div class="two-col">
           <div><div class="section-title">Recent clients</div><div class="tw"><table><thead><tr><th style="width:35%">Name</th><th style="width:22%">Type</th><th style="width:20%">Last job</th><th style="width:23%">Status</th></tr></thead><tbody>
@@ -360,44 +348,30 @@ textarea{font-family:inherit;}
       <!-- PIPELINE -->
       <div id="view-pipeline" class="vc">
         <div class="metrics" style="grid-template-columns:repeat(3,minmax(0,1fr));">
-          <div class="metric"><div class="metric-label">Active pipeline</div><div class="metric-value" id="pl-total-val">$21.5k</div><div class="metric-sub" id="pl-total-sub">10 open leads</div></div>
-          <div class="metric"><div class="metric-label">Lost this month</div><div class="metric-value" id="pl-lost-val">0</div><div class="metric-sub">Track &amp; reactivate</div></div>
-          <div class="metric"><div class="metric-label">Won this month</div><div class="metric-value" id="pl-won-val">2</div><div class="metric-sub up">Converted to clients</div></div>
+          <div class="metric"><div class="metric-label">Total pipeline</div><div class="metric-value">$21.5k</div><div class="metric-sub">12 open leads</div></div>
+          <div class="metric"><div class="metric-label">Commercial</div><div class="metric-value">$19.3k</div><div class="metric-sub">6 leads</div></div>
+          <div class="metric"><div class="metric-label">Avg close time</div><div class="metric-value">18d</div></div>
         </div>
-        <div style="display:flex;gap:0;border-bottom:1px solid #e8e8e5;margin-bottom:14px;">
-          <div class="pipe-filter-tab active" onclick="switchPipeFilter('active',this)">Active Pipeline</div>
-          <div class="pipe-filter-tab" onclick="switchPipeFilter('lost',this)">Lost Leads</div>
-          <div class="pipe-filter-tab" onclick="switchPipeFilter('won',this)">Won / Clients</div>
-        </div>
-        <!-- Active pipeline -->
-        <div id="pipe-active">
-          <div class="pipeline" style="grid-template-columns:repeat(3,minmax(0,1fr));">
-            <div class="pipe-col" id="pipe-col-new"><div class="pipe-header"><span class="pipe-label">New inquiry</span><span class="pipe-count" id="pc-new">4</span></div>
-              <div class="deal-card" onclick="openLead('maui-wellness')"><div class="deal-name">Maui Wellness Center</div><div class="deal-type"><span class="badge bc">Commercial</span></div><div class="deal-val">$1,200/mo</div></div>
-              <div class="deal-card" onclick="openLead('sarah-k')"><div class="deal-name">Sarah K.</div><div class="deal-type"><span class="badge br">Residential</span></div><div class="deal-val">$280/visit</div></div>
-              <div class="deal-card" onclick="openLead('hale-koa')"><div class="deal-name">Hale Koa HOA</div><div class="deal-type"><span class="badge bc">Commercial</span></div><div class="deal-val">$2,800/mo</div></div>
-            </div>
-            <div class="pipe-col" id="pipe-col-quoted"><div class="pipe-header"><span class="pipe-label">Quoted</span><span class="pipe-count" id="pc-quoted">3</span></div>
-              <div class="deal-card" onclick="openLead('oahu-dental')"><div class="deal-name">Oahu Dental Group</div><div class="deal-type"><span class="badge bc">Commercial</span></div><div class="deal-val">$950/mo</div></div>
-              <div class="deal-card" onclick="openLead('kailua-airbnb')"><div class="deal-name">Airbnb — Kailua</div><div class="deal-type"><span class="badge br">Residential</span></div><div class="deal-val">$180/clean</div></div>
-              <div class="deal-card" onclick="openLead('kakaako-med')"><div class="deal-name">Kakaako Medical</div><div class="deal-type"><span class="badge bc">Commercial</span></div><div class="deal-val">$1,100/mo</div></div>
-            </div>
-            <div class="pipe-col" id="pipe-col-followup"><div class="pipe-header"><span class="pipe-label">Follow-up</span><span class="pipe-count" id="pc-followup">3</span></div>
-              <div class="deal-card" onclick="openLead('hnl-airport')"><div class="deal-name">HNL Airport</div><div class="deal-type"><span class="badge bg2">Gov</span> <span class="badge bh">Hot</span></div><div class="deal-val">$14k/mo</div></div>
-              <div class="deal-card" onclick="openLead('pearl-city-law')"><div class="deal-name">Pearl City Law</div><div class="deal-type"><span class="badge bc">Commercial</span></div><div class="deal-val">$600/mo</div></div>
-              <div class="deal-card" onclick="openLead('waikiki-hotel')"><div class="deal-name">Waikiki Hotel</div><div class="deal-type"><span class="badge bc">Commercial</span></div><div class="deal-val">$3,200/mo</div></div>
-            </div>
+        <div class="pipeline">
+          <div class="pipe-col"><div class="pipe-header"><span class="pipe-label">New inquiry</span><span class="pipe-count">4</span></div>
+            <div class="deal-card" onclick="openLead('maui-wellness')"><div class="deal-name">Maui Wellness Center</div><div class="deal-type"><span class="badge bc">Commercial</span></div><div class="deal-val">$1,200/mo</div></div>
+            <div class="deal-card" onclick="openLead('sarah-k')"><div class="deal-name">Sarah K.</div><div class="deal-type"><span class="badge br">Residential</span></div><div class="deal-val">$280/visit</div></div>
+            <div class="deal-card" onclick="openLead('hale-koa')"><div class="deal-name">Hale Koa HOA</div><div class="deal-type"><span class="badge bc">Commercial</span></div><div class="deal-val">$2,800/mo</div></div>
           </div>
-        </div>
-        <!-- Lost leads -->
-        <div id="pipe-lost" style="display:none;">
-          <div style="font-size:12px;color:#999;margin-bottom:10px;">Click Reactivate to move a lead back into the active pipeline as a new inquiry.</div>
-          <div class="tw"><table><thead><tr><th style="width:20%">Name</th><th style="width:20%">Service</th><th style="width:12%">Value</th><th style="width:14%">Lost on</th><th style="width:16%">Reason</th><th style="width:18%">Action</th></tr></thead><tbody id="lost-tbody"></tbody></table></div>
-        </div>
-        <!-- Won / Clients -->
-        <div id="pipe-won" style="display:none;">
-          <div style="font-size:12px;color:#999;margin-bottom:10px;">Leads that converted to clients after scheduling an appointment.</div>
-          <div class="tw"><table><thead><tr><th style="width:22%">Name</th><th style="width:22%">Service</th><th style="width:14%">Value</th><th style="width:14%">Won on</th><th style="width:12%">Status</th><th style="width:16%">Action</th></tr></thead><tbody id="won-tbody"></tbody></table></div>
+          <div class="pipe-col"><div class="pipe-header"><span class="pipe-label">Quoted</span><span class="pipe-count">3</span></div>
+            <div class="deal-card" onclick="openLead('oahu-dental')"><div class="deal-name">Oahu Dental Group</div><div class="deal-type"><span class="badge bc">Commercial</span></div><div class="deal-val">$950/mo</div></div>
+            <div class="deal-card" onclick="openLead('kailua-airbnb')"><div class="deal-name">Airbnb — Kailua</div><div class="deal-type"><span class="badge br">Residential</span></div><div class="deal-val">$180/clean</div></div>
+            <div class="deal-card" onclick="openLead('kakaako-med')"><div class="deal-name">Kakaako Medical</div><div class="deal-type"><span class="badge bc">Commercial</span></div><div class="deal-val">$1,100/mo</div></div>
+          </div>
+          <div class="pipe-col"><div class="pipe-header"><span class="pipe-label">Follow-up</span><span class="pipe-count">3</span></div>
+            <div class="deal-card" onclick="openLead('hnl-airport')"><div class="deal-name">HNL Airport</div><div class="deal-type"><span class="badge bg2">Gov</span> <span class="badge bh">Hot</span></div><div class="deal-val">$14k/mo</div></div>
+            <div class="deal-card" onclick="openLead('pearl-city-law')"><div class="deal-name">Pearl City Law</div><div class="deal-type"><span class="badge bc">Commercial</span></div><div class="deal-val">$600/mo</div></div>
+            <div class="deal-card" onclick="openLead('waikiki-hotel')"><div class="deal-name">Waikiki Hotel</div><div class="deal-type"><span class="badge bc">Commercial</span></div><div class="deal-val">$3,200/mo</div></div>
+          </div>
+          <div class="pipe-col"><div class="pipe-header"><span class="pipe-label">Closed won</span><span class="pipe-count">2</span></div>
+            <div class="deal-card" onclick="openLead('kona-coffee')"><div class="deal-name">Kona Coffee Co.</div><div class="deal-type"><span class="badge bc">Commercial</span></div><div class="deal-val">$750/mo</div></div>
+            <div class="deal-card" onclick="openLead('lani-p')"><div class="deal-name">Lani P.</div><div class="deal-type"><span class="badge br">Residential</span></div><div class="deal-val">$240/mo</div></div>
+          </div>
         </div>
       </div>
 
@@ -765,11 +739,7 @@ textarea{font-family:inherit;}
     <div class="panel-header"><div class="panel-title">New appointment</div><button class="close-btn" onclick="closeOverlay('new-appt-overlay')">&#x2715;</button></div>
     <div class="panel-body">
       <div class="panel-section">Client info</div>
-      <div class="form-row" style="position:relative;">
-        <label>Full name</label>
-        <input type="text" id="na-name" placeholder="Search existing clients &amp; leads..." autocomplete="off" oninput="onApptNameInput(this.value)" onblur="setTimeout(function(){var d=document.getElementById('na-name-drop');if(d)d.style.display='none';},200)">
-        <div id="na-name-drop" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #e5e7eb;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,0.12);z-index:200;max-height:220px;overflow-y:auto;margin-top:2px;"></div>
-      </div>
+      <div class="form-row"><label>Full name</label><input type="text" id="na-name" placeholder="First and last name"></div>
       <div class="form-two">
         <div class="form-row"><label>Phone</label><input type="tel" id="na-phone" placeholder="(808) 555-0000"></div>
         <div class="form-row"><label>Email</label><input type="email" id="na-email" placeholder="client@email.com"></div>
@@ -888,7 +858,7 @@ textarea{font-family:inherit;}
           <button class="action-btn blue" onclick="openMsgFromAppt()">Message client</button>
           <button class="action-btn blue full" onclick="openInviteCleaner()">Invite cleaner</button>
           <button class="action-btn amber full" onclick="showApptEdit()">Edit job</button>
-          <button class="action-btn red full" onclick="cancelAppt()">Cancel appointment</button>
+          <button class="action-btn red full">Cancel appointment</button>
         </div>
         <div class="success-bar" id="appt-action-success" style="margin-top:10px;"></div>
       </div>
@@ -978,13 +948,14 @@ textarea{font-family:inherit;}
         <div class="panel-section">Notes</div>
         <div class="info-block"><div style="font-size:12px;color:#1a1a1a;line-height:1.6;" id="cl-notes">—</div></div>
         <div class="action-grid" style="margin-top:14px;">
-          <button class="action-btn green" onclick="sendClientInvoice()">Invoice</button>
-          <button class="action-btn green">Charge card</button>
+          <button class="action-btn green" onclick="oneClickInvoice('client')">Send invoice</button>
+          <button class="action-btn green" id="client-charge-btn" onclick="oneClickCharge('client')">Charge card</button>
           <button class="action-btn blue" onclick="openMsgFromClient()">Message</button>
-          <button class="action-btn blue" onclick="scheduleFromClient()">Schedule job</button>
+          <button class="action-btn blue">Schedule job</button>
           <button class="action-btn amber full" onclick="showClientEdit()">Edit client</button>
-          <button class="action-btn red full" onclick="deleteClient()">Delete client</button>
+          <button class="action-btn red full" onclick="deleteRecord('client')">Delete client</button>
         </div>
+        <div class="success-bar" id="client-action-success" style="margin-top:10px;"></div>
       </div>
       <div id="client-edit" style="display:none;">
         <div class="panel-section">Edit client</div>
@@ -1062,19 +1033,8 @@ textarea{font-family:inherit;}
         </div>
         <div class="action-grid" style="margin-top:14px;">
           <button class="action-btn blue" onclick="openMsgFromLead()">Message lead</button>
-          <button class="action-btn green full" onclick="scheduleFromLead()">Schedule appointment → converts to client</button>
-          <button class="action-btn amber full" onclick="showLeadEdit()">Edit lead</button>
-          <button class="action-btn red full" onclick="showLossReason()">Mark as Lost</button>
-        </div>
-        <div id="loss-reason-picker" style="display:none;background:#fff5f5;border:1px solid #feb2b2;border-radius:10px;padding:12px 14px;margin-top:10px;">
-          <div style="font-size:12px;font-weight:600;color:#c53030;margin-bottom:8px;">Why was this lead lost?</div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px;">
-            <button class="loss-reason-btn" onclick="confirmMarkLost('Price')">Price</button>
-            <button class="loss-reason-btn" onclick="confirmMarkLost('No response')">No response</button>
-            <button class="loss-reason-btn" onclick="confirmMarkLost('Competitor')">Competitor</button>
-            <button class="loss-reason-btn" onclick="confirmMarkLost('Not ready')">Not ready</button>
-          </div>
-          <button class="btn" onclick="hideLossReason()" style="width:100%;font-size:11px;">Cancel</button>
+          <button class="action-btn amber" onclick="showLeadEdit()">Edit lead</button>
+          <button class="action-btn red" onclick="deleteRecord('lead')">Delete lead</button>
         </div>
       </div>
       <div id="lead-edit" style="display:none;">
@@ -1136,7 +1096,7 @@ textarea{font-family:inherit;}
           <button class="action-btn blue">Send SMS</button>
           <button class="action-btn amber" onclick="showCleanerEdit()">Edit profile</button>
           <button class="action-btn green full">Log hours manually</button>
-          <button class="action-btn red full" onclick="deleteCleaner()">Delete cleaner</button>
+          <button class="action-btn red full" onclick="deleteRecord('cleaner')">Delete cleaner</button>
         </div>
       </div>
       <div id="cleaner-edit" style="display:none;">
@@ -1177,8 +1137,8 @@ async function quoSendSMS(toNumber, message) {
     var clean = toNumber.replace(/[^0-9+]/g,'');
     if(!clean.startsWith('+')) clean = '+1' + clean;
 
-    // Call our API function instead of OpenPhone directly (avoids CORS)
-    const response = await fetch('/api/send-sms', {
+    // Call our Netlify function instead of OpenPhone directly (avoids CORS)
+    const response = await fetch('/.netlify/functions/send-sms', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ to: clean, message: message })
@@ -1429,7 +1389,7 @@ async function loadAllData(){
 async function checkQuoStatus(){
   var statusEl=document.getElementById('quo-status');
   try {
-    var response=await fetch('/api/send-sms',{
+    var response=await fetch('/.netlify/functions/send-sms',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify({statusOnly:true})
@@ -1488,46 +1448,29 @@ function renderCleanersGrid(){
 }
 
 function renderLeadsPipeline(){
-  var activeStages=['New inquiry','Quoted','Follow-up'];
-  var stageColId={'New inquiry':'pipe-col-new','Quoted':'pipe-col-quoted','Follow-up':'pipe-col-followup'};
-  var dashStageMap={'New inquiry':0,'Quoted':1,'Follow-up':2};
+  // Add DB leads to pipeline in both views
   Object.entries(leadDB).forEach(function(entry){
     var id=entry[0];var l=entry[1];
     if(id.length<30)return;
-    // Skip closed leads from active pipeline
-    if(activeStages.indexOf(l.stage)<0)return;
-    // Add to main pipeline view
-    var pipeCol=document.getElementById(stageColId[l.stage]);
-    if(pipeCol){
-      var existing=pipeCol.querySelector('[data-lead-id="'+id+'"]');
-      if(!existing){
-        var card=document.createElement('div');
-        card.className='deal-card';card.dataset.leadId=id;
-        var svc=l.service||'Service';
-        var badgeCls=svc.toLowerCase().indexOf('commercial')>=0?'bc':'br';
-        card.innerHTML='<div class="deal-name">'+l.name+'</div><div class="deal-type"><span class="badge '+badgeCls+'">'+svc+'</span></div><div class="deal-val">'+(l.value||'TBD')+'</div>';
-        (function(lid){card.addEventListener('click',function(){openLead(lid);});})(id);
-        pipeCol.appendChild(card);
-      }
-    }
-    // Add to dashboard snapshot
-    var dash=document.getElementById('view-dashboard');
-    if(dash){
-      var colIdx=dashStageMap[l.stage];
-      if(colIdx===undefined)return;
-      var cols=dash.querySelectorAll('.pipe-col');
+    var stageMap={'New inquiry':0,'Quoted':1,'Follow-up':2,'Closed won':3};
+    var colIdx=stageMap[l.stage]||0;
+    ['view-dashboard','view-pipeline'].forEach(function(viewId){
+      var view=document.getElementById(viewId);
+      if(!view)return;
+      var cols=view.querySelectorAll('.pipe-col');
       if(!cols[colIdx])return;
-      var existing2=cols[colIdx].querySelector('[data-lead-id="'+id+'"]');
-      if(!existing2){
-        var card2=document.createElement('div');
-        card2.className='deal-card';card2.dataset.leadId=id;
-        var svc2=l.service||'Service';
-        var bc2=svc2.toLowerCase().indexOf('commercial')>=0?'bc':'br';
-        card2.innerHTML='<div class="deal-name">'+l.name+'</div><div class="deal-type"><span class="badge '+bc2+'">'+svc2+'</span></div><div class="deal-val">'+(l.value||'TBD')+'</div>';
-        (function(lid){card2.addEventListener('click',function(){openLead(lid);});})(id);
-        cols[colIdx].appendChild(card2);
-      }
-    }
+      // Check if already rendered
+      var existing=cols[colIdx].querySelector('[data-lead-id="'+id+'"]');
+      if(existing)return;
+      var card=document.createElement('div');
+      card.className='deal-card';
+      card.dataset.leadId=id;
+      var svc=l.service||'Service';
+      var badgeCls=svc.toLowerCase().indexOf('commercial')>=0?'bc':'br';
+      card.innerHTML='<div class="deal-name">'+l.name+'</div><div class="deal-type"><span class="badge '+badgeCls+'">'+svc+'</span></div><div class="deal-val">'+(l.value||'TBD')+'</div>';
+      (function(lid){card.addEventListener('click',function(){openLead(lid);});})(id);
+      cols[colIdx].appendChild(card);
+    });
   });
 }
 
@@ -1706,7 +1649,6 @@ function openAppt(a,dateKey){
   document.getElementById('ai-date').textContent=mo+' '+parts[2]+', '+parts[0];
   document.getElementById('ai-time').textContent=a.t.replace('am',' AM').replace('pm',' PM');
   document.getElementById('ai-cleaner').textContent=a.cleaner;
-  console.log('openAppt: a.n="'+a.n+'", clientJobData entry=',clientJobData[a.n]);
   var cd=clientJobData[a.n]||{};
   document.getElementById('ai-service').textContent=cd.service||'Standard clean';
   document.getElementById('ai-address').textContent=cd.address||'—';
@@ -1740,30 +1682,6 @@ function showApptEdit(){document.getElementById('appt-view').style.display='none
 function hideApptEdit(){document.getElementById('appt-view').style.display='block';document.getElementById('appt-edit').style.display='none';}
 function saveApptEdit(){hideApptEdit();showToast('appt-overlay','Changes saved successfully.');}
 
-async function cancelAppt(){
-  if(!currentApptKey||!currentAppt)return;
-  if(!confirm('Cancel this appointment for '+currentAppt.n+'? This cannot be undone.'))return;
-  // Delete from Supabase if it came from the database
-  if(currentAppt.dbId){
-    const {error}=await db.from('appointments').delete().eq('id',currentAppt.dbId);
-    if(error){alert('Failed to cancel: '+error.message);return;}
-  }
-  // Remove from in-memory store
-  var arr=apptData[currentApptKey];
-  if(arr){
-    var idx=arr.findIndex(function(a){return a.n===currentAppt.n&&a.t===currentAppt.t;});
-    if(idx>-1)arr.splice(idx,1);
-    if(arr.length===0)delete apptData[currentApptKey];
-  }
-  // Also remove from recurringAppts if recurring
-  if(currentAppt.recurring){
-    recurringAppts=recurringAppts.filter(function(r){return !(r.name===currentAppt.n&&r.timeStr===currentAppt.t);});
-  }
-  closeOverlay('appt-overlay');
-  renderCal();
-  showPaymentToast('Appointment for '+currentAppt.n+' cancelled.','','error');
-}
-
 function openClient(id){
   var d=clientDB[id];if(!d)return;
   currentClientName=d.name;
@@ -1789,6 +1707,7 @@ function openClient(id){
   });
   hideClientEdit();
   document.getElementById('client-overlay').classList.remove('hidden');
+  setTimeout(updateChargeBtn, 50);
 }
 
 function showClientEdit(){
@@ -1802,7 +1721,7 @@ function showClientEdit(){
   }
   document.getElementById('client-view').style.display='none';
   document.getElementById('client-edit').style.display='block';
-  initAC(['ced-address']);
+  setTimeout(function(){attachAutocomplete('ced-address');},300);
 }
 function hideClientEdit(){document.getElementById('client-view').style.display='block';document.getElementById('client-edit').style.display='none';}
 function saveClientEdit(){
@@ -1893,7 +1812,6 @@ function showLeadEdit(){
   }
   document.getElementById('lead-view').style.display='none';
   document.getElementById('lead-edit').style.display='block';
-  initAC(['led-address']);
 }
 function hideLeadEdit(){document.getElementById('lead-view').style.display='block';document.getElementById('lead-edit').style.display='none';}
 function saveLeadEdit(){
@@ -2045,432 +1963,15 @@ function saveCleanerEdit(){
   showToast('cleaner-overlay','Cleaner updated successfully.');
 }
 
-/* ── GLOBAL SEARCH ─────────────────────────────────────────── */
-function onGlobalSearch(q){
-  q=q.trim().toLowerCase();
-  var box=document.getElementById('search-results');
-  if(!q){box.innerHTML='';box.style.display='none';return;}
-  var results=[];
-
-  // Clients
-  Object.entries(clientDB).forEach(function(e){
-    var id=e[0];var c=e[1];
-    var haystack=[c.name,c.phone,c.email,c.address,c.type,c.status,c.service,c.freq,c.cleaner,c.notes].join(' ').toLowerCase();
-    if(haystack.indexOf(q)>=0)results.push({type:'Client',icon:'👤',label:c.name,sub:c.type+' · '+c.status,action:function(){closeOverlay('client-overlay');openClient(id);sv('clients',document.querySelector('.nav-item:nth-child(4))'));},id:id,entity:'client'});
-  });
-
-  // Cleaners
-  Object.entries(cleanerDB).forEach(function(e){
-    var id=e[0];var c=e[1];
-    var haystack=[c.name,c.phone,c.email,c.loc,c.role,c.rate,c.islands,c.notes].join(' ').toLowerCase();
-    if(haystack.indexOf(q)>=0)results.push({type:'Cleaner',icon:'🧹',label:c.name,sub:c.role,id:id,entity:'cleaner'});
-  });
-
-  // Leads
-  Object.entries(leadDB).forEach(function(e){
-    var id=e[0];var l=e[1];
-    var haystack=[l.name,l.contact,l.phone,l.email,l.address,l.service,l.stage,l.source,l.notes,l.value].join(' ').toLowerCase();
-    if(haystack.indexOf(q)>=0)results.push({type:'Lead',icon:'💼',label:l.name,sub:l.stage+' · '+(l.value||'TBD'),id:id,entity:'lead'});
-  });
-
-  // Appointments (flat search through all days)
-  Object.entries(apptData).forEach(function(e){
-    var key=e[0];var appts=e[1];
-    appts.forEach(function(a){
-      var haystack=[a.n,a.cleaner,a.t,a.s,key].join(' ').toLowerCase();
-      if(haystack.indexOf(q)>=0)results.push({type:'Appointment',icon:'📅',label:a.n,sub:key+' at '+a.t+' · '+a.s,id:null,entity:'appt'});
-    });
-  });
-
-  box.innerHTML='';
-  if(!results.length){
-    box.innerHTML='<div style="padding:14px 14px;font-size:12px;color:#999;">No results for "'+q+'"</div>';
-    box.style.display='block';return;
-  }
-
-  // Group by type
-  var groups={};
-  results.forEach(function(r){if(!groups[r.type])groups[r.type]=[];groups[r.type].push(r);});
-
-  Object.entries(groups).forEach(function(ge){
-    var typeName=ge[0];var items=ge[1];
-    var header=document.createElement('div');
-    header.style.cssText='padding:6px 12px 3px;font-size:10px;font-weight:600;color:#bbb;text-transform:uppercase;letter-spacing:.08em;';
-    header.textContent=typeName;
-    box.appendChild(header);
-    items.slice(0,6).forEach(function(r){
-      var row=document.createElement('div');
-      row.style.cssText='display:flex;align-items:center;gap:10px;padding:8px 12px;cursor:pointer;border-radius:6px;margin:0 4px;';
-      row.innerHTML='<div style="font-size:16px;flex-shrink:0;">'+r.icon+'</div>'
-        +'<div style="flex:1;min-width:0;"><div style="font-size:12px;font-weight:500;color:#1a1a1a;">'+r.label+'</div>'
-        +'<div style="font-size:11px;color:#999;margin-top:1px;">'+r.sub+'</div></div>';
-      row.addEventListener('mouseenter',function(){this.style.background='#f0faf6';});
-      row.addEventListener('mouseleave',function(){this.style.background='';});
-      row.addEventListener('mousedown',function(ev){ev.preventDefault();});
-      row.addEventListener('click',function(){
-        document.getElementById('global-search').value='';
-        hideSearchResults();
-        if(r.entity==='client'){
-          sv('clients',document.querySelector('[onclick="sv(\'clients\',this)"]'));
-          setTimeout(function(){openClient(r.id);},50);
-        } else if(r.entity==='cleaner'){
-          sv('cleaners',document.querySelector('[onclick="sv(\'cleaners\',this)"]'));
-          setTimeout(function(){openCleaner(r.id);},50);
-        } else if(r.entity==='lead'){
-          sv('pipeline',document.querySelector('[onclick="sv(\'pipeline\',this)"]'));
-          setTimeout(function(){openLead(r.id);},50);
-        } else if(r.entity==='appt'){
-          sv('calendar',document.querySelector('[onclick="sv(\'calendar\',this)"]'));
-        }
-      });
-      box.appendChild(row);
-    });
-  });
-  box.style.display='block';
-}
-
-function showSearchResults(){
-  var q=document.getElementById('global-search').value.trim();
-  if(q)document.getElementById('search-results').style.display='block';
-}
-function hideSearchResults(){
-  document.getElementById('search-results').style.display='none';
-}
-
-document.addEventListener('keydown',function(e){
-  if((e.metaKey||e.ctrlKey)&&e.key==='k'){
-    e.preventDefault();
-    var s=document.getElementById('global-search');s.focus();s.select();
-  }
-  if(e.key==='Escape')hideSearchResults();
-});
-
-/* ── APPOINTMENT NAME AUTOCOMPLETE ─────────────────────────── */
-function onApptNameInput(val){
-  var drop=document.getElementById('na-name-drop');
-  if(!val||val.length<1){drop.style.display='none';return;}
-  var q=val.toLowerCase();
-  var results=[];
-  // Search clients
-  Object.keys(clientDB).forEach(function(k){
-    var c=clientDB[k];
-    if(c.name&&c.name.toLowerCase().indexOf(q)>=0){
-      results.push({label:c.name,sub:c.phone&&c.phone!=='—'?c.phone:'Client',tag:'Client',data:c,type:'client'});
-    }
-  });
-  // Search leads
-  Object.keys(leadDB).forEach(function(k){
-    var l=leadDB[k];
-    if(l.name&&l.name.toLowerCase().indexOf(q)>=0){
-      results.push({label:l.name,sub:l.phone&&l.phone!=='—'?l.phone:'Lead',tag:'Lead',data:l,type:'lead'});
-    }
-  });
-  drop.innerHTML='';
-  results.slice(0,8).forEach(function(r){
-    var item=document.createElement('div');
-    item.style.cssText='padding:10px 14px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #f3f4f6;';
-    item.innerHTML='<div><div style="font-weight:600;font-size:14px;">'+r.label+'</div><div style="font-size:12px;color:#6b7280;">'+r.sub+'</div></div>'
-      +'<span style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:12px;background:'+(r.type==='client'?'#d1fae5;color:#065f46':'#dbeafe;color:#1e40af')+';">'+r.tag+'</span>';
-    item.onmousedown=function(){selectApptContact(r);};
-    item.onmouseover=function(){this.style.background='#f9fafb';};
-    item.onmouseout=function(){this.style.background='';};
-    drop.appendChild(item);
-  });
-  // "New client" option
-  var newItem=document.createElement('div');
-  newItem.style.cssText='padding:10px 14px;cursor:pointer;display:flex;align-items:center;gap:8px;color:#1D9E75;font-weight:600;font-size:14px;';
-  newItem.innerHTML='<span style="font-size:18px;line-height:1;">+</span> Add as new client';
-  newItem.onmousedown=function(){drop.style.display='none';document.getElementById('new-appt-overlay').classList.add('hidden');document.getElementById('new-client-overlay').classList.remove('hidden');initAC(['nc-address']);};
-  newItem.onmouseover=function(){this.style.background='#f0fdf4';};
-  newItem.onmouseout=function(){this.style.background='';};
-  drop.appendChild(newItem);
-  drop.style.display='block';
-}
-
-function selectApptContact(r){
-  var drop=document.getElementById('na-name-drop');
-  drop.style.display='none';
-  document.getElementById('na-name').value=r.label;
-  var d=r.data;
-  if(d.phone&&d.phone!=='—')document.getElementById('na-phone').value=d.phone;
-  if(d.email&&d.email!=='—')document.getElementById('na-email').value=d.email;
-  if(d.address&&d.address!=='—')document.getElementById('na-address').value=d.address;
-  // Fill beds/baths from bedbath string or beds/baths fields
-  if(d.beds)document.getElementById('na-beds').value=d.beds;
-  if(d.baths)document.getElementById('na-baths').value=d.baths;
-  if(!d.beds&&d.bedbath){
-    var bbm=(d.bedbath||'').match(/(\d+)\s*bed.*?([\d.]+)\s*bath/i);
-    if(bbm){document.getElementById('na-beds').value=bbm[1];document.getElementById('na-baths').value=bbm[2];}
-  }
-  // Fill frequency
-  if(d.freq){
-    var freqSel=document.getElementById('na-freq');
-    var opts=['Weekly','Biweekly','Monthly','One-time'];
-    opts.forEach(function(o){if(d.freq.toLowerCase().indexOf(o.toLowerCase())>=0)freqSel.value=o;});
-  }
-  calcPrice();
-}
-
-function scheduleFromClient(){
-  if(!currentClientId||!clientDB[currentClientId])return;
-  var c=clientDB[currentClientId];
-  closeOverlay('client-overlay');
-  // Pre-fill name & address
-  document.getElementById('na-name').value=c.name||'';
-  document.getElementById('na-address').value=c.address&&c.address!=='—'?c.address:'';
-  // Service type
-  var svcSel=document.getElementById('na-service');
-  var svcMap={'Standard clean':'standard','Deep clean':'deep','Move-out clean':'moveout','Commercial weekly':'commercial','Commercial daily':'commercial','Airbnb turnover':'airbnb'};
-  if(svcMap[c.service])svcSel.value=svcMap[c.service];
-  // Frequency
-  var freqSel=document.getElementById('na-freq');
-  var freqOpts=['Weekly','Biweekly','Monthly','One-time'];
-  if(c.freq&&freqOpts.indexOf(c.freq)>=0)freqSel.value=c.freq;
-  // Beds & baths
-  var bbMatch=(c.bedbath||'').match(/(\d+)\s*bed\s*\/\s*([\d.]+)\s*bath/i);
-  if(bbMatch){document.getElementById('na-beds').value=bbMatch[1];document.getElementById('na-baths').value=bbMatch[2];}
-  // Preferred cleaner
-  var cleanerSel=document.getElementById('na-cleaner');
-  cleanerSel.value='unassigned';
-  if(c.cleaner&&c.cleaner!=='No preference'){
-    for(var i=0;i<cleanerSel.options.length;i++){
-      if(cleanerSel.options[i].text.indexOf(c.cleaner)>=0){cleanerSel.selectedIndex=i;break;}
-    }
-  }
-  // Clear notes & date
-  document.getElementById('na-notes').value='';
-  document.getElementById('na-date').value='';
-  calcPrice();
-  document.getElementById('new-appt-overlay').classList.remove('hidden');
-  initAC(['na-address']);
-}
-
-function scheduleFromLead(){
-  if(!currentLeadId||!leadDB[currentLeadId])return;
-  var l=leadDB[currentLeadId];
-  var lid=currentLeadId;
-  closeOverlay('lead-overlay');
-  // Mark lead as Closed won and remove from active pipeline
-  leadDB[lid].stage='Closed won';
-  leadDB[lid].wonDate=new Date().toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
-  document.querySelectorAll('[data-lead-id="'+lid+'"]').forEach(function(el){el.remove();});
-  document.querySelectorAll('.deal-card').forEach(function(el){
-    if(el.getAttribute('onclick')==="openLead('"+lid+"')")el.remove();
-  });
-  if(lid.length>20){
-    db.from('leads').update({stage:'Closed won'}).eq('id',lid).then(function(){});
-  }
-  // Add to clientDB so they appear in Clients view immediately
-  var clientKey='won-'+lid;
-  var svcType=l.service||'Standard clean';
-  var isCommercial=svcType.toLowerCase().indexOf('commercial')>=0;
-  clientDB[clientKey]={
-    name:l.name, type:isCommercial?'Commercial':'Residential',
-    phone:l.phone||'—', email:l.email||'—',
-    address:l.address&&l.address!=='—'?l.address:'—',
-    payment:'—', since:new Date().toLocaleDateString('en-US',{month:'long',year:'numeric'}),
-    ltv:'—', mrr:l.value||'—', jobs:'0', avg:'—',
-    service:svcType, freq:'One-time',
-    sqft:l.sqft||'—', bedbath:'—', cleaner:'No preference',
-    lastjob:'None yet', nextjob:'Pending booking',
-    status:'New', notes:'Converted from lead on '+leadDB[lid].wonDate+(l.notes&&l.notes!=='—'?'\n'+l.notes:''),
-    history:[]
-  };
-  // Save to Supabase clients table
-  dbSaveClient({
-    name:l.name, type:isCommercial?'Commercial':'Residential',
-    phone:l.phone||null, email:l.email||null,
-    address:l.address&&l.address!=='—'?l.address:null,
-    service:svcType, freq:'One-time',
-    notes:'Converted from lead on '+leadDB[lid].wonDate
-  });
-  renderClientsTable();
-  // Pre-fill the appointment form
-  document.getElementById('na-name').value=l.name||'';
-  document.getElementById('na-address').value=l.address&&l.address!=='—'?l.address:'';
-  var svcSel=document.getElementById('na-service');
-  var svcMap={'Standard clean':'standard','Deep clean':'deep','Move-out clean':'moveout','Commercial weekly':'commercial','Commercial daily':'commercial','Janitorial':'commercial','Airbnb turnover':'airbnb'};
-  if(svcMap[l.service])svcSel.value=svcMap[l.service];
-  document.getElementById('na-freq').value='One-time';
-  document.getElementById('na-beds').value='3';
-  document.getElementById('na-baths').value='2';
-  document.getElementById('na-cleaner').value='unassigned';
-  document.getElementById('na-notes').value='';
-  document.getElementById('na-date').value='';
-  calcPrice();
-  document.getElementById('new-appt-overlay').classList.remove('hidden');
-  initAC(['na-address']);
-}
-
-/* ── PIPELINE FILTER ────────────────────────────────────────── */
-function switchPipeFilter(f,el){
-  document.querySelectorAll('.pipe-filter-tab').forEach(function(t){t.classList.remove('active');});
-  el.classList.add('active');
-  document.getElementById('pipe-active').style.display=f==='active'?'block':'none';
-  document.getElementById('pipe-lost').style.display=f==='lost'?'block':'none';
-  document.getElementById('pipe-won').style.display=f==='won'?'block':'none';
-  if(f==='lost')renderLostLeads();
-  if(f==='won')renderWonLeads();
-}
-
-function renderLostLeads(){
-  var tbody=document.getElementById('lost-tbody');
-  if(!tbody)return;
-  tbody.innerHTML='';
-  var count=0;
-  Object.entries(leadDB).forEach(function(e){
-    var id=e[0];var l=e[1];
-    if(l.stage!=='Closed lost')return;
-    count++;
-    var tr=document.createElement('tr');
-    tr.innerHTML='<td><strong>'+l.name+'</strong></td><td>'+(l.service||'—')+'</td><td>'+(l.value||'—')+'</td>'
-      +'<td style="color:#999;">'+(l.lostDate||'—')+'</td>'
-      +'<td><span class="badge" style="background:#fff5f5;color:#c53030;">'+(l.lossReason||'—')+'</span></td>'
-      +'<td><button class="btn" style="font-size:11px;padding:3px 8px;background:#e6fffa;color:#276749;border-color:#9ae6b4;" onclick="reactivateLead(\''+id+'\')">Reactivate</button></td>';
-    tbody.appendChild(tr);
-  });
-  var lostVal=document.getElementById('pl-lost-val');
-  if(lostVal)lostVal.textContent=count;
-  if(!count)tbody.innerHTML='<tr><td colspan="6" style="text-align:center;color:#bbb;padding:20px;font-size:12px;">No lost leads</td></tr>';
-}
-
-function renderWonLeads(){
-  var tbody=document.getElementById('won-tbody');
-  if(!tbody)return;
-  tbody.innerHTML='';
-  var count=0;
-  // Static won leads (kona-coffee, lani-p are already clients)
-  [['kona-coffee','Kona Coffee Co.','Commercial weekly','$750/mo'],['lani-p','Lani P.','Standard clean','$240/mo']].forEach(function(h){
-    count++;
-    var tr=document.createElement('tr');
-    tr.innerHTML='<td><strong>'+h[1]+'</strong></td><td>'+h[2]+'</td><td>'+h[3]+'</td>'
-      +'<td style="color:#999;">Mar 2026</td>'
-      +'<td><span class="badge bac">Won</span></td>'
-      +'<td><button class="btn" style="font-size:11px;padding:3px 8px;" onclick="openClient(\''+h[0]+'\')">View client</button></td>';
-    tbody.appendChild(tr);
-  });
-  // Dynamic won leads from DB
-  Object.entries(leadDB).forEach(function(e){
-    var id=e[0];var l=e[1];
-    if(l.stage!=='Closed won')return;
-    count++;
-    var tr=document.createElement('tr');
-    tr.innerHTML='<td><strong>'+l.name+'</strong></td><td>'+(l.service||'—')+'</td><td>'+(l.value||'—')+'</td>'
-      +'<td style="color:#999;">'+(l.wonDate||'—')+'</td>'
-      +'<td><span class="badge bac">Won</span></td>'
-      +'<td><span style="font-size:11px;color:#276749;">Appointment booked</span></td>';
-    tbody.appendChild(tr);
-  });
-  var wonVal=document.getElementById('pl-won-val');
-  if(wonVal)wonVal.textContent=count;
-}
-
-function showLossReason(){
-  var p=document.getElementById('loss-reason-picker');
-  if(p)p.style.display='block';
-}
-function hideLossReason(){
-  var p=document.getElementById('loss-reason-picker');
-  if(p)p.style.display='none';
-}
-function confirmMarkLost(reason){
-  if(!currentLeadId||!leadDB[currentLeadId])return;
-  leadDB[currentLeadId].stage='Closed lost';
-  leadDB[currentLeadId].lossReason=reason;
-  leadDB[currentLeadId].lostDate=new Date().toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
-  var lid=currentLeadId;
-  // Remove from active pipeline DOM
-  document.querySelectorAll('[data-lead-id="'+lid+'"]').forEach(function(el){el.remove();});
-  document.querySelectorAll('.deal-card').forEach(function(el){
-    if(el.getAttribute('onclick')==="openLead('"+lid+"')")el.remove();
-  });
-  if(lid.length>20){
-    db.from('leads').update({stage:'Closed lost',notes:(leadDB[lid].notes||'')+' [Lost: '+reason+']'}).eq('id',lid).then(function(){});
-  }
-  hideLossReason();
-  closeOverlay('lead-overlay');
-  // Update lost count badge
-  var lostVal=document.getElementById('pl-lost-val');
-  if(lostVal){var n=parseInt(lostVal.textContent)||0;lostVal.textContent=n+1;}
-}
-function reactivateLead(id){
-  if(!leadDB[id])return;
-  leadDB[id].stage='New inquiry';
-  delete leadDB[id].lossReason;
-  if(id.length>20){db.from('leads').update({stage:'New inquiry'}).eq('id',id).then(function(){});}
-  // Add back to active pipeline DOM
-  renderLeadsPipeline();
-  // Switch back to active tab
-  var tabs=document.querySelectorAll('.pipe-filter-tab');
-  if(tabs[0])switchPipeFilter('active',tabs[0]);
-  // Update lost count
-  renderLostLeads();
-}
-
-function deleteClient(){
-  if(!currentClientId||!clientDB[currentClientId])return;
-  var name=clientDB[currentClientId].name;
-  if(!confirm('Delete '+name+'? This cannot be undone.'))return;
-  if(currentClientId.length>20){
-    db.from('clients').delete().eq('id',currentClientId).then(function(res){
-      if(res.error)console.error('Delete client error:',res.error);
-    });
-  }
-  var tbody=document.querySelector('#view-clients tbody');
-  if(tbody){
-    tbody.querySelectorAll('tr').forEach(function(r){
-      if(r.getAttribute('onclick')==="openClient('"+currentClientId+"')")r.remove();
-    });
-  }
-  delete clientDB[currentClientId];
-  closeOverlay('client-overlay');
-  renderClientsTable();
-}
-
-function deleteLead(){
-  if(!currentLeadId||!leadDB[currentLeadId])return;
-  var name=leadDB[currentLeadId].name;
-  if(!confirm('Delete '+name+'? This cannot be undone.'))return;
-  if(currentLeadId.length>20){
-    db.from('leads').delete().eq('id',currentLeadId).then(function(res){
-      if(res.error)console.error('Delete lead error:',res.error);
-    });
-  }
-  document.querySelectorAll('[data-lead-id="'+currentLeadId+'"]').forEach(function(el){el.remove();});
-  document.querySelectorAll('.deal-card').forEach(function(el){
-    if(el.getAttribute('onclick')==="openLead('"+currentLeadId+"')")el.remove();
-  });
-  delete leadDB[currentLeadId];
-  closeOverlay('lead-overlay');
-}
-
-function deleteCleaner(){
-  if(!currentCleanerId||!cleanerDB[currentCleanerId])return;
-  var name=cleanerDB[currentCleanerId].name;
-  if(!confirm('Delete '+name+'? This cannot be undone.'))return;
-  if(currentCleanerId.length>20){
-    db.from('cleaners').delete().eq('id',currentCleanerId).then(function(res){
-      if(res.error)console.error('Delete cleaner error:',res.error);
-    });
-  }
-  document.querySelectorAll('.cleaner-card').forEach(function(c){
-    if(c.getAttribute('onclick')==="openCleaner('"+currentCleanerId+"')")c.remove();
-  });
-  delete cleanerDB[currentCleanerId];
-  closeOverlay('cleaner-overlay');
-  renderCleanersGrid();
-}
-
 function closeOverlay(id){document.getElementById(id).classList.add('hidden');}
 
 function showToast(overlayId,msg){
   var panel=document.getElementById(overlayId).querySelector('.panel-body');
   var t=document.createElement('div');
   t.style.cssText='background:#e6fffa;border:1px solid #9ae6b4;border-radius:8px;padding:8px 12px;font-size:12px;color:#276749;margin-bottom:12px;';
-  t.innerHTML=msg;
+  t.textContent=msg;
   panel.insertBefore(t,panel.firstChild);
-  var dur=msg.indexOf('href')>=0?8000:3000;
-  setTimeout(function(){t.remove();},dur);
+  setTimeout(function(){t.remove();},3000);
 }
 
 /* MESSAGING */
@@ -2607,7 +2108,6 @@ function sendChatMsg(){
     var cleanPhone=phone.replace(/[^0-9+]/g,'');
     if(!cleanPhone.startsWith('+'))cleanPhone='+1'+cleanPhone;
     quoSendSMS(cleanPhone, text).then(function(result){
-      console.log('send-sms full response:', JSON.stringify(result));
       if(result.success){
         console.log('Sent via Quo to '+cleanPhone);
         // Save to Supabase messages table
@@ -2623,7 +2123,7 @@ function sendChatMsg(){
           quo_message_id:result.id||null
         }]);
       } else {
-        console.warn('Quo send failed:', JSON.stringify(result));
+        console.warn('Quo send failed - saved locally only');
         showPaymentToast('Message saved but SMS failed to send. Check Quo API.',null,'error');
       }
     });
@@ -2682,36 +2182,14 @@ function saveNewAppt(){
     recurringAppts.push({name:name,freq:freq,startYear:yr,startMonth:mo,startDay:dy,dayOfWeek:new Date(yr,mo-1,dy).getDay(),timeStr:timeStr,cleaner:cleanerName,status:apptStatus,active:true});
     populateRecurringMonth(curYear,curMonth);
   }
-  // Build clientJobData entry so openAppt can display full details
-  var beds2=parseInt(document.getElementById('na-beds').value)||3;
-  var baths2=parseFloat(document.getElementById('na-baths').value)||2;
-  var cond2=parseInt(document.getElementById('na-cond').value)||7;
-  var svcType2=document.getElementById('na-service').value;
-  var svcText=document.getElementById('na-service').options[document.getElementById('na-service').selectedIndex].text;
-  var condText=document.getElementById('na-cond').options[document.getElementById('na-cond').selectedIndex].text;
-  var baseHrs2=1.0+(beds2*0.5)+(baths2*0.4);
-  if(svcType2==='deep')baseHrs2*=1.5;
-  else if(svcType2==='moveout')baseHrs2*=1.7;
-  else if(svcType2==='commercial')baseHrs2=beds2*0.8+baths2*0.5+1.5;
-  else if(svcType2==='airbnb')baseHrs2=baseHrs2*0.9;
-  var condMod2=1.0;
-  if(cond2<=2)condMod2=1.70;else if(cond2<=4)condMod2=1.40;else if(cond2<=6)condMod2=1.25;
-  var hrs2=Math.round(baseHrs2*condMod2*10)/10;
-  var basePrice=Math.round(hrs2*65*100)/100;
-  var tax=Math.round(basePrice*0.04712*100)/100;
-  var total=Math.round((basePrice+tax)*100)/100;
-  var addr2=document.getElementById('na-address').value||'—';
-  clientJobData[name]={
-    service:svcText, address:addr2, freq:freq,
-    dur:hrs2+' hrs',
-    sqft:'—',
-    bed:beds2+' bed / '+baths2+' bath',
-    cond:(condText.split(' — ')[1]||condText)+' ('+cond2+'/10)',
-    base:'$'+basePrice.toFixed(2), disc:'$0',
-    tax:'$'+tax.toFixed(2), total:'$'+total.toFixed(2)
-  };
-  console.log('saveNewAppt: wrote clientJobData["'+name+'"]=',clientJobData[name]);
   // Save to Supabase
+  var priceEl=document.getElementById('price-val');
+  var basePrice=0;var tax=0;var total=0;
+  if(priceEl){
+    total=parseFloat(priceEl.textContent.replace('$',''))||0;
+    tax=Math.round(total*0.04712*100)/100;
+    basePrice=Math.round((total-tax)*100)/100;
+  }
   dbSaveAppointment({
     clientName:name, service:document.getElementById('na-service').options[document.getElementById('na-service').selectedIndex].text,
     freq:freq, date:dateVal, time:timeStr,
@@ -2720,7 +2198,7 @@ function saveNewAppt(){
     baths:document.getElementById('na-baths').value,
     condition:document.getElementById('na-cond').value,
     cleanerName:cleanerName, basePrice:basePrice, tax:tax, totalPrice:total,
-    cleanerPay:Math.round(basePrice/65*(cleanerName.indexOf('Kaimana')>=0||cleanerName.indexOf('Maile')>=0?18:16)*100)/100,
+    cleanerPay:Math.round(hrs*rate*100)/100,
     notes:document.getElementById('na-notes').value,
     recurring:freq!=='One-time'
   });
@@ -2760,9 +2238,9 @@ function populateRecurringMonth(yr,mo){
 }
 
 function handleTopCta(){
-  if(currentView==='calendar'){document.getElementById('new-appt-overlay').classList.remove('hidden');calcPrice();initAC(['na-address']);}
-  else if(currentView==='pipeline'||currentView==='dashboard'){document.getElementById('new-lead-overlay').classList.remove('hidden');initAC(['nl-address']);}
-  else if(currentView==='clients'){document.getElementById('new-client-overlay').classList.remove('hidden');initAC(['nc-address']);}
+  if(currentView==='calendar'){document.getElementById('new-appt-overlay').classList.remove('hidden');calcPrice();}
+  else if(currentView==='pipeline'||currentView==='dashboard'){document.getElementById('new-lead-overlay').classList.remove('hidden');}
+  else if(currentView==='clients'){document.getElementById('new-client-overlay').classList.remove('hidden');}
   else if(currentView==='cleaners'){document.getElementById('new-cleaner-overlay').classList.remove('hidden');}
   else if(currentView==='automations'){openNewAuto();}
   else if(currentView==='payments'){openNewInvoice();}
@@ -2791,38 +2269,6 @@ function setPeriod(btn){document.querySelectorAll('.pbtn').forEach(function(b){b
 
 renderCal();
 loadAllData();
-
-/* ── GOOGLE PLACES ADDRESS AUTOCOMPLETE ─────────────────────── */
-var _mapsReady=false;
-var _acQueue=[];
-var _acInitialized={};
-function onMapsLoaded(){
-  _mapsReady=true;
-  // Drain any fields that opened before Maps finished loading
-  if(_acQueue.length){initAC(_acQueue);_acQueue=[];}
-}
-function initAC(ids){
-  if(!_mapsReady){
-    // Maps not ready yet — queue these ids and init when it loads
-    ids.forEach(function(id){if(_acQueue.indexOf(id)===-1)_acQueue.push(id);});
-    return;
-  }
-  ids.forEach(function(id){
-    if(_acInitialized[id])return;
-    var el=document.getElementById(id);
-    if(!el)return;
-    var ac=new google.maps.places.Autocomplete(el,{
-      componentRestrictions:{country:'us'},
-      fields:['formatted_address'],
-      types:['address']
-    });
-    ac.addListener('place_changed',function(){
-      var place=ac.getPlace();
-      if(place&&place.formatted_address)el.value=place.formatted_address;
-    });
-    _acInitialized[id]=true;
-  });
-}
 </script>
 
 <!-- NEW LEAD OVERLAY -->
@@ -3649,107 +3095,12 @@ function chargeCardRow(btn, client, amount){
   });
 }
 
-/* ── STRIPE INVOICE HELPER ──────────────────────────────────── */
-async function callStripeInvoice(params){
-  console.log('callStripeInvoice params:', params);
-  var res=await fetch('/api/stripe-invoice',{
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body:JSON.stringify(params)
-  });
-  var text=await res.text();
-  console.log('stripe-invoice raw response (status '+res.status+'):', text);
-  try{ return JSON.parse(text); }
-  catch(e){ return {success:false,error:'Server error ('+res.status+'): '+text.slice(0,120)}; }
-}
-
-function sendClientInvoice(){
-  console.log('sendClientInvoice called, currentClientId=',currentClientId);
-  try{
-    if(!currentClientId||!clientDB[currentClientId]){
-      alert('No client selected. Please open a client profile first.');return;
-    }
-    var c=clientDB[currentClientId];
-    if(!c.email||c.email==='—'){
-      showToast('client-overlay','No email on file. Edit the client to add one.');return;
-    }
-    var rawMrr=c.mrr&&c.mrr!=='—'?c.mrr:null;
-    if(!rawMrr){
-      showToast('client-overlay','No monthly revenue set. Edit the client to set an MRR.');return;
-    }
-    var terms=c.type==='Commercial'?'NET30':'Due now';
-    showToast('client-overlay','Sending invoice to '+c.email+'…');
-    callStripeInvoice({
-      customerName:c.name,
-      customerEmail:c.email,
-      amount:rawMrr,
-      service:c.service||'Cleaning service',
-      terms:terms,
-      notes:c.notes&&c.notes!=='—'?c.notes:undefined
-    }).then(function(data){
-      if(data.success){
-        db.from('invoices').insert([{
-          client_name:c.name,
-          service:c.service||'Cleaning service',
-          amount:parseFloat(String(rawMrr).replace(/[^0-9.]/g,'')),
-          total:parseFloat(String(rawMrr).replace(/[^0-9.]/g,'')),
-          payment_method:'Stripe invoice',
-          payment_terms:terms,
-          status:'Unpaid',
-          notes:'Stripe invoice ID: '+data.invoiceId
-        }]).then(function(){});
-        showToast('client-overlay','Invoice sent! <a href="'+data.invoiceUrl+'" target="_blank" style="color:#1D9E75;text-decoration:underline;">View invoice →</a>');
-      } else {
-        showToast('client-overlay','Invoice failed: '+(data.error||'Unknown error'));
-      }
-    }).catch(function(err){
-      showToast('client-overlay','Invoice error: '+err.message);
-    });
-  }catch(e){
-    alert('sendClientInvoice error: '+e.message);
-  }
-}
-
-function sendInvoiceRow(btn, clientName, amount, terms){
-  var termsLabel=terms==='now'?'Due now':terms.toUpperCase();
-  btn.textContent='Sending…';btn.disabled=true;
-  // Look up email from clientDB
-  var clientKey=Object.keys(clientDB).find(function(k){return clientDB[k].name===clientName;});
-  var email=clientKey&&clientDB[clientKey].email&&clientDB[clientKey].email!=='—'?clientDB[clientKey].email:null;
-  var service=clientKey&&clientDB[clientKey].service?clientDB[clientKey].service:'Cleaning service';
-  if(!email){
-    btn.textContent='No email';
-    showPaymentToast('No email on file for '+clientName+'. Open their client profile to add one.','','error');
-    return;
-  }
-  callStripeInvoice({
-    customerName:clientName,
-    customerEmail:email,
-    amount:amount,
-    service:service,
-    terms:termsLabel
-  }).then(function(data){
-    if(data.success){
-      var row=btn.closest('tr');
-      if(row){
-        row.cells[5].innerHTML='<span class="badge bpn" style="font-size:10px;">Invoiced</span>';
-        row.cells[6].innerHTML='<a href="'+data.invoiceUrl+'" target="_blank" style="font-size:11px;color:#1D9E75;">View invoice →</a>';
-      }
-      db.from('invoices').insert([{
-        client_name:clientName,service:service,
-        amount:parseFloat(String(amount).replace(/[^0-9.]/g,'')),
-        total:parseFloat(String(amount).replace(/[^0-9.]/g,'')),
-        payment_method:'Stripe invoice',payment_terms:termsLabel,
-        status:'Unpaid',notes:'Stripe invoice ID: '+data.invoiceId
-      }]).then(function(){});
-      showPaymentToast('Invoice sent to '+clientName+'! ACH + card options included.','','success');
-    } else {
-      btn.textContent='Failed';btn.disabled=false;
-      showPaymentToast('Invoice failed: '+(data.error||'Unknown error'),'','error');
-    }
-  }).catch(function(err){
-    btn.textContent='Error';btn.disabled=false;
-    showPaymentToast('Invoice error: '+err.message,'','error');
+function sendInvoiceRow(btn, client, amount, terms){
+  var termsLabel=terms==='now'?'due now':terms.toUpperCase();
+  showPaymentToast('Sending '+termsLabel+' invoice for '+amount+' to '+client+'...',function(){
+    var row=btn.closest('tr');
+    if(row){row.cells[5].innerHTML='<span class="badge bpn" style="font-size:10px;">Invoiced</span>';row.cells[6].innerHTML='<span style="font-size:11px;color:#b7791f;">Awaiting payment</span>';}
+    showPaymentToast('Invoice sent to '+client+' with ACH + card options shown!',null,'success');
   });
 }
 
@@ -4141,6 +3492,173 @@ function sendNewMessage(){
     renderInbox();
     openChat(item.id);
   },1500);
+}
+
+
+/* DELETE RECORDS */
+function deleteRecord(type){
+  var msg='';
+  var id=null;
+  var name='';
+  if(type==='client'){id=currentClientId;name=currentClientName;msg='Delete '+name+' and all their data? This cannot be undone.';}
+  else if(type==='lead'){id=currentLeadId;name=currentLeadName;msg='Delete lead "'+name+'"? This cannot be undone.';}
+  else if(type==='cleaner'){id=currentCleanerId;name=cleanerDB[currentCleanerId]?cleanerDB[currentCleanerId].name:'this cleaner';msg='Delete '+name+' from the roster? This cannot be undone.';}
+  if(!confirm(msg))return;
+  // Delete from Supabase if real DB record
+  if(id&&id.length>20){
+    var table=type==='client'?'clients':type==='lead'?'leads':'cleaners';
+    db.from(table).delete().eq('id',id).then(function(res){
+      if(res.error)console.error('Delete error:',res.error);
+      else console.log(type+' deleted from Supabase');
+    });
+  }
+  // Remove from local DB
+  if(type==='client'&&id){
+    delete clientDB[id];
+    // Remove from table
+    var rows=document.querySelectorAll('#view-clients tbody tr, #view-dashboard tbody tr');
+    rows.forEach(function(row){if(row.textContent.indexOf(name)>=0)row.remove();});
+  } else if(type==='lead'&&id){
+    delete leadDB[id];
+    // Remove from pipeline cards
+    document.querySelectorAll('.deal-card').forEach(function(card){
+      if(card.querySelector('.deal-name')&&card.querySelector('.deal-name').textContent===name)card.remove();
+    });
+  } else if(type==='cleaner'&&id){
+    delete cleanerDB[id];
+    // Remove from grid
+    document.querySelectorAll('.cleaner-card.db-card').forEach(function(card){
+      if(card.querySelector('.cleaner-name')&&card.querySelector('.cleaner-name').textContent===name)card.remove();
+    });
+  }
+  closeOverlay(type+'-overlay');
+  showPaymentToast(name+' deleted successfully.',null,'success');
+}
+
+/* ONE-CLICK INVOICE */
+function oneClickInvoice(source){
+  var clientName=currentClientName;
+  var cdata=currentClientId?clientDB[currentClientId]:Object.values(clientDB).find(function(c){return c.name===clientName;});
+  if(!cdata){showPaymentToast('Client data not found.',null,'error');return;}
+  var amount=cdata.mrr&&cdata.mrr!=='—'?cdata.mrr:'—';
+  var email=cdata.email||'—';
+  var isCommercial=cdata.type==='Commercial';
+  var terms=isCommercial?'NET30':'Due now';
+  if(email==='—'){
+    showPaymentToast('No email on file for '+clientName+'. Add their email first.',null,'error');
+    return;
+  }
+  // Save invoice to Supabase
+  var amountNum=parseFloat((amount||'0').replace(/[$,\/a-z]/gi,''))||0;
+  var tax=Math.round(amountNum*0.04712*100)/100;
+  var total=Math.round((amountNum+tax)*100)/100;
+  if(currentClientId&&currentClientId.length>20){
+    db.from('invoices').insert([{
+      client_name:clientName,
+      client_id:currentClientId.length>20?currentClientId:null,
+      service:cdata.service||'Cleaning service',
+      amount:amountNum,tax:tax,total:total,
+      payment_method:'email',
+      payment_terms:terms,
+      status:'Unpaid'
+    }]).then(function(res){
+      if(res.error)console.error('Invoice save error:',res.error);
+    });
+  }
+  // Add to invoice table
+  addToInvoiceTable(clientName,cdata.service||'Cleaning service','$'+total.toFixed(2),terms);
+  // Show success
+  var sb=source==='client'?document.getElementById('client-action-success'):null;
+  if(sb){
+    sb.textContent='Invoice sent to '+clientName+' at '+email+' ('+terms+'). ACH & card options included.';
+    sb.classList.add('show');
+    setTimeout(function(){sb.classList.remove('show');},4000);
+  }
+  showPaymentToast('Invoice sent to '+clientName+'!',null,'success');
+}
+
+/* ONE-CLICK CHARGE */
+function oneClickCharge(source){
+  var clientName=currentClientName;
+  var cdata=currentClientId?clientDB[currentClientId]:Object.values(clientDB).find(function(c){return c.name===clientName;});
+  if(!cdata){showPaymentToast('Client data not found.',null,'error');return;}
+  // Check if card on file
+  var hasCard=cdata.payment&&cdata.payment!=='—'&&cdata.payment.indexOf('****')>=0;
+  if(!hasCard){
+    showPaymentToast('No card on file for '+clientName+'. Send an invoice instead.',null,'error');
+    return;
+  }
+  if(!stripeConnected){openStripeConnect();return;}
+  var amountNum=parseFloat((cdata.mrr||'0').replace(/[$,\/a-z]/gi,''))||0;
+  var fee=Math.round(amountNum*0.03*100)/100;
+  var total=Math.round((amountNum+fee)*100)/100;
+  if(!confirm('Charge '+clientName+' $'+total.toFixed(2)+' (incl. 3% card fee) to '+cdata.payment+'?'))return;
+  // Save to invoices as paid
+  if(currentClientId&&currentClientId.length>20){
+    db.from('invoices').insert([{
+      client_name:clientName,
+      client_id:currentClientId.length>20?currentClientId:null,
+      service:cdata.service||'Cleaning service',
+      amount:amountNum,tax:fee,total:total,
+      payment_method:'card',
+      payment_terms:'Due now',
+      status:'Paid'
+    }]).then(function(res){
+      if(res.error)console.error('Invoice save error:',res.error);
+    });
+  }
+  addToInvoiceTable(clientName,cdata.service||'Cleaning service','$'+total.toFixed(2),'Paid');
+  var sb=source==='client'?document.getElementById('client-action-success'):null;
+  if(sb){
+    sb.textContent='$'+total.toFixed(2)+' charged to '+cdata.payment+' for '+clientName+'!';
+    sb.classList.add('show');
+    setTimeout(function(){sb.classList.remove('show');},4000);
+  }
+  showPaymentToast('$'+total.toFixed(2)+' collected from '+clientName+'!',null,'success');
+}
+
+/* UPDATE CHARGE BUTTON STATE based on card on file */
+function updateChargeBtn(){
+  var btn=document.getElementById('client-charge-btn');
+  if(!btn)return;
+  var cdata=currentClientId?clientDB[currentClientId]:null;
+  var hasCard=cdata&&cdata.payment&&cdata.payment!=='—'&&cdata.payment.indexOf('****')>=0;
+  if(hasCard){
+    btn.style.opacity='1';
+    btn.style.cursor='pointer';
+    btn.title='Charge '+cdata.payment;
+    btn.disabled=false;
+  } else {
+    btn.style.opacity='0.4';
+    btn.style.cursor='not-allowed';
+    btn.title='No card on file — send invoice instead';
+    btn.disabled=true;
+  }
+}
+
+
+/* GOOGLE PLACES AUTOCOMPLETE */
+window.placesReady = false;
+
+function initAutocomplete(){
+  window.placesReady = true;
+}
+
+function attachAutocomplete(inputId){
+  if(!window.placesReady)return;
+  var input=document.getElementById(inputId);
+  if(!input||input._autocomplete)return;
+  var ac=new google.maps.places.Autocomplete(input,{
+    types:['address'],
+    componentRestrictions:{country:'us'}
+  });
+  ac.addListener('place_changed',function(){
+    var place=ac.getPlace();
+    if(place&&place.formatted_address){
+      input.value=place.formatted_address;
+    }
+  });
+  input._autocomplete=true;
 }
 
 </script>

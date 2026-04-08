@@ -4050,63 +4050,76 @@ function initTemplateEditor() {
 
 /* LEAD ACTIONS */
 function scheduleLeadAppointment(){
-  var lead = currentLeadId ? leadDB[currentLeadId] : null;
-  if(!lead) return;
+  // Get lead - try currentLeadId first, then search by name
+  var lead = null;
+  var lid = currentLeadId;
+  if(lid && leadDB[lid]) {
+    lead = leadDB[lid];
+  } else {
+    // Fallback: search leadDB by currentLeadName
+    var keys = Object.keys(leadDB);
+    for(var i=0;i<keys.length;i++){
+      if(leadDB[keys[i]].name === currentLeadName){ lead=leadDB[keys[i]]; lid=keys[i]; break; }
+    }
+  }
+  if(!lead){ alert('Could not find lead data. Please close and reopen the lead panel.'); return; }
 
-  // Convert lead to client automatically
-  var clientId = 'client-' + Date.now();
   var isCommercial = lead.service && lead.service.toLowerCase().indexOf('commercial') >= 0;
+  var clientId = 'client-' + Date.now();
+
+  // Create client record
   clientDB[clientId] = {
-    name: lead.name,
-    type: isCommercial ? 'Commercial' : 'Residential',
-    phone: lead.phone || '—',
-    email: lead.email || '—',
-    address: lead.address || '—',
-    payment: '—',
-    since: new Date().toLocaleDateString('en-US',{month:'long',year:'numeric'}),
-    ltv: '$0', mrr: lead.value || '—',
-    jobs: '0', avg: '—',
-    service: lead.service || 'Standard clean',
-    freq: 'TBD', sqft: lead.sqft || '—',
-    bedbath: '— bed / — bath',
-    cleaner: 'No preference',
-    lastjob: 'None yet', nextjob: 'Not scheduled',
-    status: 'New',
-    notes: 'Converted from lead. ' + (lead.notes || ''),
-    history: []
+    name:lead.name, type:isCommercial?'Commercial':'Residential',
+    phone:lead.phone||'—', email:lead.email||'—', address:lead.address||'—',
+    payment:'—',
+    since:new Date().toLocaleDateString('en-US',{month:'long',year:'numeric'}),
+    ltv:'$0', mrr:lead.value||'—', jobs:'0', avg:'—',
+    service:lead.service||'Standard clean', freq:'TBD', sqft:lead.sqft||'—',
+    bedbath:'— bed / — bath', cleaner:'No preference',
+    lastjob:'None yet', nextjob:'Not scheduled', status:'New',
+    notes:'Converted from lead. '+(lead.notes||''), history:[]
   };
 
-  // Save client to Supabase
+  // Save to Supabase
   dbSaveClient({
-    name: lead.name, type: clientDB[clientId].type,
-    phone: lead.phone, email: lead.email, address: lead.address,
-    service: lead.service, notes: clientDB[clientId].notes
+    name:lead.name, type:clientDB[clientId].type,
+    phone:lead.phone, email:lead.email, address:lead.address,
+    service:lead.service, notes:clientDB[clientId].notes
   });
 
-  // Remove lead from pipeline cards
+  // Mark lead as won
+  lead.stage = 'Closed won';
+  if(lid && lid.length > 20){
+    db.from('leads').update({stage:'Closed won'}).eq('id', lid);
+  }
+
+  // Remove pipeline cards
   document.querySelectorAll('.deal-card').forEach(function(card){
-    if(card.querySelector('.deal-name') && card.querySelector('.deal-name').textContent === lead.name) card.remove();
+    var el=card.querySelector('.deal-name');
+    if(el && el.textContent.trim()===lead.name.trim()) card.remove();
   });
 
-  // Add to hidden leads table
-  var htbody = document.getElementById('hidden-leads-tbody');
-  if(htbody){
-    var htr = document.createElement('tr');
-    htr.style.borderTop = '1px solid #e8e8e5';
-    htr.innerHTML = '<td style="padding:8px 12px;font-size:12px;font-weight:600;">'+lead.name+'</td>'
-      +'<td style="padding:8px 12px;font-size:12px;color:#666;">'+(lead.service||'—')+'</td>'
-      +'<td style="padding:8px 12px;font-size:12px;color:#1D9E75;">'+(lead.value||'—')+'</td>'
-      +'<td style="padding:8px 12px;"><span class="badge bpd" style="font-size:10px;">Booked → Client</span></td>'
-      +'<td style="padding:8px 12px;"><button class="btn" style="font-size:11px;padding:3px 8px;" data-id="'+clientId+'" onclick="openClient(this.dataset.id)">View</button></td>';
-    htbody.insertBefore(htr, htbody.firstChild);
+  // Add to won table
+  var wonTbody = document.getElementById('won-leads-tbody');
+  if(wonTbody){
+    var today=new Date().toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+    var wtr=document.createElement('tr');
+    wtr.style.borderTop='1px solid #e8e8e5';
+    wtr.innerHTML='<td style="padding:9px 14px;font-size:12px;font-weight:600;">'+lead.name+'</td>'
+      +'<td style="padding:9px 14px;font-size:12px;color:#666;">'+(lead.service||'—')+'</td>'
+      +'<td style="padding:9px 14px;font-size:12px;color:#1D9E75;font-weight:600;">'+(lead.value||'—')+'</td>'
+      +'<td style="padding:9px 14px;font-size:12px;color:#666;">'+(lead.source||'—')+'</td>'
+      +'<td style="padding:9px 14px;font-size:12px;color:#666;">'+today+'</td>'
+      +'<td style="padding:9px 14px;"><button class="btn" style="font-size:11px;padding:3px 9px;" data-id="'+clientId+'" onclick="openClient(this.dataset.id)">View client</button></td>';
+    wonTbody.insertBefore(wtr, wonTbody.firstChild);
   }
 
   // Add to clients table
-  var ctbody = document.querySelector('#view-clients tbody');
+  var ctbody=document.querySelector('#view-clients tbody');
   if(ctbody){
-    var ctr = document.createElement('tr');
-    ctr.className = 'clickable db-row';
-    ctr.innerHTML = '<td>'+lead.name+'</td>'
+    var ctr=document.createElement('tr');
+    ctr.className='clickable db-row';
+    ctr.innerHTML='<td>'+lead.name+'</td>'
       +'<td><span class="badge '+(isCommercial?'bc':'br')+'">'+(isCommercial?'Commercial':'Residential')+'</span></td>'
       +'<td>—</td><td>'+(lead.value||'—')+'</td><td>TBD</td>'
       +'<td><span class="sd sn"></span>New</td>';
@@ -4114,27 +4127,23 @@ function scheduleLeadAppointment(){
     ctbody.insertBefore(ctr, ctbody.firstChild);
   }
 
-  // Update lead stage in Supabase
-  if(currentLeadId && currentLeadId.length > 20){
-    db.from('leads').update({stage:'Closed won'}).eq('id', currentLeadId);
-  }
-
-  // Close lead panel and open booking form
+  // Navigate to calendar with booking form open and pre-filled
   closeOverlay('lead-overlay');
-  var calNav = null;
+  var calNav=null;
   document.querySelectorAll('.nav-item').forEach(function(n){
     if(n.textContent.trim()==='Calendar') calNav=n;
   });
   if(calNav) sv('calendar', calNav);
   setTimeout(function(){
-    document.getElementById('new-appt-overlay').classList.remove('hidden');
+    var overlay=document.getElementById('new-appt-overlay');
+    if(overlay) overlay.classList.remove('hidden');
     calcPrice();
-    var nameEl = document.getElementById('na-name');
-    var addrEl = document.getElementById('na-address');
-    if(nameEl) nameEl.value = lead.name || '';
-    if(addrEl) addrEl.value = lead.address || '';
-    showPaymentToast(lead.name + ' added as client. Complete the booking details below.', null, 'success');
-  }, 200);
+    var nameEl=document.getElementById('na-name');
+    var addrEl=document.getElementById('na-address');
+    if(nameEl) nameEl.value=lead.name;
+    if(addrEl) addrEl.value=lead.address||'';
+    showPaymentToast(lead.name+' converted to client! Fill in the booking details below.', null, 'success');
+  }, 300);
 }
 
 function convertLeadToClient(){
@@ -4319,6 +4328,42 @@ scheduleLeadAppointment = function(){
     });
   }, 300);
 };
+
+
+function filterLeads(view, btn){
+  document.querySelectorAll('#view-pipeline .template-tab').forEach(function(b){b.classList.remove('active');});
+  btn.classList.add('active');
+  var board = document.getElementById('pipe-board');
+  var closed = document.querySelector('#view-pipeline .pipe-board + div, #view-pipeline div[style*="margin-top:28px"]');
+
+  // Find the closed leads section
+  var allDivs = document.querySelectorAll('#view-pipeline > div > div');
+  var closedSection = null;
+  allDivs.forEach(function(d){ if(d.id === 'won-leads-tbody' || d.querySelector('#won-leads-tbody')) closedSection = d.parentElement.parentElement; });
+
+  if(view === 'pipeline'){
+    if(board) board.style.display='flex';
+    if(closedSection) closedSection.style.display='none';
+  } else if(view === 'all'){
+    if(board) board.style.display='flex';
+    if(closedSection) closedSection.style.display='block';
+  } else if(view === 'won'){
+    if(board) board.style.display='none';
+    if(closedSection){
+      closedSection.style.display='block';
+      // Scroll to won section
+      var wonEl = document.getElementById('won-leads-tbody');
+      if(wonEl) wonEl.closest('div').scrollIntoView({behavior:'smooth'});
+    }
+  } else if(view === 'lost'){
+    if(board) board.style.display='none';
+    if(closedSection){
+      closedSection.style.display='block';
+      var lostEl = document.getElementById('lost-leads-tbody');
+      if(lostEl) lostEl.closest('div').scrollIntoView({behavior:'smooth'});
+    }
+  }
+}
 
 </script>
 

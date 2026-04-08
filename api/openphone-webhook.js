@@ -2,12 +2,35 @@ import { createClient } from '@supabase/supabase-js';
 
 const supabase = createClient(
   process.env.SUPABASE_URL || 'https://hehfecnjmgsthxjxlvpz.supabase.co',
-  process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_ANON_KEY
+  process.env.SUPABASE_ANON_KEY
 );
+
+async function findClientByPhone(phone) {
+  if (!phone) return null;
+  // Normalize phone - strip all non-digits
+  const digits = phone.replace(/\D/g, '');
+  const last10 = digits.slice(-10);
+  
+  const { data } = await supabase
+    .from('clients')
+    .select('id, name, phone')
+    .limit(50);
+  
+  if (!data) return null;
+  
+  // Match by last 10 digits
+  const match = data.find(c => {
+    if (!c.phone) return false;
+    const cDigits = c.phone.replace(/\D/g, '').slice(-10);
+    return cDigits === last10;
+  });
+  
+  return match || null;
+}
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
-  
+
   if (req.method === 'GET') {
     return res.status(200).json({ status: 'OpenPhone webhook receiver active' });
   }
@@ -21,20 +44,19 @@ export default async function handler(req, res) {
     const type = event.type;
     const data = event.data?.object;
 
-    console.log('OpenPhone webhook received:', type, JSON.stringify(event).slice(0, 200));
+    console.log('OpenPhone webhook:', type);
 
-    // INCOMING MESSAGE — save to messages table
+    // INCOMING MESSAGE
     if (type === 'message.received' && data) {
       const from = data.from;
       const body = data.body || '';
-      const phoneNumberId = data.phoneNumberId;
-      const conversationId = data.conversationId;
+      const client = await findClientByPhone(from);
 
       await supabase.from('messages').insert([{
-        thread_id: conversationId || from,
-        contact_name: from,
+        thread_id: data.conversationId || from,
+        contact_name: client ? client.name : from,
         contact_phone: from,
-        contact_type: 'client',
+        contact_type: client ? 'client' : 'unknown',
         direction: 'inbound',
         body: body,
         channel: 'sms',
@@ -42,61 +64,58 @@ export default async function handler(req, res) {
         quo_message_id: data.id || null
       }]);
 
-      console.log('Incoming message saved:', from, body.slice(0, 50));
+      console.log('Message saved from:', client ? client.name : 'unknown ' + from);
     }
 
-    // CALL COMPLETED — save basic call record
+    // CALL COMPLETED
     if (type === 'call.completed' && data) {
-      const from = data.from;
-      const to = data.to;
-      const duration = data.duration;
       const direction = data.direction;
-      const callId = data.id;
-
-      // Find matching client by phone
-      const phone = direction === 'inbound' ? from : to;
+      const phone = direction === 'inbound' ? data.from : data.to;
+      const client = await findClientByPhone(phone);
 
       await supabase.from('call_transcripts').upsert([{
-        call_id: callId,
+        call_id: data.id,
         phone: phone,
         direction: direction,
-        duration_seconds: duration,
+        duration_seconds: data.duration,
         called_at: data.createdAt || new Date().toISOString(),
-        status: 'completed'
+        status: 'completed',
+        client_id: client ? client.id : null,
+        client_name: client ? client.name : 'Unknown — ' + phone
       }], { onConflict: 'call_id' });
 
-      console.log('Call recorded:', callId, phone, duration + 's');
+      console.log('Call saved:', data.id, client ? client.name : 'unknown ' + phone);
     }
 
-    // CALL SUMMARY — save AI summary
+    // CALL SUMMARY
     if (type === 'call.summary.completed' && data) {
-      const callId = data.callId;
-      const summary = Array.isArray(data.summary) ? data.summary.join(' ') : (data.summary || '');
+      const summary = Array.isArray(data.summary)
+        ? data.summary.join(' ')
+        : (data.summary || '');
 
       await supabase.from('call_transcripts').upsert([{
-        call_id: callId,
+        call_id: data.callId,
         summary: summary,
         status: 'summary_ready'
       }], { onConflict: 'call_id' });
 
-      console.log('Call summary saved:', callId, summary.slice(0, 100));
+      console.log('Summary saved:', data.callId);
     }
 
-    // CALL TRANSCRIPT — save full transcript
+    // CALL TRANSCRIPT
     if (type === 'call.transcript.completed' && data) {
-      const callId = data.callId;
       const dialogue = data.dialogue || [];
       const transcript = dialogue.map(function(line) {
         return (line.identifier || 'Unknown') + ': ' + line.content;
       }).join('\n');
 
       await supabase.from('call_transcripts').upsert([{
-        call_id: callId,
+        call_id: data.callId,
         transcript: transcript,
         status: 'transcript_ready'
       }], { onConflict: 'call_id' });
 
-      console.log('Transcript saved:', callId, transcript.slice(0, 100));
+      console.log('Transcript saved:', data.callId);
     }
 
     return res.status(200).json({ received: true, type });

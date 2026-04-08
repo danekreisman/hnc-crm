@@ -1197,6 +1197,14 @@ textarea{font-family:inherit;}
         </div>
         <div class="panel-section">Job history</div>
         <div class="info-block" id="cl-history"></div>
+        <!-- AI SUMMARY -->
+        <div class="panel-section" style="display:flex;align-items:center;justify-content:space-between;">
+          <span>AI summary</span>
+          <button onclick="generateClientSummary()" style="font-size:10px;padding:3px 9px;border:1px solid #d6bcfa;border-radius:20px;background:#f5f0ff;color:#553c9a;cursor:pointer;font-family:inherit;">&#x2728; Generate</button>
+        </div>
+        <div id="cl-ai-summary" style="background:#f5f0ff;border:1px solid #e9d8fd;border-radius:10px;padding:12px 13px;margin-bottom:10px;font-size:12px;color:#44337a;line-height:1.7;display:none;"></div>
+        <div id="cl-ai-thinking" style="display:none;font-size:12px;color:#999;padding:8px 0;">&#x2728; Generating summary...</div>
+
         <div class="panel-section">Notes</div>
         <div class="info-block"><div style="font-size:12px;color:#1a1a1a;line-height:1.6;" id="cl-notes">—</div></div>
         <div class="action-grid" style="margin-top:14px;">
@@ -4531,9 +4539,27 @@ function runGlobalSearch(q){
 function selectSearchResult(id, type){
   document.getElementById('search-results').style.display='none';
   document.getElementById('global-search').value='';
-  if(type==='Client') openClient(id);
-  else if(type==='Cleaner') openCleaner(id);
-  else if(type==='Lead') openLead(id);
+  var navMap={Client:'clients',Cleaner:'cleaners',Lead:'pipeline',Appointment:'calendar'};
+  var targetView=navMap[type];
+  if(targetView && targetView!==currentView){
+    var navEl=null;
+    document.querySelectorAll('.nav-item').forEach(function(n){
+      if(n.textContent.trim()===targetView.charAt(0).toUpperCase()+targetView.slice(1)) navEl=n;
+      if(type==='Client'&&n.textContent.trim()==='Clients') navEl=n;
+      if(type==='Cleaner'&&n.textContent.trim()==='Cleaners') navEl=n;
+      if(type==='Lead'&&n.textContent.trim()==='Pipeline') navEl=n;
+    });
+    if(navEl) sv(targetView, navEl);
+    setTimeout(function(){
+      if(type==='Client') openClient(id);
+      else if(type==='Cleaner') openCleaner(id);
+      else if(type==='Lead') openLead(id);
+    }, 150);
+  } else {
+    if(type==='Client') openClient(id);
+    else if(type==='Cleaner') openCleaner(id);
+    else if(type==='Lead') openLead(id);
+  }
 }
 
 // Close search on outside click
@@ -4606,6 +4632,112 @@ function scheduleFromClient(){
     calcPrice();
     showPaymentToast(cdata.name + ' pre-filled. Pick a date and time to book.', null, 'success');
   }, 300);
+}
+
+
+async function generateClientSummary(){
+  var cdata = currentClientId ? clientDB[currentClientId] : null;
+  if(!cdata){ showPaymentToast('No client selected.', null, 'error'); return; }
+
+  var summaryEl = document.getElementById('cl-ai-summary');
+  var thinkingEl = document.getElementById('cl-ai-thinking');
+  summaryEl.style.display = 'none';
+  thinkingEl.style.display = 'block';
+
+  // Build context about the client
+  var history = (cdata.history||[]).slice(-5).map(function(h){
+    return h.date+': '+h.svc+' — '+h.amt+(h.paid?' (paid)':' (unpaid)');
+  }).join('
+');
+
+  var msgs = [];
+  inboxData.forEach(function(thread){
+    if(thread.name === cdata.name){
+      thread.msgs.slice(-6).forEach(function(m){
+        msgs.push((m.out?'You: ':'Client: ')+m.text);
+      });
+    }
+  });
+
+  // Fetch last 5 call transcripts/summaries from Supabase
+  var callContext = '';
+  try {
+    var callRes = await db.from('call_transcripts')
+      .select('called_at, direction, duration_seconds, summary, transcript')
+      .eq('client_name', cdata.name)
+      .order('called_at', {ascending: false})
+      .limit(5);
+    if(callRes.data && callRes.data.length > 0){
+      callContext = '
+Call history (last '+callRes.data.length+' calls):
+';
+      callRes.data.forEach(function(c){
+        var date = c.called_at ? new Date(c.called_at).toLocaleDateString() : 'Unknown date';
+        var dur = c.duration_seconds ? Math.round(c.duration_seconds/60)+'min' : '';
+        callContext += date+' ('+c.direction+', '+dur+')
+';
+        if(c.summary) callContext += 'Summary: '+c.summary+'
+';
+        if(c.transcript && !c.summary) callContext += 'Transcript excerpt: '+c.transcript.slice(0,300)+'
+';
+        callContext += '
+';
+      });
+    }
+  } catch(e){ console.log('No call data available'); }
+
+  var prompt = 'You are an assistant for Hawaii Natural Clean, a cleaning business in Hawaii. Generate a concise 3-4 sentence client intelligence briefing for the team. Be specific and actionable. Mention payment behavior, relationship health, call history insights if available, and any follow-up recommendations.
+
+'
+    + 'Client: ' + cdata.name + '
+'
+    + 'Type: ' + (cdata.type||'Residential') + '
+'
+    + 'Status: ' + (cdata.status||'Active') + '
+'
+    + 'Service: ' + (cdata.service||'—') + ' ' + (cdata.freq||'') + '
+'
+    + 'Since: ' + (cdata.since||'—') + '
+'
+    + 'Lifetime value: ' + (cdata.ltv||'$0') + '
+'
+    + 'Monthly revenue: ' + (cdata.mrr||'—') + '
+'
+    + 'Last job: ' + (cdata.lastjob||'None') + '
+'
+    + 'Next job: ' + (cdata.nextjob||'Not scheduled') + '
+'
+    + 'Preferred cleaner: ' + (cdata.cleaner||'No preference') + '
+'
+    + 'Payment method: ' + (cdata.payment||'—') + '
+'
+    + (history?'
+Job history (last 5):
+'+history:'')
+    + (cdata.notes&&cdata.notes!=='—'?'
+Notes: '+cdata.notes:'')
+    + (msgs.length?'
+Recent messages:
+'+msgs.join('
+'):'')
+    + callContext;
+
+  try {
+    var response = await fetch('/api/ai-summary', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt: prompt })
+    });
+    var data = await response.json();
+    var text = data.summary || 'Could not generate summary.';
+    thinkingEl.style.display = 'none';
+    summaryEl.textContent = text;
+    summaryEl.style.display = 'block';
+  } catch(err) {
+    thinkingEl.style.display = 'none';
+    summaryEl.textContent = 'Error generating summary. Check your connection.';
+    summaryEl.style.display = 'block';
+  }
 }
 
 </script>

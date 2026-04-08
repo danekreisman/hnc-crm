@@ -2794,10 +2794,19 @@ loadAllData();
 
 /* ── GOOGLE PLACES ADDRESS AUTOCOMPLETE ─────────────────────── */
 var _mapsReady=false;
+var _acQueue=[];
 var _acInitialized={};
-function onMapsLoaded(){_mapsReady=true;}
+function onMapsLoaded(){
+  _mapsReady=true;
+  // Drain any fields that opened before Maps finished loading
+  if(_acQueue.length){initAC(_acQueue);_acQueue=[];}
+}
 function initAC(ids){
-  if(!_mapsReady||typeof google==='undefined'||!google.maps||!google.maps.places)return;
+  if(!_mapsReady){
+    // Maps not ready yet — queue these ids and init when it loads
+    ids.forEach(function(id){if(_acQueue.indexOf(id)===-1)_acQueue.push(id);});
+    return;
+  }
   ids.forEach(function(id){
     if(_acInitialized[id])return;
     var el=document.getElementById(id);

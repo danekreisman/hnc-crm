@@ -24,6 +24,10 @@ export default async function handler(req, res) {
     });
 
     const data = await response.json();
+    if (!response.ok) {
+      console.error('Anthropic API error:', response.status, JSON.stringify(data));
+      return res.status(502).json({ error: 'AI service unavailable', detail: data?.error?.message });
+    }
     const summary = data.content?.[0]?.text || 'Could not generate summary.';
     return res.status(200).json({ summary });
 

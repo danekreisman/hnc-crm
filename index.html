@@ -4647,8 +4647,7 @@ async function generateClientSummary(){
   // Build context about the client
   var history = (cdata.history||[]).slice(-5).map(function(h){
     return h.date+': '+h.svc+' — '+h.amt+(h.paid?' (paid)':' (unpaid)');
-  }).join('
-');
+  }).join('\n');
 
   var msgs = [];
   inboxData.forEach(function(thread){
@@ -4668,58 +4667,33 @@ async function generateClientSummary(){
       .order('called_at', {ascending: false})
       .limit(5);
     if(callRes.data && callRes.data.length > 0){
-      callContext = '
-Call history (last '+callRes.data.length+' calls):
-';
+      callContext = '\nCall history (last '+callRes.data.length+' calls):\n';
       callRes.data.forEach(function(c){
         var date = c.called_at ? new Date(c.called_at).toLocaleDateString() : 'Unknown date';
         var dur = c.duration_seconds ? Math.round(c.duration_seconds/60)+'min' : '';
-        callContext += date+' ('+c.direction+', '+dur+')
-';
-        if(c.summary) callContext += 'Summary: '+c.summary+'
-';
-        if(c.transcript && !c.summary) callContext += 'Transcript excerpt: '+c.transcript.slice(0,300)+'
-';
-        callContext += '
-';
+        callContext += date+' ('+c.direction+', '+dur+')\n';
+        if(c.summary) callContext += 'Summary: '+c.summary+'\n';
+        if(c.transcript && !c.summary) callContext += 'Transcript excerpt: '+c.transcript.slice(0,300)+'\n';
+        callContext += '\n';
       });
     }
   } catch(e){ console.log('No call data available'); }
 
-  var prompt = 'You are an assistant for Hawaii Natural Clean, a cleaning business in Hawaii. Generate a concise 3-4 sentence client intelligence briefing for the team. Be specific and actionable. Mention payment behavior, relationship health, call history insights if available, and any follow-up recommendations.
-
-'
-    + 'Client: ' + cdata.name + '
-'
-    + 'Type: ' + (cdata.type||'Residential') + '
-'
-    + 'Status: ' + (cdata.status||'Active') + '
-'
-    + 'Service: ' + (cdata.service||'—') + ' ' + (cdata.freq||'') + '
-'
-    + 'Since: ' + (cdata.since||'—') + '
-'
-    + 'Lifetime value: ' + (cdata.ltv||'$0') + '
-'
-    + 'Monthly revenue: ' + (cdata.mrr||'—') + '
-'
-    + 'Last job: ' + (cdata.lastjob||'None') + '
-'
-    + 'Next job: ' + (cdata.nextjob||'Not scheduled') + '
-'
-    + 'Preferred cleaner: ' + (cdata.cleaner||'No preference') + '
-'
-    + 'Payment method: ' + (cdata.payment||'—') + '
-'
-    + (history?'
-Job history (last 5):
-'+history:'')
-    + (cdata.notes&&cdata.notes!=='—'?'
-Notes: '+cdata.notes:'')
-    + (msgs.length?'
-Recent messages:
-'+msgs.join('
-'):'')
+  var prompt = 'You are an assistant for Hawaii Natural Clean, a cleaning business in Hawaii. Generate a concise 3-4 sentence client intelligence briefing for the team. Be specific and actionable. Mention payment behavior, relationship health, call history insights if available, and any follow-up recommendations.\n\n'
+    + 'Client: ' + cdata.name + '\n'
+    + 'Type: ' + (cdata.type||'Residential') + '\n'
+    + 'Status: ' + (cdata.status||'Active') + '\n'
+    + 'Service: ' + (cdata.service||'—') + ' ' + (cdata.freq||'') + '\n'
+    + 'Since: ' + (cdata.since||'—') + '\n'
+    + 'Lifetime value: ' + (cdata.ltv||'$0') + '\n'
+    + 'Monthly revenue: ' + (cdata.mrr||'—') + '\n'
+    + 'Last job: ' + (cdata.lastjob||'None') + '\n'
+    + 'Next job: ' + (cdata.nextjob||'Not scheduled') + '\n'
+    + 'Preferred cleaner: ' + (cdata.cleaner||'No preference') + '\n'
+    + 'Payment method: ' + (cdata.payment||'—') + '\n'
+    + (history?'\nJob history (last 5):\n'+history:'')
+    + (cdata.notes&&cdata.notes!=='—'?'\nNotes: '+cdata.notes:'')
+    + (msgs.length?'\nRecent messages:\n'+msgs.join('\n'):'')
     + callContext;
 
   try {

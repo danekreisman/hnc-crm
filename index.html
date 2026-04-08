@@ -1177,7 +1177,7 @@ textarea{font-family:inherit;}
           <button class="action-btn blue" onclick="openMsgFromAppt()">Message client</button>
           <button class="action-btn blue full" onclick="openInviteCleaner()">Invite cleaner</button>
           <button class="action-btn amber full" onclick="showApptEdit()">Edit job</button>
-          <button class="action-btn red full">Cancel appointment</button>
+          <button class="action-btn red full" onclick="cancelAppt()">Cancel appointment</button>
         </div>
         <div class="success-bar" id="appt-action-success" style="margin-top:10px;"></div>
       </div>
@@ -2219,6 +2219,28 @@ function openAppt(a,dateKey){
 function showApptEdit(){document.getElementById('appt-view').style.display='none';document.getElementById('appt-edit').style.display='block';}
 function hideApptEdit(){document.getElementById('appt-view').style.display='block';document.getElementById('appt-edit').style.display='none';}
 function saveApptEdit(){hideApptEdit();showToast('appt-overlay','Changes saved successfully.');}
+
+function cancelAppt(){
+  if(!currentAppt||!currentApptKey)return;
+  if(!confirm('Cancel this appointment for '+currentAppt.n+'? This cannot be undone.'))return;
+  // Remove from apptData
+  if(apptData[currentApptKey]){
+    apptData[currentApptKey]=apptData[currentApptKey].filter(function(a){
+      return !(a.n===currentAppt.n&&a.t===currentAppt.t);
+    });
+    if(apptData[currentApptKey].length===0)delete apptData[currentApptKey];
+  }
+  // Delete from Supabase if it has a DB record
+  if(currentAppt.dbId){
+    db.from('appointments').delete().eq('id',currentAppt.dbId).then(function(res){
+      if(res.error)console.error('Delete appointment error:',res.error);
+    });
+  }
+  closeOverlay('appt-overlay');
+  if(curCalView==='month')renderCal();
+  else if(curCalView==='week')renderWeek();
+  else renderDay();
+}
 
 function openClient(id){
   var d=clientDB[id];if(!d)return;

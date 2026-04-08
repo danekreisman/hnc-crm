@@ -1203,7 +1203,7 @@ textarea{font-family:inherit;}
           <button class="action-btn green" onclick="oneClickInvoice('client')">Send invoice</button>
           <button class="action-btn green" id="client-charge-btn" onclick="oneClickCharge('client')">Charge card</button>
           <button class="action-btn blue" onclick="openMsgFromClient()">Message</button>
-          <button class="action-btn blue">Schedule job</button>
+          <button class="action-btn blue" onclick="scheduleFromClient()">Schedule job</button>
           <button class="action-btn amber full" onclick="showClientEdit()">Edit client</button>
           <button class="action-btn red full" onclick="deleteRecord('client')">Delete client</button>
         </div>
@@ -2519,7 +2519,7 @@ function sv(view,el){
   document.getElementById('top-cta').textContent=ctas[view]||'+ New';
   document.getElementById('top-cta').style.display=(view==='agent'||view==='settings')?'none':'block';
   document.getElementById('sec-btn').style.display=(view==='agent'||view==='settings')?'none':'block';
-  var searchViews=['clients','cleaners','pipeline','dashboard','payments'];
+  var searchViews=['clients','cleaners','pipeline','dashboard','payments','calendar'];
   document.getElementById('global-search-wrap').style.display=searchViews.indexOf(view)>=0?'block':'none';
   document.getElementById('global-search').value='';
   document.getElementById('search-results').style.display='none';
@@ -4543,6 +4543,70 @@ document.addEventListener('click', function(e){
     if(r) r.style.display='none';
   }
 });
+
+
+function scheduleFromClient(){
+  var cdata = currentClientId ? clientDB[currentClientId] : null;
+  if(!cdata){ showPaymentToast('Client data not found.', null, 'error'); return; }
+  closeOverlay('client-overlay');
+  // Navigate to calendar
+  var calNav = null;
+  document.querySelectorAll('.nav-item').forEach(function(n){
+    if(n.textContent.trim()==='Calendar') calNav=n;
+  });
+  if(calNav) sv('calendar', calNav);
+  setTimeout(function(){
+    // Open booking form
+    document.getElementById('new-appt-overlay').classList.remove('hidden');
+    calcPrice();
+    // Pre-fill all client info
+    var nameEl = document.getElementById('na-name');
+    var addrEl = document.getElementById('na-address');
+    var bedsEl = document.getElementById('na-beds');
+    var bathsEl = document.getElementById('na-baths');
+    var cleanerEl = document.getElementById('na-cleaner');
+    var freqEl = document.getElementById('na-freq');
+    var serviceEl = document.getElementById('na-service');
+    if(nameEl) nameEl.value = cdata.name || '';
+    if(addrEl) addrEl.value = cdata.address !== '—' ? cdata.address : '';
+    // Set beds
+    if(bedsEl && cdata.bedbath){
+      var beds = cdata.bedbath.match(/(\d+)\s*bed/);
+      if(beds) bedsEl.value = beds[1];
+    }
+    // Set baths
+    if(bathsEl && cdata.bedbath){
+      var baths = cdata.bedbath.match(/([\d.]+)\s*bath/);
+      if(baths) bathsEl.value = baths[1];
+    }
+    // Set frequency
+    if(freqEl && cdata.freq && cdata.freq !== '—' && cdata.freq !== 'TBD'){
+      for(var i=0;i<freqEl.options.length;i++){
+        if(freqEl.options[i].value === cdata.freq || freqEl.options[i].text === cdata.freq){
+          freqEl.selectedIndex = i; break;
+        }
+      }
+    }
+    // Set service
+    if(serviceEl && cdata.service){
+      for(var i=0;i<serviceEl.options.length;i++){
+        if(serviceEl.options[i].text.toLowerCase().indexOf(cdata.service.toLowerCase()) >= 0){
+          serviceEl.selectedIndex = i; break;
+        }
+      }
+    }
+    // Set preferred cleaner
+    if(cleanerEl && cdata.cleaner && cdata.cleaner !== 'No preference' && cdata.cleaner !== '—'){
+      for(var i=0;i<cleanerEl.options.length;i++){
+        if(cleanerEl.options[i].text.indexOf(cdata.cleaner) >= 0){
+          cleanerEl.selectedIndex = i; break;
+        }
+      }
+    }
+    calcPrice();
+    showPaymentToast(cdata.name + ' pre-filled. Pick a date and time to book.', null, 'success');
+  }, 300);
+}
 
 </script>
 

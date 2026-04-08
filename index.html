@@ -4050,19 +4050,29 @@ function initTemplateEditor() {
 
 /* LEAD ACTIONS */
 function scheduleLeadAppointment(){
+  console.log('scheduleLeadAppointment called');
+  console.log('currentLeadId:', currentLeadId);
+  console.log('currentLeadName:', currentLeadName);
+  console.log('leadDB keys:', Object.keys(leadDB));
   // Get lead - try currentLeadId first, then search by name
   var lead = null;
   var lid = currentLeadId;
   if(lid && leadDB[lid]) {
     lead = leadDB[lid];
+    console.log('Found lead by ID:', lead.name);
   } else {
     // Fallback: search leadDB by currentLeadName
     var keys = Object.keys(leadDB);
     for(var i=0;i<keys.length;i++){
       if(leadDB[keys[i]].name === currentLeadName){ lead=leadDB[keys[i]]; lid=keys[i]; break; }
     }
+    if(lead) console.log('Found lead by name:', lead.name);
   }
-  if(!lead){ alert('Could not find lead data. Please close and reopen the lead panel.'); return; }
+  if(!lead){ 
+    console.error('Lead not found! ID:', currentLeadId, 'Name:', currentLeadName);
+    alert('Could not find lead data. currentLeadId: ' + currentLeadId + ', currentLeadName: ' + currentLeadName); 
+    return; 
+  }
 
   var isCommercial = lead.service && lead.service.toLowerCase().indexOf('commercial') >= 0;
   var clientId = 'client-' + Date.now();
@@ -4331,6 +4341,7 @@ scheduleLeadAppointment = function(){
 
 
 function filterLeads(view, btn){
+  console.log('filterLeads called with view:', view);
   document.querySelectorAll('#view-pipeline .template-tab').forEach(function(b){b.classList.remove('active');});
   btn.classList.add('active');
   var board = document.getElementById('pipe-board');

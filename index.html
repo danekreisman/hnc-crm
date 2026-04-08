@@ -73,16 +73,11 @@ tr.clickable:hover td{background:#f0faf6;cursor:pointer;}
 .deal-type{font-size:11px;margin-bottom:4px;}
 .deal-val{font-size:12px;color:#1D9E75;font-weight:600;}
 /* CALENDAR */
-.cal-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;}
+.cal-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
 .cal-nav{display:flex;align-items:center;gap:10px;}
-.cal-month{font-size:15px;font-weight:600;color:#1a1a1a;min-width:140px;}
+.cal-month{font-size:15px;font-weight:600;color:#1a1a1a;min-width:120px;}
 .cal-arrow{background:#fff;border:1px solid #e8e8e5;border-radius:8px;width:28px;height:28px;cursor:pointer;color:#666;font-size:16px;display:flex;align-items:center;justify-content:center;line-height:1;}
 .cal-arrow:hover{background:#f5f5f3;}
-.cal-view-tabs{display:flex;border:1px solid #e8e8e5;border-radius:8px;overflow:hidden;}
-.cal-view-tab{background:#fff;border:none;padding:5px 12px;font-size:12px;font-family:inherit;cursor:pointer;color:#666;font-weight:500;}
-.cal-view-tab:not(:last-child){border-right:1px solid #e8e8e5;}
-.cal-view-tab.active{background:#1D9E75;color:#fff;}
-.cal-view-tab:hover:not(.active){background:#f5f5f3;}
 .legend{display:flex;gap:12px;align-items:center;flex-wrap:wrap;}
 .legend-item{display:flex;align-items:center;gap:5px;font-size:11px;color:#666;}
 .ld{width:10px;height:10px;border-radius:3px;flex-shrink:0;}
@@ -90,54 +85,23 @@ tr.clickable:hover td{background:#f0faf6;cursor:pointer;}
 .la{background:#B5D4F4;border:1px solid #85B7EB;}
 .lc{background:#FAC775;border:1px solid #EF9F27;}
 .lp{background:#9FE1CB;border:1px solid #5DCAA5;}
-/* Month grid */
 .cal-grid{background:#fff;border:1px solid #e8e8e5;border-radius:10px;overflow:hidden;}
 .cal-dow{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));background:#fafaf8;border-bottom:1px solid #e8e8e5;}
 .cal-dow-cell{font-size:11px;font-weight:600;color:#999;text-align:center;padding:7px 0;}
 .cal-days{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));}
-.cal-day{min-height:90px;border-right:1px solid #f0f0ee;border-bottom:1px solid #f0f0ee;padding:5px;}
+.cal-day{min-height:80px;border-right:1px solid #f0f0ee;border-bottom:1px solid #f0f0ee;padding:5px;}
 .cal-day:nth-child(7n){border-right:none;}
 .cal-day.om .dn2{opacity:.3;}
 .cal-day.today{background:#f0faf6;}
-.dn2{font-size:11px;color:#666;margin-bottom:4px;font-weight:600;display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;cursor:pointer;}
-.dn2:hover{background:#e8e8e5;}
-.cal-day.today .dn2{background:#1D9E75;color:#fff;}
+.dn2{font-size:11px;color:#666;margin-bottom:3px;font-weight:500;}
+.cal-day.today .dn2{color:#1D9E75;font-weight:700;}
 .appt{font-size:10px;border-radius:4px;padding:2px 5px;margin-bottom:2px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:500;display:block;width:100%;text-align:left;border:none;}
 .appt:hover{opacity:.8;}
 .au{background:#F4C0D1;color:#72243E;}
 .aa{background:#B5D4F4;color:#0C447C;}
 .ac{background:#FAC775;color:#633806;}
 .ap{background:#9FE1CB;color:#085041;}
-/* Timeline (week/day) */
-.cal-tl-outer{background:#fff;border:1px solid #e8e8e5;border-radius:10px;overflow:hidden;display:flex;flex-direction:column;}
-.cal-tl-top{display:flex;flex-shrink:0;border-bottom:1px solid #e8e8e5;background:#fafaf8;}
-.cal-tl-gutter{width:52px;flex-shrink:0;border-right:1px solid #e8e8e5;}
-.cal-tl-hdrs{flex:1;display:grid;min-width:0;}
-.cal-tl-dh{padding:6px 4px;text-align:center;font-size:11px;font-weight:600;color:#999;border-right:1px solid #f0f0ee;cursor:pointer;line-height:1.4;}
-.cal-tl-dh:last-child{border-right:none;}
-.cal-tl-dh:hover{background:#f0f0ee;}
-.cal-tl-dh.today{color:#1D9E75;}
-.cal-tl-dh .dh-day{font-size:10px;opacity:.7;}
-.cal-tl-dh .dh-num{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;margin:1px auto 0;font-size:12px;}
-.cal-tl-dh.today .dh-num{background:#1D9E75;color:#fff;}
-.cal-tl-scroll{overflow-y:auto;display:flex;max-height:560px;scroll-behavior:smooth;}
-.cal-tl-times{width:52px;flex-shrink:0;border-right:1px solid #e8e8e5;position:relative;}
-.cal-tl-lbl{position:absolute;right:6px;font-size:9px;color:#bbb;transform:translateY(-50%);white-space:nowrap;font-weight:500;letter-spacing:.02em;}
-.cal-tl-cols{flex:1;display:grid;position:relative;min-width:0;}
-.cal-tl-col{border-right:1px solid #f0f0ee;position:relative;}
-.cal-tl-col:last-child{border-right:none;}
-.cal-tl-col.today{background:#fafffe;}
-.cal-tl-line{position:absolute;left:0;right:0;pointer-events:none;}
-.cal-tl-line.half{border-top:1px dashed #f0f0ee;}
-.cal-tl-line.hour{border-top:1px solid #ebebeb;}
-.cal-ab{position:absolute;border-radius:5px;padding:3px 5px 3px 7px;overflow:hidden;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,.1);transition:filter .1s;}
-.cal-ab:hover{filter:brightness(.93);}
-.cal-ab-name{font-size:10px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.cal-ab-time{font-size:9px;opacity:.75;white-space:nowrap;margin-top:1px;}
-.cal-ab-who{font-size:9px;opacity:.65;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.cal-tl-now{position:absolute;left:0;right:0;height:2px;background:#e53e3e;z-index:4;pointer-events:none;}
-.cal-tl-now::before{content:'';position:absolute;left:-5px;top:-4px;width:10px;height:10px;background:#e53e3e;border-radius:50%;}
-.cal-tl-empty{color:#bbb;font-size:12px;text-align:center;padding:30px 0;}
+.more-appts{font-size:10px;color:#999;}
 /* CLEANERS */
 .cleaner-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:16px;}
 .cleaner-card{background:#fff;border:1px solid #e8e8e5;border-radius:10px;padding:13px;cursor:pointer;}
@@ -197,15 +161,7 @@ tr.clickable:hover td{background:#f0faf6;cursor:pointer;}
 .stat-box-val{font-size:16px;font-weight:600;color:#1a1a1a;margin-top:2px;}
 .job-history-item{padding:8px 0;border-bottom:1px solid #f0f0ee;display:flex;justify-content:space-between;align-items:center;}
 .job-history-item:last-child{border-bottom:none;}
-.form-row{margin-bottom:10px;position:relative;}
-.na-ac-drop{position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #e0e0dd;border-radius:8px;box-shadow:0 4px 14px rgba(0,0,0,.1);z-index:200;max-height:220px;overflow-y:auto;display:none;}
-.na-ac-drop.open{display:block;}
-.na-ac-item{padding:8px 12px;font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:8px;}
-.na-ac-item:hover{background:#f0faf6;}
-.na-ac-item .ac-name{font-weight:500;color:#1a1a1a;}
-.na-ac-item .ac-meta{font-size:11px;color:#999;white-space:nowrap;}
-.na-ac-new{padding:8px 12px;font-size:12px;cursor:pointer;color:#1D9E75;font-weight:500;border-top:1px solid #f0f0ee;display:flex;align-items:center;gap:6px;}
-.na-ac-new:hover{background:#f0faf6;}
+.form-row{margin-bottom:10px;}
 .form-row label{display:block;font-size:11px;color:#999;margin-bottom:4px;font-weight:500;}
 .form-row input,.form-row select,.form-row textarea{width:100%;padding:7px 10px;border:1px solid #e0e0dd;border-radius:8px;font-size:12px;font-family:inherit;color:#1a1a1a;background:#fff;}
 .form-row input:focus,.form-row select:focus,.form-row textarea:focus{outline:none;border-color:#1D9E75;}
@@ -356,11 +312,6 @@ textarea{font-family:inherit;}
             <div class="cal-month" id="cal-month-label">April 2026</div>
             <button class="cal-arrow" id="next-btn">&rsaquo;</button>
           </div>
-          <div class="cal-view-tabs">
-            <button class="cal-view-tab active" onclick="setCalView('month')">Month</button>
-            <button class="cal-view-tab" onclick="setCalView('week')">Week</button>
-            <button class="cal-view-tab" onclick="setCalView('day')">Day</button>
-          </div>
           <div class="legend">
             <div class="legend-item"><div class="ld lu"></div>Unassigned</div>
             <div class="legend-item"><div class="ld la"></div>Assigned</div>
@@ -368,35 +319,9 @@ textarea{font-family:inherit;}
             <div class="legend-item"><div class="ld lp"></div>Paid</div>
           </div>
         </div>
-        <div id="cal-month-view">
-          <div class="cal-grid">
-            <div class="cal-dow"><div class="cal-dow-cell">Sun</div><div class="cal-dow-cell">Mon</div><div class="cal-dow-cell">Tue</div><div class="cal-dow-cell">Wed</div><div class="cal-dow-cell">Thu</div><div class="cal-dow-cell">Fri</div><div class="cal-dow-cell">Sat</div></div>
-            <div class="cal-days" id="cal-days"></div>
-          </div>
-        </div>
-        <div id="cal-week-view" style="display:none;">
-          <div class="cal-tl-outer">
-            <div class="cal-tl-top">
-              <div class="cal-tl-gutter"></div>
-              <div class="cal-tl-hdrs" id="week-hdrs"></div>
-            </div>
-            <div class="cal-tl-scroll" id="week-scroll">
-              <div class="cal-tl-times" id="week-times"></div>
-              <div class="cal-tl-cols" id="week-cols"></div>
-            </div>
-          </div>
-        </div>
-        <div id="cal-day-view" style="display:none;">
-          <div class="cal-tl-outer">
-            <div class="cal-tl-top">
-              <div class="cal-tl-gutter"></div>
-              <div class="cal-tl-hdrs" id="day-hdrs"></div>
-            </div>
-            <div class="cal-tl-scroll" id="day-scroll">
-              <div class="cal-tl-times" id="day-times"></div>
-              <div class="cal-tl-cols" id="day-cols"></div>
-            </div>
-          </div>
+        <div class="cal-grid">
+          <div class="cal-dow"><div class="cal-dow-cell">Sun</div><div class="cal-dow-cell">Mon</div><div class="cal-dow-cell">Tue</div><div class="cal-dow-cell">Wed</div><div class="cal-dow-cell">Thu</div><div class="cal-dow-cell">Fri</div><div class="cal-dow-cell">Sat</div></div>
+          <div class="cal-days" id="cal-days"></div>
         </div>
       </div>
 
@@ -1066,11 +991,7 @@ textarea{font-family:inherit;}
     <div class="panel-header"><div class="panel-title">New appointment</div><button class="close-btn" onclick="closeOverlay('new-appt-overlay')">&#x2715;</button></div>
     <div class="panel-body">
       <div class="panel-section">Client info</div>
-      <div class="form-row">
-        <label>Full name</label>
-        <input type="text" id="na-name" placeholder="Search existing client or type new name" autocomplete="off" oninput="naClientSearch(this.value)" onblur="setTimeout(naCloseAC,180)">
-        <div class="na-ac-drop" id="na-ac-drop"></div>
-      </div>
+      <div class="form-row"><label>Full name</label><input type="text" id="na-name" placeholder="First and last name"></div>
       <div class="form-two">
         <div class="form-row"><label>Phone</label><input type="tel" id="na-phone" placeholder="(808) 555-0000"></div>
         <div class="form-row"><label>Email</label><input type="email" id="na-email" placeholder="client@email.com"></div>
@@ -1189,7 +1110,7 @@ textarea{font-family:inherit;}
           <button class="action-btn blue" onclick="openMsgFromAppt()">Message client</button>
           <button class="action-btn blue full" onclick="openInviteCleaner()">Invite cleaner</button>
           <button class="action-btn amber full" onclick="showApptEdit()">Edit job</button>
-          <button class="action-btn red full" onclick="cancelAppt()">Cancel appointment</button>
+          <button class="action-btn red full">Cancel appointment</button>
         </div>
         <div class="success-bar" id="appt-action-success" style="margin-top:10px;"></div>
       </div>
@@ -1938,117 +1859,11 @@ var aiDraftTemplates={
   'maile':{sms:'Hey Maile! Just checking in. Everything good? Let us know if you need anything. — HNC',email:''}
 };
 
-// ── Timeline constants ────────────────────────────────────────────────────────
-var TL_START=4,TL_END=23,TL_PX_HR=60,TL_DURATION=90;
-var TL_PX_MIN=TL_PX_HR/60;
-var TL_HEIGHT=(TL_END-TL_START)*TL_PX_HR; // 960px
-
-function parseApptTime(t){
-  if(!t)return TL_START*60;
-  var m=(t+'').toLowerCase().match(/^(\d+)(?::(\d+))?\s*(am|pm)$/);
-  if(!m)return TL_START*60;
-  var h=parseInt(m[1]),min=parseInt(m[2]||0),per=m[3];
-  if(per==='pm'&&h!==12)h+=12;
-  if(per==='am'&&h===12)h=0;
-  return h*60+min;
-}
-
-function fmtTime(totalMin){
-  var h=Math.floor(totalMin/60),m=totalMin%60,p=h>=12?'pm':'am';
-  if(h>12)h-=12;if(h===0)h=12;
-  return h+(m>0?':'+(m<10?'0'+m:m):'')+p;
-}
-
-function apptColors(s){
-  if(s==='unassigned')return{bg:'#F4C0D1',fg:'#72243E',bd:'#ED93B1'};
-  if(s==='assigned')return{bg:'#B5D4F4',fg:'#0C447C',bd:'#85B7EB'};
-  if(s==='completed')return{bg:'#FAC775',fg:'#633806',bd:'#EF9F27'};
-  if(s==='paid')return{bg:'#9FE1CB',fg:'#085041',bd:'#5DCAA5'};
-  return{bg:'#f0f0ee',fg:'#555',bd:'#ccc'};
-}
-
-function layoutAppts(appts){
-  if(!appts.length)return appts;
-  appts.sort(function(a,b){return a.startMin-b.startMin||b.endMin-a.endMin;});
-  var lanes=[];
-  appts.forEach(function(a){
-    var placed=false;
-    for(var c=0;c<lanes.length;c++){
-      if(a.startMin>=lanes[c]){a.col=c;lanes[c]=a.endMin;placed=true;break;}
-    }
-    if(!placed){a.col=lanes.length;lanes.push(a.endMin);}
-  });
-  var nc=lanes.length;
-  appts.forEach(function(a){a.totalCols=nc;});
-  return appts;
-}
-
-function buildTimeCells(el){
-  el.style.position='relative';
-  el.style.height=TL_HEIGHT+'px';
-  el.innerHTML='';
-  for(var h=TL_START;h<=TL_END;h++){
-    var top=(h-TL_START)*TL_PX_HR;
-    var lbl=document.createElement('div');
-    lbl.className='cal-tl-lbl';
-    lbl.style.top=top+'px';
-    if(h===TL_START){lbl.style.transform='none';}
-    var hd=h>12?h-12:(h===0?12:h);
-    lbl.textContent=hd+(h>=12?'pm':'am');
-    el.appendChild(lbl);
-  }
-}
-
-function buildGridLines(col){
-  for(var h=TL_START;h<TL_END;h++){
-    var hl=document.createElement('div');hl.className='cal-tl-line hour';hl.style.top=((h-TL_START)*TL_PX_HR)+'px';col.appendChild(hl);
-    var hf=document.createElement('div');hf.className='cal-tl-line half';hf.style.top=((h-TL_START)*TL_PX_HR+TL_PX_HR/2)+'px';col.appendChild(hf);
-  }
-}
-
-function buildApptBlock(a,k,wp,lp){
-  var sm=parseApptTime(a.t),em=sm+TL_DURATION;
-  var top=(sm-TL_START*60)*TL_PX_MIN;
-  var ht=TL_DURATION*TL_PX_MIN;
-  if(top<0){ht+=top;top=0;}
-  if(top+ht>TL_HEIGHT)ht=TL_HEIGHT-top;
-  if(ht<18)ht=18;
-  var c=apptColors(a.s);
-  var b=document.createElement('div');
-  b.className='cal-ab';
-  b.style.cssText='top:'+top+'px;height:'+ht+'px;left:'+lp.toFixed(1)+'%;width:calc('+wp.toFixed(1)+'% - 3px);background:'+c.bg+';color:'+c.fg+';border-left:3px solid '+c.bd+';';
-  var nm=document.createElement('div');nm.className='cal-ab-name';nm.textContent=(a.recurring?'\u21bb ':'')+a.n;b.appendChild(nm);
-  if(ht>=32){var tm=document.createElement('div');tm.className='cal-ab-time';tm.textContent=fmtTime(sm)+' \u2013 '+fmtTime(em);b.appendChild(tm);}
-  if(ht>=50){var wh=document.createElement('div');wh.className='cal-ab-who';wh.textContent=a.cleaner;b.appendChild(wh);}
-  b.dataset.appt=JSON.stringify(a);b.dataset.key=k;
-  b.addEventListener('click',function(ev){ev.stopPropagation();openAppt(JSON.parse(this.dataset.appt),this.dataset.key);});
-  return b;
-}
-
-function addNowLine(col,isToday){
-  if(!isToday)return;
-  var now=new Date();
-  var nm=now.getHours()*60+now.getMinutes();
-  if(nm<TL_START*60||nm>TL_END*60)return;
-  var line=document.createElement('div');
-  line.className='cal-tl-now';
-  line.style.top=((nm-TL_START*60)*TL_PX_MIN)+'px';
-  col.appendChild(line);
-}
-
-function updateNowLines(){
-  var now=new Date();
-  var nm=now.getHours()*60+now.getMinutes();
-  var top=((nm-TL_START*60)*TL_PX_MIN)+'px';
-  document.querySelectorAll('.cal-tl-now').forEach(function(el){el.style.top=top;});
-}
-setInterval(updateNowLines,60000);
-
-// ── Month view ────────────────────────────────────────────────────────────────
 function renderCal(){
   populateRecurringMonth(curYear,curMonth);
   document.getElementById('cal-month-label').textContent=MONTHS[curMonth-1]+' '+curYear;
-  var c=document.getElementById('cal-days');c.innerHTML='';
+  var c=document.getElementById('cal-days');
+  c.innerHTML='';
   var first=new Date(curYear,curMonth-1,1).getDay();
   var dim=new Date(curYear,curMonth,0).getDate();
   var dipm=new Date(curYear,curMonth-1,0).getDate();
@@ -2060,19 +1875,19 @@ function renderCal(){
   }
   for(var d=1;d<=dim;d++){
     var el=document.createElement('div');el.className='cal-day'+(isToday(curYear,curMonth,d)?' today':'');
-    var dn=document.createElement('div');dn.className='dn2';dn.textContent=d;
-    (function(yr,mo,dy){dn.addEventListener('click',function(ev){ev.stopPropagation();curDayDate=new Date(yr,mo-1,dy);setCalView('day');});})(curYear,curMonth,d);
-    el.appendChild(dn);
+    var dn=document.createElement('div');dn.className='dn2';dn.textContent=d;el.appendChild(dn);
     var k=curYear+'-'+curMonth+'-'+d;
     var da=apptData[k]||[];
-    da.forEach(function(a){
+    da.slice(0,2).forEach(function(a){
       var btn=document.createElement('button');
       btn.className='appt a'+a.s.charAt(0);
       btn.textContent=(a.recurring?'\u21bb ':'')+a.t+' '+a.n;
-      btn.dataset.appt=JSON.stringify(a);btn.dataset.key=k;
+      btn.dataset.appt=JSON.stringify(a);
+      btn.dataset.key=k;
       btn.addEventListener('click',function(ev){ev.stopPropagation();openAppt(JSON.parse(this.dataset.appt),this.dataset.key);});
       el.appendChild(btn);
     });
+    if(da.length>2){var more=document.createElement('div');more.className='more-appts';more.textContent='+'+(da.length-2)+' more';el.appendChild(more);}
     c.appendChild(el);
   }
   var tot=first+dim;var rem=tot%7===0?0:7-(tot%7);
@@ -2082,111 +1897,9 @@ function renderCal(){
   }
 }
 
-// ── State ─────────────────────────────────────────────────────────────────────
-var curCalView='month';
-var curWeekStart=(function(){var d=new Date();d.setHours(0,0,0,0);d.setDate(d.getDate()-d.getDay());return d;})();
-var curDayDate=(function(){var d=new Date();d.setHours(0,0,0,0);return d;})();
-
-function setCalView(view){
-  curCalView=view;
-  document.querySelectorAll('.cal-view-tab').forEach(function(b){b.classList.remove('active');});
-  document.querySelectorAll('.cal-view-tab').forEach(function(b){if(b.textContent.toLowerCase()===view)b.classList.add('active');});
-  document.getElementById('cal-month-view').style.display=view==='month'?'':'none';
-  document.getElementById('cal-week-view').style.display=view==='week'?'':'none';
-  document.getElementById('cal-day-view').style.display=view==='day'?'':'none';
-  if(view==='month'){renderCal();}
-  else if(view==='week'){renderWeek();setTimeout(function(){var s=document.getElementById('week-scroll');if(s)s.scrollTop=(8-TL_START)*TL_PX_HR;},10);}
-  else{renderDay();setTimeout(function(){var s=document.getElementById('day-scroll');if(s)s.scrollTop=(8-TL_START)*TL_PX_HR;},10);}
-}
-
-// ── Week view ─────────────────────────────────────────────────────────────────
-function renderWeek(){
-  var ws=curWeekStart;
-  populateRecurringMonth(ws.getFullYear(),ws.getMonth()+1);
-  var dayNames=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-  var today=new Date();today.setHours(0,0,0,0);
-  // Label
-  var endDate=new Date(ws);endDate.setDate(endDate.getDate()+6);
-  var startLbl=MONTHS[ws.getMonth()].slice(0,3)+' '+ws.getDate();
-  var endLbl=(ws.getMonth()===endDate.getMonth()?'':MONTHS[endDate.getMonth()].slice(0,3)+' ')+endDate.getDate();
-  document.getElementById('cal-month-label').textContent=startLbl+' \u2013 '+endLbl+', '+endDate.getFullYear();
-  // Build headers and columns
-  var hdrsEl=document.getElementById('week-hdrs');
-  hdrsEl.style.gridTemplateColumns='repeat(7,minmax(0,1fr))';
-  hdrsEl.innerHTML='';
-  var timesEl=document.getElementById('week-times');
-  var colsEl=document.getElementById('week-cols');
-  colsEl.style.gridTemplateColumns='repeat(7,minmax(0,1fr))';
-  colsEl.innerHTML='';
-  colsEl.style.height=TL_HEIGHT+'px';
-  buildTimeCells(timesEl);
-  for(var i=0;i<7;i++){
-    var d=new Date(ws);d.setDate(d.getDate()+i);
-    var isTd=d.getTime()===today.getTime();
-    // Header
-    var dh=document.createElement('div');dh.className='cal-tl-dh'+(isTd?' today':'');
-    var dd=document.createElement('div');dd.className='dh-day';dd.textContent=dayNames[i];
-    var dn=document.createElement('div');dn.className='dh-num';dn.textContent=d.getDate();
-    dh.appendChild(dd);dh.appendChild(dn);
-    (function(date){dh.addEventListener('click',function(){curDayDate=new Date(date);setCalView('day');});})(d);
-    hdrsEl.appendChild(dh);
-    // Column
-    var col=document.createElement('div');col.className='cal-tl-col'+(isTd?' today':'');col.style.height=TL_HEIGHT+'px';
-    buildGridLines(col);
-    addNowLine(col,isTd);
-    var k=d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate();
-    var da=apptData[k]||[];
-    if(da.length>0){
-      var laid=layoutAppts(da.map(function(a){var sm=parseApptTime(a.t);return{n:a.n,s:a.s,t:a.t,cleaner:a.cleaner,recurring:a.recurring,startMin:sm,endMin:sm+TL_DURATION};}));
-      laid.forEach(function(a){col.appendChild(buildApptBlock(a,k,100/a.totalCols,a.col*(100/a.totalCols)));});
-    }
-    colsEl.appendChild(col);
-  }
-}
-
-// ── Day view ──────────────────────────────────────────────────────────────────
-function renderDay(){
-  var d=curDayDate;
-  populateRecurringMonth(d.getFullYear(),d.getMonth()+1);
-  var today=new Date();today.setHours(0,0,0,0);
-  var isTd=d.getTime()===today.getTime();
-  var fullDays=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
-  var shortDays=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-  document.getElementById('cal-month-label').textContent=fullDays[d.getDay()]+', '+MONTHS[d.getMonth()].slice(0,3)+' '+d.getDate()+', '+d.getFullYear();
-  // Header
-  var hdrsEl=document.getElementById('day-hdrs');
-  hdrsEl.style.gridTemplateColumns='minmax(0,1fr)';hdrsEl.innerHTML='';
-  var dh=document.createElement('div');dh.className='cal-tl-dh'+(isTd?' today':'');
-  var dd=document.createElement('div');dd.className='dh-day';dd.textContent=shortDays[d.getDay()];
-  var dn=document.createElement('div');dn.className='dh-num';dn.textContent=d.getDate();
-  dh.appendChild(dd);dh.appendChild(dn);hdrsEl.appendChild(dh);
-  // Column
-  var timesEl=document.getElementById('day-times');
-  var colsEl=document.getElementById('day-cols');
-  colsEl.style.gridTemplateColumns='minmax(0,1fr)';colsEl.innerHTML='';colsEl.style.height=TL_HEIGHT+'px';
-  buildTimeCells(timesEl);
-  var col=document.createElement('div');col.className='cal-tl-col'+(isTd?' today':'');col.style.height=TL_HEIGHT+'px';
-  buildGridLines(col);
-  addNowLine(col,isTd);
-  var k=d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate();
-  var da=apptData[k]||[];
-  if(da.length===0){
-    var emp=document.createElement('div');emp.className='cal-tl-empty';emp.textContent='No appointments this day.';col.appendChild(emp);
-  } else {
-    var laid=layoutAppts(da.map(function(a){var sm=parseApptTime(a.t);return{n:a.n,s:a.s,t:a.t,cleaner:a.cleaner,recurring:a.recurring,startMin:sm,endMin:sm+TL_DURATION};}));
-    laid.forEach(function(a){col.appendChild(buildApptBlock(a,k,100/a.totalCols,a.col*(100/a.totalCols)));});
-  }
-  colsEl.appendChild(col);
-}
-
-// ── Navigation ────────────────────────────────────────────────────────────────
 document.getElementById('prev-btn').addEventListener('click',function(){changeMonth(-1);});
 document.getElementById('next-btn').addEventListener('click',function(){changeMonth(1);});
-function changeMonth(d){
-  if(curCalView==='month'){curMonth+=d;if(curMonth>12){curMonth=1;curYear++;}if(curMonth<1){curMonth=12;curYear--;}renderCal();}
-  else if(curCalView==='week'){curWeekStart.setDate(curWeekStart.getDate()+(d*7));renderWeek();}
-  else{curDayDate.setDate(curDayDate.getDate()+d);renderDay();}
-}
+function changeMonth(d){curMonth+=d;if(curMonth>12){curMonth=1;curYear++;}if(curMonth<1){curMonth=12;curYear--;}renderCal();}
 
 function openAppt(a,dateKey){
   var parts=dateKey.split('-');
@@ -2231,92 +1944,6 @@ function openAppt(a,dateKey){
 function showApptEdit(){document.getElementById('appt-view').style.display='none';document.getElementById('appt-edit').style.display='block';}
 function hideApptEdit(){document.getElementById('appt-view').style.display='block';document.getElementById('appt-edit').style.display='none';}
 function saveApptEdit(){hideApptEdit();showToast('appt-overlay','Changes saved successfully.');}
-
-// ── New appointment client autocomplete ───────────────────────────────────────
-function naClientSearch(val){
-  var drop=document.getElementById('na-ac-drop');
-  drop.innerHTML='';
-  var q=val.trim().toLowerCase();
-  if(!q){drop.classList.remove('open');return;}
-  var matches=Object.entries(clientDB).filter(function(e){
-    return e[1].name.toLowerCase().indexOf(q)>=0||
-           (e[1].phone&&e[1].phone.indexOf(q)>=0)||
-           (e[1].email&&e[1].email.toLowerCase().indexOf(q)>=0);
-  }).slice(0,8);
-  matches.forEach(function(e){
-    var id=e[0],c=e[1];
-    var item=document.createElement('div');
-    item.className='na-ac-item';
-    item.innerHTML='<span class="ac-name">'+c.name+'</span><span class="ac-meta">'+c.type+' &middot; '+(c.phone||'—')+'</span>';
-    item.addEventListener('mousedown',function(ev){ev.preventDefault();naSelectClient(id);});
-    drop.appendChild(item);
-  });
-  // Always show "Add as new client" option
-  var newItem=document.createElement('div');
-  newItem.className='na-ac-new';
-  newItem.innerHTML='<svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M8 2v12M2 8h12" stroke="#1D9E75" stroke-width="2" stroke-linecap="round"/></svg> Add &ldquo;'+val.trim()+'&rdquo; as new client';
-  newItem.addEventListener('mousedown',function(ev){ev.preventDefault();naUseNewClient(val.trim());});
-  drop.appendChild(newItem);
-  drop.classList.add('open');
-}
-
-function naSelectClient(id){
-  var c=clientDB[id];
-  if(!c)return;
-  document.getElementById('na-name').value=c.name;
-  document.getElementById('na-phone').value=c.phone||'';
-  document.getElementById('na-email').value=c.email||'';
-  document.getElementById('na-address').value=c.address||'';
-  naCloseAC();
-  // Pre-select service/freq if available
-  var svc=document.getElementById('na-service');
-  if(c.service){
-    var svcMap={'Standard clean':'standard','Deep clean':'deep','Move-out clean':'moveout','Commercial weekly':'commercial','Airbnb turnover':'airbnb'};
-    if(svcMap[c.service])svc.value=svcMap[c.service];
-  }
-  var frq=document.getElementById('na-freq');
-  if(c.freq){
-    var opts=frq.options;
-    for(var i=0;i<opts.length;i++){if(opts[i].text===c.freq||opts[i].value===c.freq){frq.selectedIndex=i;break;}}
-  }
-  calcPrice();
-}
-
-function naUseNewClient(name){
-  document.getElementById('na-name').value=name;
-  document.getElementById('na-phone').value='';
-  document.getElementById('na-email').value='';
-  document.getElementById('na-address').value='';
-  naCloseAC();
-  document.getElementById('na-phone').focus();
-}
-
-function naCloseAC(){
-  var drop=document.getElementById('na-ac-drop');
-  if(drop)drop.classList.remove('open');
-}
-
-function cancelAppt(){
-  if(!currentAppt||!currentApptKey)return;
-  if(!confirm('Cancel this appointment for '+currentAppt.n+'? This cannot be undone.'))return;
-  // Remove from apptData
-  if(apptData[currentApptKey]){
-    apptData[currentApptKey]=apptData[currentApptKey].filter(function(a){
-      return !(a.n===currentAppt.n&&a.t===currentAppt.t);
-    });
-    if(apptData[currentApptKey].length===0)delete apptData[currentApptKey];
-  }
-  // Delete from Supabase if it has a DB record
-  if(currentAppt.dbId){
-    db.from('appointments').delete().eq('id',currentAppt.dbId).then(function(res){
-      if(res.error)console.error('Delete appointment error:',res.error);
-    });
-  }
-  closeOverlay('appt-overlay');
-  if(curCalView==='month')renderCal();
-  else if(curCalView==='week')renderWeek();
-  else renderDay();
-}
 
 function openClient(id){
   var d=clientDB[id];if(!d)return;
@@ -2895,11 +2522,11 @@ function sv(view,el){
   if(el)el.classList.add('active');
   var titles={dashboard:'Dashboard',calendar:'Calendar',pipeline:'Pipeline',clients:'Clients',tasks:'VA Tasks',messaging:'Messaging',cleaners:'Cleaners',payroll:'Payroll',reporting:'Reporting',automations:'Automations',payments:'Payments',settings:'Settings',agent:'AI Agent'};
   var ctas={dashboard:'+ New lead',calendar:'+ New appointment',pipeline:'+ New lead',clients:'+ Add client',tasks:'+ Add task',messaging:'+ New message',cleaners:'+ Add cleaner',payroll:'Log hours',reporting:'Export',automations:'+ New automation',payments:'+ New invoice',settings:'',agent:''};
-  var secs={payroll:'Export',reporting:'Export',automations:'Filter',payments:'Filter',settings:''};
+  var secs={calendar:'Month view',payroll:'Export',reporting:'Export',automations:'Filter',payments:'Filter',settings:''};
   document.getElementById('page-title').textContent=titles[view]||view;
   document.getElementById('top-cta').textContent=ctas[view]||'+ New';
   document.getElementById('top-cta').style.display=(view==='agent'||view==='settings')?'none':'block';
-  document.getElementById('sec-btn').style.display=(view==='agent'||view==='settings'||view==='calendar')?'none':'block';
+  document.getElementById('sec-btn').style.display=(view==='agent'||view==='settings')?'none':'block';
   var searchViews=['clients','cleaners','pipeline','dashboard','payments','calendar'];
   document.getElementById('global-search-wrap').style.display=searchViews.indexOf(view)>=0?'block':'none';
   document.getElementById('global-search').value='';
@@ -5020,7 +4647,8 @@ async function generateClientSummary(){
   // Build context about the client
   var history = (cdata.history||[]).slice(-5).map(function(h){
     return h.date+': '+h.svc+' — '+h.amt+(h.paid?' (paid)':' (unpaid)');
-  }).join('\n');
+  }).join('
+');
 
   var msgs = [];
   inboxData.forEach(function(thread){
@@ -5040,33 +4668,58 @@ async function generateClientSummary(){
       .order('called_at', {ascending: false})
       .limit(5);
     if(callRes.data && callRes.data.length > 0){
-      callContext = '\nCall history (last '+callRes.data.length+' calls):\n';
+      callContext = '
+Call history (last '+callRes.data.length+' calls):
+';
       callRes.data.forEach(function(c){
         var date = c.called_at ? new Date(c.called_at).toLocaleDateString() : 'Unknown date';
         var dur = c.duration_seconds ? Math.round(c.duration_seconds/60)+'min' : '';
-        callContext += date+' ('+c.direction+', '+dur+')\n';
-        if(c.summary) callContext += 'Summary: '+c.summary+'\n';
-        if(c.transcript && !c.summary) callContext += 'Transcript excerpt: '+c.transcript.slice(0,300)+'\n';
-        callContext += '\n';
+        callContext += date+' ('+c.direction+', '+dur+')
+';
+        if(c.summary) callContext += 'Summary: '+c.summary+'
+';
+        if(c.transcript && !c.summary) callContext += 'Transcript excerpt: '+c.transcript.slice(0,300)+'
+';
+        callContext += '
+';
       });
     }
   } catch(e){ console.log('No call data available'); }
 
-  var prompt = 'You are an assistant for Hawaii Natural Clean, a cleaning business in Hawaii. Generate a concise 3-4 sentence client intelligence briefing for the team. Be specific and actionable. Mention payment behavior, relationship health, call history insights if available, and any follow-up recommendations.\n\n'
-    + 'Client: ' + cdata.name + '\n'
-    + 'Type: ' + (cdata.type||'Residential') + '\n'
-    + 'Status: ' + (cdata.status||'Active') + '\n'
-    + 'Service: ' + (cdata.service||'—') + ' ' + (cdata.freq||'') + '\n'
-    + 'Since: ' + (cdata.since||'—') + '\n'
-    + 'Lifetime value: ' + (cdata.ltv||'$0') + '\n'
-    + 'Monthly revenue: ' + (cdata.mrr||'—') + '\n'
-    + 'Last job: ' + (cdata.lastjob||'None') + '\n'
-    + 'Next job: ' + (cdata.nextjob||'Not scheduled') + '\n'
-    + 'Preferred cleaner: ' + (cdata.cleaner||'No preference') + '\n'
-    + 'Payment method: ' + (cdata.payment||'—') + '\n'
-    + (history?'\nJob history (last 5):\n'+history:'')
-    + (cdata.notes&&cdata.notes!=='—'?'\nNotes: '+cdata.notes:'')
-    + (msgs.length?'\nRecent messages:\n'+msgs.join('\n'):'')
+  var prompt = 'You are an assistant for Hawaii Natural Clean, a cleaning business in Hawaii. Generate a concise 3-4 sentence client intelligence briefing for the team. Be specific and actionable. Mention payment behavior, relationship health, call history insights if available, and any follow-up recommendations.
+
+'
+    + 'Client: ' + cdata.name + '
+'
+    + 'Type: ' + (cdata.type||'Residential') + '
+'
+    + 'Status: ' + (cdata.status||'Active') + '
+'
+    + 'Service: ' + (cdata.service||'—') + ' ' + (cdata.freq||'') + '
+'
+    + 'Since: ' + (cdata.since||'—') + '
+'
+    + 'Lifetime value: ' + (cdata.ltv||'$0') + '
+'
+    + 'Monthly revenue: ' + (cdata.mrr||'—') + '
+'
+    + 'Last job: ' + (cdata.lastjob||'None') + '
+'
+    + 'Next job: ' + (cdata.nextjob||'Not scheduled') + '
+'
+    + 'Preferred cleaner: ' + (cdata.cleaner||'No preference') + '
+'
+    + 'Payment method: ' + (cdata.payment||'—') + '
+'
+    + (history?'
+Job history (last 5):
+'+history:'')
+    + (cdata.notes&&cdata.notes!=='—'?'
+Notes: '+cdata.notes:'')
+    + (msgs.length?'
+Recent messages:
+'+msgs.join('
+'):'')
     + callContext;
 
   try {

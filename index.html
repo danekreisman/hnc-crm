@@ -197,7 +197,15 @@ tr.clickable:hover td{background:#f0faf6;cursor:pointer;}
 .stat-box-val{font-size:16px;font-weight:600;color:#1a1a1a;margin-top:2px;}
 .job-history-item{padding:8px 0;border-bottom:1px solid #f0f0ee;display:flex;justify-content:space-between;align-items:center;}
 .job-history-item:last-child{border-bottom:none;}
-.form-row{margin-bottom:10px;}
+.form-row{margin-bottom:10px;position:relative;}
+.na-ac-drop{position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #e0e0dd;border-radius:8px;box-shadow:0 4px 14px rgba(0,0,0,.1);z-index:200;max-height:220px;overflow-y:auto;display:none;}
+.na-ac-drop.open{display:block;}
+.na-ac-item{padding:8px 12px;font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:8px;}
+.na-ac-item:hover{background:#f0faf6;}
+.na-ac-item .ac-name{font-weight:500;color:#1a1a1a;}
+.na-ac-item .ac-meta{font-size:11px;color:#999;white-space:nowrap;}
+.na-ac-new{padding:8px 12px;font-size:12px;cursor:pointer;color:#1D9E75;font-weight:500;border-top:1px solid #f0f0ee;display:flex;align-items:center;gap:6px;}
+.na-ac-new:hover{background:#f0faf6;}
 .form-row label{display:block;font-size:11px;color:#999;margin-bottom:4px;font-weight:500;}
 .form-row input,.form-row select,.form-row textarea{width:100%;padding:7px 10px;border:1px solid #e0e0dd;border-radius:8px;font-size:12px;font-family:inherit;color:#1a1a1a;background:#fff;}
 .form-row input:focus,.form-row select:focus,.form-row textarea:focus{outline:none;border-color:#1D9E75;}
@@ -1058,7 +1066,11 @@ textarea{font-family:inherit;}
     <div class="panel-header"><div class="panel-title">New appointment</div><button class="close-btn" onclick="closeOverlay('new-appt-overlay')">&#x2715;</button></div>
     <div class="panel-body">
       <div class="panel-section">Client info</div>
-      <div class="form-row"><label>Full name</label><input type="text" id="na-name" placeholder="First and last name"></div>
+      <div class="form-row">
+        <label>Full name</label>
+        <input type="text" id="na-name" placeholder="Search existing client or type new name" autocomplete="off" oninput="naClientSearch(this.value)" onblur="setTimeout(naCloseAC,180)">
+        <div class="na-ac-drop" id="na-ac-drop"></div>
+      </div>
       <div class="form-two">
         <div class="form-row"><label>Phone</label><input type="tel" id="na-phone" placeholder="(808) 555-0000"></div>
         <div class="form-row"><label>Email</label><input type="email" id="na-email" placeholder="client@email.com"></div>
@@ -2219,6 +2231,70 @@ function openAppt(a,dateKey){
 function showApptEdit(){document.getElementById('appt-view').style.display='none';document.getElementById('appt-edit').style.display='block';}
 function hideApptEdit(){document.getElementById('appt-view').style.display='block';document.getElementById('appt-edit').style.display='none';}
 function saveApptEdit(){hideApptEdit();showToast('appt-overlay','Changes saved successfully.');}
+
+// ── New appointment client autocomplete ───────────────────────────────────────
+function naClientSearch(val){
+  var drop=document.getElementById('na-ac-drop');
+  drop.innerHTML='';
+  var q=val.trim().toLowerCase();
+  if(!q){drop.classList.remove('open');return;}
+  var matches=Object.entries(clientDB).filter(function(e){
+    return e[1].name.toLowerCase().indexOf(q)>=0||
+           (e[1].phone&&e[1].phone.indexOf(q)>=0)||
+           (e[1].email&&e[1].email.toLowerCase().indexOf(q)>=0);
+  }).slice(0,8);
+  matches.forEach(function(e){
+    var id=e[0],c=e[1];
+    var item=document.createElement('div');
+    item.className='na-ac-item';
+    item.innerHTML='<span class="ac-name">'+c.name+'</span><span class="ac-meta">'+c.type+' &middot; '+(c.phone||'—')+'</span>';
+    item.addEventListener('mousedown',function(ev){ev.preventDefault();naSelectClient(id);});
+    drop.appendChild(item);
+  });
+  // Always show "Add as new client" option
+  var newItem=document.createElement('div');
+  newItem.className='na-ac-new';
+  newItem.innerHTML='<svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M8 2v12M2 8h12" stroke="#1D9E75" stroke-width="2" stroke-linecap="round"/></svg> Add &ldquo;'+val.trim()+'&rdquo; as new client';
+  newItem.addEventListener('mousedown',function(ev){ev.preventDefault();naUseNewClient(val.trim());});
+  drop.appendChild(newItem);
+  drop.classList.add('open');
+}
+
+function naSelectClient(id){
+  var c=clientDB[id];
+  if(!c)return;
+  document.getElementById('na-name').value=c.name;
+  document.getElementById('na-phone').value=c.phone||'';
+  document.getElementById('na-email').value=c.email||'';
+  document.getElementById('na-address').value=c.address||'';
+  naCloseAC();
+  // Pre-select service/freq if available
+  var svc=document.getElementById('na-service');
+  if(c.service){
+    var svcMap={'Standard clean':'standard','Deep clean':'deep','Move-out clean':'moveout','Commercial weekly':'commercial','Airbnb turnover':'airbnb'};
+    if(svcMap[c.service])svc.value=svcMap[c.service];
+  }
+  var frq=document.getElementById('na-freq');
+  if(c.freq){
+    var opts=frq.options;
+    for(var i=0;i<opts.length;i++){if(opts[i].text===c.freq||opts[i].value===c.freq){frq.selectedIndex=i;break;}}
+  }
+  calcPrice();
+}
+
+function naUseNewClient(name){
+  document.getElementById('na-name').value=name;
+  document.getElementById('na-phone').value='';
+  document.getElementById('na-email').value='';
+  document.getElementById('na-address').value='';
+  naCloseAC();
+  document.getElementById('na-phone').focus();
+}
+
+function naCloseAC(){
+  var drop=document.getElementById('na-ac-drop');
+  if(drop)drop.classList.remove('open');
+}
 
 function cancelAppt(){
   if(!currentAppt||!currentApptKey)return;

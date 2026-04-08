@@ -89,6 +89,19 @@ tr.clickable:hover td{background:#f0faf6;cursor:pointer;}
 .cal-dow{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));background:#fafaf8;border-bottom:1px solid #e8e8e5;}
 .cal-dow-cell{font-size:11px;font-weight:600;color:#999;text-align:center;padding:7px 0;}
 .cal-days{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));}
+.cal-view-btn{padding:5px 12px;font-size:12px;border:none;background:#fff;color:#666;cursor:pointer;font-family:inherit;}
+.cal-view-btn.active{background:#1D9E75;color:#fff;}
+.cal-view-btn:hover:not(.active){background:#f5f5f3;}
+.time-grid{display:grid;grid-template-columns:50px 1fr;border:1px solid #e8e8e5;border-radius:10px;overflow:hidden;background:#fff;}
+.time-label{font-size:10px;color:#999;padding:0 8px;text-align:right;height:60px;display:flex;align-items:flex-start;padding-top:4px;border-right:1px solid #f0f0ee;}
+.time-slot{height:60px;border-bottom:1px solid #f5f5f3;position:relative;}
+.time-slot:hover{background:#fafaf8;}
+.day-appt-block{position:absolute;left:4px;right:4px;border-radius:6px;padding:3px 7px;font-size:11px;font-weight:500;cursor:pointer;overflow:hidden;z-index:1;}
+.week-col-header{text-align:center;padding:8px 4px;font-size:12px;font-weight:600;color:#1a1a1a;border-right:1px solid #f0f0ee;}
+.week-col-header.today-col{color:#1D9E75;}
+.week-day-col{border-right:1px solid #f0f0ee;position:relative;}
+.more-appts{font-size:10px;color:#1D9E75;padding:1px 4px;cursor:pointer;font-weight:500;}
+.more-appts:hover{text-decoration:underline;}
 .cal-day{min-height:80px;border-right:1px solid #f0f0ee;border-bottom:1px solid #f0f0ee;padding:5px;}
 .cal-day:nth-child(7n){border-right:none;}
 .cal-day.om .dn2{opacity:.3;}
@@ -312,6 +325,13 @@ textarea{font-family:inherit;}
             <div class="cal-month" id="cal-month-label">April 2026</div>
             <button class="cal-arrow" id="next-btn">&rsaquo;</button>
           </div>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <div style="display:flex;border:1px solid #e0e0dd;border-radius:8px;overflow:hidden;">
+              <button class="cal-view-btn active" onclick="setCalView('month',this)" id="btn-month">Month</button>
+              <button class="cal-view-btn" onclick="setCalView('week',this)" id="btn-week">Week</button>
+              <button class="cal-view-btn" onclick="setCalView('day',this)" id="btn-day">Day</button>
+            </div>
+          </div>
           <div class="legend">
             <div class="legend-item"><div class="ld lu"></div>Unassigned</div>
             <div class="legend-item"><div class="ld la"></div>Assigned</div>
@@ -319,9 +339,23 @@ textarea{font-family:inherit;}
             <div class="legend-item"><div class="ld lp"></div>Paid</div>
           </div>
         </div>
-        <div class="cal-grid">
-          <div class="cal-dow"><div class="cal-dow-cell">Sun</div><div class="cal-dow-cell">Mon</div><div class="cal-dow-cell">Tue</div><div class="cal-dow-cell">Wed</div><div class="cal-dow-cell">Thu</div><div class="cal-dow-cell">Fri</div><div class="cal-dow-cell">Sat</div></div>
-          <div class="cal-days" id="cal-days"></div>
+
+        <!-- MONTH VIEW -->
+        <div id="cal-month-view">
+          <div class="cal-grid">
+            <div class="cal-dow"><div class="cal-dow-cell">Sun</div><div class="cal-dow-cell">Mon</div><div class="cal-dow-cell">Tue</div><div class="cal-dow-cell">Wed</div><div class="cal-dow-cell">Thu</div><div class="cal-dow-cell">Fri</div><div class="cal-dow-cell">Sat</div></div>
+            <div class="cal-days" id="cal-days"></div>
+          </div>
+        </div>
+
+        <!-- WEEK VIEW -->
+        <div id="cal-week-view" style="display:none;">
+          <div id="week-grid"></div>
+        </div>
+
+        <!-- DAY VIEW -->
+        <div id="cal-day-view" style="display:none;">
+          <div id="day-grid"></div>
         </div>
       </div>
 
@@ -1595,7 +1629,8 @@ async function loadAllData(){
         bedbath:(c.beds||'?')+' bed / '+(c.baths||'?')+' bath',
         cleaner:c.preferred_cleaner||'No preference',
         lastjob:'None yet', nextjob:'Not scheduled',
-        status:c.status||'New', notes:c.notes||'—', history:[]
+        status:c.status||'New', notes:c.notes||'—', history:[],
+        properties:c.properties||[]
       };
     });
 
@@ -1859,9 +1894,29 @@ var aiDraftTemplates={
   'maile':{sms:'Hey Maile! Just checking in. Everything good? Let us know if you need anything. — HNC',email:''}
 };
 
+var calView='month';
+var curDay=new Date().getDate();
+
+function setCalView(view,btn){
+  calView=view;
+  document.querySelectorAll('.cal-view-btn').forEach(function(b){b.classList.remove('active');});
+  btn.classList.add('active');
+  document.getElementById('cal-month-view').style.display=view==='month'?'block':'none';
+  document.getElementById('cal-week-view').style.display=view==='week'?'block':'none';
+  document.getElementById('cal-day-view').style.display=view==='day'?'block':'none';
+  renderCal();
+}
+
 function renderCal(){
   populateRecurringMonth(curYear,curMonth);
-  document.getElementById('cal-month-label').textContent=MONTHS[curMonth-1]+' '+curYear;
+  if(calView==='month') renderMonth();
+  else if(calView==='week') renderWeek();
+  else if(calView==='day') renderDay(curDay);
+}
+
+function renderMonth(){
+  var label=MONTHS[curMonth-1]+' '+curYear;
+  document.getElementById('cal-month-label').textContent=label;
   var c=document.getElementById('cal-days');
   c.innerHTML='';
   var first=new Date(curYear,curMonth-1,1).getDay();
@@ -1869,16 +1924,29 @@ function renderCal(){
   var dipm=new Date(curYear,curMonth-1,0).getDate();
   var today=new Date();
   function isToday(y,m,d){return y===today.getFullYear()&&m===today.getMonth()+1&&d===today.getDate();}
+
   for(var i=0;i<first;i++){
     var el=document.createElement('div');el.className='cal-day om';
     var dn=document.createElement('div');dn.className='dn2';dn.textContent=dipm-first+1+i;el.appendChild(dn);c.appendChild(el);
   }
   for(var d=1;d<=dim;d++){
-    var el=document.createElement('div');el.className='cal-day'+(isToday(curYear,curMonth,d)?' today':'');
-    var dn=document.createElement('div');dn.className='dn2';dn.textContent=d;el.appendChild(dn);
+    var el=document.createElement('div');
+    el.className='cal-day'+(isToday(curYear,curMonth,d)?' today':'');
+    var dn=document.createElement('div');dn.className='dn2';
+    // Make day number clickable to go to day view
+    (function(day){
+      dn.style.cursor='pointer';
+      dn.addEventListener('click',function(e){
+        e.stopPropagation();
+        curDay=day;
+        setCalView('day',document.getElementById('btn-day'));
+      });
+    })(d);
+    dn.textContent=d;el.appendChild(dn);
     var k=curYear+'-'+curMonth+'-'+d;
     var da=apptData[k]||[];
-    da.slice(0,2).forEach(function(a){
+    // Show all appointments - no limit
+    da.forEach(function(a){
       var btn=document.createElement('button');
       btn.className='appt a'+a.s.charAt(0);
       btn.textContent=(a.recurring?'\u21bb ':'')+a.t+' '+a.n;
@@ -1887,7 +1955,6 @@ function renderCal(){
       btn.addEventListener('click',function(ev){ev.stopPropagation();openAppt(JSON.parse(this.dataset.appt),this.dataset.key);});
       el.appendChild(btn);
     });
-    if(da.length>2){var more=document.createElement('div');more.className='more-appts';more.textContent='+'+(da.length-2)+' more';el.appendChild(more);}
     c.appendChild(el);
   }
   var tot=first+dim;var rem=tot%7===0?0:7-(tot%7);
@@ -1897,8 +1964,180 @@ function renderCal(){
   }
 }
 
-document.getElementById('prev-btn').addEventListener('click',function(){changeMonth(-1);});
-document.getElementById('next-btn').addEventListener('click',function(){changeMonth(1);});
+function renderWeek(){
+  // Find start of week containing curDay
+  var startDate=new Date(curYear,curMonth-1,curDay);
+  var dow=startDate.getDay();
+  startDate.setDate(startDate.getDate()-dow);
+  var endDate=new Date(startDate);endDate.setDate(endDate.getDate()+6);
+  var label=MONTHS[startDate.getMonth()]+' '+startDate.getDate()+' — '+MONTHS[endDate.getMonth()]+' '+endDate.getDate()+', '+endDate.getFullYear();
+  document.getElementById('cal-month-label').textContent=label;
+
+  var hours=[];
+  for(var h=6;h<=22;h++) hours.push(h);
+  var today=new Date();
+
+  var grid=document.getElementById('week-grid');
+  grid.innerHTML='';
+  grid.style.cssText='overflow-x:auto;';
+
+  var table=document.createElement('div');
+  table.style.cssText='display:grid;grid-template-columns:50px repeat(7,minmax(100px,1fr));min-width:600px;border:1px solid #e8e8e5;border-radius:10px;overflow:hidden;background:#fff;';
+
+  // Header row
+  var cornerCell=document.createElement('div');
+  cornerCell.style.cssText='border-right:1px solid #e8e8e5;border-bottom:1px solid #e8e8e5;background:#fafaf8;';
+  table.appendChild(cornerCell);
+
+  var days=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  for(var di=0;di<7;di++){
+    var d=new Date(startDate);d.setDate(d.getDate()+di);
+    var isT=d.toDateString()===today.toDateString();
+    var hdr=document.createElement('div');
+    hdr.className='week-col-header'+(isT?' today-col':'');
+    hdr.style.cssText='border-bottom:1px solid #e8e8e5;background:#fafaf8;padding:8px 4px;';
+    hdr.innerHTML='<div style="font-size:11px;color:#999;">'+days[di]+'</div><div style="font-size:14px;font-weight:600;'+(isT?'color:#1D9E75;':'')+'">'+d.getDate()+'</div>';
+    (function(day){
+      hdr.style.cursor='pointer';
+      hdr.addEventListener('click',function(){
+        curDay=day.getDate();curMonth=day.getMonth()+1;curYear=day.getFullYear();
+        setCalView('day',document.getElementById('btn-day'));
+      });
+    })(d);
+    table.appendChild(hdr);
+  }
+
+  // Time rows
+  hours.forEach(function(h){
+    var timeLabel=document.createElement('div');
+    timeLabel.className='time-label';
+    timeLabel.style.cssText='font-size:10px;color:#999;padding:4px 6px;text-align:right;border-right:1px solid #e8e8e5;border-bottom:1px solid #f5f5f3;height:60px;display:flex;align-items:flex-start;padding-top:4px;';
+    timeLabel.textContent=(h%12||12)+(h>=12?'pm':'am');
+    table.appendChild(timeLabel);
+
+    for(var di=0;di<7;di++){
+      var d=new Date(startDate);d.setDate(d.getDate()+di);
+      var k=d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate();
+      var cell=document.createElement('div');
+      cell.style.cssText='height:60px;border-bottom:1px solid #f5f5f3;border-right:1px solid #f0f0ee;position:relative;';
+      var da=apptData[k]||[];
+      da.forEach(function(a){
+        var ah=parseApptHour(a.t);
+        if(ah===h){
+          var block=document.createElement('div');
+          var colorMap={u:'#fce7f3',a:'#dbeafe',c:'#fef9c3',p:'#dcfce7'};
+          var textMap={u:'#9d174d',a:'#1e40af',c:'#713f12',p:'#166534'};
+          var sc=a.s?a.s.charAt(0):'u';
+          block.style.cssText='position:absolute;left:2px;right:2px;top:2px;border-radius:5px;padding:2px 5px;font-size:10px;font-weight:500;cursor:pointer;overflow:hidden;background:'+(colorMap[sc]||'#f3f4f6')+';color:'+(textMap[sc]||'#374151')+';z-index:1;';
+          block.textContent=a.t+' '+a.n;
+          (function(appt,key){block.addEventListener('click',function(){openAppt(appt,key);});})(a,k);
+          cell.appendChild(block);
+        }
+      });
+      table.appendChild(cell);
+    }
+  });
+
+  grid.appendChild(table);
+}
+
+function renderDay(day){
+  var date=new Date(curYear,curMonth-1,day);
+  var dayNames=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  document.getElementById('cal-month-label').textContent=dayNames[date.getDay()]+', '+MONTHS[curMonth-1]+' '+day+', '+curYear;
+
+  var k=curYear+'-'+curMonth+'-'+day;
+  var da=apptData[k]||[];
+  var hours=[];for(var h=6;h<=22;h++)hours.push(h);
+
+  var grid=document.getElementById('day-grid');
+  grid.innerHTML='';
+
+  var wrap=document.createElement('div');
+  wrap.style.cssText='border:1px solid #e8e8e5;border-radius:10px;overflow:hidden;background:#fff;max-width:600px;';
+
+  // Day summary header
+  var hdr=document.createElement('div');
+  hdr.style.cssText='background:#fafaf8;padding:10px 14px;border-bottom:1px solid #e8e8e5;display:flex;justify-content:space-between;align-items:center;';
+  hdr.innerHTML='<div style="font-size:13px;font-weight:600;color:#1a1a1a;">'+da.length+' appointment'+(da.length!==1?'s':'')+'</div>'
+    +(da.length===0?'<div style="font-size:12px;color:#999;">No appointments</div>':'');
+  wrap.appendChild(hdr);
+
+  var timeWrap=document.createElement('div');
+  timeWrap.style.cssText='display:grid;grid-template-columns:55px 1fr;';
+
+  hours.forEach(function(h){
+    var timeLabel=document.createElement('div');
+    timeLabel.style.cssText='font-size:10px;color:#bbb;padding:0 8px;height:60px;display:flex;align-items:flex-start;padding-top:4px;border-right:1px solid #f0f0ee;border-bottom:1px solid #f9f9f9;';
+    timeLabel.textContent=(h%12||12)+(h>=12?'pm':'am');
+    timeWrap.appendChild(timeLabel);
+
+    var slot=document.createElement('div');
+    slot.style.cssText='height:60px;border-bottom:1px solid #f9f9f9;position:relative;';
+
+    // Show half hour line
+    var half=document.createElement('div');
+    half.style.cssText='position:absolute;left:0;right:0;top:50%;border-top:1px dashed #f0f0ee;';
+    slot.appendChild(half);
+
+    da.forEach(function(a){
+      var ah=parseApptHour(a.t);
+      var am=parseApptMinute(a.t);
+      if(ah===h){
+        var colorMap={u:'#fce7f3',a:'#dbeafe',c:'#fef9c3',p:'#dcfce7'};
+        var textMap={u:'#9d174d',a:'#1e40af',c:'#713f12',p:'#166534'};
+        var borderMap={u:'#f9a8d4',a:'#93c5fd',c:'#fde68a',p:'#86efac'};
+        var sc=a.s?a.s.charAt(0):'u';
+        var top=Math.round(am/60*60);
+        var block=document.createElement('div');
+        block.style.cssText='position:absolute;left:6px;right:6px;top:'+top+'px;min-height:50px;border-radius:7px;padding:5px 9px;font-size:12px;cursor:pointer;background:'+(colorMap[sc]||'#f3f4f6')+';color:'+(textMap[sc]||'#374151')+';border-left:3px solid '+(borderMap[sc]||'#d1d5db')+';z-index:2;';
+        block.innerHTML='<div style="font-weight:600;">'+a.n+'</div><div style="font-size:11px;opacity:.8;">'+a.t+(a.cleaner&&a.cleaner!=='Unassigned'?' · '+a.cleaner:'')+'</div>';
+        (function(appt,key){block.addEventListener('click',function(){openAppt(appt,key);});})(a,k);
+        slot.appendChild(block);
+      }
+    });
+
+    timeWrap.appendChild(slot);
+  });
+
+  wrap.appendChild(timeWrap);
+  grid.appendChild(wrap);
+
+  // Scroll to first appointment or 8am
+  setTimeout(function(){
+    var firstHour=da.length>0?Math.max(6,parseApptHour(da[0].t)-1):8;
+    var scrollPos=(firstHour-6)*60;
+    grid.scrollTop=scrollPos;
+    wrap.scrollTop=scrollPos;
+  },50);
+}
+
+function parseApptHour(t){
+  if(!t)return 8;
+  var m=t.match(/(\d+)(am|pm)/i);
+  if(!m)return 8;
+  var h=parseInt(m[1]);
+  if(m[2].toLowerCase()==='pm'&&h!==12)h+=12;
+  if(m[2].toLowerCase()==='am'&&h===12)h=0;
+  return h;
+}
+
+function parseApptMinute(t){
+  if(!t)return 0;
+  var m=t.match(/:(\d+)/);
+  return m?parseInt(m[1]):0;
+}
+
+document.getElementById('prev-btn').addEventListener('click',function(){
+  if(calView==='month') changeMonth(-1);
+  else if(calView==='week'){var d=new Date(curYear,curMonth-1,curDay);d.setDate(d.getDate()-7);curYear=d.getFullYear();curMonth=d.getMonth()+1;curDay=d.getDate();renderCal();}
+  else if(calView==='day'){var d=new Date(curYear,curMonth-1,curDay);d.setDate(d.getDate()-1);curYear=d.getFullYear();curMonth=d.getMonth()+1;curDay=d.getDate();renderCal();}
+});
+document.getElementById('next-btn').addEventListener('click',function(){
+  if(calView==='month') changeMonth(1);
+  else if(calView==='week'){var d=new Date(curYear,curMonth-1,curDay);d.setDate(d.getDate()+7);curYear=d.getFullYear();curMonth=d.getMonth()+1;curDay=d.getDate();renderCal();}
+  else if(calView==='day'){var d=new Date(curYear,curMonth-1,curDay);d.setDate(d.getDate()+1);curYear=d.getFullYear();curMonth=d.getMonth()+1;curDay=d.getDate();renderCal();}
+});
 function changeMonth(d){curMonth+=d;if(curMonth>12){curMonth=1;curYear++;}if(curMonth<1){curMonth=12;curYear--;}renderCal();}
 
 function openAppt(a,dateKey){
@@ -1968,7 +2207,36 @@ function openClient(id){
     row.innerHTML='<div><div style="font-size:12px;font-weight:500;">'+h.date+' — '+h.svc+'</div></div><div style="text-align:right;"><div style="font-size:12px;font-weight:600;color:#1D9E75;">'+h.amt+'</div><div style="font-size:10px;color:'+(h.paid?'#276749':'#b7791f')+';">'+(h.paid?'Paid':'Pending')+'</div></div>';
     hist.appendChild(row);
   });
+  // Render properties
+  var propsEl = document.getElementById('cl-properties');
+  if(propsEl){
+    propsEl.innerHTML = '';
+    var props = d.properties || [];
+    if(props.length === 0){
+      propsEl.innerHTML = '<div style="font-size:12px;color:#999;padding:4px 0;">No properties saved yet.</div>';
+    } else {
+      props.forEach(function(p, idx){
+        var card = document.createElement('div');
+        card.style.cssText = 'background:#fafaf8;border:1px solid #e8e8e5;border-radius:8px;padding:10px 12px;margin-bottom:6px;';
+        card.innerHTML = '<div style="display:flex;justify-content:space-between;align-items:flex-start;">'
+          +'<div>'
+            +'<div style="font-size:12px;font-weight:600;color:#1a1a1a;">'+p.address+'</div>'
+            +'<div style="font-size:11px;color:#666;margin-top:2px;">'+p.beds+' bed / '+p.baths+' bath'+(p.sqft?' · '+p.sqft:'')+'</div>'
+            +'<div style="font-size:12px;color:#1D9E75;font-weight:600;margin-top:3px;">$'+p.price+' per clean</div>'
+            +(p.notes?'<div style="font-size:11px;color:#999;margin-top:2px;">'+p.notes+'</div>':'')
+          +'</div>'
+          +'<button onclick="removeProperty('+idx+')" style="font-size:10px;color:#e53e3e;background:none;border:none;cursor:pointer;padding:2px;">&#x2715;</button>'
+          +'</div>';
+        propsEl.appendChild(card);
+      });
+    }
+  }
   hideClientEdit();
+  // Clear AI summary when switching clients
+  var summaryEl = document.getElementById('cl-ai-summary');
+  var thinkingEl = document.getElementById('cl-ai-thinking');
+  if(summaryEl){ summaryEl.style.display='none'; summaryEl.textContent=''; }
+  if(thinkingEl){ thinkingEl.style.display='none'; }
   document.getElementById('client-overlay').classList.remove('hidden');
   setTimeout(updateChargeBtn, 50);
 }
@@ -2522,7 +2790,7 @@ function sv(view,el){
   if(el)el.classList.add('active');
   var titles={dashboard:'Dashboard',calendar:'Calendar',pipeline:'Pipeline',clients:'Clients',tasks:'VA Tasks',messaging:'Messaging',cleaners:'Cleaners',payroll:'Payroll',reporting:'Reporting',automations:'Automations',payments:'Payments',settings:'Settings',agent:'AI Agent'};
   var ctas={dashboard:'+ New lead',calendar:'+ New appointment',pipeline:'+ New lead',clients:'+ Add client',tasks:'+ Add task',messaging:'+ New message',cleaners:'+ Add cleaner',payroll:'Log hours',reporting:'Export',automations:'+ New automation',payments:'+ New invoice',settings:'',agent:''};
-  var secs={calendar:'Month view',payroll:'Export',reporting:'Export',automations:'Filter',payments:'Filter',settings:''};
+  var secs={calendar:'',payroll:'Export',reporting:'Export',automations:'Filter',payments:'Filter',settings:''};
   document.getElementById('page-title').textContent=titles[view]||view;
   document.getElementById('top-cta').textContent=ctas[view]||'+ New';
   document.getElementById('top-cta').style.display=(view==='agent'||view==='settings')?'none':'block';
@@ -3775,7 +4043,13 @@ function deleteRecord(type){
   if(type==='client'){
     id=currentClientId;
     name=currentClientName;
-    msg='Delete '+name+' and all their data? This cannot be undone.';
+    // Count their appointments
+    var apptCount=0;
+    Object.keys(apptData).forEach(function(k){
+      apptData[k].forEach(function(a){if(a.n===name)apptCount++;});
+    });
+    var apptWarn=apptCount>0?' This will also delete '+apptCount+' appointment'+(apptCount!==1?'s':'')+' from the calendar.':'';
+    msg='Delete '+name+' and all their data?'+apptWarn+' This cannot be undone.';
   } else if(type==='lead'){
     id=currentLeadId;
     name=currentLeadName||'this lead';
@@ -3804,6 +4078,22 @@ function deleteRecord(type){
     document.querySelectorAll('#view-clients tbody tr, #view-dashboard tbody tr').forEach(function(row){
       if(row.textContent.indexOf(name)>=0)row.remove();
     });
+    // Remove all appointments for this client from calendar
+    var apptCount=0;
+    Object.keys(apptData).forEach(function(k){
+      var before=apptData[k].length;
+      apptData[k]=apptData[k].filter(function(a){return a.n!==name;});
+      apptCount+=before-apptData[k].length;
+    });
+    // Remove recurring appointments
+    recurringAppts=recurringAppts.filter(function(r){return r.name!==name;});
+    // Delete from Supabase appointments table
+    if(id&&id.length>20){
+      db.from('appointments').delete().eq('client_name',name).then(function(res){
+        if(res.error)console.error('Delete appts error:',res.error);
+      });
+    }
+    if(apptCount>0) renderCal();
   } else if(type==='lead'){
     if(id)delete leadDB[id];
     // Remove pipeline card by name
@@ -4644,11 +4934,9 @@ async function generateClientSummary(){
   summaryEl.style.display = 'none';
   thinkingEl.style.display = 'block';
 
-  // Build context about the client
   var history = (cdata.history||[]).slice(-5).map(function(h){
     return h.date+': '+h.svc+' — '+h.amt+(h.paid?' (paid)':' (unpaid)');
-  }).join('
-');
+  }).join('\n');
 
   var msgs = [];
   inboxData.forEach(function(thread){
@@ -4659,7 +4947,6 @@ async function generateClientSummary(){
     }
   });
 
-  // Fetch last 5 call transcripts/summaries from Supabase
   var callContext = '';
   try {
     var callRes = await db.from('call_transcripts')
@@ -4668,59 +4955,40 @@ async function generateClientSummary(){
       .order('called_at', {ascending: false})
       .limit(5);
     if(callRes.data && callRes.data.length > 0){
-      callContext = '
-Call history (last '+callRes.data.length+' calls):
-';
+      callContext = '\nCall history (last '+callRes.data.length+' calls):\n';
       callRes.data.forEach(function(c){
         var date = c.called_at ? new Date(c.called_at).toLocaleDateString() : 'Unknown date';
         var dur = c.duration_seconds ? Math.round(c.duration_seconds/60)+'min' : '';
-        callContext += date+' ('+c.direction+', '+dur+')
-';
-        if(c.summary) callContext += 'Summary: '+c.summary+'
-';
-        if(c.transcript && !c.summary) callContext += 'Transcript excerpt: '+c.transcript.slice(0,300)+'
-';
-        callContext += '
-';
+        callContext += date+' ('+c.direction+', '+dur+')\n';
+        if(c.summary) callContext += 'Summary: '+c.summary+'\n';
+        callContext += '\n';
       });
     }
-  } catch(e){ console.log('No call data available'); }
+  } catch(e){ console.log('No call data'); }
 
-  var prompt = 'You are an assistant for Hawaii Natural Clean, a cleaning business in Hawaii. Generate a concise 3-4 sentence client intelligence briefing for the team. Be specific and actionable. Mention payment behavior, relationship health, call history insights if available, and any follow-up recommendations.
+  var props = (cdata.properties||[]).map(function(p){
+    return p.address+' ('+p.beds+'bd/'+p.baths+'ba, $'+p.price+'/clean)';
+  }).join('; ');
 
-'
-    + 'Client: ' + cdata.name + '
-'
-    + 'Type: ' + (cdata.type||'Residential') + '
-'
-    + 'Status: ' + (cdata.status||'Active') + '
-'
-    + 'Service: ' + (cdata.service||'—') + ' ' + (cdata.freq||'') + '
-'
-    + 'Since: ' + (cdata.since||'—') + '
-'
-    + 'Lifetime value: ' + (cdata.ltv||'$0') + '
-'
-    + 'Monthly revenue: ' + (cdata.mrr||'—') + '
-'
-    + 'Last job: ' + (cdata.lastjob||'None') + '
-'
-    + 'Next job: ' + (cdata.nextjob||'Not scheduled') + '
-'
-    + 'Preferred cleaner: ' + (cdata.cleaner||'No preference') + '
-'
-    + 'Payment method: ' + (cdata.payment||'—') + '
-'
-    + (history?'
-Job history (last 5):
-'+history:'')
-    + (cdata.notes&&cdata.notes!=='—'?'
-Notes: '+cdata.notes:'')
-    + (msgs.length?'
-Recent messages:
-'+msgs.join('
-'):'')
-    + callContext;
+  var prompt = 'You are an assistant for Hawaii Natural Clean, a cleaning business in Hawaii.'
+    +' Generate a concise 3-4 sentence client intelligence briefing. Be specific and actionable.'
+    +' Mention payment behavior, relationship health, call history insights if available, and follow-up recommendations.\n\n'
+    +'Client: '+cdata.name+'\n'
+    +'Type: '+(cdata.type||'Residential')+'\n'
+    +'Status: '+(cdata.status||'Active')+'\n'
+    +'Service: '+(cdata.service||'Standard clean')+' '+(cdata.freq||'')+'\n'
+    +'Since: '+(cdata.since||'—')+'\n'
+    +'Lifetime value: '+(cdata.ltv||'$0')+'\n'
+    +'Monthly revenue: '+(cdata.mrr||'—')+'\n'
+    +'Last job: '+(cdata.lastjob||'None')+'\n'
+    +'Next job: '+(cdata.nextjob||'Not scheduled')+'\n'
+    +'Preferred cleaner: '+(cdata.cleaner||'No preference')+'\n'
+    +'Payment method: '+(cdata.payment||'—')+'\n'
+    +(props?'Properties: '+props+'\n':'')
+    +(history?'\nJob history (last 5):\n'+history:'')
+    +(cdata.notes&&cdata.notes!=='—'?'\nNotes: '+cdata.notes:'')
+    +(msgs.length?'\nRecent messages:\n'+msgs.join('\n'):'')
+    +callContext;
 
   try {
     var response = await fetch('/api/ai-summary', {
@@ -4738,6 +5006,58 @@ Recent messages:
     summaryEl.textContent = 'Error generating summary. Check your connection.';
     summaryEl.style.display = 'block';
   }
+}
+
+function openAddProperty(){
+  if(!currentClientId){ showPaymentToast('No client selected.', null, 'error'); return; }
+  var cdata = clientDB[currentClientId];
+  document.getElementById('prop-client-name').textContent = 'Adding property for: ' + (cdata?cdata.name:'');
+  document.getElementById('prop-address').value = '';
+  document.getElementById('prop-beds').value = '3';
+  document.getElementById('prop-baths').value = '2';
+  document.getElementById('prop-sqft').value = '';
+  document.getElementById('prop-price').value = '';
+  document.getElementById('prop-notes').value = '';
+  document.getElementById('add-property-overlay').classList.remove('hidden');
+}
+
+function saveProperty(){
+  var address = document.getElementById('prop-address').value;
+  if(!address){ document.getElementById('prop-address').focus(); return; }
+  var cdata = clientDB[currentClientId];
+  if(!cdata) return;
+  if(!cdata.properties) cdata.properties = [];
+  var prop = {
+    address: address,
+    beds: document.getElementById('prop-beds').value,
+    baths: document.getElementById('prop-baths').value,
+    sqft: document.getElementById('prop-sqft').value,
+    price: document.getElementById('prop-price').value,
+    notes: document.getElementById('prop-notes').value
+  };
+  cdata.properties.push(prop);
+  // Save to Supabase
+  if(currentClientId && currentClientId.length > 20){
+    db.from('clients').update({ properties: cdata.properties }).eq('id', currentClientId);
+  }
+  var s = document.getElementById('prop-success');
+  s.classList.add('show');
+  setTimeout(function(){
+    s.classList.remove('show');
+    closeOverlay('add-property-overlay');
+    openClient(currentClientId); // Refresh panel
+  }, 1500);
+}
+
+function removeProperty(idx){
+  if(!confirm('Remove this property?')) return;
+  var cdata = clientDB[currentClientId];
+  if(!cdata || !cdata.properties) return;
+  cdata.properties.splice(idx, 1);
+  if(currentClientId && currentClientId.length > 20){
+    db.from('clients').update({ properties: cdata.properties }).eq('id', currentClientId);
+  }
+  openClient(currentClientId);
 }
 
 </script>
@@ -5010,6 +5330,30 @@ Your total will update automatically when you select a payment method.</textarea
         <button class="btn" onclick="closeOverlay('new-msg-overlay')">Cancel</button>
       </div>
       <div class="success-bar" id="nm-success">Message sent!</div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ADD PROPERTY OVERLAY -->
+<div class="overlay hidden" id="add-property-overlay" onclick="closeOverlay('add-property-overlay')">
+  <div class="panel" onclick="event.stopPropagation()">
+    <div class="panel-header"><div class="panel-title">Add property</div><button class="close-btn" onclick="closeOverlay('add-property-overlay')">&#x2715;</button></div>
+    <div class="panel-body">
+      <div style="font-size:12px;color:#666;margin-bottom:12px;" id="prop-client-name"></div>
+      <div class="form-row"><label>Property address</label><input type="text" id="prop-address" placeholder="123 Kalani St, Kailua, HI"></div>
+      <div class="form-three">
+        <div class="form-row"><label>Bedrooms</label><input type="number" id="prop-beds" value="3" min="0"></div>
+        <div class="form-row"><label>Bathrooms</label><input type="number" id="prop-baths" value="2" min="0" step="0.5"></div>
+        <div class="form-row"><label>Sq footage</label><input type="text" id="prop-sqft" placeholder="1,400 sq ft"></div>
+      </div>
+      <div class="form-row"><label>Price per clean ($)</label><input type="number" id="prop-price" placeholder="238.00" step="0.01"></div>
+      <div class="form-row"><label>Notes</label><textarea id="prop-notes" style="min-height:50px;" placeholder="Access code, special instructions, parking..."></textarea></div>
+      <div class="save-bar">
+        <button class="btn btn-primary" onclick="saveProperty()">Save property</button>
+        <button class="btn" onclick="closeOverlay('add-property-overlay')">Cancel</button>
+      </div>
+      <div class="success-bar" id="prop-success">Property saved!</div>
     </div>
   </div>
 </div>

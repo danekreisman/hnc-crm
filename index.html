@@ -293,6 +293,11 @@ textarea{font-family:inherit;}
     <div class="topbar">
       <h1 id="page-title">Calendar</h1>
       <div class="topbar-actions">
+        <div id="global-search-wrap" style="position:relative;display:none;">
+          <input type="text" id="global-search" placeholder="Search..." style="padding:6px 12px 6px 30px;border:1px solid #e0e0dd;border-radius:8px;font-size:12px;font-family:inherit;background:#fafaf8;width:200px;outline:none;" oninput="runGlobalSearch(this.value)" onfocus="this.style.borderColor='#1D9E75'" onblur="this.style.borderColor='#e0e0dd'">
+          <svg style="position:absolute;left:9px;top:50%;transform:translateY(-50%);opacity:.4;" width="13" height="13" viewBox="0 0 16 16" fill="none"><circle cx="6.5" cy="6.5" r="5" stroke="#1a1a1a" stroke-width="1.5"/><path d="M10.5 10.5l3 3" stroke="#1a1a1a" stroke-width="1.5" stroke-linecap="round"/></svg>
+          <div id="search-results" style="display:none;position:absolute;top:36px;right:0;background:#fff;border:1px solid #e0e0dd;border-radius:10px;box-shadow:0 4px 16px rgba(0,0,0,.1);width:300px;max-height:320px;overflow-y:auto;z-index:999;"></div>
+        </div>
         <button class="btn" id="sec-btn">Month view</button>
         <button class="btn btn-primary" id="top-cta" onclick="handleTopCta()">+ New appointment</button>
       </div>
@@ -2514,6 +2519,10 @@ function sv(view,el){
   document.getElementById('top-cta').textContent=ctas[view]||'+ New';
   document.getElementById('top-cta').style.display=(view==='agent'||view==='settings')?'none':'block';
   document.getElementById('sec-btn').style.display=(view==='agent'||view==='settings')?'none':'block';
+  var searchViews=['clients','cleaners','pipeline','dashboard','payments'];
+  document.getElementById('global-search-wrap').style.display=searchViews.indexOf(view)>=0?'block':'none';
+  document.getElementById('global-search').value='';
+  document.getElementById('search-results').style.display='none';
   document.getElementById('sec-btn').textContent=secs[view]||'Filter';
   if(view==='messaging')renderInbox();
   if(view==='automations')renderAutomations();
@@ -4446,6 +4455,94 @@ function filterLeads(view, btn){
     }
   }
 }
+
+
+/* GLOBAL SEARCH */
+function runGlobalSearch(q){
+  var results=document.getElementById('search-results');
+  if(!q||q.length<2){results.style.display='none';return;}
+  q=q.toLowerCase();
+  var hits=[];
+
+  // Search clients
+  Object.entries(clientDB).forEach(function(e){
+    var c=e[1];
+    if(c.name.toLowerCase().indexOf(q)>=0||
+       (c.phone&&c.phone.toLowerCase().indexOf(q)>=0)||
+       (c.email&&c.email.toLowerCase().indexOf(q)>=0)||
+       (c.address&&c.address.toLowerCase().indexOf(q)>=0)){
+      hits.push({type:'Client',name:c.name,sub:c.address||c.phone||'',id:e[0],action:function(id){openClient(id);}});
+    }
+  });
+
+  // Search cleaners
+  Object.entries(cleanerDB).forEach(function(e){
+    var c=e[1];
+    if(c.name.toLowerCase().indexOf(q)>=0||
+       (c.phone&&c.phone.toLowerCase().indexOf(q)>=0)||
+       (c.loc&&c.loc.toLowerCase().indexOf(q)>=0)){
+      hits.push({type:'Cleaner',name:c.name,sub:c.role||'',id:e[0],action:function(id){openCleaner(id);}});
+    }
+  });
+
+  // Search leads
+  Object.entries(leadDB).forEach(function(e){
+    var l=e[1];
+    if(l.name.toLowerCase().indexOf(q)>=0||
+       (l.phone&&l.phone.toLowerCase().indexOf(q)>=0)||
+       (l.email&&l.email.toLowerCase().indexOf(q)>=0)||
+       (l.address&&l.address.toLowerCase().indexOf(q)>=0)){
+      hits.push({type:'Lead',name:l.name,sub:l.stage+' · '+(l.value||''),id:e[0],action:function(id){openLead(id);}});
+    }
+  });
+
+  // Search appointments
+  Object.keys(apptData).forEach(function(k){
+    apptData[k].forEach(function(a){
+      if(a.n.toLowerCase().indexOf(q)>=0){
+        var parts=k.split('-');
+        var dateStr=MONTHS[parseInt(parts[1])-1]+' '+parts[2]+', '+parts[0];
+        hits.push({type:'Appointment',name:a.n,sub:dateStr+' · '+a.t,id:k,action:null});
+      }
+    });
+  });
+
+  if(hits.length===0){
+    results.innerHTML='<div style="padding:14px;font-size:12px;color:#999;text-align:center;">No results for "'+q+'"</div>';
+    results.style.display='block';
+    return;
+  }
+
+  var typeColors={Client:'#ebf5ff',Cleaner:'#f0faf6',Lead:'#fffbeb',Appointment:'#f5f0ff'};
+  var typeText={Client:'#2b6cb0',Cleaner:'#276749',Lead:'#b7791f',Appointment:'#553c9a'};
+  results.innerHTML=hits.slice(0,8).map(function(h){
+    var bg=typeColors[h.type]||'#f5f5f3';
+    var tc=typeText[h.type]||'#666';
+    var onclick='selectSearchResult(\"'+h.id+'\",\"'+h.type+'\")';
+    return '<div class="search-result-item" onclick="'+onclick+'" style="display:flex;align-items:center;gap:10px;padding:10px 14px;cursor:pointer;border-bottom:1px solid #f5f5f3;">'
+      +'<span style="font-size:10px;padding:2px 7px;border-radius:10px;background:'+bg+';color:'+tc+';font-weight:500;flex-shrink:0;">'+h.type+'</span>'
+      +'<div style="min-width:0;"><div style="font-size:12px;font-weight:600;color:#1a1a1a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+h.name+'</div>'
+      +(h.sub?'<div style="font-size:11px;color:#999;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+h.sub+'</div>':'')
+      +'</div></div>';
+  }).join('');
+  results.style.display='block';
+}
+
+function selectSearchResult(id, type){
+  document.getElementById('search-results').style.display='none';
+  document.getElementById('global-search').value='';
+  if(type==='Client') openClient(id);
+  else if(type==='Cleaner') openCleaner(id);
+  else if(type==='Lead') openLead(id);
+}
+
+// Close search on outside click
+document.addEventListener('click', function(e){
+  if(!e.target.closest('#global-search-wrap')){
+    var r=document.getElementById('search-results');
+    if(r) r.style.display='none';
+  }
+});
 
 </script>
 

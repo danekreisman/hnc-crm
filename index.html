@@ -73,11 +73,30 @@ tr.clickable:hover td{background:#f0faf6;cursor:pointer;}
 .deal-type{font-size:11px;margin-bottom:4px;}
 .deal-val{font-size:12px;color:#1D9E75;font-weight:600;}
 /* CALENDAR */
-.cal-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
+.cal-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;}
 .cal-nav{display:flex;align-items:center;gap:10px;}
 .cal-month{font-size:15px;font-weight:600;color:#1a1a1a;min-width:120px;}
 .cal-arrow{background:#fff;border:1px solid #e8e8e5;border-radius:8px;width:28px;height:28px;cursor:pointer;color:#666;font-size:16px;display:flex;align-items:center;justify-content:center;line-height:1;}
 .cal-arrow:hover{background:#f5f5f3;}
+.cal-view-tabs{display:flex;border:1px solid #e8e8e5;border-radius:8px;overflow:hidden;}
+.cal-view-tab{background:#fff;border:none;padding:5px 12px;font-size:12px;font-family:inherit;cursor:pointer;color:#666;font-weight:500;}
+.cal-view-tab:not(:last-child){border-right:1px solid #e8e8e5;}
+.cal-view-tab.active{background:#1D9E75;color:#fff;}
+.cal-view-tab:hover:not(.active){background:#f5f5f3;}
+.cal-week-grid{background:#fff;border:1px solid #e8e8e5;border-radius:10px;overflow:hidden;}
+.cal-week-cols{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));}
+.cal-week-col{border-right:1px solid #f0f0ee;min-height:120px;padding:5px;}
+.cal-week-col:last-child{border-right:none;}
+.cal-week-col.today{background:#f0faf6;}
+.cal-week-dh{font-size:11px;font-weight:600;color:#999;text-align:center;padding:7px 0;background:#fafaf8;border-bottom:1px solid #e8e8e5;}
+.cal-week-dh.today{color:#1D9E75;}
+.cal-day-view{background:#fff;border:1px solid #e8e8e5;border-radius:10px;padding:16px;}
+.cal-day-appt{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:8px;margin-bottom:6px;cursor:pointer;}
+.cal-day-appt:hover{opacity:.85;}
+.cal-day-time{font-size:12px;font-weight:600;min-width:50px;}
+.cal-day-name{font-size:13px;font-weight:500;}
+.cal-day-meta{font-size:11px;color:#888;margin-top:1px;}
+.cal-empty{color:#999;font-size:13px;padding:20px 0;text-align:center;}
 .legend{display:flex;gap:12px;align-items:center;flex-wrap:wrap;}
 .legend-item{display:flex;align-items:center;gap:5px;font-size:11px;color:#666;}
 .ld{width:10px;height:10px;border-radius:3px;flex-shrink:0;}
@@ -312,6 +331,11 @@ textarea{font-family:inherit;}
             <div class="cal-month" id="cal-month-label">April 2026</div>
             <button class="cal-arrow" id="next-btn">&rsaquo;</button>
           </div>
+          <div class="cal-view-tabs">
+            <button class="cal-view-tab active" onclick="setCalView('month')">Month</button>
+            <button class="cal-view-tab" onclick="setCalView('week')">Week</button>
+            <button class="cal-view-tab" onclick="setCalView('day')">Day</button>
+          </div>
           <div class="legend">
             <div class="legend-item"><div class="ld lu"></div>Unassigned</div>
             <div class="legend-item"><div class="ld la"></div>Assigned</div>
@@ -319,9 +343,20 @@ textarea{font-family:inherit;}
             <div class="legend-item"><div class="ld lp"></div>Paid</div>
           </div>
         </div>
-        <div class="cal-grid">
-          <div class="cal-dow"><div class="cal-dow-cell">Sun</div><div class="cal-dow-cell">Mon</div><div class="cal-dow-cell">Tue</div><div class="cal-dow-cell">Wed</div><div class="cal-dow-cell">Thu</div><div class="cal-dow-cell">Fri</div><div class="cal-dow-cell">Sat</div></div>
-          <div class="cal-days" id="cal-days"></div>
+        <div id="cal-month-view">
+          <div class="cal-grid">
+            <div class="cal-dow"><div class="cal-dow-cell">Sun</div><div class="cal-dow-cell">Mon</div><div class="cal-dow-cell">Tue</div><div class="cal-dow-cell">Wed</div><div class="cal-dow-cell">Thu</div><div class="cal-dow-cell">Fri</div><div class="cal-dow-cell">Sat</div></div>
+            <div class="cal-days" id="cal-days"></div>
+          </div>
+        </div>
+        <div id="cal-week-view" style="display:none;">
+          <div class="cal-week-grid">
+            <div class="cal-week-cols" id="cal-week-headers"></div>
+            <div class="cal-week-cols" id="cal-week-cols"></div>
+          </div>
+        </div>
+        <div id="cal-day-view" style="display:none;">
+          <div class="cal-day-view" id="cal-day-content"></div>
         </div>
       </div>
 
@@ -1897,9 +1932,94 @@ function renderCal(){
   }
 }
 
+var curCalView='month';
+var curWeekStart=(function(){var d=new Date();d.setHours(0,0,0,0);d.setDate(d.getDate()-d.getDay());return d;})();
+var curDayDate=new Date();curDayDate.setHours(0,0,0,0);
+
+function setCalView(view){
+  curCalView=view;
+  document.querySelectorAll('.cal-view-tab').forEach(function(btn){btn.classList.remove('active');});
+  document.querySelectorAll('.cal-view-tab').forEach(function(btn){if(btn.textContent.toLowerCase()===view)btn.classList.add('active');});
+  document.getElementById('cal-month-view').style.display=view==='month'?'':'none';
+  document.getElementById('cal-week-view').style.display=view==='week'?'':'none';
+  document.getElementById('cal-day-view').style.display=view==='day'?'':'none';
+  if(view==='month')renderCal();
+  else if(view==='week')renderWeek();
+  else renderDay();
+}
+
+function renderWeek(){
+  populateRecurringMonth(curWeekStart.getFullYear(),curWeekStart.getMonth()+1);
+  var days=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  var today=new Date();today.setHours(0,0,0,0);
+  var hdr=document.getElementById('cal-week-headers');
+  var cols=document.getElementById('cal-week-cols');
+  hdr.innerHTML='';cols.innerHTML='';
+  // Build label e.g. "Apr 6 – 12, 2026"
+  var endDate=new Date(curWeekStart);endDate.setDate(endDate.getDate()+6);
+  var startLbl=MONTHS[curWeekStart.getMonth()].slice(0,3)+' '+curWeekStart.getDate();
+  var endLbl=(curWeekStart.getMonth()===endDate.getMonth()?'':MONTHS[endDate.getMonth()].slice(0,3)+' ')+endDate.getDate();
+  document.getElementById('cal-month-label').textContent=startLbl+' \u2013 '+endLbl+', '+endDate.getFullYear();
+  for(var i=0;i<7;i++){
+    var d=new Date(curWeekStart);d.setDate(d.getDate()+i);
+    var isToday=d.getTime()===today.getTime();
+    var dh=document.createElement('div');
+    dh.className='cal-week-dh'+(isToday?' today':'');
+    dh.textContent=days[i]+' '+d.getDate();
+    hdr.appendChild(dh);
+    var col=document.createElement('div');
+    col.className='cal-week-col'+(isToday?' today':'');
+    var k=(d.getFullYear())+'-'+(d.getMonth()+1)+'-'+d.getDate();
+    var da=apptData[k]||[];
+    da.forEach(function(a){
+      var btn=document.createElement('button');
+      btn.className='appt a'+a.s.charAt(0);
+      btn.textContent=(a.recurring?'\u21bb ':'')+a.t+' '+a.n;
+      btn.dataset.appt=JSON.stringify(a);btn.dataset.key=k;
+      btn.addEventListener('click',function(ev){ev.stopPropagation();openAppt(JSON.parse(this.dataset.appt),this.dataset.key);});
+      col.appendChild(btn);
+    });
+    if(da.length===0){var emp=document.createElement('div');emp.style.cssText='font-size:11px;color:#ccc;padding:4px 2px;';emp.textContent='—';col.appendChild(emp);}
+    cols.appendChild(col);
+  }
+}
+
+function renderDay(){
+  populateRecurringMonth(curDayDate.getFullYear(),curDayDate.getMonth()+1);
+  var today=new Date();today.setHours(0,0,0,0);
+  var days=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  document.getElementById('cal-month-label').textContent=days[curDayDate.getDay()]+', '+MONTHS[curDayDate.getMonth()].slice(0,3)+' '+curDayDate.getDate()+', '+curDayDate.getFullYear();
+  var k=curDayDate.getFullYear()+'-'+(curDayDate.getMonth()+1)+'-'+curDayDate.getDate();
+  var da=apptData[k]||[];
+  var content=document.getElementById('cal-day-content');
+  content.innerHTML='';
+  if(da.length===0){var emp=document.createElement('div');emp.className='cal-empty';emp.textContent='No appointments this day.';content.appendChild(emp);return;}
+  da.forEach(function(a){
+    var row=document.createElement('div');
+    row.className='cal-day-appt a'+a.s.charAt(0);
+    var timeEl=document.createElement('div');timeEl.className='cal-day-time';timeEl.textContent=a.t.replace('am',' AM').replace('pm',' PM');
+    var info=document.createElement('div');
+    var name=document.createElement('div');name.className='cal-day-name';name.textContent=(a.recurring?'\u21bb ':'')+a.n;
+    var meta=document.createElement('div');meta.className='cal-day-meta';meta.textContent=a.cleaner+(a.s?' \u00b7 '+a.s:'');
+    info.appendChild(name);info.appendChild(meta);
+    row.appendChild(timeEl);row.appendChild(info);
+    row.dataset.appt=JSON.stringify(a);row.dataset.key=k;
+    row.addEventListener('click',function(){openAppt(JSON.parse(this.dataset.appt),this.dataset.key);});
+    content.appendChild(row);
+  });
+}
+
 document.getElementById('prev-btn').addEventListener('click',function(){changeMonth(-1);});
 document.getElementById('next-btn').addEventListener('click',function(){changeMonth(1);});
-function changeMonth(d){curMonth+=d;if(curMonth>12){curMonth=1;curYear++;}if(curMonth<1){curMonth=12;curYear--;}renderCal();}
+function changeMonth(d){
+  if(curCalView==='month'){
+    curMonth+=d;if(curMonth>12){curMonth=1;curYear++;}if(curMonth<1){curMonth=12;curYear--;}renderCal();
+  } else if(curCalView==='week'){
+    curWeekStart.setDate(curWeekStart.getDate()+(d*7));renderWeek();
+  } else {
+    curDayDate.setDate(curDayDate.getDate()+d);renderDay();
+  }
+}
 
 function openAppt(a,dateKey){
   var parts=dateKey.split('-');
@@ -2522,11 +2642,11 @@ function sv(view,el){
   if(el)el.classList.add('active');
   var titles={dashboard:'Dashboard',calendar:'Calendar',pipeline:'Pipeline',clients:'Clients',tasks:'VA Tasks',messaging:'Messaging',cleaners:'Cleaners',payroll:'Payroll',reporting:'Reporting',automations:'Automations',payments:'Payments',settings:'Settings',agent:'AI Agent'};
   var ctas={dashboard:'+ New lead',calendar:'+ New appointment',pipeline:'+ New lead',clients:'+ Add client',tasks:'+ Add task',messaging:'+ New message',cleaners:'+ Add cleaner',payroll:'Log hours',reporting:'Export',automations:'+ New automation',payments:'+ New invoice',settings:'',agent:''};
-  var secs={calendar:'Month view',payroll:'Export',reporting:'Export',automations:'Filter',payments:'Filter',settings:''};
+  var secs={payroll:'Export',reporting:'Export',automations:'Filter',payments:'Filter',settings:''};
   document.getElementById('page-title').textContent=titles[view]||view;
   document.getElementById('top-cta').textContent=ctas[view]||'+ New';
   document.getElementById('top-cta').style.display=(view==='agent'||view==='settings')?'none':'block';
-  document.getElementById('sec-btn').style.display=(view==='agent'||view==='settings')?'none':'block';
+  document.getElementById('sec-btn').style.display=(view==='agent'||view==='settings'||view==='calendar')?'none':'block';
   var searchViews=['clients','cleaners','pipeline','dashboard','payments','calendar'];
   document.getElementById('global-search-wrap').style.display=searchViews.indexOf(view)>=0?'block':'none';
   document.getElementById('global-search').value='';

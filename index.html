@@ -240,6 +240,9 @@ textarea{font-family:inherit;}
 .agent-bubble-ai{background:#fff;border:1px solid #e8e8e5;padding:12px 14px;border-radius:12px;border-bottom-left-radius:4px;font-size:13px;line-height:1.7;color:#1a1a1a;max-width:90%;}
 .agent-bubble-ai strong{font-weight:600;}
 .agent-thinking{display:flex;align-items:center;gap:8px;font-size:12px;color:#999;padding:4px 0;}
+.template-tab{font-size:12px;padding:5px 12px;border-radius:20px;border:1px solid #e0e0dd;background:#fff;color:#666;cursor:pointer;font-family:inherit;}
+.template-tab.active{background:#1D9E75;color:#fff;border-color:#1D9E75;}
+.template-tab:hover:not(.active){background:#f5f5f3;}
 .auto-card{background:#fff;border:1px solid #e8e8e5;border-radius:10px;padding:14px 16px;margin-bottom:10px;display:flex;align-items:flex-start;gap:14px;}
 .auto-card:hover{border-color:#e0e0dd;}
 .auto-toggle{flex-shrink:0;margin-top:2px;}
@@ -280,6 +283,8 @@ textarea{font-family:inherit;}
     <div class="nav-section">Automate</div>
     <div class="nav-item" onclick="sv('automations',this)"><svg class="nav-icon" viewBox="0 0 16 16" fill="none"><path d="M3 8a5 5 0 0 1 5-5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M13 8a5 5 0 0 1-5 5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M11 3l2 0 0 2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M5 13l-2 0 0-2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>Automations</div>
     <div class="nav-item" onclick="sv('payments',this)"><svg class="nav-icon" viewBox="0 0 16 16" fill="none"><rect x="1" y="3" width="14" height="10" rx="2" stroke="currentColor" stroke-width="1.3"/><path d="M1 7h14" stroke="currentColor" stroke-width="1.3"/><rect x="3" y="10" width="3" height="1.5" rx=".5" fill="currentColor" opacity=".6"/></svg>Payments</div>
+    <div class="nav-section">Config</div>
+    <div class="nav-item" onclick="sv('settings',this)"><svg class="nav-icon" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="2.5" stroke="currentColor" stroke-width="1.3"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2M3.05 3.05l1.41 1.41M11.54 11.54l1.41 1.41M3.05 12.95l1.41-1.41M11.54 4.46l1.41-1.41" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>Settings</div>
     <div class="nav-section">AI</div>
     <div class="nav-item" onclick="sv('agent',this)" style="color:#553c9a;"><svg class="nav-icon" viewBox="0 0 16 16" fill="none" style="opacity:1;"><circle cx="8" cy="8" r="6" stroke="#553c9a" stroke-width="1.3"/><path d="M5.5 9.5s.8 1.5 2.5 1.5 2.5-1.5 2.5-1.5" stroke="#553c9a" stroke-width="1.2" stroke-linecap="round"/><circle cx="6" cy="7" r="1" fill="#553c9a"/><circle cx="10" cy="7" r="1" fill="#553c9a"/></svg>AI Agent</div>
   </div>
@@ -704,7 +709,161 @@ textarea{font-family:inherit;}
         </div>
       </div>
 
-      <!-- AI AGENT VIEW -->      <!-- AI AGENT VIEW -->
+      <!-- SETTINGS VIEW -->
+      <div id="view-settings" class="vc">
+
+        <!-- BUSINESS INFO -->
+        <div style="background:#fff;border:1px solid #e8e8e5;border-radius:12px;padding:20px;margin-bottom:18px;">
+          <div style="font-size:14px;font-weight:600;color:#1a1a1a;margin-bottom:14px;">Business info</div>
+          <div class="form-two">
+            <div class="form-row"><label>Business name</label><input type="text" id="set-biz-name" value="Hawaii Natural Clean"></div>
+            <div class="form-row"><label>From email</label><input type="email" id="set-from-email" value="dane@hawaiinaturalclean.com"></div>
+          </div>
+          <div class="form-two">
+            <div class="form-row"><label>Phone</label><input type="tel" id="set-phone" value="(808) 468-5356"></div>
+            <div class="form-row"><label>Website</label><input type="text" id="set-website" value="hawaiinaturalclean.com"></div>
+          </div>
+          <div class="form-row"><label>Logo URL</label><input type="text" id="set-logo" placeholder="https://hawaiinaturalclean.com/logo.png"></div>
+          <div style="display:flex;gap:8px;margin-top:4px;align-items:center;">
+            <div id="set-logo-preview" style="width:48px;height:48px;border:1px solid #e8e8e5;border-radius:8px;display:flex;align-items:center;justify-content:center;overflow:hidden;background:#fafaf8;">
+              <span style="font-size:10px;color:#999;">Logo</span>
+            </div>
+            <button class="btn" style="font-size:12px;" onclick="previewLogo()">Preview logo</button>
+          </div>
+          <div style="margin-top:12px;">
+            <button class="btn btn-primary" style="font-size:12px;" onclick="saveSettings()">Save settings</button>
+          </div>
+        </div>
+
+        <!-- EMAIL TEMPLATES -->
+        <div style="font-size:14px;font-weight:600;color:#1a1a1a;margin-bottom:12px;">Email templates</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;" id="template-tabs">
+          <button class="template-tab active" onclick="switchTemplate('invoice',this)">Invoice</button>
+          <button class="template-tab" onclick="switchTemplate('reminder',this)">Appointment reminder</button>
+          <button class="template-tab" onclick="switchTemplate('thankyou',this)">Job complete</button>
+          <button class="template-tab" onclick="switchTemplate('receipt',this)">Payment receipt</button>
+          <button class="template-tab" onclick="switchTemplate('reactivation',this)">Reactivation</button>
+          <button class="template-tab" onclick="switchTemplate('quote',this)">Quote</button>
+          <button class="template-tab" onclick="switchTemplate('lead_followup',this)">Lead follow-up</button>
+          <button class="template-tab" onclick="switchTemplate('invoice_reminder',this)">Unpaid invoice</button>
+        </div>
+
+        <div style="background:#fff;border:1px solid #e8e8e5;border-radius:12px;padding:20px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+            <div style="font-size:13px;font-weight:600;color:#1a1a1a;" id="template-title">Invoice email</div>
+            <button class="btn" style="font-size:11px;" onclick="resetTemplate()">Reset to default</button>
+          </div>
+          <div class="form-row"><label>Subject line</label><input type="text" id="tmpl-subject"></div>
+          <div class="form-row"><label>Email body</label>
+            <textarea id="tmpl-body" style="min-height:180px;font-size:12px;line-height:1.7;"></textarea>
+          </div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;">
+            <button class="tone-btn" onclick="insertTmplVar('{{client_name}}')">+ Client name</button>
+            <button class="tone-btn" onclick="insertTmplVar('{{amount}}')">+ Amount</button>
+            <button class="tone-btn" onclick="insertTmplVar('{{service}}')">+ Service</button>
+            <button class="tone-btn" onclick="insertTmplVar('{{date}}')">+ Date</button>
+            <button class="tone-btn" onclick="insertTmplVar('{{time}}')">+ Time</button>
+            <button class="tone-btn" onclick="insertTmplVar('{{cleaner}}')">+ Cleaner</button>
+            <button class="tone-btn" onclick="insertTmplVar('{{invoice_url}}')">+ Invoice link</button>
+            <button class="tone-btn" onclick="insertTmplVar('{{business_name}}')">+ Business name</button>
+            <button class="tone-btn" onclick="insertTmplVar('{{phone}}')">+ Phone</button>
+          </div>
+          <div style="display:flex;gap:8px;">
+            <button class="btn btn-primary" style="font-size:12px;" onclick="saveTemplate()">Save template</button>
+            <button class="btn" style="font-size:12px;background:#f0faf6;color:#276749;border-color:#9ae6b4;" onclick="previewTemplate()">Preview email</button>
+          </div>
+          <div class="success-bar" id="tmpl-success">Template saved!</div>
+        </div>
+
+        <!-- PREVIEW MODAL -->
+        <div id="email-preview-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;align-items:center;justify-content:center;">
+          <div style="background:#fff;border-radius:12px;width:90%;max-width:600px;max-height:80vh;overflow:auto;padding:24px;position:relative;">
+            <button onclick="closeEmailPreview()" style="position:absolute;top:12px;right:12px;background:none;border:none;font-size:18px;cursor:pointer;">&#x2715;</button>
+            <div style="font-size:13px;font-weight:600;margin-bottom:16px;color:#666;">Email preview</div>
+            <div id="email-preview-content"></div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- AI AGENT VIEW -->      <!-- SETTINGS VIEW -->
+      <div id="view-settings" class="vc">
+
+        <!-- BUSINESS INFO -->
+        <div style="background:#fff;border:1px solid #e8e8e5;border-radius:12px;padding:20px;margin-bottom:18px;">
+          <div style="font-size:14px;font-weight:600;color:#1a1a1a;margin-bottom:14px;">Business info</div>
+          <div class="form-two">
+            <div class="form-row"><label>Business name</label><input type="text" id="set-biz-name" value="Hawaii Natural Clean"></div>
+            <div class="form-row"><label>From email</label><input type="email" id="set-from-email" value="dane@hawaiinaturalclean.com"></div>
+          </div>
+          <div class="form-two">
+            <div class="form-row"><label>Phone</label><input type="tel" id="set-phone" value="(808) 468-5356"></div>
+            <div class="form-row"><label>Website</label><input type="text" id="set-website" value="hawaiinaturalclean.com"></div>
+          </div>
+          <div class="form-row"><label>Logo URL</label><input type="text" id="set-logo" placeholder="https://hawaiinaturalclean.com/logo.png"></div>
+          <div style="display:flex;gap:8px;margin-top:4px;align-items:center;">
+            <div id="set-logo-preview" style="width:48px;height:48px;border:1px solid #e8e8e5;border-radius:8px;display:flex;align-items:center;justify-content:center;overflow:hidden;background:#fafaf8;">
+              <span style="font-size:10px;color:#999;">Logo</span>
+            </div>
+            <button class="btn" style="font-size:12px;" onclick="previewLogo()">Preview logo</button>
+          </div>
+          <div style="margin-top:12px;">
+            <button class="btn btn-primary" style="font-size:12px;" onclick="saveSettings()">Save settings</button>
+          </div>
+        </div>
+
+        <!-- EMAIL TEMPLATES -->
+        <div style="font-size:14px;font-weight:600;color:#1a1a1a;margin-bottom:12px;">Email templates</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;" id="template-tabs">
+          <button class="template-tab active" onclick="switchTemplate('invoice',this)">Invoice</button>
+          <button class="template-tab" onclick="switchTemplate('reminder',this)">Appointment reminder</button>
+          <button class="template-tab" onclick="switchTemplate('thankyou',this)">Job complete</button>
+          <button class="template-tab" onclick="switchTemplate('receipt',this)">Payment receipt</button>
+          <button class="template-tab" onclick="switchTemplate('reactivation',this)">Reactivation</button>
+          <button class="template-tab" onclick="switchTemplate('quote',this)">Quote</button>
+          <button class="template-tab" onclick="switchTemplate('lead_followup',this)">Lead follow-up</button>
+          <button class="template-tab" onclick="switchTemplate('invoice_reminder',this)">Unpaid invoice</button>
+        </div>
+
+        <div style="background:#fff;border:1px solid #e8e8e5;border-radius:12px;padding:20px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+            <div style="font-size:13px;font-weight:600;color:#1a1a1a;" id="template-title">Invoice email</div>
+            <button class="btn" style="font-size:11px;" onclick="resetTemplate()">Reset to default</button>
+          </div>
+          <div class="form-row"><label>Subject line</label><input type="text" id="tmpl-subject"></div>
+          <div class="form-row"><label>Email body</label>
+            <textarea id="tmpl-body" style="min-height:180px;font-size:12px;line-height:1.7;"></textarea>
+          </div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;">
+            <button class="tone-btn" onclick="insertTmplVar('{{client_name}}')">+ Client name</button>
+            <button class="tone-btn" onclick="insertTmplVar('{{amount}}')">+ Amount</button>
+            <button class="tone-btn" onclick="insertTmplVar('{{service}}')">+ Service</button>
+            <button class="tone-btn" onclick="insertTmplVar('{{date}}')">+ Date</button>
+            <button class="tone-btn" onclick="insertTmplVar('{{time}}')">+ Time</button>
+            <button class="tone-btn" onclick="insertTmplVar('{{cleaner}}')">+ Cleaner</button>
+            <button class="tone-btn" onclick="insertTmplVar('{{invoice_url}}')">+ Invoice link</button>
+            <button class="tone-btn" onclick="insertTmplVar('{{business_name}}')">+ Business name</button>
+            <button class="tone-btn" onclick="insertTmplVar('{{phone}}')">+ Phone</button>
+          </div>
+          <div style="display:flex;gap:8px;">
+            <button class="btn btn-primary" style="font-size:12px;" onclick="saveTemplate()">Save template</button>
+            <button class="btn" style="font-size:12px;background:#f0faf6;color:#276749;border-color:#9ae6b4;" onclick="previewTemplate()">Preview email</button>
+          </div>
+          <div class="success-bar" id="tmpl-success">Template saved!</div>
+        </div>
+
+        <!-- PREVIEW MODAL -->
+        <div id="email-preview-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;align-items:center;justify-content:center;">
+          <div style="background:#fff;border-radius:12px;width:90%;max-width:600px;max-height:80vh;overflow:auto;padding:24px;position:relative;">
+            <button onclick="closeEmailPreview()" style="position:absolute;top:12px;right:12px;background:none;border:none;font-size:18px;cursor:pointer;">&#x2715;</button>
+            <div style="font-size:13px;font-weight:600;margin-bottom:16px;color:#666;">Email preview</div>
+            <div id="email-preview-content"></div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- AI AGENT VIEW -->
       <div id="view-agent" class="vc">
         <div style="max-width:680px;margin:0 auto;">
           <div style="text-align:center;padding:20px 0 18px;">
@@ -2253,16 +2412,17 @@ function sv(view,el){
   document.querySelectorAll('.nav-item').forEach(function(n){n.classList.remove('active');});
   document.getElementById('view-'+view).classList.add('active');
   if(el)el.classList.add('active');
-  var titles={dashboard:'Dashboard',calendar:'Calendar',pipeline:'Pipeline',clients:'Clients',tasks:'VA Tasks',messaging:'Messaging',cleaners:'Cleaners',payroll:'Payroll',reporting:'Reporting',automations:'Automations',payments:'Payments',agent:'AI Agent'};
-  var ctas={dashboard:'+ New lead',calendar:'+ New appointment',pipeline:'+ New lead',clients:'+ Add client',tasks:'+ Add task',messaging:'+ New message',cleaners:'+ Add cleaner',payroll:'Log hours',reporting:'Export',automations:'+ New automation',payments:'+ New invoice',agent:''};
-  var secs={calendar:'Month view',payroll:'Export',reporting:'Export',automations:'Filter',payments:'Filter'};
+  var titles={dashboard:'Dashboard',calendar:'Calendar',pipeline:'Pipeline',clients:'Clients',tasks:'VA Tasks',messaging:'Messaging',cleaners:'Cleaners',payroll:'Payroll',reporting:'Reporting',automations:'Automations',payments:'Payments',settings:'Settings',agent:'AI Agent'};
+  var ctas={dashboard:'+ New lead',calendar:'+ New appointment',pipeline:'+ New lead',clients:'+ Add client',tasks:'+ Add task',messaging:'+ New message',cleaners:'+ Add cleaner',payroll:'Log hours',reporting:'Export',automations:'+ New automation',payments:'+ New invoice',settings:'',agent:''};
+  var secs={calendar:'Month view',payroll:'Export',reporting:'Export',automations:'Filter',payments:'Filter',settings:''};
   document.getElementById('page-title').textContent=titles[view]||view;
   document.getElementById('top-cta').textContent=ctas[view]||'+ New';
-  document.getElementById('top-cta').style.display=view==='agent'?'none':'block';
-  document.getElementById('sec-btn').style.display=view==='agent'?'none':'block';
+  document.getElementById('top-cta').style.display=(view==='agent'||view==='settings')?'none':'block';
+  document.getElementById('sec-btn').style.display=(view==='agent'||view==='settings')?'none':'block';
   document.getElementById('sec-btn').textContent=secs[view]||'Filter';
   if(view==='messaging')renderInbox();
   if(view==='automations')renderAutomations();
+  if(view==='settings')initTemplateEditor();
 }
 
 function setPeriod(btn){document.querySelectorAll('.pbtn').forEach(function(b){b.classList.remove('active');});btn.classList.add('active');}
@@ -3659,6 +3819,205 @@ function attachAutocomplete(inputId){
     }
   });
   input._autocomplete=true;
+}
+
+
+/* SETTINGS & EMAIL TEMPLATES */
+var bizSettings = {
+  name: 'Hawaii Natural Clean',
+  fromEmail: 'dane@hawaiinaturalclean.com',
+  phone: '(808) 468-5356',
+  website: 'hawaiinaturalclean.com',
+  logo: ''
+};
+
+var emailTemplates = {
+  invoice: {
+    title: 'Invoice email',
+    subject: 'Invoice from Hawaii Natural Clean — {{amount}} due',
+    body: 'Hi {{client_name}},\n\nThank you for choosing Hawaii Natural Clean! Please find your invoice for {{service}} below.\n\nAmount due: {{amount}}\nPayment terms: Due now\n\nPay by ACH bank transfer — FREE\nPay by card — 3% processing fee added\n\n{{invoice_url}}\n\nThank you for your business!\n\n— {{business_name}}\n{{phone}}'
+  },
+  reminder: {
+    title: 'Appointment reminder',
+    subject: 'Reminder: Your cleaning is tomorrow — Hawaii Natural Clean',
+    body: 'Hi {{client_name}},\n\nJust a friendly reminder that your cleaning is scheduled for tomorrow!\n\nService: {{service}}\nDate: {{date}}\nTime: {{time}}\nCleaner: {{cleaner}}\n\nQuestions? Reply to this email or text us at {{phone}}.\n\nSee you tomorrow!\n— {{business_name}}'
+  },
+  thankyou: {
+    title: 'Job complete thank you',
+    subject: 'Your home is sparkling clean! 🌺',
+    body: 'Hi {{client_name}},\n\nYour home has been cleaned and we hope everything looks amazing!\n\nIf you have a moment, we would really appreciate a Google review — it helps us grow and serve more families in Hawaii.\n\nLeave a review: https://g.page/r/hawaiinaturalclean/review\n\nThank you for choosing us!\n— The {{business_name}} Team\n{{phone}}'
+  },
+  receipt: {
+    title: 'Payment receipt',
+    subject: 'Payment received — Hawaii Natural Clean',
+    body: 'Hi {{client_name}},\n\nWe have received your payment of {{amount}} for {{service}}.\n\nThank you!\n— {{business_name}}\n{{phone}}'
+  },
+  reactivation: {
+    title: 'Reactivation email',
+    subject: 'We miss you, {{client_name}}! 10% off your next clean 🌺',
+    body: 'Hi {{client_name}},\n\nIt has been a while since your last cleaning and we wanted to reach out!\n\nWe are offering 10% off your next booking this month. Reply to this email or text us at {{phone}} to schedule.\n\nWe would love to have you back!\n— {{business_name}}'
+  },
+  quote: {
+    title: 'Quote email',
+    subject: 'Your cleaning quote from Hawaii Natural Clean',
+    body: 'Hi {{client_name}},\n\nThank you for your interest in Hawaii Natural Clean! Here is your quote:\n\nService: {{service}}\nEstimated price: {{amount}}\n\nThis quote is valid for 7 days. Reply to this email or text us at {{phone}} to book.\n\nMahalo!\n— {{business_name}}'
+  },
+  lead_followup: {
+    title: 'Lead follow-up',
+    subject: 'Following up on your Hawaii Natural Clean inquiry',
+    body: 'Hi {{client_name}},\n\nI wanted to follow up on your recent inquiry about our cleaning services. We would love to help keep your home spotless!\n\nWe serve all of Oahu and Maui with professional, reliable cleaning teams.\n\nReply to this email or text us at {{phone}} — we are happy to answer any questions.\n\nMahalo!\n— {{business_name}}'
+  },
+  invoice_reminder: {
+    title: 'Unpaid invoice reminder',
+    subject: 'Reminder: Invoice for {{amount}} is outstanding',
+    body: 'Hi {{client_name}},\n\nThis is a friendly reminder that your invoice for {{amount}} is still outstanding.\n\nYou can pay online here: {{invoice_url}}\n\nPay by ACH — FREE\nPay by card — 3% fee\n\nPlease reach out if you have any questions.\n\nThank you!\n— {{business_name}}\n{{phone}}'
+  }
+};
+
+var currentTemplate = 'invoice';
+
+function switchTemplate(type, btn) {
+  currentTemplate = type;
+  document.querySelectorAll('.template-tab').forEach(function(b){b.classList.remove('active');});
+  btn.classList.add('active');
+  var tmpl = emailTemplates[type];
+  document.getElementById('template-title').textContent = tmpl.title;
+  document.getElementById('tmpl-subject').value = tmpl.subject;
+  document.getElementById('tmpl-body').value = tmpl.body;
+}
+
+function saveTemplate() {
+  emailTemplates[currentTemplate].subject = document.getElementById('tmpl-subject').value;
+  emailTemplates[currentTemplate].body = document.getElementById('tmpl-body').value;
+  var s = document.getElementById('tmpl-success');
+  s.classList.add('show');
+  setTimeout(function(){s.classList.remove('show');}, 2000);
+}
+
+function resetTemplate() {
+  if(!confirm('Reset this template to default?')) return;
+  switchTemplate(currentTemplate, document.querySelector('.template-tab.active'));
+}
+
+function insertTmplVar(v) {
+  var ta = document.getElementById('tmpl-body');
+  var pos = ta.selectionStart;
+  ta.value = ta.value.slice(0,pos) + v + ta.value.slice(ta.selectionEnd);
+  ta.focus();
+  ta.selectionStart = ta.selectionEnd = pos + v.length;
+}
+
+function saveSettings() {
+  bizSettings.name = document.getElementById('set-biz-name').value;
+  bizSettings.fromEmail = document.getElementById('set-from-email').value;
+  bizSettings.phone = document.getElementById('set-phone').value;
+  bizSettings.website = document.getElementById('set-website').value;
+  bizSettings.logo = document.getElementById('set-logo').value;
+  showPaymentToast('Settings saved!', null, 'success');
+}
+
+function previewLogo() {
+  var url = document.getElementById('set-logo').value;
+  var preview = document.getElementById('set-logo-preview');
+  if(url) {
+    var img = document.createElement('img');
+    img.src = url;
+    img.style.cssText = 'width:100%;height:100%;object-fit:contain;';
+    img.onerror = function(){ preview.innerHTML = '<span style="font-size:10px;color:#e53e3e;">Not found</span>'; };
+    preview.innerHTML = '';
+    preview.appendChild(img);
+  }
+}
+
+function previewTemplate() {
+  var subject = document.getElementById('tmpl-subject').value;
+  var body = document.getElementById('tmpl-body').value;
+  // Replace variables with sample data
+  var sample = {
+    '{{client_name}}': 'Sarah Johnson',
+    '{{amount}}': '$238.22',
+    '{{service}}': 'Standard clean',
+    '{{date}}': 'April 14, 2026',
+    '{{time}}': '9:00 AM',
+    '{{cleaner}}': 'Kaimana M.',
+    '{{invoice_url}}': '<a href="#" style="color:#1D9E75;">Click here to pay →</a>',
+    '{{business_name}}': bizSettings.name,
+    '{{phone}}': bizSettings.phone
+  };
+  Object.entries(sample).forEach(function(e){
+    subject = subject.replace(new RegExp(e[0].replace(/[{}]/g,'\$&'),'g'), e[1]);
+    body = body.replace(new RegExp(e[0].replace(/[{}]/g,'\$&'),'g'), e[1]);
+  });
+  var logoHtml = bizSettings.logo ? '<img src="'+bizSettings.logo+'" style="height:40px;margin-bottom:20px;"><br>' : '';
+  var html = '<div style="font-family:sans-serif;padding:20px;background:#f9f9f7;border-radius:8px;">'
+    + logoHtml
+    + '<div style="font-size:11px;color:#999;margin-bottom:4px;">Subject: <strong>'+subject+'</strong></div>'
+    + '<hr style="border:none;border-top:1px solid #e8e8e5;margin:12px 0;">'
+    + '<div style="font-size:13px;line-height:1.8;white-space:pre-wrap;">'+body+'</div>'
+    + '</div>';
+  document.getElementById('email-preview-content').innerHTML = html;
+  document.getElementById('email-preview-modal').style.display = 'flex';
+}
+
+function closeEmailPreview() {
+  document.getElementById('email-preview-modal').style.display = 'none';
+}
+
+function buildEmailHtml(type, data) {
+  var tmpl = emailTemplates[type] || emailTemplates.invoice;
+  var body = tmpl.body;
+  var subject = tmpl.subject;
+  var vars = {
+    '{{client_name}}': data.clientName || '',
+    '{{amount}}': data.amount || '',
+    '{{service}}': data.service || '',
+    '{{date}}': data.date || '',
+    '{{time}}': data.time || '',
+    '{{cleaner}}': data.cleaner || '',
+    '{{invoice_url}}': data.invoiceUrl ? '<a href="'+data.invoiceUrl+'" style="display:inline-block;background:#1D9E75;color:#fff;padding:10px 20px;border-radius:8px;text-decoration:none;font-weight:600;">Pay Invoice →</a>' : '',
+    '{{business_name}}': bizSettings.name,
+    '{{phone}}': bizSettings.phone
+  };
+  Object.entries(vars).forEach(function(e){
+    var key = e[0].replace(/[{}]/g,'\$&');
+    body = body.replace(new RegExp(key,'g'), e[1]);
+    subject = subject.replace(new RegExp(key,'g'), e[1]);
+  });
+  var logoHtml = bizSettings.logo ? '<img src="'+bizSettings.logo+'" style="height:48px;margin-bottom:20px;"><br>' : '';
+  var html = '<div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:32px 24px;color:#1a1a1a;">'
+    + logoHtml
+    + '<div style="font-size:13px;line-height:1.8;white-space:pre-wrap;">'+body+'</div>'
+    + '<p style="color:#999;font-size:11px;margin-top:32px;padding-top:16px;border-top:1px solid #e8e8e5;">'+bizSettings.name+' &middot; '+bizSettings.website+'</p>'
+    + '</div>';
+  return { subject: subject, html: html };
+}
+
+async function sendEmail(type, data) {
+  var built = buildEmailHtml(type, data);
+  try {
+    var response = await fetch('/api/send-email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        to: data.email,
+        subject: built.subject,
+        html: built.html
+      })
+    });
+    var result = await response.json();
+    console.log('Email sent:', result);
+    return result;
+  } catch(err) {
+    console.error('Email error:', err);
+    return { success: false, error: err.message };
+  }
+}
+
+// Initialize template editor with first template
+function initTemplateEditor() {
+  var tmpl = emailTemplates[currentTemplate];
+  document.getElementById('tmpl-subject').value = tmpl.subject;
+  document.getElementById('tmpl-body').value = tmpl.body;
 }
 
 </script>

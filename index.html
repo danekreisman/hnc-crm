@@ -330,10 +330,18 @@ textarea{font-family:inherit;}
         </div>
         <div class="section-title">Lead pipeline snapshot</div>
         <div class="pipeline">
-          <div class="pipe-col"><div class="pipe-header"><span class="pipe-label">New inquiry</span><span class="pipe-count">4</span></div><div class="deal-card" onclick="openLead('maui-wellness')"><div class="deal-name">Maui Wellness Center</div><div class="deal-type"><span class="badge bc">Commercial</span></div><div class="deal-val">$1,200/mo</div></div><div class="deal-card" onclick="openLead('hale-koa')"><div class="deal-name">Hale Koa HOA</div><div class="deal-type"><span class="badge bc">Commercial</span></div><div class="deal-val">$2,800/mo</div></div></div>
-          <div class="pipe-col"><div class="pipe-header"><span class="pipe-label">Quoted</span><span class="pipe-count">3</span></div><div class="deal-card" onclick="openLead('oahu-dental')"><div class="deal-name">Oahu Dental Group</div><div class="deal-type"><span class="badge bc">Commercial</span></div><div class="deal-val">$950/mo</div></div><div class="deal-card" onclick="openLead('kailua-airbnb')"><div class="deal-name">Airbnb — Kailua</div><div class="deal-type"><span class="badge br">Residential</span></div><div class="deal-val">$180/clean</div></div></div>
-          <div class="pipe-col"><div class="pipe-header"><span class="pipe-label">Follow-up</span><span class="pipe-count">3</span></div><div class="deal-card" onclick="openLead('hnl-airport')"><div class="deal-name">HNL Airport</div><div class="deal-type"><span class="badge bg2">Gov</span> <span class="badge bh">Hot</span></div><div class="deal-val">$14k/mo</div></div><div class="deal-card" onclick="openLead('pearl-city-law')"><div class="deal-name">Pearl City Law</div><div class="deal-type"><span class="badge bc">Commercial</span></div><div class="deal-val">$600/mo</div></div></div>
-          <div class="pipe-col"><div class="pipe-header"><span class="pipe-label">Closed</span><span class="pipe-count">2</span></div><div class="deal-card" onclick="openLead('kona-coffee')"><div class="deal-name">Kona Coffee Co.</div><div class="deal-type"><span class="badge bc">Commercial</span></div><div class="deal-val">$750/mo</div></div></div>
+          <div class="pipe-col"><div class="pipe-header"><span class="pipe-label">New inquiry</span><span class="pipe-count">2</span></div>
+            <div class="deal-card" onclick="openLead('maui-wellness')"><div class="deal-name">Maui Wellness Center</div><div class="deal-type"><span class="badge bc">Commercial</span></div><div class="deal-val">$1,200/mo</div></div>
+            <div class="deal-card" onclick="openLead('hale-koa')"><div class="deal-name">Hale Koa HOA</div><div class="deal-type"><span class="badge bc">Commercial</span></div><div class="deal-val">$2,800/mo</div></div>
+          </div>
+          <div class="pipe-col"><div class="pipe-header"><span class="pipe-label">Quoted</span><span class="pipe-count">2</span></div>
+            <div class="deal-card" onclick="openLead('oahu-dental')"><div class="deal-name">Oahu Dental Group</div><div class="deal-type"><span class="badge bc">Commercial</span></div><div class="deal-val">$950/mo</div></div>
+            <div class="deal-card" onclick="openLead('kailua-airbnb')"><div class="deal-name">Airbnb — Kailua</div><div class="deal-type"><span class="badge br">Residential</span></div><div class="deal-val">$180/clean</div></div>
+          </div>
+          <div class="pipe-col"><div class="pipe-header"><span class="pipe-label">Follow-up</span><span class="pipe-count">2</span></div>
+            <div class="deal-card" onclick="openLead('hnl-airport')"><div class="deal-name">HNL Airport</div><div class="deal-type"><span class="badge bg2">Gov</span> <span class="badge bh">Hot</span></div><div class="deal-val">$14k/mo</div></div>
+            <div class="deal-card" onclick="openLead('pearl-city-law')"><div class="deal-name">Pearl City Law</div><div class="deal-type"><span class="badge bc">Commercial</span></div><div class="deal-val">$600/mo</div></div>
+          </div>
         </div>
         <div class="two-col">
           <div><div class="section-title">Recent clients</div><div class="tw"><table><thead><tr><th style="width:35%">Name</th><th style="width:22%">Type</th><th style="width:20%">Last job</th><th style="width:23%">Status</th></tr></thead><tbody>
@@ -358,24 +366,20 @@ textarea{font-family:inherit;}
           <div class="metric"><div class="metric-label">Avg close time</div><div class="metric-value">18d</div></div>
         </div>
         <div class="pipeline">
-          <div class="pipe-col"><div class="pipe-header"><span class="pipe-label">New inquiry</span><span class="pipe-count">4</span></div>
+          <div class="pipe-col"><div class="pipe-header"><span class="pipe-label">New inquiry</span><span class="pipe-count" id="count-inquiry">3</span></div>
             <div class="deal-card" onclick="openLead('maui-wellness')"><div class="deal-name">Maui Wellness Center</div><div class="deal-type"><span class="badge bc">Commercial</span></div><div class="deal-val">$1,200/mo</div></div>
             <div class="deal-card" onclick="openLead('sarah-k')"><div class="deal-name">Sarah K.</div><div class="deal-type"><span class="badge br">Residential</span></div><div class="deal-val">$280/visit</div></div>
             <div class="deal-card" onclick="openLead('hale-koa')"><div class="deal-name">Hale Koa HOA</div><div class="deal-type"><span class="badge bc">Commercial</span></div><div class="deal-val">$2,800/mo</div></div>
           </div>
-          <div class="pipe-col"><div class="pipe-header"><span class="pipe-label">Quoted</span><span class="pipe-count">3</span></div>
+          <div class="pipe-col"><div class="pipe-header"><span class="pipe-label">Quoted</span><span class="pipe-count" id="count-quoted">3</span></div>
             <div class="deal-card" onclick="openLead('oahu-dental')"><div class="deal-name">Oahu Dental Group</div><div class="deal-type"><span class="badge bc">Commercial</span></div><div class="deal-val">$950/mo</div></div>
             <div class="deal-card" onclick="openLead('kailua-airbnb')"><div class="deal-name">Airbnb — Kailua</div><div class="deal-type"><span class="badge br">Residential</span></div><div class="deal-val">$180/clean</div></div>
             <div class="deal-card" onclick="openLead('kakaako-med')"><div class="deal-name">Kakaako Medical</div><div class="deal-type"><span class="badge bc">Commercial</span></div><div class="deal-val">$1,100/mo</div></div>
           </div>
-          <div class="pipe-col"><div class="pipe-header"><span class="pipe-label">Follow-up</span><span class="pipe-count">3</span></div>
+          <div class="pipe-col"><div class="pipe-header"><span class="pipe-label">Follow-up</span><span class="pipe-count" id="count-followup">3</span></div>
             <div class="deal-card" onclick="openLead('hnl-airport')"><div class="deal-name">HNL Airport</div><div class="deal-type"><span class="badge bg2">Gov</span> <span class="badge bh">Hot</span></div><div class="deal-val">$14k/mo</div></div>
             <div class="deal-card" onclick="openLead('pearl-city-law')"><div class="deal-name">Pearl City Law</div><div class="deal-type"><span class="badge bc">Commercial</span></div><div class="deal-val">$600/mo</div></div>
             <div class="deal-card" onclick="openLead('waikiki-hotel')"><div class="deal-name">Waikiki Hotel</div><div class="deal-type"><span class="badge bc">Commercial</span></div><div class="deal-val">$3,200/mo</div></div>
-          </div>
-          <div class="pipe-col"><div class="pipe-header"><span class="pipe-label">Closed won</span><span class="pipe-count">2</span></div>
-            <div class="deal-card" onclick="openLead('kona-coffee')"><div class="deal-name">Kona Coffee Co.</div><div class="deal-type"><span class="badge bc">Commercial</span></div><div class="deal-val">$750/mo</div></div>
-            <div class="deal-card" onclick="openLead('lani-p')"><div class="deal-name">Lani P.</div><div class="deal-type"><span class="badge br">Residential</span></div><div class="deal-val">$240/mo</div></div>
           </div>
         </div>
       </div>
@@ -1191,10 +1195,13 @@ textarea{font-family:inherit;}
           <div class="success-bar" id="quote-success" style="margin-top:8px;margin-bottom:0;">Quote sent successfully!</div>
         </div>
         <div class="action-grid" style="margin-top:14px;">
+          <button class="action-btn green full" onclick="scheduleLeadAppointment()">Book appointment</button>
           <button class="action-btn blue" onclick="openMsgFromLead()">Message lead</button>
           <button class="action-btn amber" onclick="showLeadEdit()">Edit lead</button>
+          <button class="action-btn amber" onclick="markLeadLost()">Mark as lost</button>
           <button class="action-btn red" onclick="deleteRecord('lead')">Delete lead</button>
         </div>
+        <div class="success-bar" id="lead-action-success" style="margin-top:10px;"></div>
       </div>
       <div id="lead-edit" style="display:none;">
         <div class="panel-section">Edit lead</div>
@@ -1205,7 +1212,7 @@ textarea{font-family:inherit;}
         <div class="form-row"><label>Address</label><input type="text" id="led-address"></div>
         <div class="form-row"><label>Est. monthly value ($)</label><input type="number" id="led-value"></div>
         <div class="form-row"><label>Service type</label><select id="led-service"><option>Standard clean</option><option>Commercial weekly</option><option>Commercial daily</option><option>Deep clean</option><option>Move-out clean</option><option>Janitorial</option></select></div>
-        <div class="form-row"><label>Stage</label><select id="led-stage"><option>New inquiry</option><option>Quoted</option><option>Follow-up</option><option>Closed won</option><option>Closed lost</option></select></div>
+        <div class="form-row"><label>Stage</label><select id="led-stage"><option>New inquiry</option><option>Quoted</option><option>Follow-up</option></select></div>
         <div class="form-row"><label>Lead source</label><select id="led-source"><option>Google SEO</option><option>Referral</option><option>Cold outreach</option><option>Walk-in</option><option>Social media</option></select></div>
         <div class="form-row"><label>Next action</label><input type="text" id="led-action"></div>
         <div class="form-row"><label>Due date</label><input type="date" id="led-due"></div>
@@ -1611,7 +1618,7 @@ function renderLeadsPipeline(){
   Object.entries(leadDB).forEach(function(entry){
     var id=entry[0];var l=entry[1];
     if(id.length<30)return;
-    var stageMap={'New inquiry':0,'Quoted':1,'Follow-up':2,'Closed won':3};
+    var stageMap={'New inquiry':0,'Quoted':1,'Follow-up':2};
     var colIdx=stageMap[l.stage]||0;
     ['view-dashboard','view-pipeline'].forEach(function(viewId){
       var view=document.getElementById(viewId);
@@ -2599,7 +2606,7 @@ function saveNewLead(){
     notes:document.getElementById('nl-notes').value||'—'
   };
   // Add card to correct pipeline column in both dashboard and pipeline views
-  var stageMap={'New inquiry':0,'Quoted':1,'Follow-up':2,'Closed won':3};
+  var stageMap={'New inquiry':0,'Quoted':1,'Follow-up':2};
   var colIdx=stageMap[stage]||0;
   ['view-dashboard','view-pipeline'].forEach(function(viewId){
     var view=document.getElementById(viewId);
@@ -3657,14 +3664,27 @@ function sendNewMessage(){
 
 /* DELETE RECORDS */
 function deleteRecord(type){
-  var msg='';
   var id=null;
   var name='';
-  if(type==='client'){id=currentClientId;name=currentClientName;msg='Delete '+name+' and all their data? This cannot be undone.';}
-  else if(type==='lead'){id=currentLeadId;name=currentLeadName;msg='Delete lead "'+name+'"? This cannot be undone.';}
-  else if(type==='cleaner'){id=currentCleanerId;name=cleanerDB[currentCleanerId]?cleanerDB[currentCleanerId].name:'this cleaner';msg='Delete '+name+' from the roster? This cannot be undone.';}
+  var msg='';
+  if(type==='client'){
+    id=currentClientId;
+    name=currentClientName;
+    msg='Delete '+name+' and all their data? This cannot be undone.';
+  } else if(type==='lead'){
+    id=currentLeadId;
+    name=currentLeadName||'this lead';
+    // Also get name from leadDB if available
+    if(id&&leadDB[id])name=leadDB[id].name||name;
+    msg='Delete lead "'+name+'"? This cannot be undone.';
+  } else if(type==='cleaner'){
+    id=currentCleanerId;
+    name=cleanerDB[currentCleanerId]?cleanerDB[currentCleanerId].name:'this cleaner';
+    msg='Delete '+name+' from the roster? This cannot be undone.';
+  }
   if(!confirm(msg))return;
-  // Delete from Supabase if real DB record
+
+  // Delete from Supabase
   if(id&&id.length>20){
     var table=type==='client'?'clients':type==='lead'?'leads':'cleaners';
     db.from(table).delete().eq('id',id).then(function(res){
@@ -3672,25 +3692,32 @@ function deleteRecord(type){
       else console.log(type+' deleted from Supabase');
     });
   }
-  // Remove from local DB
-  if(type==='client'&&id){
-    delete clientDB[id];
-    // Remove from table
-    var rows=document.querySelectorAll('#view-clients tbody tr, #view-dashboard tbody tr');
-    rows.forEach(function(row){if(row.textContent.indexOf(name)>=0)row.remove();});
-  } else if(type==='lead'&&id){
-    delete leadDB[id];
-    // Remove from pipeline cards
-    document.querySelectorAll('.deal-card').forEach(function(card){
-      if(card.querySelector('.deal-name')&&card.querySelector('.deal-name').textContent===name)card.remove();
+
+  // Remove from local DB and UI
+  if(type==='client'){
+    if(id)delete clientDB[id];
+    document.querySelectorAll('#view-clients tbody tr, #view-dashboard tbody tr').forEach(function(row){
+      if(row.textContent.indexOf(name)>=0)row.remove();
     });
-  } else if(type==='cleaner'&&id){
-    delete cleanerDB[id];
-    // Remove from grid
-    document.querySelectorAll('.cleaner-card.db-card').forEach(function(card){
-      if(card.querySelector('.cleaner-name')&&card.querySelector('.cleaner-name').textContent===name)card.remove();
+  } else if(type==='lead'){
+    if(id)delete leadDB[id];
+    // Remove pipeline card by name
+    document.querySelectorAll('.deal-card').forEach(function(card){
+      var nameEl=card.querySelector('.deal-name');
+      if(nameEl&&nameEl.textContent.trim()===name.trim())card.remove();
+    });
+    // Remove from hidden leads table too
+    document.querySelectorAll('#hidden-leads-tbody tr').forEach(function(row){
+      if(row.textContent.indexOf(name)>=0)row.remove();
+    });
+  } else if(type==='cleaner'){
+    if(id)delete cleanerDB[id];
+    document.querySelectorAll('.cleaner-card').forEach(function(card){
+      var nameEl=card.querySelector('.cleaner-name');
+      if(nameEl&&nameEl.textContent.trim()===name.trim())card.remove();
     });
   }
+
   closeOverlay(type+'-overlay');
   showPaymentToast(name+' deleted successfully.',null,'success');
 }
@@ -4019,6 +4046,279 @@ function initTemplateEditor() {
   document.getElementById('tmpl-subject').value = tmpl.subject;
   document.getElementById('tmpl-body').value = tmpl.body;
 }
+
+
+/* LEAD ACTIONS */
+function scheduleLeadAppointment(){
+  var lead = currentLeadId ? leadDB[currentLeadId] : null;
+  if(!lead) return;
+
+  // Convert lead to client automatically
+  var clientId = 'client-' + Date.now();
+  var isCommercial = lead.service && lead.service.toLowerCase().indexOf('commercial') >= 0;
+  clientDB[clientId] = {
+    name: lead.name,
+    type: isCommercial ? 'Commercial' : 'Residential',
+    phone: lead.phone || '—',
+    email: lead.email || '—',
+    address: lead.address || '—',
+    payment: '—',
+    since: new Date().toLocaleDateString('en-US',{month:'long',year:'numeric'}),
+    ltv: '$0', mrr: lead.value || '—',
+    jobs: '0', avg: '—',
+    service: lead.service || 'Standard clean',
+    freq: 'TBD', sqft: lead.sqft || '—',
+    bedbath: '— bed / — bath',
+    cleaner: 'No preference',
+    lastjob: 'None yet', nextjob: 'Not scheduled',
+    status: 'New',
+    notes: 'Converted from lead. ' + (lead.notes || ''),
+    history: []
+  };
+
+  // Save client to Supabase
+  dbSaveClient({
+    name: lead.name, type: clientDB[clientId].type,
+    phone: lead.phone, email: lead.email, address: lead.address,
+    service: lead.service, notes: clientDB[clientId].notes
+  });
+
+  // Remove lead from pipeline cards
+  document.querySelectorAll('.deal-card').forEach(function(card){
+    if(card.querySelector('.deal-name') && card.querySelector('.deal-name').textContent === lead.name) card.remove();
+  });
+
+  // Add to hidden leads table
+  var htbody = document.getElementById('hidden-leads-tbody');
+  if(htbody){
+    var htr = document.createElement('tr');
+    htr.style.borderTop = '1px solid #e8e8e5';
+    htr.innerHTML = '<td style="padding:8px 12px;font-size:12px;font-weight:600;">'+lead.name+'</td>'
+      +'<td style="padding:8px 12px;font-size:12px;color:#666;">'+(lead.service||'—')+'</td>'
+      +'<td style="padding:8px 12px;font-size:12px;color:#1D9E75;">'+(lead.value||'—')+'</td>'
+      +'<td style="padding:8px 12px;"><span class="badge bpd" style="font-size:10px;">Booked → Client</span></td>'
+      +'<td style="padding:8px 12px;"><button class="btn" style="font-size:11px;padding:3px 8px;" data-id="'+clientId+'" onclick="openClient(this.dataset.id)">View</button></td>';
+    htbody.insertBefore(htr, htbody.firstChild);
+  }
+
+  // Add to clients table
+  var ctbody = document.querySelector('#view-clients tbody');
+  if(ctbody){
+    var ctr = document.createElement('tr');
+    ctr.className = 'clickable db-row';
+    ctr.innerHTML = '<td>'+lead.name+'</td>'
+      +'<td><span class="badge '+(isCommercial?'bc':'br')+'">'+(isCommercial?'Commercial':'Residential')+'</span></td>'
+      +'<td>—</td><td>'+(lead.value||'—')+'</td><td>TBD</td>'
+      +'<td><span class="sd sn"></span>New</td>';
+    (function(cid){ctr.addEventListener('click',function(){openClient(cid);});})(clientId);
+    ctbody.insertBefore(ctr, ctbody.firstChild);
+  }
+
+  // Update lead stage in Supabase
+  if(currentLeadId && currentLeadId.length > 20){
+    db.from('leads').update({stage:'Closed won'}).eq('id', currentLeadId);
+  }
+
+  // Close lead panel and open booking form
+  closeOverlay('lead-overlay');
+  var calNav = null;
+  document.querySelectorAll('.nav-item').forEach(function(n){
+    if(n.textContent.trim()==='Calendar') calNav=n;
+  });
+  if(calNav) sv('calendar', calNav);
+  setTimeout(function(){
+    document.getElementById('new-appt-overlay').classList.remove('hidden');
+    calcPrice();
+    var nameEl = document.getElementById('na-name');
+    var addrEl = document.getElementById('na-address');
+    if(nameEl) nameEl.value = lead.name || '';
+    if(addrEl) addrEl.value = lead.address || '';
+    showPaymentToast(lead.name + ' added as client. Complete the booking details below.', null, 'success');
+  }, 200);
+}
+
+function convertLeadToClient(){
+  var lead = currentLeadId ? leadDB[currentLeadId] : null;
+  if(!lead) return;
+  if(!confirm('Convert "'+lead.name+'" to a client? They will be removed from the pipeline and added to your client list.')) return;
+
+  // Create client from lead data
+  var id = 'client-' + Date.now();
+  clientDB[id] = {
+    name: lead.name,
+    type: lead.service && lead.service.toLowerCase().indexOf('commercial') >= 0 ? 'Commercial' : 'Residential',
+    phone: lead.phone || '—',
+    email: lead.email || '—',
+    address: lead.address || '—',
+    payment: '—',
+    since: new Date().toLocaleDateString('en-US',{month:'long',year:'numeric'}),
+    ltv: '$0', mrr: lead.value || '—',
+    jobs: '0', avg: '—',
+    service: lead.service || 'Standard clean',
+    freq: 'TBD', sqft: lead.sqft || '—',
+    bedbath: '— bed / — bath',
+    cleaner: 'No preference',
+    lastjob: 'None yet', nextjob: 'Not scheduled',
+    status: 'New',
+    notes: 'Converted from lead on ' + new Date().toLocaleDateString() + '. ' + (lead.notes || ''),
+    history: []
+  };
+
+  // Save to Supabase
+  dbSaveClient({
+    name: lead.name,
+    type: clientDB[id].type,
+    phone: lead.phone,
+    email: lead.email,
+    address: lead.address,
+    service: lead.service,
+    notes: clientDB[id].notes
+  });
+
+  // Update lead stage to won in Supabase
+  if(currentLeadId && currentLeadId.length > 20){
+    db.from('leads').update({stage:'Closed won'}).eq('id',currentLeadId);
+  }
+
+  // Remove lead card from pipeline
+  document.querySelectorAll('.deal-card').forEach(function(card){
+    if(card.querySelector('.deal-name') && card.querySelector('.deal-name').textContent === lead.name){
+      card.remove();
+    }
+  });
+
+  // Add to hidden leads table
+  var tbody = document.getElementById('hidden-leads-tbody');
+  if(tbody){
+    var tr = document.createElement('tr');
+    tr.style.borderTop = '1px solid #e8e8e5';
+    tr.innerHTML = '<td style="padding:8px 12px;font-size:12px;font-weight:600;">'+lead.name+'</td>'
+      +'<td style="padding:8px 12px;font-size:12px;color:#666;">'+(lead.service||'—')+'</td>'
+      +'<td style="padding:8px 12px;font-size:12px;color:#1D9E75;">'+(lead.value||'—')+'</td>'
+      +'<td style="padding:8px 12px;"><span class="badge bpd" style="font-size:10px;">Won → Client</span></td>'
+      +'<td style="padding:8px 12px;"><button class="btn" style="font-size:11px;padding:3px 8px;" onclick="openClient(this.dataset.id)" data-id="'+id+'">View</button></td>';
+    tbody.insertBefore(tr, tbody.firstChild);
+  }
+
+  // Add to clients table
+  var tbody2 = document.querySelector('#view-clients tbody');
+  if(tbody2){
+    var tr2 = document.createElement('tr');
+    tr2.className = 'clickable db-row';
+    tr2.innerHTML = '<td>'+lead.name+'</td>'
+      +'<td><span class="badge '+(clientDB[id].type==='Commercial'?'bc':'br')+'">'+clientDB[id].type+'</span></td>'
+      +'<td>—</td><td>'+(lead.value||'—')+'</td><td>TBD</td>'
+      +'<td><span class="sd sn"></span>New</td>';
+    (function(cid){tr2.addEventListener('click',function(){openClient(cid);});})(id);
+    tbody2.insertBefore(tr2, tbody2.firstChild);
+  }
+
+  closeOverlay('lead-overlay');
+  showPaymentToast(lead.name + ' converted to client successfully!', null, 'success');
+}
+
+
+function markLeadLost(){
+  var lead = currentLeadId ? leadDB[currentLeadId] : null;
+  if(!lead) return;
+  var reason = prompt('Reason for losing this lead (optional):') || 'No reason given';
+  if(reason === null) return; // cancelled
+
+  // Remove from pipeline
+  document.querySelectorAll('.deal-card').forEach(function(card){
+    var nameEl = card.querySelector('.deal-name');
+    if(nameEl && nameEl.textContent.trim() === lead.name) card.remove();
+  });
+
+  // Update in Supabase
+  if(currentLeadId && currentLeadId.length > 20){
+    db.from('leads').update({stage:'Closed lost', notes:(lead.notes||'') + ' Lost: ' + reason}).eq('id', currentLeadId);
+  }
+  lead.stage = 'Closed lost';
+
+  // Add to lost table
+  var tbody = document.getElementById('lost-leads-tbody');
+  if(tbody){
+    var today = new Date().toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+    var tr = document.createElement('tr');
+    tr.style.borderTop = '1px solid #e8e8e5';
+    var lid = currentLeadId;
+    tr.innerHTML = '<td style="padding:9px 14px;font-size:12px;font-weight:600;">'+lead.name+'</td>'
+      +'<td style="padding:9px 14px;font-size:12px;color:#666;">'+(lead.service||'—')+'</td>'
+      +'<td style="padding:9px 14px;font-size:12px;color:#999;">'+(lead.value||'—')+'</td>'
+      +'<td style="padding:9px 14px;font-size:12px;color:#666;">'+reason+'</td>'
+      +'<td style="padding:9px 14px;font-size:12px;color:#666;">'+today+'</td>'
+      +'<td style="padding:9px 14px;display:flex;gap:4px;">'
+        +'<button class="btn" style="font-size:11px;padding:3px 9px;" data-id="'+lid+'" onclick="openLead(this.dataset.id)">View</button>'
+        +'<button class="btn" style="font-size:11px;padding:3px 9px;background:#f0faf6;color:#276749;border-color:#9ae6b4;" data-id="'+lid+'" onclick="reactivateLead(this.dataset.id)">Reactivate</button>'
+      +'</td>';
+    tbody.insertBefore(tr, tbody.firstChild);
+  }
+
+  closeOverlay('lead-overlay');
+  showPaymentToast(lead.name + ' marked as lost.', null, 'error');
+}
+
+function reactivateLead(id){
+  var lead = leadDB[id];
+  if(!lead) return;
+  lead.stage = 'Follow-up';
+
+  // Update in Supabase
+  if(id && id.length > 20){
+    db.from('leads').update({stage:'Follow-up'}).eq('id', id);
+  }
+
+  // Remove from lost table row
+  document.querySelectorAll('#lost-leads-tbody tr').forEach(function(row){
+    if(row.textContent.indexOf(lead.name) >= 0) row.remove();
+  });
+
+  // Add back to pipeline Follow-up column
+  var cols = document.querySelectorAll('#view-pipeline .pipe-col');
+  if(cols[2]){
+    var card = document.createElement('div');
+    card.className = 'deal-card';
+    var svc = lead.service || 'Service';
+    var badgeCls = svc.toLowerCase().indexOf('commercial') >= 0 ? 'bc' : 'br';
+    card.innerHTML = '<div class="deal-name">'+lead.name+'</div>'
+      +'<div class="deal-type"><span class="badge '+badgeCls+'">'+svc+'</span></div>'
+      +'<div class="deal-val">'+(lead.value||'TBD')+'</div>';
+    (function(lid){card.addEventListener('click',function(){openLead(lid);});})(id);
+    cols[2].appendChild(card);
+  }
+
+  showPaymentToast(lead.name + ' reactivated and moved to Follow-up!', null, 'success');
+}
+
+// Update scheduleLeadAppointment to add to won table
+var _origSchedule = scheduleLeadAppointment;
+scheduleLeadAppointment = function(){
+  var lead = currentLeadId ? leadDB[currentLeadId] : null;
+  var lid = currentLeadId;
+  _origSchedule();
+  if(!lead) return;
+  // Add to won table
+  setTimeout(function(){
+    var tbody = document.getElementById('won-leads-tbody');
+    if(tbody){
+      var today = new Date().toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+      var tr = document.createElement('tr');
+      tr.style.borderTop = '1px solid #e8e8e5';
+      tr.innerHTML = '<td style="padding:9px 14px;font-size:12px;font-weight:600;">'+lead.name+'</td>'
+        +'<td style="padding:9px 14px;font-size:12px;color:#666;">'+(lead.service||'—')+'</td>'
+        +'<td style="padding:9px 14px;font-size:12px;color:#1D9E75;font-weight:600;">'+(lead.value||'—')+'</td>'
+        +'<td style="padding:9px 14px;font-size:12px;color:#666;">'+(lead.source||'—')+'</td>'
+        +'<td style="padding:9px 14px;font-size:12px;color:#666;">'+today+'</td>'
+        +'<td style="padding:9px 14px;"><button class="btn" style="font-size:11px;padding:3px 9px;" data-id="'+lid+'" onclick="openLead(this.dataset.id)">View</button></td>';
+      tbody.insertBefore(tr, tbody.firstChild);
+    }
+    // Remove from hidden-leads-tbody if added there
+    document.querySelectorAll('#hidden-leads-tbody tr').forEach(function(row){
+      if(row.textContent.indexOf(lead.name) >= 0) row.remove();
+    });
+  }, 300);
+};
 
 </script>
 

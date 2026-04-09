@@ -3,7 +3,6 @@
 <head>
 <meta charset="UTF-8">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDFWraEDO5b8RqpqNz213WlmkM9Duf3oUk&libraries=places&callback=initAutocomplete" async defer></script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Hawaii Natural Clean — CRM</title>
 <style>
@@ -1024,13 +1023,45 @@ textarea{font-family:inherit;}
   <div class="panel panel-wide" onclick="event.stopPropagation()">
     <div class="panel-header"><div class="panel-title">New appointment</div><button class="close-btn" onclick="closeOverlay('new-appt-overlay')">&#x2715;</button></div>
     <div class="panel-body">
-      <div class="panel-section">Client info</div>
-      <div class="form-row"><label>Full name</label><input type="text" id="na-name" placeholder="First and last name"></div>
+      <div class="panel-section">Client</div>
+      <div class="form-row"><label>Full name</label>
+        <div style="position:relative;">
+          <input type="text" id="na-name" placeholder="Search existing client or enter new name..." style="width:100%;" autocomplete="off">
+          <div id="na-name-dropdown" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #e0e0dd;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.12);z-index:200;max-height:220px;overflow-y:auto;margin-top:2px;"></div>
+        </div>
+      </div>
       <div class="form-two">
         <div class="form-row"><label>Phone</label><input type="tel" id="na-phone" placeholder="(808) 555-0000"></div>
         <div class="form-row"><label>Email</label><input type="email" id="na-email" placeholder="client@email.com"></div>
       </div>
-      <div class="form-row"><label>Address</label><input type="text" id="na-address" placeholder="Street address, city, HI"></div>
+      <div class="panel-section">Property</div>
+      <div class="form-row">
+        <label>Property</label>
+        <select id="na-property-select" onchange="applyPropertyToBooking()">
+          <option value="manual">Enter address manually</option>
+        </select>
+      </div>
+      <div class="form-row" id="na-address-row">
+        <label>Address</label>
+        <input type="text" id="na-address" placeholder="123 Kalani St, Kailua, HI">
+      </div>
+      <div class="form-row" id="na-save-prop-row" style="display:none;">
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-weight:normal;">
+          <input type="checkbox" id="na-save-property"> Save as property for this client
+        </label>
+      </div>
+      <div class="form-two">
+        <div class="form-row"><label>Bedrooms</label>
+          <select id="na-beds" onchange="calcPrice()">
+            <option value="1">1</option><option value="2">2</option><option value="3" selected>3</option><option value="4">4</option><option value="5">5</option><option value="6">6+</option>
+          </select>
+        </div>
+        <div class="form-row"><label>Bathrooms</label>
+          <select id="na-baths" onchange="calcPrice()">
+            <option value="1">1</option><option value="1.5">1.5</option><option value="2" selected>2</option><option value="2.5">2.5</option><option value="3">3</option><option value="4">4+</option>
+          </select>
+        </div>
+      </div>
       <div class="panel-section">Service details</div>
       <div class="form-two">
         <div class="form-row"><label>Service type</label>
@@ -1051,26 +1082,14 @@ textarea{font-family:inherit;}
           </select>
         </div>
       </div>
-      <div class="form-three">
-        <div class="form-row"><label>Bedrooms</label>
-          <select id="na-beds" onchange="calcPrice()">
-            <option value="1">1</option><option value="2">2</option><option value="3" selected>3</option><option value="4">4</option><option value="5">5</option><option value="6">6+</option>
-          </select>
-        </div>
-        <div class="form-row"><label>Bathrooms</label>
-          <select id="na-baths" onchange="calcPrice()">
-            <option value="1">1</option><option value="1.5">1.5</option><option value="2" selected>2</option><option value="2.5">2.5</option><option value="3">3</option><option value="4">4+</option>
-          </select>
-        </div>
-        <div class="form-row"><label>Condition (1-10)</label>
-          <select id="na-cond" onchange="calcPrice()">
-            <option value="9">9-10 — Excellent</option>
-            <option value="7" selected>7-8 — Good</option>
-            <option value="5">5-6 — Average</option>
-            <option value="3">3-4 — Below avg</option>
-            <option value="1">1-2 — Poor</option>
-          </select>
-        </div>
+      <div class="form-row"><label>Condition (1-10)</label>
+        <select id="na-cond" onchange="calcPrice()">
+          <option value="9">9-10 — Excellent</option>
+          <option value="7" selected>7-8 — Good</option>
+          <option value="5">5-6 — Average</option>
+          <option value="3">3-4 — Below avg</option>
+          <option value="1">1-2 — Poor</option>
+        </select>
       </div>
       <div class="price-preview" id="price-preview">
         <div class="price-preview-label">Estimated price</div>
@@ -1115,12 +1134,12 @@ textarea{font-family:inherit;}
           <div class="info-row"><span class="info-label">Service type</span><span class="info-val" id="ai-service">—</span></div>
           <div class="info-row"><span class="info-label">Date</span><span class="info-val" id="ai-date">—</span></div>
           <div class="info-row"><span class="info-label">Time</span><span class="info-val" id="ai-time">—</span></div>
-          <div class="info-row"><span class="info-label">Address</span><span class="info-val" id="ai-address">—</span></div>
           <div class="info-row"><span class="info-label">Frequency</span><span class="info-val" id="ai-freq">—</span></div>
           <div class="info-row"><span class="info-label">Est. duration</span><span class="info-val" id="ai-dur">—</span></div>
         </div>
         <div class="panel-section">Property</div>
         <div class="info-block">
+          <div class="info-row"><span class="info-label">Address</span><span class="info-val" id="ai-address">—</span></div>
           <div class="info-row"><span class="info-label">House size</span><span class="info-val" id="ai-sqft">—</span></div>
           <div class="info-row"><span class="info-label">Bed / bath</span><span class="info-val" id="ai-bedbath">—</span></div>
           <div class="info-row"><span class="info-label">Condition</span><span class="info-val" id="ai-cond">—</span></div>
@@ -1136,6 +1155,10 @@ textarea{font-family:inherit;}
           <div class="info-row"><span class="info-label">Discount</span><span class="info-val" id="ai-disc" style="color:#1D9E75;">—</span></div>
           <div class="info-row"><span class="info-label">Tax (4.712%)</span><span class="info-val" id="ai-tax">—</span></div>
           <div class="info-row"><span class="info-label" style="font-weight:600;">Total</span><span class="info-val" id="ai-total" style="font-size:15px;color:#1D9E75;">—</span></div>
+        </div>
+        <div class="panel-section">Notes</div>
+        <div class="info-block">
+          <div class="info-row"><span class="info-val" id="ai-notes" style="white-space:pre-wrap;color:#444;">—</span></div>
         </div>
         <div class="panel-section">Actions</div>
         <div class="action-grid">
@@ -1165,10 +1188,15 @@ textarea{font-family:inherit;}
           <div class="form-row"><label>Date</label><input type="date" id="edit-date"></div>
           <div class="form-row"><label>Time</label><input type="time" id="edit-time"></div>
         </div>
-        <div class="form-row"><label>Address</label><input type="text" id="edit-address"></div>
-        <div class="form-two">
-          <div class="form-row"><label>Bedrooms</label><input type="number" id="edit-beds"></div>
-          <div class="form-row"><label>Bathrooms</label><input type="number" id="edit-baths"></div>
+        <div class="form-row">
+          <label>Property</label>
+          <select id="edit-property-select" onchange="applyEditProperty()">
+            <option value="manual">Enter address manually</option>
+          </select>
+        </div>
+        <div id="edit-property-info" style="display:none;background:#f9f9f7;border:1px solid #e8e8e5;border-radius:8px;padding:8px 12px;margin-bottom:10px;font-size:12px;color:#444;">
+          <div id="edit-prop-addr" style="font-weight:500;margin-bottom:2px;"></div>
+          <div id="edit-prop-detail" style="color:#999;font-size:11px;"></div>
         </div>
         <div class="form-row"><label>Assigned cleaner</label>
           <select id="edit-cleaner">
@@ -1239,6 +1267,11 @@ textarea{font-family:inherit;}
         <div id="cl-ai-summary" style="background:#f5f0ff;border:1px solid #e9d8fd;border-radius:10px;padding:12px 13px;margin-bottom:10px;font-size:12px;color:#44337a;line-height:1.7;display:none;"></div>
         <div id="cl-ai-thinking" style="display:none;font-size:12px;color:#999;padding:8px 0;">&#x2728; Generating summary...</div>
 
+        <div class="panel-section" style="display:flex;align-items:center;justify-content:space-between;">
+          <span>Properties</span>
+          <button onclick="openAddProperty()" style="font-size:10px;padding:3px 9px;border:1px solid #9ae6b4;border-radius:20px;background:#e6fffa;color:#276749;cursor:pointer;font-family:inherit;">+ Add property</button>
+        </div>
+        <div id="cl-properties" style="margin-bottom:4px;"></div>
         <div class="panel-section">Notes</div>
         <div class="info-block"><div style="font-size:12px;color:#1a1a1a;line-height:1.6;" id="cl-notes">—</div></div>
         <div class="action-grid" style="margin-top:14px;">
@@ -1269,6 +1302,11 @@ textarea{font-family:inherit;}
         </div>
         <div class="form-row"><label>Preferred cleaner</label><select id="ced-cleaner"><option>No preference</option><option>Kaimana M.</option><option>Alohi L.</option><option>Maile K.</option><option>Keanu N.</option><option>Leilani H.</option></select></div>
         <div class="form-row"><label>Notes</label><textarea id="ced-notes" style="min-height:70px;"></textarea></div>
+        <div class="panel-section" style="display:flex;align-items:center;justify-content:space-between;margin-top:14px;">
+          <span>Properties</span>
+          <button onclick="openAddProperty()" style="font-size:10px;padding:3px 9px;border:1px solid #9ae6b4;border-radius:20px;background:#e6fffa;color:#276749;cursor:pointer;font-family:inherit;">+ Add property</button>
+        </div>
+        <div id="ced-properties" style="margin-bottom:10px;"></div>
         <div class="save-bar">
           <button class="btn btn-primary" onclick="saveClientEdit()">Save changes</button>
           <button class="btn" onclick="hideClientEdit()">Cancel</button>
@@ -1309,6 +1347,9 @@ textarea{font-family:inherit;}
           <div class="info-row"><span class="info-label">Due date</span><span class="info-val" id="lead-due">—</span></div>
           <div class="info-row"><span class="info-label">Assigned to</span><span class="info-val" id="lead-assigned">—</span></div>
         </div>
+        <div class="panel-section">AI summary</div>
+        <div id="lead-ai-thinking" style="display:none;font-size:12px;color:#999;padding:8px 0;">&#x2728; Generating summary...</div>
+        <div id="lead-ai-summary" style="background:#f5f0ff;border:1px solid #e9d8fd;border-radius:10px;padding:12px 13px;margin-bottom:10px;font-size:12px;color:#44337a;line-height:1.7;display:none;"></div>
         <div class="panel-section">Notes</div>
         <div class="info-block"><div style="font-size:12px;color:#1a1a1a;line-height:1.6;" id="lead-notes">—</div></div>
         <div class="panel-section">Send quote</div>
@@ -1527,7 +1568,7 @@ async function dbLoadCleaners(){
 }
 
 async function dbSaveAppointment(data){
-  const {error}=await db.from('appointments').insert([{
+  var res=await db.from('appointments').insert([{
     client_name:data.clientName, service:data.service||'Standard clean',
     frequency:data.freq||'One-time', date:data.date,
     time:data.time||'8am', address:data.address||null,
@@ -1542,8 +1583,8 @@ async function dbSaveAppointment(data){
     notes:data.notes||null,
     recurring:data.recurring||false
   }]);
-  if(error)console.error('Save appointment error:',error);
-  return !error;
+  if(res.error)console.error('Save appointment error:',res.error);
+  return res;
 }
 
 async function dbLoadAppointments(){
@@ -1607,7 +1648,14 @@ async function loadAllData(){
         apptData[key].push({
           n:a.client_name, s:a.status||'unassigned',
           t:a.time||'8am', cleaner:a.cleaner_name||'Unassigned',
-          recurring:a.recurring||false, dbId:a.id
+          recurring:a.recurring||false, dbId:a.id,
+          service:a.service||'Standard clean',
+          freq:a.frequency||'One-time',
+          address:a.address||'',
+          beds:a.beds||'', baths:a.baths||'',
+          condition:a.condition||7,
+          basePrice:a.base_price||0, tax:a.tax||0, totalPrice:a.total_price||0,
+          notes:a.notes||''
         });
       }
     });
@@ -1964,81 +2012,228 @@ function renderMonth(){
   }
 }
 
+// ── Calendar constants ──────────────────────────────────────────────────────
+var CAL_START_HOUR=4;   // 4am
+var CAL_END_HOUR=23;    // 11pm
+var CAL_PX_HR=60;       // pixels per hour
+var CAL_DURATION=90;    // default appointment duration in minutes
+var CAL_TOTAL_H=(CAL_END_HOUR-CAL_START_HOUR)*CAL_PX_HR; // 19*60=1140px
+var CAL_COLORS={
+  u:{bg:'#fce7f3',text:'#9d174d',border:'#f9a8d4'},
+  a:{bg:'#dbeafe',text:'#1e40af',border:'#93c5fd'},
+  c:{bg:'#fef9c3',text:'#713f12',border:'#fde68a'},
+  p:{bg:'#dcfce7',text:'#166534',border:'#86efac'}
+};
+
+function parseApptHour(t){
+  if(!t)return 8;
+  t=t.trim().toLowerCase();
+  var m=t.match(/^(\d+)(?::\d+)?(am|pm)$/);
+  if(!m)return 8;
+  var h=parseInt(m[1]);
+  if(m[2]==='pm'&&h!==12)h+=12;
+  if(m[2]==='am'&&h===12)h=0;
+  return h;
+}
+
+function parseApptMinute(t){
+  if(!t)return 0;
+  t=t.trim().toLowerCase();
+  var m=t.match(/^\d+:(\d+)(am|pm)$/);
+  return m?parseInt(m[1]):0;
+}
+
+function calFormatTime(totalMin){
+  // totalMin is minutes since midnight
+  var h=Math.floor(totalMin/60);
+  var m=totalMin%60;
+  var ampm=h>=12?'pm':'am';
+  var dh=h%12||12;
+  return dh+(m?':'+String(m).padStart(2,'0'):'')+ampm;
+}
+
+function calBuildTimeGrid(container,totalHeight){
+  // Draws hour lines and half-hour dashed lines into container (position:relative)
+  for(var h=CAL_START_HOUR;h<=CAL_END_HOUR;h++){
+    var top=(h-CAL_START_HOUR)*CAL_PX_HR;
+    var line=document.createElement('div');
+    line.style.cssText='position:absolute;left:0;right:0;top:'+top+'px;border-top:1px solid #e8e8e5;pointer-events:none;';
+    container.appendChild(line);
+    if(h<CAL_END_HOUR){
+      var half=document.createElement('div');
+      half.style.cssText='position:absolute;left:0;right:0;top:'+(top+30)+'px;border-top:1px dashed #f0f0ee;pointer-events:none;';
+      container.appendChild(half);
+    }
+  }
+}
+
+function calBuildTimeLabelCol(height){
+  var col=document.createElement('div');
+  col.style.cssText='width:55px;flex-shrink:0;position:relative;height:'+height+'px;border-right:1px solid #e8e8e5;background:#fff;';
+  for(var h=CAL_START_HOUR;h<=CAL_END_HOUR;h++){
+    var top=(h-CAL_START_HOUR)*CAL_PX_HR;
+    var lbl=document.createElement('div');
+    var dh=h%12||12;
+    var ampm=h>=12?'pm':'am';
+    lbl.style.cssText='position:absolute;right:6px;font-size:10px;color:#bbb;line-height:1;white-space:nowrap;';
+    if(h===CAL_START_HOUR){
+      lbl.style.top=(top+3)+'px';
+    } else {
+      lbl.style.top=top+'px';
+      lbl.style.transform='translateY(-50%)';
+    }
+    lbl.textContent=dh+ampm;
+    col.appendChild(lbl);
+  }
+  return col;
+}
+
+function calLayoutAppts(appts,dateKey,col,compact){
+  // appts: [{a, startMin, endMin}]
+  // Groups into overlap clusters, assigns columns within each cluster
+  var colorMap=CAL_COLORS;
+  var clusters=[];
+  appts.forEach(function(appt){
+    var placed=false;
+    for(var ci=0;ci<clusters.length;ci++){
+      var cl=clusters[ci];
+      if(cl.some(function(ca){return appt.startMin<ca.endMin&&appt.endMin>ca.startMin;})){
+        cl.push(appt);placed=true;break;
+      }
+    }
+    if(!placed)clusters.push([appt]);
+  });
+
+  clusters.forEach(function(cluster){
+    // Greedy slot assignment
+    var slots=[];
+    cluster.forEach(function(appt){
+      var slot=0;
+      while(slots.some(function(s){return s.slot===slot&&appt.startMin<s.endMin&&appt.endMin>s.startMin;}))slot++;
+      slots.push({slot:slot,startMin:appt.startMin,endMin:appt.endMin});
+      appt.slot=slot;
+    });
+    var numSlots=slots.reduce(function(m,s){return Math.max(m,s.slot);},0)+1;
+
+    cluster.forEach(function(appt){
+      var a=appt.a;
+      var sc=a.s?a.s.charAt(0):'u';
+      var clr=colorMap[sc]||colorMap.u;
+      var pct=100/numSlots;
+      var leftPct=appt.slot*pct;
+      var gap=2;
+      var height=Math.max(compact?20:30, CAL_DURATION-2);
+
+      var block=document.createElement('div');
+      block.style.cssText='position:absolute;'
+        +'top:'+appt.startMin+'px;'
+        +'height:'+height+'px;'
+        +'left:calc('+leftPct+'% + '+gap+'px);'
+        +'width:calc('+pct+'% - '+(gap*2)+'px);'
+        +'background:'+clr.bg+';'
+        +'color:'+clr.text+';'
+        +'border-left:3px solid '+clr.border+';'
+        +'border-radius:6px;'
+        +'padding:'+(compact?'3px 5px':'5px 8px')+';'
+        +'font-size:'+(compact?'10px':'11px')+';'
+        +'cursor:pointer;'
+        +'overflow:hidden;'
+        +'box-shadow:0 1px 3px rgba(0,0,0,.08);'
+        +'z-index:2;';
+
+      var endTotalMin=(CAL_START_HOUR*60)+appt.startMin+CAL_DURATION;
+      var endStr=calFormatTime(endTotalMin);
+      var startStr=calFormatTime((CAL_START_HOUR*60)+appt.startMin);
+
+      if(compact){
+        block.innerHTML='<div style="font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+a.n+'</div>'
+          +'<div style="opacity:.75;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+a.t+'</div>';
+      } else {
+        block.innerHTML='<div style="font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+a.n+'</div>'
+          +'<div style="font-size:10px;opacity:.75;margin-top:1px;">'+startStr+' \u2013 '+endStr+'</div>'
+          +(a.cleaner&&a.cleaner!=='Unassigned'?'<div style="font-size:10px;opacity:.7;margin-top:1px;">'+a.cleaner+'</div>':'');
+      }
+
+      (function(appt,key){block.addEventListener('click',function(ev){ev.stopPropagation();openAppt(appt,key);});})(a,dateKey);
+      col.appendChild(block);
+    });
+  });
+}
+
 function renderWeek(){
-  // Find start of week containing curDay
   var startDate=new Date(curYear,curMonth-1,curDay);
   var dow=startDate.getDay();
   startDate.setDate(startDate.getDate()-dow);
   var endDate=new Date(startDate);endDate.setDate(endDate.getDate()+6);
-  var label=MONTHS[startDate.getMonth()]+' '+startDate.getDate()+' — '+MONTHS[endDate.getMonth()]+' '+endDate.getDate()+', '+endDate.getFullYear();
+  var label=MONTHS[startDate.getMonth()]+' '+startDate.getDate()+' \u2014 '+MONTHS[endDate.getMonth()]+' '+endDate.getDate()+', '+endDate.getFullYear();
   document.getElementById('cal-month-label').textContent=label;
 
-  var hours=[];
-  for(var h=6;h<=22;h++) hours.push(h);
   var today=new Date();
+  var days=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 
   var grid=document.getElementById('week-grid');
   grid.innerHTML='';
-  grid.style.cssText='overflow-x:auto;';
+  grid.style.cssText='';
 
-  var table=document.createElement('div');
-  table.style.cssText='display:grid;grid-template-columns:50px repeat(7,minmax(100px,1fr));min-width:600px;border:1px solid #e8e8e5;border-radius:10px;overflow:hidden;background:#fff;';
+  var outerWrap=document.createElement('div');
+  outerWrap.style.cssText='border:1px solid #e8e8e5;border-radius:10px;overflow:hidden;background:#fff;';
 
-  // Header row
+  // Sticky header: corner + 7 day headers
+  var headerRow=document.createElement('div');
+  headerRow.style.cssText='display:flex;border-bottom:1px solid #e8e8e5;background:#fafaf8;position:sticky;top:0;z-index:10;';
   var cornerCell=document.createElement('div');
-  cornerCell.style.cssText='border-right:1px solid #e8e8e5;border-bottom:1px solid #e8e8e5;background:#fafaf8;';
-  table.appendChild(cornerCell);
-
-  var days=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  cornerCell.style.cssText='width:55px;flex-shrink:0;border-right:1px solid #e8e8e5;';
+  headerRow.appendChild(cornerCell);
   for(var di=0;di<7;di++){
     var d=new Date(startDate);d.setDate(d.getDate()+di);
     var isT=d.toDateString()===today.toDateString();
     var hdr=document.createElement('div');
-    hdr.className='week-col-header'+(isT?' today-col':'');
-    hdr.style.cssText='border-bottom:1px solid #e8e8e5;background:#fafaf8;padding:8px 4px;';
-    hdr.innerHTML='<div style="font-size:11px;color:#999;">'+days[di]+'</div><div style="font-size:14px;font-weight:600;'+(isT?'color:#1D9E75;':'')+'">'+d.getDate()+'</div>';
+    hdr.style.cssText='flex:1;text-align:center;padding:8px 4px;border-right:1px solid #f0f0ee;cursor:pointer;user-select:none;'+(isT?'background:#f0faf6;':'');
+    hdr.innerHTML='<div style="font-size:11px;color:#999;text-transform:uppercase;letter-spacing:.05em;">'+days[di]+'</div>'
+      +'<div style="font-size:16px;font-weight:700;'+(isT?'color:#1D9E75;':'color:#1a1a1a;')+'margin-top:2px;">'+d.getDate()+'</div>';
     (function(day){
-      hdr.style.cursor='pointer';
       hdr.addEventListener('click',function(){
         curDay=day.getDate();curMonth=day.getMonth()+1;curYear=day.getFullYear();
         setCalView('day',document.getElementById('btn-day'));
       });
-    })(d);
-    table.appendChild(hdr);
+    })(new Date(d));
+    headerRow.appendChild(hdr);
+  }
+  outerWrap.appendChild(headerRow);
+
+  // Scrollable body
+  var scrollWrap=document.createElement('div');
+  scrollWrap.style.cssText='overflow-y:auto;max-height:calc(100vh - 200px);';
+
+  var bodyRow=document.createElement('div');
+  bodyRow.style.cssText='display:flex;position:relative;';
+
+  bodyRow.appendChild(calBuildTimeLabelCol(CAL_TOTAL_H));
+
+  for(var di=0;di<7;di++){
+    var d=new Date(startDate);d.setDate(d.getDate()+di);
+    var k=d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate();
+    var da=apptData[k]||[];
+    var isT=d.toDateString()===today.toDateString();
+
+    var col=document.createElement('div');
+    col.style.cssText='flex:1;position:relative;height:'+CAL_TOTAL_H+'px;border-right:1px solid #f0f0ee;'+(isT?'background:#fafffe;':'background:#fff;');
+    calBuildTimeGrid(col,CAL_TOTAL_H);
+
+    var appts=da.map(function(a){
+      var startMin=(parseApptHour(a.t)-CAL_START_HOUR)*60+parseApptMinute(a.t);
+      return {a:a,startMin:startMin,endMin:startMin+CAL_DURATION};
+    }).filter(function(x){return x.startMin>=0&&x.startMin<(CAL_END_HOUR-CAL_START_HOUR)*60;});
+
+    calLayoutAppts(appts,k,col,true);
+    bodyRow.appendChild(col);
   }
 
-  // Time rows
-  hours.forEach(function(h){
-    var timeLabel=document.createElement('div');
-    timeLabel.className='time-label';
-    timeLabel.style.cssText='font-size:10px;color:#999;padding:4px 6px;text-align:right;border-right:1px solid #e8e8e5;border-bottom:1px solid #f5f5f3;height:60px;display:flex;align-items:flex-start;padding-top:4px;';
-    timeLabel.textContent=(h%12||12)+(h>=12?'pm':'am');
-    table.appendChild(timeLabel);
+  scrollWrap.appendChild(bodyRow);
+  outerWrap.appendChild(scrollWrap);
+  grid.appendChild(outerWrap);
 
-    for(var di=0;di<7;di++){
-      var d=new Date(startDate);d.setDate(d.getDate()+di);
-      var k=d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate();
-      var cell=document.createElement('div');
-      cell.style.cssText='height:60px;border-bottom:1px solid #f5f5f3;border-right:1px solid #f0f0ee;position:relative;';
-      var da=apptData[k]||[];
-      da.forEach(function(a){
-        var ah=parseApptHour(a.t);
-        if(ah===h){
-          var block=document.createElement('div');
-          var colorMap={u:'#fce7f3',a:'#dbeafe',c:'#fef9c3',p:'#dcfce7'};
-          var textMap={u:'#9d174d',a:'#1e40af',c:'#713f12',p:'#166534'};
-          var sc=a.s?a.s.charAt(0):'u';
-          block.style.cssText='position:absolute;left:2px;right:2px;top:2px;border-radius:5px;padding:2px 5px;font-size:10px;font-weight:500;cursor:pointer;overflow:hidden;background:'+(colorMap[sc]||'#f3f4f6')+';color:'+(textMap[sc]||'#374151')+';z-index:1;';
-          block.textContent=a.t+' '+a.n;
-          (function(appt,key){block.addEventListener('click',function(){openAppt(appt,key);});})(a,k);
-          cell.appendChild(block);
-        }
-      });
-      table.appendChild(cell);
-    }
-  });
-
-  grid.appendChild(table);
+  setTimeout(function(){scrollWrap.scrollTop=(7-CAL_START_HOUR)*CAL_PX_HR;},50);
 }
 
 function renderDay(day){
@@ -2048,84 +2243,46 @@ function renderDay(day){
 
   var k=curYear+'-'+curMonth+'-'+day;
   var da=apptData[k]||[];
-  var hours=[];for(var h=6;h<=22;h++)hours.push(h);
 
   var grid=document.getElementById('day-grid');
   grid.innerHTML='';
 
-  var wrap=document.createElement('div');
-  wrap.style.cssText='border:1px solid #e8e8e5;border-radius:10px;overflow:hidden;background:#fff;max-width:600px;';
+  var outerWrap=document.createElement('div');
+  outerWrap.style.cssText='border:1px solid #e8e8e5;border-radius:10px;overflow:hidden;background:#fff;';
 
-  // Day summary header
+  // Header
   var hdr=document.createElement('div');
   hdr.style.cssText='background:#fafaf8;padding:10px 14px;border-bottom:1px solid #e8e8e5;display:flex;justify-content:space-between;align-items:center;';
-  hdr.innerHTML='<div style="font-size:13px;font-weight:600;color:#1a1a1a;">'+da.length+' appointment'+(da.length!==1?'s':'')+'</div>'
-    +(da.length===0?'<div style="font-size:12px;color:#999;">No appointments</div>':'');
-  wrap.appendChild(hdr);
+  hdr.innerHTML='<div style="font-size:13px;font-weight:600;color:#1a1a1a;">'+dayNames[date.getDay()]+', '+MONTHS[curMonth-1]+' '+day+'</div>'
+    +'<div style="font-size:12px;color:#999;">'+da.length+' appointment'+(da.length!==1?'s':'')+'</div>';
+  outerWrap.appendChild(hdr);
 
-  var timeWrap=document.createElement('div');
-  timeWrap.style.cssText='display:grid;grid-template-columns:55px 1fr;';
+  // Scrollable area
+  var scrollWrap=document.createElement('div');
+  scrollWrap.style.cssText='overflow-y:auto;max-height:calc(100vh - 200px);';
 
-  hours.forEach(function(h){
-    var timeLabel=document.createElement('div');
-    timeLabel.style.cssText='font-size:10px;color:#bbb;padding:0 8px;height:60px;display:flex;align-items:flex-start;padding-top:4px;border-right:1px solid #f0f0ee;border-bottom:1px solid #f9f9f9;';
-    timeLabel.textContent=(h%12||12)+(h>=12?'pm':'am');
-    timeWrap.appendChild(timeLabel);
+  var bodyRow=document.createElement('div');
+  bodyRow.style.cssText='display:flex;position:relative;';
 
-    var slot=document.createElement('div');
-    slot.style.cssText='height:60px;border-bottom:1px solid #f9f9f9;position:relative;';
+  bodyRow.appendChild(calBuildTimeLabelCol(CAL_TOTAL_H));
 
-    // Show half hour line
-    var half=document.createElement('div');
-    half.style.cssText='position:absolute;left:0;right:0;top:50%;border-top:1px dashed #f0f0ee;';
-    slot.appendChild(half);
+  // Appointment column
+  var apptArea=document.createElement('div');
+  apptArea.style.cssText='flex:1;position:relative;height:'+CAL_TOTAL_H+'px;background:#fff;';
+  calBuildTimeGrid(apptArea,CAL_TOTAL_H);
 
-    da.forEach(function(a){
-      var ah=parseApptHour(a.t);
-      var am=parseApptMinute(a.t);
-      if(ah===h){
-        var colorMap={u:'#fce7f3',a:'#dbeafe',c:'#fef9c3',p:'#dcfce7'};
-        var textMap={u:'#9d174d',a:'#1e40af',c:'#713f12',p:'#166534'};
-        var borderMap={u:'#f9a8d4',a:'#93c5fd',c:'#fde68a',p:'#86efac'};
-        var sc=a.s?a.s.charAt(0):'u';
-        var top=Math.round(am/60*60);
-        var block=document.createElement('div');
-        block.style.cssText='position:absolute;left:6px;right:6px;top:'+top+'px;min-height:50px;border-radius:7px;padding:5px 9px;font-size:12px;cursor:pointer;background:'+(colorMap[sc]||'#f3f4f6')+';color:'+(textMap[sc]||'#374151')+';border-left:3px solid '+(borderMap[sc]||'#d1d5db')+';z-index:2;';
-        block.innerHTML='<div style="font-weight:600;">'+a.n+'</div><div style="font-size:11px;opacity:.8;">'+a.t+(a.cleaner&&a.cleaner!=='Unassigned'?' · '+a.cleaner:'')+'</div>';
-        (function(appt,key){block.addEventListener('click',function(){openAppt(appt,key);});})(a,k);
-        slot.appendChild(block);
-      }
-    });
+  var appts=da.map(function(a){
+    var startMin=(parseApptHour(a.t)-CAL_START_HOUR)*60+parseApptMinute(a.t);
+    return {a:a,startMin:startMin,endMin:startMin+CAL_DURATION};
+  }).filter(function(x){return x.startMin>=0&&x.startMin<(CAL_END_HOUR-CAL_START_HOUR)*60;});
 
-    timeWrap.appendChild(slot);
-  });
+  calLayoutAppts(appts,k,apptArea,false);
+  bodyRow.appendChild(apptArea);
+  scrollWrap.appendChild(bodyRow);
+  outerWrap.appendChild(scrollWrap);
+  grid.appendChild(outerWrap);
 
-  wrap.appendChild(timeWrap);
-  grid.appendChild(wrap);
-
-  // Scroll to first appointment or 8am
-  setTimeout(function(){
-    var firstHour=da.length>0?Math.max(6,parseApptHour(da[0].t)-1):8;
-    var scrollPos=(firstHour-6)*60;
-    grid.scrollTop=scrollPos;
-    wrap.scrollTop=scrollPos;
-  },50);
-}
-
-function parseApptHour(t){
-  if(!t)return 8;
-  var m=t.match(/(\d+)(am|pm)/i);
-  if(!m)return 8;
-  var h=parseInt(m[1]);
-  if(m[2].toLowerCase()==='pm'&&h!==12)h+=12;
-  if(m[2].toLowerCase()==='am'&&h===12)h=0;
-  return h;
-}
-
-function parseApptMinute(t){
-  if(!t)return 0;
-  var m=t.match(/:(\d+)/);
-  return m?parseInt(m[1]):0;
+  setTimeout(function(){scrollWrap.scrollTop=(7-CAL_START_HOUR)*CAL_PX_HR;},50);
 }
 
 document.getElementById('prev-btn').addEventListener('click',function(){
@@ -2141,6 +2298,9 @@ document.getElementById('next-btn').addEventListener('click',function(){
 function changeMonth(d){curMonth+=d;if(curMonth>12){curMonth=1;curYear++;}if(curMonth<1){curMonth=12;curYear--;}renderCal();}
 
 function openAppt(a,dateKey){
+  try{_openApptInner(a,dateKey);}catch(e){console.error('openAppt error:',e);showPaymentToast('Error opening appointment: '+e.message,null,'error');}
+}
+function _openApptInner(a,dateKey){
   var parts=dateKey.split('-');
   var mo=MONTHS[parseInt(parts[1])-1];
   document.getElementById('appt-title').textContent=a.n;
@@ -2151,36 +2311,36 @@ function openAppt(a,dateKey){
   document.getElementById('ai-date').textContent=mo+' '+parts[2]+', '+parts[0];
   document.getElementById('ai-time').textContent=a.t.replace('am',' AM').replace('pm',' PM');
   document.getElementById('ai-cleaner').textContent=a.cleaner;
-  var cd=clientJobData[a.n]||{};
-  document.getElementById('ai-service').textContent=cd.service||'Standard clean';
-  document.getElementById('ai-address').textContent=cd.address||'—';
-  document.getElementById('ai-freq').textContent=cd.freq||'—';
-  document.getElementById('ai-dur').textContent=cd.dur||'—';
-  document.getElementById('ai-sqft').textContent=cd.sqft||'—';
-  document.getElementById('ai-bedbath').textContent=cd.bed||'—';
-  document.getElementById('ai-cond').textContent=cd.cond||'—';
-  var hrs=parseFloat(cd.dur)||3.5;
+  document.getElementById('ai-service').textContent=a.service||'Standard clean';
+  document.getElementById('ai-address').textContent=a.address||'—';
+  document.getElementById('ai-freq').textContent=a.freq||'—';
+  document.getElementById('ai-dur').textContent='—';
+  document.getElementById('ai-sqft').textContent='—';
+  var bedbath=a.beds&&a.baths?(a.beds+' bed / '+a.baths+' bath'):'—';
+  document.getElementById('ai-bedbath').textContent=bedbath;
+  document.getElementById('ai-cond').textContent=a.condition?('Condition '+a.condition+'/10'):'—';
   var rate=(a.cleaner.indexOf('Kaimana')>=0||a.cleaner.indexOf('Maile')>=0)?18:16;
-  document.getElementById('ai-cpay').textContent='$'+(hrs*rate).toFixed(2)+' ('+hrs+' hrs x $'+rate+')';
-  document.getElementById('ai-base').textContent=cd.base||'—';
-  document.getElementById('ai-disc').textContent='— '+(cd.disc||'$0');
-  document.getElementById('ai-tax').textContent=cd.tax||'—';
-  document.getElementById('ai-total').textContent=cd.total||'—';
+  document.getElementById('ai-cpay').textContent=fmtPrice(a.cleanerPay);
+  document.getElementById('ai-base').textContent=fmtPrice(a.base||a.basePrice);
+  document.getElementById('ai-disc').textContent='$0';
+  document.getElementById('ai-tax').textContent=fmtPrice(a.tax);
+  document.getElementById('ai-total').textContent=fmtPrice(a.total||a.totalPrice);
+  var aiNotes=document.getElementById('ai-notes');
+  if(aiNotes)aiNotes.textContent=a.notes||'—';
   document.getElementById('edit-client').value=a.n;
   document.getElementById('edit-date').value=parts[0]+'-'+parts[1].padStart(2,'0')+'-'+parts[2].padStart(2,'0');
   document.getElementById('edit-time').value=a.t.includes('am')?'0'+a.t.replace('am',':00'):'';
   document.getElementById('edit-cleaner').value=a.cleaner;
-  document.getElementById('edit-address').value=cd.address||'';
-  document.getElementById('edit-price').value=cd.base?cd.base.replace('$',''):'';
+  document.getElementById('edit-price').value=a.basePrice?parseFloat(a.basePrice).toFixed(2):'';
   hideApptEdit();
   currentClientName=a.n;
   currentAppt=a;
   currentApptKey=dateKey;
-  currentApptData=cd;
+  currentApptData=a;
   document.getElementById('appt-overlay').classList.remove('hidden');
 }
 
-function showApptEdit(){document.getElementById('appt-view').style.display='none';document.getElementById('appt-edit').style.display='block';}
+function showApptEdit(){document.getElementById('appt-view').style.display='none';document.getElementById('appt-edit').style.display='block';populateEditPropertySelector(currentClientName);}
 function hideApptEdit(){document.getElementById('appt-view').style.display='block';document.getElementById('appt-edit').style.display='none';}
 function saveApptEdit(){hideApptEdit();showToast('appt-overlay','Changes saved successfully.');}
 
@@ -2225,20 +2385,23 @@ function openClient(id){
             +'<div style="font-size:12px;color:#1D9E75;font-weight:600;margin-top:3px;">$'+p.price+' per clean</div>'
             +(p.notes?'<div style="font-size:11px;color:#999;margin-top:2px;">'+p.notes+'</div>':'')
           +'</div>'
-          +'<button onclick="removeProperty('+idx+')" style="font-size:10px;color:#e53e3e;background:none;border:none;cursor:pointer;padding:2px;">&#x2715;</button>'
+          +'<div style="display:flex;gap:6px;">'
+            +'<button onclick="editProperty('+idx+')" style="font-size:10px;color:#2b6cb0;background:none;border:none;cursor:pointer;padding:2px;">Edit</button>'
+            +'<button onclick="removeProperty('+idx+')" style="font-size:10px;color:#e53e3e;background:none;border:none;cursor:pointer;padding:2px;">&#x2715;</button>'
+          +'</div>'
           +'</div>';
         propsEl.appendChild(card);
       });
     }
   }
   hideClientEdit();
-  // Clear AI summary when switching clients
   var summaryEl = document.getElementById('cl-ai-summary');
   var thinkingEl = document.getElementById('cl-ai-thinking');
   if(summaryEl){ summaryEl.style.display='none'; summaryEl.textContent=''; }
   if(thinkingEl){ thinkingEl.style.display='none'; }
   document.getElementById('client-overlay').classList.remove('hidden');
   setTimeout(updateChargeBtn, 50);
+  setTimeout(generateClientSummary, 400);
 }
 
 function showClientEdit(){
@@ -2249,10 +2412,30 @@ function showClientEdit(){
     document.getElementById('ced-email').value=c.email||'';
     document.getElementById('ced-address').value=c.address||'';
     document.getElementById('ced-notes').value=c.notes||'';
+    // Render properties in edit form
+    var cedProps=document.getElementById('ced-properties');
+    if(cedProps){
+      var props=c.properties||[];
+      if(props.length===0){
+        cedProps.innerHTML='<div style="font-size:11px;color:#999;padding:4px 0;">No properties yet. Click + Add property.</div>';
+      } else {
+        cedProps.innerHTML='';
+        props.forEach(function(p,idx){
+          var row=document.createElement('div');
+          row.style.cssText='display:flex;align-items:center;justify-content:space-between;background:#fafaf8;border:1px solid #e8e8e5;border-radius:8px;padding:8px 11px;margin-bottom:5px;';
+          row.innerHTML='<div><div style="font-size:11px;font-weight:600;color:#1a1a1a;">'+p.address+'</div>'
+            +'<div style="font-size:10px;color:#999;margin-top:1px;">'+p.beds+'bd / '+p.baths+'ba'+(p.price?' · $'+p.price+'/clean':'')+'</div></div>'
+            +'<div style="display:flex;gap:6px;">'
+            +'<button style="font-size:10px;color:#2b6cb0;background:none;border:none;cursor:pointer;padding:2px 4px;" onclick="editProperty('+idx+')">Edit</button>'
+            +'<button style="font-size:10px;color:#e53e3e;background:none;border:none;cursor:pointer;padding:2px 4px;" onclick="removeProperty('+idx+')">&#x2715;</button>'
+            +'</div>';
+          cedProps.appendChild(row);
+        });
+      }
+    }
   }
   document.getElementById('client-view').style.display='none';
   document.getElementById('client-edit').style.display='block';
-  setTimeout(function(){attachAutocomplete('ced-address');},300);
 }
 function hideClientEdit(){document.getElementById('client-view').style.display='block';document.getElementById('client-edit').style.display='none';}
 function saveClientEdit(){
@@ -2327,7 +2510,12 @@ function openLead(id){
   document.getElementById('quote-price').value=d.value||'';
   document.getElementById('quote-success').classList.remove('show');
   hideLeadEdit();
+  var leadSumEl=document.getElementById('lead-ai-summary');
+  var leadThinkEl=document.getElementById('lead-ai-thinking');
+  if(leadSumEl){leadSumEl.style.display='none';leadSumEl.textContent='';}
+  if(leadThinkEl){leadThinkEl.style.display='none';}
   document.getElementById('lead-overlay').classList.remove('hidden');
+  setTimeout(generateLeadSummary, 400);
 }
 
 function showLeadEdit(){
@@ -2663,6 +2851,17 @@ function sendChatMsg(){
   }
 }
 
+/* PROPERTY PRICING CALC */
+var propPriceOverride = false;
+function calcPropPrice(){
+  if(propPriceOverride) return;
+  var beds = parseFloat(document.getElementById('prop-beds').value) || 3;
+  var baths = parseFloat(document.getElementById('prop-baths').value) || 2;
+  var baseHrs = 1.0 + (beds * 0.5) + (baths * 0.4);
+  var price = Math.round(baseHrs * 65 * 100) / 100;
+  document.getElementById('prop-price').value = price.toFixed(2);
+}
+
 /* PRICING CALC */
 function calcPrice(){
   var beds=parseInt(document.getElementById('na-beds').value)||3;
@@ -2687,8 +2886,16 @@ function calcPrice(){
 }
 
 var recurringAppts=[];
+var _editPropIdx=-1;
 
-function saveNewAppt(){
+function fmtPrice(v){
+  if(v===undefined||v===null||v==='')return '—';
+  if(typeof v==='string'&&v.startsWith('$'))return v;
+  var n=parseFloat(v);
+  return isNaN(n)?'—':'$'+n.toFixed(2);
+}
+
+async function saveNewAppt(){
   var name=document.getElementById('na-name').value;
   var dateVal=document.getElementById('na-date').value;
   var timeVal=document.getElementById('na-time').value;
@@ -2705,38 +2912,70 @@ function saveNewAppt(){
   var timeStr=hr12+(hr>=12?'pm':'am');
   var cleanerName=cleaner==='unassigned'?'Unassigned':cleaner.split(' — ')[0];
   var apptStatus=cleaner==='unassigned'?'unassigned':'assigned';
+  var naService=document.getElementById('na-service');
+  var naServiceText=naService?naService.options[naService.selectedIndex].text:'Standard clean';
+  // Get address — always read from na-address (applyPropertyToBooking fills it for saved properties)
+  var apptAddress=(document.getElementById('na-address')||{}).value||'';
+  var apptBeds=(document.getElementById('na-beds')||{}).value||'';
+  var apptBaths=(document.getElementById('na-baths')||{}).value||'';
+  var apptCond=(document.getElementById('na-cond')||{}).value||'7';
+  var apptNotes=(document.getElementById('na-notes')||{}).value||'';
+  // Calculate price FIRST so it's in the apptData entry
+  var priceEl=document.getElementById('price-val');
+  var total=0;
+  if(priceEl){total=parseFloat(priceEl.textContent.replace('$','').replace(',',''))||0;}
+  var apptTax=Math.round(total*0.04712*100)/100;
+  var apptBase=Math.round((total-apptTax)*100)/100;
+  var naHrs=parseFloat((document.getElementById('dur-val')||{}).textContent)||3.5;
+  var naRate=16;
+  var apptCleanerPay=Math.round(naHrs*naRate*100)/100;
+  // Build full appointment object
+  var apptObj={
+    n:name, s:apptStatus, t:timeStr, cleaner:cleanerName,
+    address:apptAddress, beds:apptBeds, baths:apptBaths,
+    service:naServiceText, freq:freq, condition:apptCond,
+    base:'$'+apptBase.toFixed(2), tax:'$'+apptTax.toFixed(2), total:'$'+total.toFixed(2),
+    basePrice:apptBase, taxAmt:apptTax, totalPrice:total,
+    cleanerPay:apptCleanerPay, notes:apptNotes
+  };
+  console.log('[saveNewAppt] appointment object:', apptObj);
   if(freq==='One-time'){
     var key=yr+'-'+mo+'-'+dy;
     if(!apptData[key])apptData[key]=[];
-    apptData[key].push({n:name,s:apptStatus,t:timeStr,cleaner:cleanerName});
+    apptData[key].push(apptObj);
   } else {
     recurringAppts.push({name:name,freq:freq,startYear:yr,startMonth:mo,startDay:dy,dayOfWeek:new Date(yr,mo-1,dy).getDay(),timeStr:timeStr,cleaner:cleanerName,status:apptStatus,active:true});
     populateRecurringMonth(curYear,curMonth);
   }
-  // Save to Supabase
-  var priceEl=document.getElementById('price-val');
-  var basePrice=0;var tax=0;var total=0;
-  if(priceEl){
-    total=parseFloat(priceEl.textContent.replace('$',''))||0;
-    tax=Math.round(total*0.04712*100)/100;
-    basePrice=Math.round((total-tax)*100)/100;
+  // Save as property if checkbox is checked
+  var savePropChk=document.getElementById('na-save-property');
+  if(savePropChk&&savePropChk.checked&&apptAddress){
+    var propFound=_findClientByName(name);
+    if(propFound){
+      var pdata=propFound.data;
+      if(!Array.isArray(pdata.properties))pdata.properties=[];
+      var alreadySaved=pdata.properties.some(function(p){return p.address===apptAddress;});
+      if(!alreadySaved){
+        var newProp={address:apptAddress,beds:apptBeds,baths:apptBaths,sqft:'',price:apptBase.toFixed(2),notes:''};
+        pdata.properties.push(newProp);
+        if(propFound.id&&propFound.id.length>20){
+          await db.from('clients').update({properties:pdata.properties}).eq('id',propFound.id);
+        }
+        console.log('[saveNewAppt] saved property for client:', newProp);
+      }
+    }
   }
-  var naHrs=parseFloat((document.getElementById('dur-val')||{}).textContent)||3.5;
-  var naRate=16;
-  var naService=document.getElementById('na-service');
-  var naServiceText=naService?naService.options[naService.selectedIndex].text:'Standard clean';
-  dbSaveAppointment({
+  // Save to Supabase
+  var sbRes=await dbSaveAppointment({
     clientName:name, service:naServiceText,
     freq:freq, date:dateVal, time:timeStr,
-    address:(document.getElementById('na-address')||{}).value||'',
-    beds:(document.getElementById('na-beds')||{}).value||'',
-    baths:(document.getElementById('na-baths')||{}).value||'',
-    condition:(document.getElementById('na-cond')||{}).value||'7',
-    cleanerName:cleanerName, basePrice:basePrice, tax:tax, totalPrice:total,
-    cleanerPay:Math.round(naHrs*naRate*100)/100,
-    notes:(document.getElementById('na-notes')||{}).value||'',
-    recurring:freq!=='One-time'
+    address:apptAddress,
+    beds:apptBeds, baths:apptBaths, condition:apptCond,
+    cleanerName:cleanerName, basePrice:apptBase, tax:apptTax, totalPrice:total,
+    cleanerPay:apptCleanerPay,
+    notes:apptNotes, recurring:freq!=='One-time'
   });
+  console.log('[saveNewAppt] Supabase response:', sbRes);
   var success=document.getElementById('na-success');
   success.textContent='Booked! '+name+' added as '+(freq==='One-time'?'a one-time appointment':'a '+freq.toLowerCase()+' recurring appointment')+'. Will auto-populate future months.';
   success.classList.add('show');
@@ -4219,29 +4458,7 @@ function updateChargeBtn(){
 }
 
 
-/* GOOGLE PLACES AUTOCOMPLETE */
-window.placesReady = false;
-
-function initAutocomplete(){
-  window.placesReady = true;
-}
-
-function attachAutocomplete(inputId){
-  if(!window.placesReady)return;
-  var input=document.getElementById(inputId);
-  if(!input||input._autocomplete)return;
-  var ac=new google.maps.places.Autocomplete(input,{
-    types:['address'],
-    componentRestrictions:{country:'us'}
-  });
-  ac.addListener('place_changed',function(){
-    var place=ac.getPlace();
-    if(place&&place.formatted_address){
-      input.value=place.formatted_address;
-    }
-  });
-  input._autocomplete=true;
-}
+/* Address fields are plain text — no autocomplete library needed */
 
 
 /* SETTINGS & EMAIL TEMPLATES */
@@ -4814,16 +5031,21 @@ function runGlobalSearch(q){
 
   var typeColors={Client:'#ebf5ff',Cleaner:'#f0faf6',Lead:'#fffbeb',Appointment:'#f5f0ff'};
   var typeText={Client:'#2b6cb0',Cleaner:'#276749',Lead:'#b7791f',Appointment:'#553c9a'};
-  results.innerHTML=hits.slice(0,8).map(function(h){
+  results.innerHTML='';
+  hits.slice(0,8).forEach(function(h){
     var bg=typeColors[h.type]||'#f5f5f3';
     var tc=typeText[h.type]||'#666';
-    var onclick='selectSearchResult(\"'+h.id+'\",\"'+h.type+'\")';
-    return '<div class="search-result-item" onclick="'+onclick+'" style="display:flex;align-items:center;gap:10px;padding:10px 14px;cursor:pointer;border-bottom:1px solid #f5f5f3;">'
-      +'<span style="font-size:10px;padding:2px 7px;border-radius:10px;background:'+bg+';color:'+tc+';font-weight:500;flex-shrink:0;">'+h.type+'</span>'
+    var item=document.createElement('div');
+    item.style.cssText='display:flex;align-items:center;gap:10px;padding:10px 14px;cursor:pointer;border-bottom:1px solid #f5f5f3;';
+    item.innerHTML='<span style="font-size:10px;padding:2px 7px;border-radius:10px;background:'+bg+';color:'+tc+';font-weight:500;flex-shrink:0;">'+h.type+'</span>'
       +'<div style="min-width:0;"><div style="font-size:12px;font-weight:600;color:#1a1a1a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+h.name+'</div>'
       +(h.sub?'<div style="font-size:11px;color:#999;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+h.sub+'</div>':'')
-      +'</div></div>';
-  }).join('');
+      +'</div>';
+    item.addEventListener('mouseover',function(){this.style.background='#f5f5f3';});
+    item.addEventListener('mouseout',function(){this.style.background='';});
+    (function(id,type){item.addEventListener('click',function(){selectSearchResult(id,type);});})(h.id,h.type);
+    results.appendChild(item);
+  });
   results.style.display='block';
 }
 
@@ -5010,143 +5232,432 @@ async function generateClientSummary(){
   }
 }
 
+async function generateLeadSummary(){
+  var d = currentLeadId ? leadDB[currentLeadId] : null;
+  if(!d) return;
+  var summaryEl = document.getElementById('lead-ai-summary');
+  var thinkingEl = document.getElementById('lead-ai-thinking');
+  if(!summaryEl || !thinkingEl) return;
+  summaryEl.style.display = 'none';
+  thinkingEl.style.display = 'block';
+
+  var msgs = [];
+  inboxData.forEach(function(thread){
+    if(thread.name === d.name){
+      thread.msgs.slice(-4).forEach(function(m){
+        msgs.push((m.out?'You: ':'Lead: ')+m.text);
+      });
+    }
+  });
+
+  var prompt = 'You are an assistant for Hawaii Natural Clean, a cleaning business in Hawaii.'
+    +' Generate a concise 3-4 sentence lead intelligence briefing. Be specific and actionable.'
+    +' Assess deal likelihood, suggest next steps, and flag any urgency.\n\n'
+    +'Lead: '+d.name+'\n'
+    +'Stage: '+(d.stage||'New inquiry')+'\n'
+    +'Service: '+(d.service||'—')+'\n'
+    +'Est. value: '+(d.value||'—')+'\n'
+    +'Property: '+(d.sqft||'—')+'\n'
+    +'Source: '+(d.source||'—')+'\n'
+    +'Next action: '+(d.action||'—')+'\n'
+    +'Due: '+(d.due||'—')+'\n'
+    +'Assigned: '+(d.assigned||'—')+'\n'
+    +(d.notes&&d.notes!=='—'?'Notes: '+d.notes+'\n':'')
+    +(msgs.length?'\nRecent messages:\n'+msgs.join('\n'):'');
+
+  try {
+    var response = await fetch('/api/ai-summary', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt: prompt })
+    });
+    var data = await response.json();
+    thinkingEl.style.display = 'none';
+    summaryEl.textContent = data.summary || 'Could not generate summary.';
+    summaryEl.style.display = 'block';
+  } catch(err) {
+    thinkingEl.style.display = 'none';
+    summaryEl.textContent = 'Error generating summary.';
+    summaryEl.style.display = 'block';
+  }
+}
+
 function openAddProperty(){
   if(!currentClientId){ showPaymentToast('No client selected.', null, 'error'); return; }
   var cdata = clientDB[currentClientId];
+  _editPropIdx = -1;
+  _propSaveContext = 'client';
   document.getElementById('prop-client-name').textContent = 'Adding property for: ' + (cdata?cdata.name:'');
+  document.getElementById('add-property-overlay').querySelector('.panel-title').textContent = 'Add property';
   document.getElementById('prop-address').value = '';
   document.getElementById('prop-beds').value = '3';
   document.getElementById('prop-baths').value = '2';
   document.getElementById('prop-sqft').value = '';
-  document.getElementById('prop-price').value = '';
   document.getElementById('prop-notes').value = '';
+  propPriceOverride = false;
+  var overrideChk = document.getElementById('prop-price-override');
+  if(overrideChk) overrideChk.checked = false;
+  calcPropPrice();
   document.getElementById('add-property-overlay').classList.remove('hidden');
 }
 
-function saveProperty(){
-  var address = document.getElementById('prop-address').value;
+function editProperty(idx){
+  if(!currentClientId){ showPaymentToast('No client selected.', null, 'error'); return; }
+  var cdata = clientDB[currentClientId];
+  if(!cdata||!cdata.properties||!cdata.properties[idx]) return;
+  var p = cdata.properties[idx];
+  _editPropIdx = idx;
+  // Determine context: are we in client edit form or client view?
+  var editPanel = document.getElementById('client-edit');
+  _propSaveContext = (editPanel && editPanel.style.display !== 'none') ? 'clientEdit' : 'client';
+  document.getElementById('prop-client-name').textContent = 'Editing property for: ' + (cdata.name||'');
+  var titleEl = document.getElementById('add-property-overlay').querySelector('.panel-title');
+  if(titleEl) titleEl.textContent = 'Edit property';
+  document.getElementById('prop-address').value = p.address || '';
+  document.getElementById('prop-beds').value = p.beds || '3';
+  document.getElementById('prop-baths').value = p.baths || '2';
+  document.getElementById('prop-sqft').value = p.sqft || '';
+  document.getElementById('prop-notes').value = p.notes || '';
+  propPriceOverride = true;
+  var overrideChk = document.getElementById('prop-price-override');
+  if(overrideChk) overrideChk.checked = true;
+  document.getElementById('prop-price').value = p.price || '';
+  document.getElementById('add-property-overlay').classList.remove('hidden');
+}
+
+async function saveProperty(){
+  var address = document.getElementById('prop-address').value.trim();
   if(!address){ document.getElementById('prop-address').style.border='1px solid #e53e3e'; document.getElementById('prop-address').focus(); return; }
   document.getElementById('prop-address').style.border='';
+
   var cdata = clientDB[currentClientId];
-  if(!cdata) return;
-  if(!cdata.properties) cdata.properties = [];
+  if(!cdata){ showPaymentToast('Client not found (id: '+currentClientId+'). Select client first.', null, 'error'); return; }
+  if(!Array.isArray(cdata.properties)) cdata.properties = [];
+
   var prop = {
     address: address,
-    beds: document.getElementById('prop-beds').value || '—',
+    beds:  document.getElementById('prop-beds').value  || '—',
     baths: document.getElementById('prop-baths').value || '—',
-    sqft: document.getElementById('prop-sqft').value || '',
+    sqft:  document.getElementById('prop-sqft').value  || '',
     price: document.getElementById('prop-price').value || '0',
     notes: document.getElementById('prop-notes').value || ''
   };
-  cdata.properties.push(prop);
-
-  // Save to Supabase
-  var savePromise;
-  if(currentClientId && currentClientId.length > 20){
-    savePromise = db.from('clients').update({ properties: cdata.properties }).eq('id', currentClientId);
+  var isEditMode = (_editPropIdx >= 0);
+  var editIdx = _editPropIdx;
+  var originalProp = isEditMode ? cdata.properties[editIdx] : null;
+  if(isEditMode){
+    cdata.properties[editIdx] = prop;
+    console.log('[saveProperty] updated prop['+editIdx+']:', prop, 'full array:', cdata.properties);
   } else {
-    savePromise = Promise.resolve({error: null});
+    cdata.properties.push(prop);
+    console.log('[saveProperty] clientId:', currentClientId, 'new prop:', prop, 'full array:', cdata.properties);
   }
+  _editPropIdx = -1;
 
-  savePromise.then(function(res){
-    if(res && res.error){
-      console.error('Property save error:', res.error);
+  // Save to Supabase (only real DB records have UUID-length IDs)
+  if(currentClientId && currentClientId.length > 20){
+    var res = await db.from('clients').update({ properties: cdata.properties }).eq('id', currentClientId);
+    console.log('[saveProperty] Supabase response:', res);
+    if(res.error){
+      console.error('[saveProperty] ERROR:', res.error);
       showPaymentToast('Error saving property: ' + res.error.message, null, 'error');
+      if(isEditMode){ cdata.properties[editIdx] = originalProp; } else { cdata.properties.pop(); }
       return;
     }
-    var s = document.getElementById('prop-success');
-    s.textContent = 'Property at ' + address + ' saved!';
-    s.classList.add('show');
-    setTimeout(function(){
-      s.classList.remove('show');
-      closeOverlay('add-property-overlay');
+    console.log('[saveProperty] SUCCESS — properties saved to Supabase');
+  } else {
+    console.log('[saveProperty] local-only client, skipping Supabase write');
+  }
+
+  var s = document.getElementById('prop-success');
+  s.textContent = isEditMode ? 'Property updated!' : 'Property saved!';
+  s.classList.add('show');
+  var ctx = _propSaveContext;
+  _propSaveContext = 'client';
+
+  setTimeout(function(){
+    s.classList.remove('show');
+    closeOverlay('add-property-overlay');
+    if(ctx === 'booking'){
+      var clientName = (document.getElementById('na-name')||{}).value || '';
+      populatePropertySelector(clientName);
+      var propSel = document.getElementById('na-property-select');
+      if(propSel){ propSel.value = String(isEditMode ? editIdx : cdata.properties.length - 1); applyPropertyToBooking(); }
+    } else if(ctx === 'edit'){
+      populateEditPropertySelector(currentClientName);
+      var propSel = document.getElementById('edit-property-select');
+      if(propSel){ propSel.value = String(isEditMode ? editIdx : cdata.properties.length - 1); applyEditProperty(); }
+    } else if(ctx === 'clientEdit'){
       openClient(currentClientId);
-    }, 1500);
-  });
+      showClientEdit();
+    } else {
+      openClient(currentClientId);
+    }
+  }, 800);
 }
 
-function removeProperty(idx){
+async function removeProperty(idx){
   if(!confirm('Remove this property?')) return;
   var cdata = clientDB[currentClientId];
   if(!cdata || !cdata.properties) return;
   cdata.properties.splice(idx, 1);
   if(currentClientId && currentClientId.length > 20){
-    db.from('clients').update({ properties: cdata.properties }).eq('id', currentClientId);
+    var res = await db.from('clients').update({ properties: cdata.properties }).eq('id', currentClientId);
+    console.log('[removeProperty] Supabase response:', res);
+    if(res.error) console.error('[removeProperty] ERROR:', res.error);
   }
-  openClient(currentClientId);
+  var editPanel = document.getElementById('client-edit');
+  if(editPanel && editPanel.style.display !== 'none'){
+    showClientEdit();
+  } else {
+    openClient(currentClientId);
+  }
 }
 
 
-/* PROPERTY SELECTION IN BOOKING FORM */
-function populatePropertySelector(clientName){
-  var propRow = document.getElementById('na-property-row');
-  var propSel = document.getElementById('na-property-select');
-  if(!propRow || !propSel) return;
+/* ── CLIENT AUTOCOMPLETE FOR NEW APPOINTMENT FORM ── */
+var _propSaveContext = 'client'; // 'client' | 'booking' | 'edit'
 
-  // Find client by name
-  var cdata = null;
-  Object.values(clientDB).forEach(function(c){
-    if(c.name === clientName) cdata = c;
+function _findClientByName(name){
+  var result = null;
+  Object.entries(clientDB).forEach(function(e){
+    if(e[1].name === name) result = {id: e[0], data: e[1]};
+  });
+  return result;
+}
+
+function initNewApptClientAutocomplete(){
+  var input = document.getElementById('na-name');
+  var dropdown = document.getElementById('na-name-dropdown');
+  if(!input || !dropdown) return;
+
+  input.addEventListener('input', function(){
+    var q = this.value.trim().toLowerCase();
+    dropdown.innerHTML = '';
+    if(!q){ dropdown.style.display='none'; populatePropertySelector(''); return; }
+
+    var matches = Object.entries(clientDB).filter(function(e){
+      return e[1].name.toLowerCase().indexOf(q) >= 0;
+    });
+
+    if(matches.length === 0 && !q){ dropdown.style.display='none'; return; }
+
+    // Existing client matches
+    matches.slice(0,8).forEach(function(e){
+      var id = e[0], c = e[1];
+      var item = document.createElement('div');
+      item.style.cssText = 'padding:9px 12px;cursor:pointer;font-size:12px;border-bottom:1px solid #f5f5f3;';
+      item.innerHTML = '<div style="font-weight:600;color:#1a1a1a;">'+c.name+'</div>'
+        +'<div style="font-size:11px;color:#999;margin-top:1px;">'+c.type+' · '+(c.phone!=='—'?c.phone:c.email)+'</div>';
+      item.addEventListener('mousedown', function(ev){ ev.preventDefault(); });
+      item.addEventListener('click', function(){
+        input.value = c.name;
+        var ph = document.getElementById('na-phone');
+        var em = document.getElementById('na-email');
+        var ad = document.getElementById('na-address');
+        if(ph) ph.value = c.phone !== '—' ? c.phone : '';
+        if(em) em.value = c.email !== '—' ? c.email : '';
+        if(ad) ad.value = c.address !== '—' ? c.address : '';
+        dropdown.style.display = 'none';
+        populatePropertySelector(c.name);
+      });
+      item.addEventListener('mouseover', function(){ this.style.background='#f5f5f3'; });
+      item.addEventListener('mouseout',  function(){ this.style.background=''; });
+      dropdown.appendChild(item);
+    });
+
+    // "Create new client" option
+    var newItem = document.createElement('div');
+    newItem.style.cssText = 'padding:9px 12px;cursor:pointer;font-size:12px;color:#1D9E75;font-weight:600;';
+    newItem.textContent = '+ New client: "' + input.value + '"';
+    newItem.addEventListener('mousedown', function(ev){ ev.preventDefault(); });
+    newItem.addEventListener('click', function(){
+      dropdown.style.display='none';
+    });
+    newItem.addEventListener('mouseover', function(){ this.style.background='#f0faf6'; });
+    newItem.addEventListener('mouseout',  function(){ this.style.background=''; });
+    dropdown.appendChild(newItem);
+
+    dropdown.style.display = 'block';
   });
 
-  var props = cdata && cdata.properties ? cdata.properties : [];
+  input.addEventListener('blur', function(){
+    setTimeout(function(){ dropdown.style.display='none'; }, 200);
+  });
+}
 
-  if(props.length > 0){
-    propSel.innerHTML = '<option value="">— Select property —</option>';
-    props.forEach(function(p, idx){
-      var opt = document.createElement('option');
-      opt.value = idx;
-      opt.textContent = p.address + ' (' + p.beds + 'bd/' + p.baths + 'ba — $' + p.price + ')';
-      propSel.appendChild(opt);
-    });
-    propRow.style.display = 'block';
-    // If only one property, auto-select it
-    if(props.length === 1){
-      propSel.value = '0';
-      applyPropertyToBooking();
-    }
-  } else {
-    propRow.style.display = 'none';
+/* ── PROPERTY SELECTOR — NEW APPOINTMENT FORM ── */
+function populatePropertySelector(clientName){
+  var propSel = document.getElementById('na-property-select');
+  if(!propSel) return;
+
+  // Always reset to just "Enter manually"
+  propSel.innerHTML = '<option value="manual">Enter address manually</option>';
+
+  var found = _findClientByName(clientName);
+  if(!found || !found.id || found.id.length <= 20) return; // new client, nothing to add
+
+  var props = found.data.properties || [];
+  props.forEach(function(p, idx){
+    var opt = document.createElement('option');
+    opt.value = idx;
+    opt.textContent = p.address + ' (' + p.beds + 'bd / ' + p.baths + 'ba' + (p.price ? ' — $' + p.price + '/clean' : '') + ')';
+    propSel.appendChild(opt);
+  });
+
+  // "Add new property" option for existing DB clients
+  var addOpt = document.createElement('option');
+  addOpt.value = 'new';
+  addOpt.textContent = '+ Add new property for this client';
+  propSel.appendChild(addOpt);
+
+  // Auto-select if only one property
+  if(props.length === 1){
+    propSel.value = '0';
+    applyPropertyToBooking();
   }
 }
 
 function applyPropertyToBooking(){
   var propSel = document.getElementById('na-property-select');
+  if(!propSel) return;
+
+  var addrRow = document.getElementById('na-address-row');
+  var savePropRow = document.getElementById('na-save-prop-row');
+
+  if(propSel.value === 'manual'){
+    if(addrRow) addrRow.style.display = '';
+    // Show save checkbox only for existing clients
+    var cname = (document.getElementById('na-name')||{}).value || '';
+    var cfound = _findClientByName(cname);
+    if(savePropRow) savePropRow.style.display = (cfound && cfound.id) ? '' : 'none';
+    return;
+  }
+
+  if(propSel.value === 'new'){
+    var clientName = (document.getElementById('na-name')||{}).value || '';
+    var found = _findClientByName(clientName);
+    if(!found){ showPaymentToast('Select an existing client first to add a property.', null, 'error'); propSel.value='manual'; return; }
+    if(addrRow) addrRow.style.display = 'none';
+    if(savePropRow) savePropRow.style.display = 'none';
+    _propSaveContext = 'booking';
+    currentClientId = found.id;
+    document.getElementById('prop-client-name').textContent = 'Adding property for: ' + found.data.name;
+    ['prop-address','prop-sqft','prop-notes'].forEach(function(id){ document.getElementById(id).value=''; });
+    document.getElementById('prop-beds').value = '3';
+    document.getElementById('prop-baths').value = '2';
+    propPriceOverride = false;
+    var overrideChk = document.getElementById('prop-price-override');
+    if(overrideChk) overrideChk.checked = false;
+    calcPropPrice();
+    document.getElementById('add-property-overlay').classList.remove('hidden');
+    return;
+  }
+
+  // A saved property selected — hide address row, show property details
+  if(addrRow) addrRow.style.display = 'none';
+  if(savePropRow) savePropRow.style.display = 'none';
+
   var idx = parseInt(propSel.value);
   if(isNaN(idx)) return;
+  var clientName = (document.getElementById('na-name')||{}).value || '';
+  var found = _findClientByName(clientName);
+  if(!found || !found.data.properties || !found.data.properties[idx]) return;
+  var prop = found.data.properties[idx];
 
-  var nameEl = document.getElementById('na-name');
-  var clientName = nameEl ? nameEl.value : '';
-  var cdata = null;
-  Object.values(clientDB).forEach(function(c){
-    if(c.name === clientName) cdata = c;
-  });
-
-  if(!cdata || !cdata.properties || !cdata.properties[idx]) return;
-  var prop = cdata.properties[idx];
-
+  // Fill address into the (hidden) na-address field so saveNewAppt can read it
   var addrEl = document.getElementById('na-address');
+  if(addrEl) addrEl.value = prop.address || '';
+
   var bedsEl = document.getElementById('na-beds');
   var bathsEl = document.getElementById('na-baths');
-
-  if(addrEl) addrEl.value = prop.address;
-  if(bedsEl) bedsEl.value = prop.beds;
-  if(bathsEl) bathsEl.value = prop.baths;
-
+  if(bedsEl) bedsEl.value = String(prop.beds);
+  if(bathsEl) bathsEl.value = String(prop.baths);
   calcPrice();
 }
 
-// Hook into na-name field to show properties when client name is typed/filled
-document.addEventListener('DOMContentLoaded', function(){
-  var nameEl = document.getElementById('na-name');
-  if(nameEl){
-    nameEl.addEventListener('input', function(){
-      populatePropertySelector(this.value);
-    });
-    nameEl.addEventListener('change', function(){
-      populatePropertySelector(this.value);
-    });
+/* ── PROPERTY SELECTOR — EDIT APPOINTMENT FORM ── */
+function populateEditPropertySelector(clientName){
+  var propSel = document.getElementById('edit-property-select');
+  if(!propSel) return;
+
+  propSel.innerHTML = '<option value="manual">Enter address manually</option>';
+
+  var found = _findClientByName(clientName);
+  if(!found || !found.id || found.id.length <= 20) return;
+
+  var props = found.data.properties || [];
+  props.forEach(function(p, idx){
+    var opt = document.createElement('option');
+    opt.value = idx;
+    opt.textContent = p.address + ' (' + p.beds + 'bd / ' + p.baths + 'ba' + (p.price ? ' — $' + p.price + '/clean' : '') + ')';
+    propSel.appendChild(opt);
+  });
+
+  var addOpt = document.createElement('option');
+  addOpt.value = 'new';
+  addOpt.textContent = '+ Add new property for this client';
+  propSel.appendChild(addOpt);
+
+  // Pre-select if current address matches a saved property
+  var curAddr = (currentAppt && currentAppt.address) || '';
+  if(curAddr){
+    var matchIdx = props.findIndex(function(p){ return p.address === curAddr; });
+    if(matchIdx >= 0){ propSel.value = String(matchIdx); applyEditProperty(); }
   }
+}
+
+function applyEditProperty(){
+  var propSel = document.getElementById('edit-property-select');
+  if(!propSel) return;
+
+  if(propSel.value === 'manual'){
+    var infoDiv=document.getElementById('edit-property-info');
+    if(infoDiv) infoDiv.style.display='none';
+    return;
+  }
+
+  if(propSel.value === 'new'){
+    var found = _findClientByName(currentClientName);
+    if(!found){ propSel.value='manual'; return; }
+    _propSaveContext = 'edit';
+    currentClientId = found.id;
+    document.getElementById('prop-client-name').textContent = 'Adding property for: ' + found.data.name;
+    ['prop-address','prop-sqft','prop-notes'].forEach(function(id){ document.getElementById(id).value=''; });
+    document.getElementById('prop-beds').value = '3';
+    document.getElementById('prop-baths').value = '2';
+    propPriceOverride = false;
+    var overrideChk = document.getElementById('prop-price-override');
+    if(overrideChk) overrideChk.checked = false;
+    calcPropPrice();
+    document.getElementById('add-property-overlay').classList.remove('hidden');
+    return;
+  }
+
+  var idx = parseInt(propSel.value);
+  if(isNaN(idx)) return;
+  var found = _findClientByName(currentClientName);
+  if(!found || !found.data.properties || !found.data.properties[idx]) return;
+  var prop = found.data.properties[idx];
+
+  var infoDiv = document.getElementById('edit-property-info');
+  var addrDiv = document.getElementById('edit-prop-addr');
+  var detailDiv = document.getElementById('edit-prop-detail');
+  if(infoDiv){ infoDiv.style.display='block'; }
+  if(addrDiv) addrDiv.textContent = prop.address;
+  if(detailDiv){
+    var parts=[];
+    if(prop.beds) parts.push(prop.beds+' bed');
+    if(prop.baths) parts.push(prop.baths+' bath');
+    if(prop.price) parts.push('$'+prop.price+'/clean');
+    detailDiv.textContent = parts.join(' · ');
+  }
+  if(currentAppt) currentAppt.address = prop.address;
+  document.getElementById('edit-price').value = prop.price || '';
+}
+
+document.addEventListener('DOMContentLoaded', function(){
+  initNewApptClientAutocomplete();
 });
 
 </script>
@@ -5425,18 +5936,27 @@ Your total will update automatically when you select a payment method.</textarea
 
 
 <!-- ADD PROPERTY OVERLAY -->
-<div class="overlay hidden" id="add-property-overlay" onclick="closeOverlay('add-property-overlay')">
+<div class="overlay hidden" id="add-property-overlay" style="z-index:1100;" onclick="closeOverlay('add-property-overlay')">
   <div class="panel" onclick="event.stopPropagation()">
     <div class="panel-header"><div class="panel-title">Add property</div><button class="close-btn" onclick="closeOverlay('add-property-overlay')">&#x2715;</button></div>
     <div class="panel-body">
       <div style="font-size:12px;color:#666;margin-bottom:12px;" id="prop-client-name"></div>
       <div class="form-row"><label>Property address</label><input type="text" id="prop-address" placeholder="123 Kalani St, Kailua, HI"></div>
       <div class="form-three">
-        <div class="form-row"><label>Bedrooms</label><input type="number" id="prop-beds" value="3" min="0"></div>
-        <div class="form-row"><label>Bathrooms</label><input type="number" id="prop-baths" value="2" min="0" step="0.5"></div>
+        <div class="form-row"><label>Bedrooms</label><input type="number" id="prop-beds" value="3" min="0" oninput="calcPropPrice()"></div>
+        <div class="form-row"><label>Bathrooms</label><input type="number" id="prop-baths" value="2" min="0" step="0.5" oninput="calcPropPrice()"></div>
         <div class="form-row"><label>Sq footage</label><input type="text" id="prop-sqft" placeholder="1,400 sq ft"></div>
       </div>
-      <div class="form-row"><label>Price per clean ($)</label><input type="number" id="prop-price" placeholder="238.00" step="0.01"></div>
+      <div class="form-row">
+        <label>Price per clean ($)</label>
+        <input type="number" id="prop-price" placeholder="238.00" step="0.01">
+        <div style="margin-top:5px;font-size:11px;color:#999;display:flex;align-items:center;gap:6px;">
+          <label style="display:flex;align-items:center;gap:5px;cursor:pointer;">
+            <input type="checkbox" id="prop-price-override" onchange="propPriceOverride=this.checked;if(!this.checked)calcPropPrice();">
+            Override auto-calculated price
+          </label>
+        </div>
+      </div>
       <div class="form-row"><label>Notes</label><textarea id="prop-notes" style="min-height:50px;" placeholder="Access code, special instructions, parking..."></textarea></div>
       <div class="save-bar">
         <button class="btn btn-primary" onclick="saveProperty()">Save property</button>

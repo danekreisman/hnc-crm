@@ -535,12 +535,6 @@ textarea{font-family:inherit;}
         </div>
         <div class="section-title">Roster — click a card to view profile</div>
         <div class="cleaner-grid">
-          <div class="cleaner-card" onclick="openCleaner('km')"><div class="cleaner-top"><div class="avatar" style="background:#9FE1CB;color:#085041;">KM</div><div><div class="cleaner-name">Kaimana M.</div><div class="cleaner-role">Lead · Oahu</div></div></div><div class="cleaner-stats"><div class="cs"><div class="cs-label">This week</div><div class="cs-val">34 hrs</div></div><div class="cs"><div class="cs-label">Rate</div><div class="cs-val">$18/hr</div></div><div class="cs"><div class="cs-label">Jobs this mo</div><div class="cs-val">12</div></div><div class="cs"><div class="cs-label">Status</div><div class="cs-val"><span class="badge bac">Active</span></div></div></div><div class="pb"><div class="pf" style="width:85%"></div></div></div>
-          <div class="cleaner-card" onclick="openCleaner('al')"><div class="cleaner-top"><div class="avatar" style="background:#B5D4F4;color:#0C447C;">AL</div><div><div class="cleaner-name">Alohi L.</div><div class="cleaner-role">Cleaner · Oahu</div></div></div><div class="cleaner-stats"><div class="cs"><div class="cs-label">This week</div><div class="cs-val">28 hrs</div></div><div class="cs"><div class="cs-label">Rate</div><div class="cs-val">$16/hr</div></div><div class="cs"><div class="cs-label">Jobs this mo</div><div class="cs-val">9</div></div><div class="cs"><div class="cs-label">Status</div><div class="cs-val"><span class="badge bac">Active</span></div></div></div><div class="pb"><div class="pf" style="width:70%"></div></div></div>
-          <div class="cleaner-card" onclick="openCleaner('mk')"><div class="cleaner-top"><div class="avatar" style="background:#F5C4B3;color:#712B13;">MK</div><div><div class="cleaner-name">Maile K.</div><div class="cleaner-role">Lead · Maui</div></div></div><div class="cleaner-stats"><div class="cs"><div class="cs-label">This week</div><div class="cs-val">36 hrs</div></div><div class="cs"><div class="cs-label">Rate</div><div class="cs-val">$18/hr</div></div><div class="cs"><div class="cs-label">Jobs this mo</div><div class="cs-val">14</div></div><div class="cs"><div class="cs-label">Status</div><div class="cs-val"><span class="badge bac">Active</span></div></div></div><div class="pb"><div class="pf" style="width:90%"></div></div></div>
-          <div class="cleaner-card" onclick="openCleaner('kn')"><div class="cleaner-top"><div class="avatar" style="background:#CECBF6;color:#3C3489;">KN</div><div><div class="cleaner-name">Keanu N.</div><div class="cleaner-role">Cleaner · Oahu</div></div></div><div class="cleaner-stats"><div class="cs"><div class="cs-label">This week</div><div class="cs-val">22 hrs</div></div><div class="cs"><div class="cs-label">Rate</div><div class="cs-val">$16/hr</div></div><div class="cs"><div class="cs-label">Jobs this mo</div><div class="cs-val">7</div></div><div class="cs"><div class="cs-label">Status</div><div class="cs-val"><span class="badge bac">Active</span></div></div></div><div class="pb"><div class="pf" style="width:55%;background:#dd6b20;"></div></div></div>
-          <div class="cleaner-card" onclick="openCleaner('lh')"><div class="cleaner-top"><div class="avatar" style="background:#FAC775;color:#633806;">LH</div><div><div class="cleaner-name">Leilani H.</div><div class="cleaner-role">Cleaner · Maui</div></div></div><div class="cleaner-stats"><div class="cs"><div class="cs-label">This week</div><div class="cs-val">22 hrs</div></div><div class="cs"><div class="cs-label">Rate</div><div class="cs-val">$16/hr</div></div><div class="cs"><div class="cs-label">Jobs this mo</div><div class="cs-val">8</div></div><div class="cs"><div class="cs-label">Status</div><div class="cs-val"><span class="badge bac">Active</span></div></div></div><div class="pb"><div class="pf" style="width:55%;background:#dd6b20;"></div></div></div>
-          <div class="cleaner-card" onclick="openCleaner('tr')" style="opacity:.65"><div class="cleaner-top"><div class="avatar" style="background:#F4C0D1;color:#72243E;">TR</div><div><div class="cleaner-name">Tua R.</div><div class="cleaner-role">Cleaner · Oahu</div></div></div><div class="cleaner-stats"><div class="cs"><div class="cs-label">This week</div><div class="cs-val">0 hrs</div></div><div class="cs"><div class="cs-label">Rate</div><div class="cs-val">$16/hr</div></div><div class="cs"><div class="cs-label">Jobs this mo</div><div class="cs-val">0</div></div><div class="cs"><div class="cs-label">Status</div><div class="cs-val"><span class="badge bin">Inactive</span></div></div></div><div class="pb"><div class="pf" style="width:0%"></div></div></div>
         </div>
         <div class="section-title">Hours log — this week</div>
         <div class="tw"><table><thead><tr><th style="width:18%">Cleaner</th><th style="width:13%">Date</th><th style="width:30%">Job / client</th><th style="width:10%">Hours</th><th style="width:14%">Island</th><th style="width:15%">Pay</th></tr></thead><tbody>
@@ -1739,11 +1733,11 @@ function renderClientsTable(){
 function renderCleanersGrid(){
   var grid=document.querySelector('.cleaner-grid');
   if(!grid)return;
-  var dbCards=grid.querySelectorAll('.cleaner-card.db-card');
-  dbCards.forEach(function(c){c.remove();});
-  Object.entries(cleanerDB).forEach(function(entry){
+  var cleanerEntries=Object.entries(cleanerDB).filter(function(e){return e[0].length>=30;});
+  console.log('[renderCleanersGrid] Rendering '+cleanerEntries.length+' real cleaners from Supabase');
+  grid.innerHTML=''; // Clear all cards
+  cleanerEntries.forEach(function(entry){
     var id=entry[0];var c=entry[1];
-    if(id.length<30)return;
     var card=document.createElement('div');
     card.className='cleaner-card db-card';
     card.innerHTML='<div class="cleaner-top"><div class="avatar" style="background:'+c.bg+';color:'+c.fg+';">'+c.initials+'</div><div><div class="cleaner-name">'+c.name+'</div><div class="cleaner-role">'+c.role+'</div></div></div>'
@@ -1811,44 +1805,9 @@ var clientDB={};
 
 var leadDB={};
 
-var cleanerDB={
-  km:{name:'Kaimana M.',role:'Lead cleaner · Oahu',initials:'KM',bg:'#9FE1CB',fg:'#085041',phone:'(808) 555-0142',email:'kaimana.m@email.com',loc:'Kailua, Oahu',start:'Jan 2024',rate:'$18/hr',week:'34 hrs',month:'112 hrs',paid:'$600',jobs:'12',alltime:'147',islands:'Oahu',bgcheck:'Cleared',notes:'Reliable, client favorite. Clients frequently request her by name.'},
-  al:{name:'Alohi L.',role:'Cleaner · Oahu',initials:'AL',bg:'#B5D4F4',fg:'#0C447C',phone:'(808) 555-0198',email:'alohi.l@email.com',loc:'Kaneohe, Oahu',start:'Mar 2024',rate:'$16/hr',week:'28 hrs',month:'88 hrs',paid:'$0',jobs:'9',alltime:'82',islands:'Oahu',bgcheck:'Cleared',notes:'Good with commercial clients. Punctual.'},
-  mk:{name:'Maile K.',role:'Lead cleaner · Maui',initials:'MK',bg:'#F5C4B3',fg:'#712B13',phone:'(808) 555-0231',email:'maile.k@email.com',loc:'Kahului, Maui',start:'Nov 2023',rate:'$18/hr',week:'36 hrs',month:'124 hrs',paid:'$1,200',jobs:'14',alltime:'198',islands:'Maui',bgcheck:'Cleared',notes:'Top performer on Maui.'},
-  kn:{name:'Keanu N.',role:'Cleaner · Oahu',initials:'KN',bg:'#CECBF6',fg:'#3C3489',phone:'(808) 555-0317',email:'keanu.n@email.com',loc:'Aiea, Oahu',start:'Jun 2024',rate:'$16/hr',week:'22 hrs',month:'68 hrs',paid:'$0',jobs:'7',alltime:'54',islands:'Oahu',bgcheck:'Cleared',notes:'Part-time, available weekdays.'},
-  lh:{name:'Leilani H.',role:'Cleaner · Maui',initials:'LH',bg:'#FAC775',fg:'#633806',phone:'(808) 555-0289',email:'leilani.h@email.com',loc:'Lahaina, Maui',start:'Aug 2024',rate:'$16/hr',week:'22 hrs',month:'72 hrs',paid:'$0',jobs:'8',alltime:'41',islands:'Maui',bgcheck:'Cleared',notes:'Good availability, Maui west side.'},
-  tr:{name:'Tua R.',role:'Cleaner · Oahu',initials:'TR',bg:'#F4C0D1',fg:'#72243E',phone:'(808) 555-0354',email:'tua.r@email.com',loc:'Waipahu, Oahu',start:'Sep 2024',rate:'$16/hr',week:'0 hrs',month:'0 hrs',paid:'$0',jobs:'0',alltime:'12',islands:'Oahu',bgcheck:'Pending',notes:'On leave — returning May.'}
-};
+var cleanerDB={};
 
-var inboxData=[
-  {id:'morrisons',name:'The Morrisons',type:'client',avatar:'TM',phone:'(808) 555-1234',lastMsg:'Sounds great, see you Monday!',time:'10:42am',unread:false,msgs:[
-    {out:false,text:'Hi! Just confirming our cleaning is still on for Monday April 7 at 8am?',time:'10:38am'},
-    {out:true,text:'Hi Morrison family! Yes, Kaimana will be there Monday at 8am as scheduled. Let us know if you need anything!',time:'10:41am'},
-    {out:false,text:'Sounds great, see you Monday!',time:'10:42am'}
-  ]},
-  {id:'chen-family',name:'Chen Family',type:'client',avatar:'CF',phone:'(808) 555-3310',lastMsg:'We might be interested in monthly cleaning',time:'Yesterday',unread:true,msgs:[
-    {out:true,text:'Hi Chen family! Hope your move went well. We would love to help with regular cleaning — we are offering 10% off your first recurring booking this month!',time:'Mar 31'},
-    {out:false,text:'Thank you! We might be interested in monthly cleaning',time:'Yesterday'}
-  ]},
-  {id:'kaimana',name:'Kaimana M.',type:'cleaner',avatar:'KM',phone:'(808) 555-0142',lastMsg:'On my way, should be there in 10 min',time:'8:51am',unread:false,msgs:[
-    {out:true,text:'Hey Kaimana, job available — The Morrisons, Mon Apr 14 @ 8am in Kailua. Est 3.5 hrs, $63. Reply YES to claim!',time:'8:45am'},
-    {out:false,text:'YES! I will take it',time:'8:48am'},
-    {out:true,text:'Perfect, you are confirmed! Address: 1247 Kalani St, Kailua.',time:'8:50am'},
-    {out:false,text:'On my way, should be there in 10 min',time:'8:51am'}
-  ]},
-  {id:'oahu-dental',name:'Oahu Dental Group',type:'lead',avatar:'OD',phone:'(808) 555-7788',lastMsg:'We will review the quote and get back to you',time:'Mar 28',unread:true,msgs:[
-    {out:true,text:'Hi Dr. Lee! Following up on the cleaning quote we sent last week for $950/month. Happy to answer any questions or adjust the scope.',time:'Mar 27'},
-    {out:false,text:'We will review the quote and get back to you',time:'Mar 28'}
-  ]},
-  {id:'pearl-city-law',name:'Pearl City Law',type:'lead',avatar:'PL',phone:'(808) 555-2233',lastMsg:'Let me check with the partners',time:'Mar 25',unread:false,msgs:[
-    {out:true,text:'Hi Maria! Just following up on our cleaning proposal for $600/month. Would love to get you started before the end of the month.',time:'Mar 24'},
-    {out:false,text:'Let me check with the partners',time:'Mar 25'}
-  ]},
-  {id:'maile',name:'Maile K.',type:'cleaner',avatar:'MK',phone:'(808) 555-0231',lastMsg:'All done, hotel looks great!',time:'Mar 30',unread:false,msgs:[
-    {out:true,text:'Hey Maile! Just checking in on the Maui Surf Hotel job today.',time:'Mar 30'},
-    {out:false,text:'All done, hotel looks great!',time:'Mar 30'}
-  ]}
-];
+var inboxData=[];
 
 var currentChatChannel='sms';
 var currentAppt=null;
@@ -1857,14 +1816,7 @@ var currentApptData={};
 var currentClientId=null;
 var currentLeadId=null;
 var currentCleanerId=null;
-var aiDraftTemplates={
-  'morrisons':{sms:'Hi Morrison family! Just a reminder that Kaimana will be there Monday Apr 7 at 8am for your biweekly clean. Let us know if anything needs special attention. See you then! — Hawaii Natural Clean',email:'Hi Morrison family,\n\nThis is a friendly reminder that Kaimana from Hawaii Natural Clean will be at your home Monday, April 7th at 8:00 AM for your biweekly clean.\n\nIf you need to reschedule or have special requests, just reply to this message.\n\nMahalo!\nHawaii Natural Clean'},
-  'chen-family':{sms:'Hi Chen family! It has been a while — hope you are settled in. We would love to set up regular cleaning for you. Reply here to schedule or visit hawaiinaturalclean.com',email:'Hi Chen family,\n\nHope your move went smoothly! We noticed it has been about 51 days since your last clean.\n\nWe are offering 10% off your first recurring booking this month. Would you like to set up a regular cleaning schedule?\n\nMahalo,\nHawaii Natural Clean'},
-  'kaimana':{sms:'Hey Kaimana! Job available — [Client], [Date] @ [Time] in [Location]. Est [Hours] hrs, $[Pay]. Reply YES to claim or NO to pass. First YES gets it! — HNC',email:''},
-  'oahu-dental':{sms:'Hi Dr. Lee! Following up on our cleaning proposal for Oahu Dental Group. Happy to answer any questions or schedule a quick call. — Hawaii Natural Clean',email:'Hi Dr. Lee,\n\nI wanted to follow up on the cleaning proposal we sent for Oahu Dental Group ($950/month for weekly service).\n\nWe would love to get you set up and can be flexible on scheduling. Feel free to reply or call us anytime.\n\nMahalo,\nHawaii Natural Clean'},
-  'pearl-city-law':{sms:'Hi Maria! Just checking in on our cleaning proposal for Pearl City Law. We are happy to adjust scope or pricing to fit your needs. — HNC',email:'Hi Maria,\n\nJust a friendly follow-up on our commercial cleaning proposal for Pearl City Law Office.\n\nWe are happy to discuss adjustments to the scope or schedule to better fit your team. Would love to get started this month!\n\nMahalo,\nHawaii Natural Clean'},
-  'maile':{sms:'Hey Maile! Just checking in. Everything good? Let us know if you need anything. — HNC',email:''}
-};
+var aiDraftTemplates={};
 
 var calView='month';
 var curDay=new Date().getDate();

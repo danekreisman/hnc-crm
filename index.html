@@ -1060,15 +1060,58 @@ textarea{font-family:inherit;}
       <div id="appt-edit" style="display:none;">
         <div class="panel-section">Edit appointment</div>
         <div class="form-row"><label>Client</label><input type="text" id="edit-client"></div>
-        <div class="form-row"><label>Service type</label>
-          <select id="edit-service">
-            <option>Standard clean</option><option>Deep clean</option><option>Move-out clean</option><option>Commercial weekly</option><option>Commercial daily</option>
-          </select>
+        <div class="form-two">
+          <div class="form-row"><label>Service type</label>
+            <select id="edit-service" onchange="calcEditPrice()">
+              <option value="standard">Regular Cleaning</option>
+              <option value="deep">Deep Cleaning</option>
+              <option value="moveout">Move Out Cleaning</option>
+              <option value="airbnb">Airbnb Turnover</option>
+              <option value="commercial">Commercial Cleaning</option>
+            </select>
+          </div>
+          <div class="form-row"><label>Frequency</label>
+            <select id="edit-freq">
+              <option>Every Day</option>
+              <option>Weekly</option>
+              <option>Biweekly</option>
+              <option>Monthly</option>
+              <option>One-time</option>
+            </select>
+          </div>
         </div>
-        <div class="form-row"><label>Frequency</label>
-          <select id="edit-freq">
-            <option>Weekly</option><option>Biweekly</option><option>Monthly</option><option>One-time</option>
-          </select>
+        <div id="edit-residential-fields">
+          <div class="form-two">
+            <div class="form-row"><label>Bedrooms</label>
+              <select id="edit-beds" onchange="calcEditPrice()">
+                <option value="1">1</option><option value="2">2</option><option value="3" selected>3</option><option value="4">4</option><option value="5">5</option><option value="6">6+</option>
+              </select>
+            </div>
+            <div class="form-row"><label>Bathrooms</label>
+              <select id="edit-baths" onchange="calcEditPrice()">
+                <option value="1">1</option><option value="1.5">1.5</option><option value="2" selected>2</option><option value="2.5">2.5</option><option value="3">3</option><option value="4">4+</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-two">
+            <div class="form-row"><label>Sq ft</label>
+              <input type="number" id="edit-sqft" placeholder="e.g. 1200" min="100" step="50" oninput="calcEditPrice()">
+            </div>
+            <div class="form-row"><label>Condition (1-10)</label>
+              <select id="edit-cond" onchange="calcEditPrice()">
+                <option value="9">9-10 — Excellent</option>
+                <option value="7" selected>7-8 — Good</option>
+                <option value="5">5-6 — Average</option>
+                <option value="3">3-4 — Below avg</option>
+                <option value="1">1-2 — Poor</option>
+              </select>
+            </div>
+          </div>
+        </div>
+        <div id="edit-commercial-fields" style="display:none;">
+          <div class="form-row"><label>Total hours</label>
+            <input type="number" id="edit-commercial-hrs" placeholder="e.g. 4" min="1" step="0.5" oninput="calcEditPrice()">
+          </div>
         </div>
         <div class="form-two">
           <div class="form-row"><label>Date</label><input type="date" id="edit-date"></div>
@@ -1079,6 +1122,10 @@ textarea{font-family:inherit;}
           <select id="edit-property-select" onchange="applyEditProperty()">
             <option value="manual">Enter address manually</option>
           </select>
+        </div>
+        <div class="form-row" id="edit-address-row" style="padding-left:12px;border-left:3px solid #e8e8e5;">
+          <label>Address</label>
+          <input type="text" id="edit-address" placeholder="123 Kalani St, Kailua, HI">
         </div>
         <div id="edit-property-info" style="display:none;background:#f9f9f7;border:1px solid #e8e8e5;border-radius:8px;padding:8px 12px;margin-bottom:10px;font-size:12px;color:#444;">
           <div id="edit-prop-addr" style="font-weight:500;margin-bottom:2px;"></div>
@@ -1094,9 +1141,16 @@ textarea{font-family:inherit;}
             <option>unassigned</option><option>assigned</option><option>completed</option><option>paid</option>
           </select>
         </div>
-        <div class="form-two">
-          <div class="form-row"><label>Base price ($)</label><input type="number" id="edit-price"></div>
-          <div class="form-row"><label>Discount ($)</label><input type="number" id="edit-discount" value="0"></div>
+        <div class="price-preview" id="edit-price-preview">
+          <div class="price-preview-label">Estimated price</div>
+          <div class="price-preview-val" id="edit-price-val">—</div>
+          <div class="price-preview-breakdown" id="edit-price-breakdown"></div>
+          <div style="margin-top:10px;display:flex;align-items:center;gap:10px;">
+            <label style="font-size:13px;color:#666;font-weight:normal;display:flex;align-items:center;gap:6px;cursor:pointer;">
+              <input type="checkbox" id="edit-price-override-chk" onchange="calcEditPrice()"> Override price
+            </label>
+            <input type="number" id="edit-price-override-val" placeholder="Custom $" min="0" step="0.01" style="width:120px;display:none;" oninput="calcEditPrice()">
+          </div>
         </div>
         <div class="form-row"><label>Notes</label><textarea id="edit-notes" style="min-height:60px;"></textarea></div>
         <div class="save-bar">
@@ -1459,10 +1513,11 @@ async function dbLoadCleaners(){
 
 async function dbSaveAppointment(data){
   var res=await db.from('appointments').insert([{
-    client_name:data.clientName, service:data.service||'Standard clean',
+    client_name:data.clientName, service:data.service||'Regular Cleaning',
     frequency:data.freq||'One-time', date:data.date,
     time:data.time||'8am', address:data.address||null,
     beds:parseInt(data.beds)||null, baths:parseFloat(data.baths)||null,
+    sqft:parseInt(data.sqft)||null,
     condition:parseInt(data.condition)||7,
     cleaner_name:data.cleanerName||'Unassigned',
     status:data.cleanerName&&data.cleanerName!=='Unassigned'?'assigned':'unassigned',
@@ -1471,9 +1526,32 @@ async function dbSaveAppointment(data){
     total_price:parseFloat(data.totalPrice)||0,
     cleaner_pay:parseFloat(data.cleanerPay)||0,
     notes:data.notes||null,
-    recurring:data.recurring||false
+    recurring:data.recurring||false,
+    duration_hours:parseFloat(data.duration)||null
   }]).select();
   if(res.error)console.error('Save appointment error:',res.error);
+  else console.log('[dbSaveAppointment] saved with duration_hours='+data.duration);
+  return res;
+}
+
+async function dbUpdateAppointment(dbId,data){
+  var res=await db.from('appointments').update({
+    client_name:data.clientName, service:data.service,
+    frequency:data.freq, date:data.date,
+    time:data.time, address:data.address||null,
+    beds:parseInt(data.beds)||null, baths:parseFloat(data.baths)||null,
+    sqft:parseInt(data.sqft)||null,
+    condition:parseInt(data.condition)||7,
+    cleaner_name:data.cleanerName||'Unassigned',
+    status:data.status||'assigned',
+    base_price:parseFloat(data.basePrice)||0,
+    tax:parseFloat(data.tax)||0,
+    total_price:parseFloat(data.totalPrice)||0,
+    notes:data.notes||null,
+    duration_hours:parseFloat(data.duration)||null
+  }).eq('id',dbId).select();
+  if(res.error)console.error('[dbUpdateAppointment] error:',res.error);
+  else console.log('[dbUpdateAppointment] updated id='+dbId+' duration_hours='+data.duration);
   return res;
 }
 
@@ -1540,14 +1618,17 @@ async function loadAllData(){
           n:a.client_name, s:a.status||'unassigned',
           t:a.time||'8am', cleaner:a.cleaner_name||'Unassigned',
           recurring:a.recurring||false, dbId:a.id,
-          service:a.service||'Standard clean',
+          service:a.service||'Regular Cleaning',
           freq:a.frequency||'One-time',
           address:a.address||'',
           beds:a.beds||'', baths:a.baths||'',
+          sqft:a.sqft||'',
           condition:a.condition||7,
           basePrice:a.base_price||0, tax:a.tax||0, totalPrice:a.total_price||0,
-          notes:a.notes||''
+          notes:a.notes||'',
+          duration:a.duration_hours||null
         });
+        console.log('[loadAllData] appt loaded: '+a.client_name+' key='+key+' duration='+a.duration_hours);
       }
     });
 
@@ -1995,7 +2076,8 @@ function calLayoutAppts(appts,dateKey,col,compact){
       var pct=100/numSlots;
       var leftPct=appt.slot*pct;
       var gap=2;
-      var height=Math.max(compact?20:30, CAL_DURATION-2);
+      var durationMin=appt.endMin-appt.startMin;
+      var height=Math.max(compact?20:30, durationMin-2);
 
       var block=document.createElement('div');
       block.style.cssText='position:absolute;'
@@ -2014,7 +2096,7 @@ function calLayoutAppts(appts,dateKey,col,compact){
         +'box-shadow:0 1px 3px rgba(0,0,0,.08);'
         +'z-index:2;';
 
-      var endTotalMin=(CAL_START_HOUR*60)+appt.startMin+CAL_DURATION;
+      var endTotalMin=(CAL_START_HOUR*60)+appt.endMin;
       var endStr=calFormatTime(endTotalMin);
       var startStr=calFormatTime((CAL_START_HOUR*60)+appt.startMin);
 
@@ -2095,7 +2177,8 @@ function renderWeek(){
 
     var appts=da.map(function(a){
       var startMin=(parseApptHour(a.t)-CAL_START_HOUR)*60+parseApptMinute(a.t);
-      return {a:a,startMin:startMin,endMin:startMin+CAL_DURATION};
+      var durMin=a.duration?Math.round(a.duration*60):CAL_DURATION;
+      return {a:a,startMin:startMin,endMin:startMin+durMin};
     }).filter(function(x){return x.startMin>=0&&x.startMin<(CAL_END_HOUR-CAL_START_HOUR)*60;});
 
     calLayoutAppts(appts,k,col,true);
@@ -2146,7 +2229,8 @@ function renderDay(day){
 
   var appts=da.map(function(a){
     var startMin=(parseApptHour(a.t)-CAL_START_HOUR)*60+parseApptMinute(a.t);
-    return {a:a,startMin:startMin,endMin:startMin+CAL_DURATION};
+    var durMin=a.duration?Math.round(a.duration*60):CAL_DURATION;
+    return {a:a,startMin:startMin,endMin:startMin+durMin};
   }).filter(function(x){return x.startMin>=0&&x.startMin<(CAL_END_HOUR-CAL_START_HOUR)*60;});
 
   calLayoutAppts(appts,k,apptArea,false);
@@ -2184,15 +2268,14 @@ function _openApptInner(a,dateKey){
   document.getElementById('ai-date').textContent=mo+' '+parts[2]+', '+parts[0];
   document.getElementById('ai-time').textContent=a.t.replace('am',' AM').replace('pm',' PM');
   document.getElementById('ai-cleaner').textContent=a.cleaner;
-  document.getElementById('ai-service').textContent=a.service||'Standard clean';
+  document.getElementById('ai-service').textContent=a.service||'Regular Cleaning';
   document.getElementById('ai-address').textContent=a.address||'—';
   document.getElementById('ai-freq').textContent=a.freq||'—';
-  document.getElementById('ai-dur').textContent='—';
-  document.getElementById('ai-sqft').textContent='—';
+  document.getElementById('ai-dur').textContent=a.duration?(a.duration+' hrs'):'—';
+  document.getElementById('ai-sqft').textContent=a.sqft?(a.sqft+' sq ft'):'—';
   var bedbath=a.beds&&a.baths?(a.beds+' bed / '+a.baths+' bath'):'—';
   document.getElementById('ai-bedbath').textContent=bedbath;
   document.getElementById('ai-cond').textContent=a.condition?('Condition '+a.condition+'/10'):'—';
-  var rate=(a.cleaner.indexOf('Kaimana')>=0||a.cleaner.indexOf('Maile')>=0)?18:16;
   document.getElementById('ai-cpay').textContent=fmtPrice(a.cleanerPay);
   document.getElementById('ai-base').textContent=fmtPrice(a.base||a.basePrice);
   document.getElementById('ai-disc').textContent='$0';
@@ -2200,11 +2283,46 @@ function _openApptInner(a,dateKey){
   document.getElementById('ai-total').textContent=fmtPrice(a.total||a.totalPrice);
   var aiNotes=document.getElementById('ai-notes');
   if(aiNotes)aiNotes.textContent=a.notes||'—';
+  // Pre-fill edit form fields
   document.getElementById('edit-client').value=a.n;
+  // Map service text → value
+  var svcMap={'Regular Cleaning':'standard','Deep Cleaning':'deep','Move Out Cleaning':'moveout','Airbnb Turnover':'airbnb','Commercial Cleaning':'commercial',
+    'Standard clean':'standard','Deep clean':'deep','Move-out clean':'moveout','Commercial weekly':'commercial','Commercial daily':'commercial','Airbnb turnover':'airbnb'};
+  var editSvc=document.getElementById('edit-service');
+  if(editSvc) editSvc.value=svcMap[a.service]||'standard';
+  var editFreq=document.getElementById('edit-freq');
+  if(editFreq&&a.freq){var fOpts=Array.from(editFreq.options).map(function(o){return o.value||o.text;});if(fOpts.indexOf(a.freq)>=0)editFreq.value=a.freq;}
+  // Date/time
   document.getElementById('edit-date').value=parts[0]+'-'+parts[1].padStart(2,'0')+'-'+parts[2].padStart(2,'0');
-  document.getElementById('edit-time').value=a.t.includes('am')?'0'+a.t.replace('am',':00'):'';
-  document.getElementById('edit-cleaner').value=a.cleaner;
-  document.getElementById('edit-price').value=a.basePrice?parseFloat(a.basePrice).toFixed(2):'';
+  var hr24='08:00';
+  if(a.t){var hm=parseApptHour(a.t);var mm=parseApptMinute(a.t);hr24=String(hm).padStart(2,'0')+':'+String(mm).padStart(2,'0');}
+  document.getElementById('edit-time').value=hr24;
+  document.getElementById('edit-cleaner').value=a.cleaner||'Unassigned';
+  var editStatus=document.getElementById('edit-status');
+  if(editStatus) editStatus.value=a.s||'unassigned';
+  // Residential fields
+  var editBeds=document.getElementById('edit-beds');
+  var editBaths=document.getElementById('edit-baths');
+  var editSqft=document.getElementById('edit-sqft');
+  var editCond=document.getElementById('edit-cond');
+  if(editBeds&&a.beds) editBeds.value=String(a.beds);
+  if(editBaths&&a.baths) editBaths.value=String(a.baths);
+  if(editSqft) editSqft.value=a.sqft||'';
+  if(editCond&&a.condition) editCond.value=String(a.condition);
+  // Commercial hours
+  var editComHrs=document.getElementById('edit-commercial-hrs');
+  if(editComHrs) editComHrs.value=a.duration&&(svcMap[a.service]==='commercial')?a.duration:'';
+  // Address
+  var editAddr=document.getElementById('edit-address');
+  if(editAddr) editAddr.value=a.address||'';
+  // Notes
+  var editNotes=document.getElementById('edit-notes');
+  if(editNotes) editNotes.value=a.notes||'';
+  // Price override
+  var editOverrideChk=document.getElementById('edit-price-override-chk');
+  var editOverrideVal=document.getElementById('edit-price-override-val');
+  if(editOverrideChk) editOverrideChk.checked=false;
+  if(editOverrideVal) editOverrideVal.style.display='none';
   hideApptEdit();
   currentClientName=a.n;
   currentAppt=a;
@@ -2216,9 +2334,87 @@ function _openApptInner(a,dateKey){
   document.getElementById('appt-overlay').classList.remove('hidden');
 }
 
-function showApptEdit(){document.getElementById('appt-view').style.display='none';document.getElementById('appt-edit').style.display='block';populateEditPropertySelector(currentClientName);}
+function showApptEdit(){
+  document.getElementById('appt-view').style.display='none';
+  document.getElementById('appt-edit').style.display='block';
+  populateEditPropertySelector(currentClientName);
+  calcEditPrice();
+}
 function hideApptEdit(){document.getElementById('appt-view').style.display='block';document.getElementById('appt-edit').style.display='none';}
-function saveApptEdit(){hideApptEdit();showToast('appt-overlay','Changes saved successfully.');}
+async function saveApptEdit(){
+  var a=currentAppt;
+  if(!a||!currentApptKey){console.error('[saveApptEdit] no currentAppt');return;}
+  var editClient=document.getElementById('edit-client').value||a.n;
+  var svcEl=document.getElementById('edit-service');
+  var svcText=svcEl?svcEl.options[svcEl.selectedIndex].text:'Regular Cleaning';
+  var svcVal=svcEl?svcEl.value:'standard';
+  var isCommercial=(svcVal==='commercial');
+  var freq=document.getElementById('edit-freq').value;
+  var dateVal=document.getElementById('edit-date').value;
+  var timeVal=document.getElementById('edit-time').value;
+  var cleanerVal=document.getElementById('edit-cleaner').value||'Unassigned';
+  var statusVal=document.getElementById('edit-status').value||a.s;
+  var editAddr=(document.getElementById('edit-address')||{}).value||a.address||'';
+  var editBeds=isCommercial?a.beds:(document.getElementById('edit-beds')||{}).value||a.beds||'';
+  var editBaths=isCommercial?a.baths:(document.getElementById('edit-baths')||{}).value||a.baths||'';
+  var editSqft=isCommercial?a.sqft:(document.getElementById('edit-sqft')||{}).value||a.sqft||'';
+  var editCond=isCommercial?a.condition:(document.getElementById('edit-cond')||{}).value||a.condition||7;
+  var editNotes=(document.getElementById('edit-notes')||{}).value||a.notes||'';
+  var editDuration=_lastEditCalcHrs;
+  // Resolve price
+  var overrideChk=document.getElementById('edit-price-override-chk');
+  var overrideValEl=document.getElementById('edit-price-override-val');
+  var isOverride=overrideChk&&overrideChk.checked&&overrideValEl&&overrideValEl.value;
+  var editBase,editTax,editTotal;
+  if(isOverride){
+    editTotal=parseFloat(overrideValEl.value)||0;
+    editTax=Math.round(editTotal*0.04712/(1.04712)*100)/100;
+    editBase=editTotal-editTax;
+  } else {
+    var editPriceText=(document.getElementById('edit-price-val')||{}).textContent||'0';
+    editTotal=parseFloat(editPriceText.replace('$',''))||0;
+    editTax=Math.round(editTotal*0.04712*100)/100;
+    editBase=editTotal-editTax;
+  }
+  // Parse time string
+  var hr24=timeVal||'08:00';
+  var hh=parseInt(hr24.split(':')[0]);var mm2=parseInt(hr24.split(':')[1])||0;
+  var hr12=hh%12||12;var ampm=hh>=12?'pm':'am';
+  var newTimeStr=hr12+(ampm);
+  // Update in-memory apptObj
+  var updatedAppt=Object.assign({},a,{
+    n:editClient, s:statusVal, t:newTimeStr,
+    cleaner:cleanerVal, service:svcText, freq:freq,
+    address:editAddr, beds:editBeds, baths:editBaths,
+    sqft:editSqft, condition:editCond, notes:editNotes,
+    duration:editDuration,
+    basePrice:editBase, tax:editTax, totalPrice:editTotal,
+    base:'$'+editBase.toFixed(2), totalPrice:editTotal
+  });
+  // Update apptData in memory
+  var dayArr=apptData[currentApptKey];
+  if(dayArr){
+    var idx=dayArr.findIndex(function(x){return x.dbId===a.dbId;});
+    if(idx>=0){dayArr[idx]=updatedAppt;console.log('[saveApptEdit] updated in-memory apptData['+currentApptKey+']['+idx+']');}
+  }
+  currentAppt=updatedAppt;
+  currentApptData=updatedAppt;
+  // Persist to Supabase
+  if(a.dbId){
+    var sbUpdate=await dbUpdateAppointment(a.dbId,{
+      clientName:editClient, service:svcText, freq:freq,
+      date:dateVal, time:newTimeStr, address:editAddr,
+      beds:editBeds, baths:editBaths, sqft:editSqft, condition:editCond,
+      cleanerName:cleanerVal, status:statusVal,
+      basePrice:editBase, tax:editTax, totalPrice:editTotal,
+      notes:editNotes, duration:editDuration
+    });
+    console.log('[saveApptEdit] Supabase update response:', sbUpdate);
+  }
+  renderCal();
+  hideApptEdit();
+  showToast('appt-overlay','Changes saved successfully.');
+}
 
 async function cancelAppointment(){
   if(!currentAppt||!currentApptKey){
@@ -2845,6 +3041,9 @@ function calcPropPrice(){
 }
 
 /* PRICING CALC */
+var _lastCalcHrs=3.5;
+var _lastEditCalcHrs=3.5;
+
 function fmtPhone(el){
   var digits=el.value.replace(/\D/g,'').slice(0,10);
   if(digits.length===0){el.value='';return;}
@@ -2885,6 +3084,7 @@ function calcPrice(){
   var overrideValEl=document.getElementById('na-price-override-val');
   var isOverride=overrideChk&&overrideChk.checked;
   if(overrideValEl) overrideValEl.style.display=isOverride?'':'none';
+  _lastCalcHrs=hrs;
   var base=Math.round(hrs*65*100)/100;
   var tax=Math.round(base*0.04712*100)/100;
   var total;
@@ -2898,6 +3098,53 @@ function calcPrice(){
     document.getElementById('price-val').textContent='$'+total.toFixed(2);
     document.getElementById('price-breakdown').textContent=hrs+' est hrs x $65 = $'+base.toFixed(2)+' + tax $'+tax.toFixed(2);
     console.log('[calcPrice] total=$'+total+' hrs='+hrs+' svc='+svcType+(isCommercial?' (commercial)':''));
+  }
+}
+
+function calcEditPrice(){
+  var svcEl=document.getElementById('edit-service');
+  if(!svcEl) return;
+  var svcType=svcEl.value;
+  var isCommercial=(svcType==='commercial');
+  var resFields=document.getElementById('edit-residential-fields');
+  var comFields=document.getElementById('edit-commercial-fields');
+  if(resFields) resFields.style.display=isCommercial?'none':'';
+  if(comFields) comFields.style.display=isCommercial?'':'none';
+  var hrs;
+  if(isCommercial){
+    hrs=parseFloat((document.getElementById('edit-commercial-hrs')||{}).value)||4;
+  } else {
+    var beds=parseInt((document.getElementById('edit-beds')||{}).value)||3;
+    var baths=parseFloat((document.getElementById('edit-baths')||{}).value)||2;
+    var cond=parseInt((document.getElementById('edit-cond')||{}).value)||7;
+    var baseHrs=1.0+(beds*0.5)+(baths*0.4);
+    if(svcType==='deep')baseHrs*=1.5;
+    else if(svcType==='moveout')baseHrs*=1.7;
+    else if(svcType==='airbnb')baseHrs*=0.9;
+    var condMod=1.0;
+    if(cond<=2)condMod=1.70;
+    else if(cond<=4)condMod=1.40;
+    else if(cond<=6)condMod=1.25;
+    hrs=Math.round(baseHrs*condMod*10)/10;
+  }
+  _lastEditCalcHrs=hrs;
+  var overrideChk=document.getElementById('edit-price-override-chk');
+  var overrideValEl=document.getElementById('edit-price-override-val');
+  var isOverride=overrideChk&&overrideChk.checked;
+  if(overrideValEl) overrideValEl.style.display=isOverride?'':'none';
+  var base=Math.round(hrs*65*100)/100;
+  var tax=Math.round(base*0.04712*100)/100;
+  var total;
+  if(isOverride&&overrideValEl&&overrideValEl.value){
+    total=parseFloat(overrideValEl.value)||0;
+    document.getElementById('edit-price-val').textContent='$'+total.toFixed(2);
+    document.getElementById('edit-price-breakdown').textContent=hrs+' est hrs — custom price override';
+    console.log('[calcEditPrice] override='+total+' hrs='+hrs+' svc='+svcType);
+  } else {
+    total=Math.round((base+tax)*100)/100;
+    document.getElementById('edit-price-val').textContent='$'+total.toFixed(2);
+    document.getElementById('edit-price-breakdown').textContent=hrs+' est hrs x $65 = $'+base.toFixed(2)+' + tax $'+tax.toFixed(2);
+    console.log('[calcEditPrice] total=$'+total+' hrs='+hrs+' svc='+svcType+(isCommercial?' (commercial)':''));
   }
 }
 
@@ -2987,19 +3234,20 @@ async function saveNewAppt(){
   if(priceEl){total=parseFloat(priceEl.textContent.replace('$','').replace(',',''))||0;}
   var apptTax=Math.round(total*0.04712*100)/100;
   var apptBase=Math.round((total-apptTax)*100)/100;
-  var naHrs=parseFloat((document.getElementById('dur-val')||{}).textContent)||3.5;
+  var apptDuration=_lastCalcHrs; // from calcPrice()
   var naRate=16;
-  var apptCleanerPay=Math.round(naHrs*naRate*100)/100;
+  var apptCleanerPay=Math.round(apptDuration*naRate*100)/100;
   // Build full appointment object
   var apptObj={
     n:name, s:apptStatus, t:timeStr, cleaner:cleanerName,
-    address:apptAddress, beds:apptBeds, baths:apptBaths,
+    address:apptAddress, beds:apptBeds, baths:apptBaths, sqft:apptSqft,
     service:naServiceText, freq:freq, condition:apptCond,
     base:'$'+apptBase.toFixed(2), tax:'$'+apptTax.toFixed(2), total:'$'+total.toFixed(2),
     basePrice:apptBase, taxAmt:apptTax, totalPrice:total,
-    cleanerPay:apptCleanerPay, notes:apptNotes
+    cleanerPay:apptCleanerPay, notes:apptNotes,
+    duration:apptDuration
   };
-  console.log('[saveNewAppt] appointment object:', apptObj);
+  console.log('[saveNewAppt] appointment object with duration='+apptDuration+':', apptObj);
   if(freq==='One-time'){
     var key=yr+'-'+mo+'-'+dy;
     if(!apptData[key])apptData[key]=[];
@@ -3031,10 +3279,11 @@ async function saveNewAppt(){
     clientName:name, service:naServiceText,
     freq:freq, date:dateVal, time:timeStr,
     address:apptAddress,
-    beds:apptBeds, baths:apptBaths, condition:apptCond,
+    beds:apptBeds, baths:apptBaths, sqft:apptSqft, condition:apptCond,
     cleanerName:cleanerName, basePrice:apptBase, tax:apptTax, totalPrice:total,
     cleanerPay:apptCleanerPay,
-    notes:apptNotes, recurring:freq!=='One-time'
+    notes:apptNotes, recurring:freq!=='One-time',
+    duration:apptDuration
   });
   console.log('[saveNewAppt] Supabase response:', sbRes);
   // Store the real dbId back into apptObj so cancelAppointment() can use it
@@ -5708,6 +5957,8 @@ function applyEditProperty(){
   if(propSel.value === 'manual'){
     var infoDiv=document.getElementById('edit-property-info');
     if(infoDiv) infoDiv.style.display='none';
+    var addrRow=document.getElementById('edit-address-row');
+    if(addrRow) addrRow.style.display='';
     return;
   }
 
@@ -5737,6 +5988,8 @@ function applyEditProperty(){
   var infoDiv = document.getElementById('edit-property-info');
   var addrDiv = document.getElementById('edit-prop-addr');
   var detailDiv = document.getElementById('edit-prop-detail');
+  var addrRow=document.getElementById('edit-address-row');
+  if(addrRow) addrRow.style.display='none';
   if(infoDiv){ infoDiv.style.display='block'; }
   if(addrDiv) addrDiv.textContent = prop.address;
   if(detailDiv){
@@ -5746,8 +5999,16 @@ function applyEditProperty(){
     if(prop.price) parts.push('$'+prop.price+'/clean');
     detailDiv.textContent = parts.join(' · ');
   }
+  // Fill address into hidden edit-address field
+  var editAddrEl=document.getElementById('edit-address');
+  if(editAddrEl) editAddrEl.value=prop.address||'';
+  // Fill beds/baths from property
+  var editBeds=document.getElementById('edit-beds');
+  var editBaths=document.getElementById('edit-baths');
+  if(editBeds&&prop.beds) editBeds.value=String(prop.beds);
+  if(editBaths&&prop.baths) editBaths.value=String(prop.baths);
   if(currentAppt) currentAppt.address = prop.address;
-  document.getElementById('edit-price').value = prop.price || '';
+  calcEditPrice();
 }
 
 document.addEventListener('DOMContentLoaded', function(){

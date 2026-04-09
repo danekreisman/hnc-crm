@@ -363,10 +363,10 @@ textarea{font-family:inherit;}
       <!-- DASHBOARD -->
       <div id="view-dashboard" class="vc">
         <div class="metrics">
-          <div class="metric"><div class="metric-label">Active clients</div><div class="metric-value">34</div><div class="metric-sub up">+3 this month</div></div>
-          <div class="metric"><div class="metric-label">Open leads</div><div class="metric-value">12</div><div class="metric-sub">6 commercial</div></div>
-          <div class="metric"><div class="metric-label">Monthly revenue</div><div class="metric-value">$18.4k</div><div class="metric-sub up">+12% vs last mo</div></div>
-          <div class="metric"><div class="metric-label">VA tasks open</div><div class="metric-value">7</div><div class="metric-sub down">2 overdue</div></div>
+          <div class="metric"><div class="metric-label">Active clients</div><div class="metric-value" id="dash-active-clients">—</div><div class="metric-sub" id="dash-active-clients-sub"></div></div>
+          <div class="metric"><div class="metric-label">Open leads</div><div class="metric-value" id="dash-open-leads">—</div><div class="metric-sub" id="dash-open-leads-sub"></div></div>
+          <div class="metric"><div class="metric-label">Monthly revenue</div><div class="metric-value">—</div><div class="metric-sub"></div></div>
+          <div class="metric"><div class="metric-label">VA tasks open</div><div class="metric-value">—</div><div class="metric-sub"></div></div>
         </div>
         <div class="section-title">Lead pipeline snapshot</div>
         <div class="pipeline">
@@ -388,9 +388,9 @@ textarea{font-family:inherit;}
       <!-- PIPELINE -->
       <div id="view-pipeline" class="vc">
         <div class="metrics" style="grid-template-columns:repeat(3,minmax(0,1fr));">
-          <div class="metric"><div class="metric-label">Total pipeline</div><div class="metric-value">$21.5k</div><div class="metric-sub">12 open leads</div></div>
-          <div class="metric"><div class="metric-label">Commercial</div><div class="metric-value">$19.3k</div><div class="metric-sub">6 leads</div></div>
-          <div class="metric"><div class="metric-label">Avg close time</div><div class="metric-value">18d</div></div>
+          <div class="metric"><div class="metric-label">Total pipeline</div><div class="metric-value" id="pipe-total-val">—</div><div class="metric-sub" id="pipe-total-sub"></div></div>
+          <div class="metric"><div class="metric-label">Commercial</div><div class="metric-value" id="pipe-commercial-val">—</div><div class="metric-sub" id="pipe-commercial-sub"></div></div>
+          <div class="metric"><div class="metric-label">Avg close time</div><div class="metric-value">—</div></div>
         </div>
 
         <!-- FILTER TABS -->
@@ -459,9 +459,9 @@ textarea{font-family:inherit;}
       <!-- CLIENTS -->
       <div id="view-clients" class="vc">
         <div class="metrics" style="grid-template-columns:repeat(3,minmax(0,1fr));">
-          <div class="metric"><div class="metric-label">Total clients</div><div class="metric-value">34</div><div class="metric-sub">28 active</div></div>
-          <div class="metric"><div class="metric-label">Dormant (60d+)</div><div class="metric-value">4</div><div class="metric-sub down">Needs reactivation</div></div>
-          <div class="metric"><div class="metric-label">Recurring</div><div class="metric-value">22</div><div class="metric-sub up">65% of base</div></div>
+          <div class="metric"><div class="metric-label">Total clients</div><div class="metric-value" id="clients-total">—</div><div class="metric-sub" id="clients-total-sub"></div></div>
+          <div class="metric"><div class="metric-label">Dormant (60d+)</div><div class="metric-value" id="clients-dormant">—</div><div class="metric-sub down"></div></div>
+          <div class="metric"><div class="metric-label">Recurring</div><div class="metric-value" id="clients-recurring">—</div><div class="metric-sub up"></div></div>
         </div>
         <div class="tw"><table><thead><tr><th style="width:22%">Name</th><th style="width:16%">Type</th><th style="width:13%">Last job</th><th style="width:15%">Rev/mo</th><th style="width:15%">Schedule</th><th style="width:19%">Status</th></tr></thead><tbody>
         </tbody></table></div>
@@ -470,22 +470,15 @@ textarea{font-family:inherit;}
       <!-- TASKS -->
       <div id="view-tasks" class="vc">
         <div class="metrics" style="grid-template-columns:repeat(3,minmax(0,1fr));">
-          <div class="metric"><div class="metric-label">Open tasks</div><div class="metric-value">7</div></div>
-          <div class="metric"><div class="metric-label">Overdue</div><div class="metric-value">2</div><div class="metric-sub down">Needs attention</div></div>
-          <div class="metric"><div class="metric-label">Done this week</div><div class="metric-value">9</div><div class="metric-sub up">On track</div></div>
+          <div class="metric"><div class="metric-label">Open tasks</div><div class="metric-value">—</div></div>
+          <div class="metric"><div class="metric-label">Overdue</div><div class="metric-value">—</div><div class="metric-sub down"></div></div>
+          <div class="metric"><div class="metric-label">Done this week</div><div class="metric-value">—</div><div class="metric-sub"></div></div>
         </div>
         <div class="two-col">
-          <div><div class="section-title">Open tasks</div><div class="task-list">
-            <div class="ti"><div class="tch"></div><div class="tb"><div class="tt">Follow up: Pearl City Law (2nd touch)</div><div class="tm"><span class="pd ph2"></span>High · Overdue Apr 1</div></div></div>
-            <div class="ti"><div class="tch"></div><div class="tb"><div class="tt">Cold call — 10 Oahu gyms</div><div class="tm"><span class="pd ph2"></span>High · Due today</div></div></div>
-            <div class="ti"><div class="tch"></div><div class="tb"><div class="tt">Update airport hire tracker</div><div class="tm"><span class="pd pmm"></span>Med · Due Apr 4</div></div></div>
-            <div class="ti"><div class="tch"></div><div class="tb"><div class="tt">Reactivation text — Chen Family</div><div class="tm"><span class="pd pmm"></span>Med · Due Apr 5</div></div></div>
-            <div class="ti"><div class="tch"></div><div class="tb"><div class="tt">Onboard new VA — process docs</div><div class="tm"><span class="pd ph2"></span>High · Due Apr 10</div></div></div>
+          <div><div class="section-title">Open tasks</div><div class="task-list" id="open-tasks-list">
+            <div class="ti"><div class="tb"><div class="tt" style="color:#bbb;font-size:11px;">No tasks yet — add tasks from your workflow.</div></div></div>
           </div></div>
-          <div><div class="section-title">Completed</div><div class="task-list">
-            <div class="ti"><div class="tch done"></div><div class="tb"><div class="tt dt">Send quote to Oahu Dental</div><div class="tm">Done Mar 31</div></div></div>
-            <div class="ti"><div class="tch done"></div><div class="tb"><div class="tt dt">Confirm Maui Surf Hotel schedule</div><div class="tm">Done Mar 30</div></div></div>
-            <div class="ti"><div class="tch done"></div><div class="tb"><div class="tt dt">Invoice Aloha Realty — March</div><div class="tm">Done Mar 29</div></div></div>
+          <div><div class="section-title">Completed</div><div class="task-list" id="done-tasks-list">
           </div></div>
         </div>
       </div>
@@ -528,32 +521,26 @@ textarea{font-family:inherit;}
       <!-- CLEANERS -->
       <div id="view-cleaners" class="vc">
         <div class="metrics">
-          <div class="metric"><div class="metric-label">Total cleaners</div><div class="metric-value">6</div><div class="metric-sub">5 active</div></div>
-          <div class="metric"><div class="metric-label">Hours this week</div><div class="metric-value">142</div><div class="metric-sub up">+18 vs last wk</div></div>
-          <div class="metric"><div class="metric-label">Avg hrs / cleaner</div><div class="metric-value">28.4</div></div>
-          <div class="metric"><div class="metric-label">Payroll this period</div><div class="metric-value">$4,260</div><div class="metric-sub">bi-weekly</div></div>
+          <div class="metric"><div class="metric-label">Total cleaners</div><div class="metric-value" id="cleaners-total">—</div><div class="metric-sub" id="cleaners-total-sub"></div></div>
+          <div class="metric"><div class="metric-label">Hours this week</div><div class="metric-value">—</div><div class="metric-sub"></div></div>
+          <div class="metric"><div class="metric-label">Avg hrs / cleaner</div><div class="metric-value">—</div></div>
+          <div class="metric"><div class="metric-label">Payroll this period</div><div class="metric-value">—</div><div class="metric-sub"></div></div>
         </div>
         <div class="section-title">Roster — click a card to view profile</div>
         <div class="cleaner-grid">
         </div>
         <div class="section-title">Hours log — this week</div>
-        <div class="tw"><table><thead><tr><th style="width:18%">Cleaner</th><th style="width:13%">Date</th><th style="width:30%">Job / client</th><th style="width:10%">Hours</th><th style="width:14%">Island</th><th style="width:15%">Pay</th></tr></thead><tbody>
-          <tr><td>Kaimana M.</td><td>Apr 2</td><td>The Morrisons</td><td>3.5</td><td>Oahu</td><td>$63</td></tr>
-          <tr><td>Alohi L.</td><td>Apr 2</td><td>Aloha Realty</td><td>4.0</td><td>Oahu</td><td>$64</td></tr>
-          <tr><td>Maile K.</td><td>Apr 2</td><td>Maui Surf Hotel</td><td>5.0</td><td>Maui</td><td>$90</td></tr>
-          <tr><td>Kaimana M.</td><td>Apr 3</td><td>Kona Coffee Co.</td><td>3.0</td><td>Oahu</td><td>$54</td></tr>
-          <tr><td>Keanu N.</td><td>Apr 3</td><td>Pearl City Gym</td><td>4.0</td><td>Oahu</td><td>$64</td></tr>
-          <tr><td>Leilani H.</td><td>Apr 3</td><td>Lani P.</td><td>2.5</td><td>Maui</td><td>$40</td></tr>
+        <div class="tw"><table><thead><tr><th style="width:18%">Cleaner</th><th style="width:13%">Date</th><th style="width:30%">Job / client</th><th style="width:10%">Hours</th><th style="width:14%">Island</th><th style="width:15%">Pay</th></tr></thead><tbody id="hours-log-tbody">
         </tbody></table></div>
       </div>
 
       <!-- PAYROLL -->
       <div id="view-payroll" class="vc">
         <div class="metrics">
-          <div class="metric"><div class="metric-label">Period total</div><div class="metric-value">$4,260</div><div class="metric-sub">Apr 1–14</div></div>
-          <div class="metric"><div class="metric-label">Total hours</div><div class="metric-value">284</div></div>
-          <div class="metric"><div class="metric-label">Paid out</div><div class="metric-value">$1,800</div><div class="metric-sub down">$2,460 pending</div></div>
-          <div class="metric"><div class="metric-label">Blended rate</div><div class="metric-value">$15/hr</div></div>
+          <div class="metric"><div class="metric-label">Period total</div><div class="metric-value">—</div><div class="metric-sub"></div></div>
+          <div class="metric"><div class="metric-label">Total hours</div><div class="metric-value">—</div></div>
+          <div class="metric"><div class="metric-label">Paid out</div><div class="metric-value">—</div><div class="metric-sub"></div></div>
+          <div class="metric"><div class="metric-label">Blended rate</div><div class="metric-value">—</div></div>
         </div>
         <div class="ppbar">
           <div class="ppbar-label">Pay period:</div>
@@ -565,46 +552,31 @@ textarea{font-family:inherit;}
           <button class="btn" style="background:#e6fffa;color:#276749;border-color:#9ae6b4;">Run in Gusto</button>
         </div>
         <div class="section-title">Summary</div>
-        <div class="tw" style="margin-bottom:16px;"><table><thead><tr><th style="width:20%">Cleaner</th><th style="width:12%">Island</th><th style="width:11%">Hours</th><th style="width:11%">Rate</th><th style="width:14%">Gross</th><th style="width:13%">Paid</th><th style="width:19%">Status</th></tr></thead><tbody>
-          <tr><td>Kaimana M.</td><td>Oahu</td><td>68</td><td>$18</td><td>$1,224</td><td>$600</td><td><span class="badge bpt">Partial</span></td></tr>
-          <tr><td>Maile K.</td><td>Maui</td><td>72</td><td>$18</td><td>$1,296</td><td>$1,200</td><td><span class="badge bpt">Partial</span></td></tr>
-          <tr><td>Alohi L.</td><td>Oahu</td><td>56</td><td>$16</td><td>$896</td><td>$0</td><td><span class="badge bpn">Pending</span></td></tr>
-          <tr><td>Keanu N.</td><td>Oahu</td><td>44</td><td>$16</td><td>$704</td><td>$0</td><td><span class="badge bpn">Pending</span></td></tr>
-          <tr><td>Leilani H.</td><td>Maui</td><td>44</td><td>$16</td><td>$704</td><td>$0</td><td><span class="badge bpn">Pending</span></td></tr>
-          <tr><td>Tua R.</td><td>Oahu</td><td>0</td><td>$16</td><td>$0</td><td>$0</td><td><span class="badge bin">Inactive</span></td></tr>
+        <div class="tw" style="margin-bottom:16px;"><table><thead><tr><th style="width:20%">Cleaner</th><th style="width:12%">Island</th><th style="width:11%">Hours</th><th style="width:11%">Rate</th><th style="width:14%">Gross</th><th style="width:13%">Paid</th><th style="width:19%">Status</th></tr></thead><tbody id="payroll-tbody">
         </tbody></table></div>
       </div>
 
       <!-- REPORTING -->
       <div id="view-reporting" class="vc">
         <div class="metrics">
-          <div class="metric"><div class="metric-label">Revenue — March</div><div class="metric-value">$18.4k</div><div class="metric-sub up">+12% vs Feb</div></div>
-          <div class="metric"><div class="metric-label">Commercial MRR</div><div class="metric-value">$11.2k</div></div>
-          <div class="metric"><div class="metric-label">Residential MRR</div><div class="metric-value">$7.2k</div></div>
-          <div class="metric"><div class="metric-label">Churn</div><div class="metric-value">1</div><div class="metric-sub down">this month</div></div>
+          <div class="metric"><div class="metric-label">Revenue (current mo)</div><div class="metric-value">—</div><div class="metric-sub"></div></div>
+          <div class="metric"><div class="metric-label">Commercial MRR</div><div class="metric-value">—</div></div>
+          <div class="metric"><div class="metric-label">Residential MRR</div><div class="metric-value">—</div></div>
+          <div class="metric"><div class="metric-label">Churn</div><div class="metric-value">—</div><div class="metric-sub"></div></div>
         </div>
         <div class="report-two">
           <div>
             <div class="section-title">Revenue by segment</div>
-            <div class="tw" style="margin-bottom:14px;"><table><thead><tr><th style="width:35%">Segment</th><th style="width:25%">Revenue</th><th style="width:20%">Clients</th><th style="width:20%">Avg</th></tr></thead><tbody>
-              <tr><td><span class="badge bg2">Gov</span></td><td>$14,000</td><td>1</td><td>$14,000</td></tr>
-              <tr><td><span class="badge bc">Commercial</span></td><td>$11,200</td><td>8</td><td>$1,400</td></tr>
-              <tr><td><span class="badge br">Residential</span></td><td>$7,200</td><td>26</td><td>$277</td></tr>
+            <div class="tw" style="margin-bottom:14px;"><table><thead><tr><th style="width:35%">Segment</th><th style="width:25%">Revenue</th><th style="width:20%">Clients</th><th style="width:20%">Avg</th></tr></thead><tbody id="revenue-segment-tbody">
             </tbody></table></div>
             <div class="section-title">Monthly trend</div>
-            <div class="tw"><table><thead><tr><th style="width:30%">Month</th><th style="width:35%">Revenue</th><th style="width:35%">vs prior</th></tr></thead><tbody>
-              <tr><td>Jan</td><td>$14,200</td><td>—</td></tr>
-              <tr><td>Feb</td><td>$16,400</td><td><span style="color:#1D9E75">+15.5%</span></td></tr>
-              <tr><td>Mar</td><td>$18,400</td><td><span style="color:#1D9E75">+12.2%</span></td></tr>
-              <tr><td>Apr (proj)</td><td>$32,400</td><td><span style="color:#1D9E75">+76%</span></td></tr>
+            <div class="tw"><table><thead><tr><th style="width:30%">Month</th><th style="width:35%">Revenue</th><th style="width:35%">vs prior</th></tr></thead><tbody id="monthly-trend-tbody">
             </tbody></table></div>
           </div>
           <div>
             <div class="section-title">Dormant watch</div>
-            <div class="task-list">
-              <div class="ti"><div class="tb"><div class="tt">Chen Family</div><div class="tm">Feb 10 · 51d ago</div></div><div style="font-size:11px;color:#e53e3e;font-weight:600;">51d</div></div>
-              <div class="ti"><div class="tb"><div class="tt">Tanaka Residence</div><div class="tm">Jan 15 · 77d ago</div></div><div style="font-size:11px;color:#e53e3e;font-weight:600;">77d</div></div>
-              <div class="ti"><div class="tb"><div class="tt">Patel Family</div><div class="tm">Jan 28 · 64d ago</div></div><div style="font-size:11px;color:#e53e3e;font-weight:600;">64d</div></div>
+            <div class="task-list" id="dormant-watch-list">
+              <div class="ti"><div class="tb"><div class="tt" style="color:#bbb;font-size:11px;">No dormant clients — data loads from Supabase.</div></div></div>
             </div>
           </div>
         </div>
@@ -678,42 +650,6 @@ textarea{font-family:inherit;}
             <th style="width:14%">Payment</th>
             <th style="width:20%">Action</th>
           </tr></thead><tbody id="pending-tbody">
-            <tr>
-              <td><strong>Aloha Realty</strong></td><td>Commercial weekly</td><td>Apr 2</td><td>$272.25</td>
-              <td><span class="badge bc">Commercial</span></td>
-              <td><span class="badge bpd" style="font-size:10px;">ACH on file</span></td>
-              <td style="display:flex;gap:5px;padding:6px 10px;">
-                <button class="btn" style="font-size:11px;padding:3px 8px;background:#ebf5ff;color:#2b6cb0;border-color:#bee3f8;" onclick="sendInvoiceRow(this,'Aloha Realty','$272.25','net30')">Invoice NET30</button>
-                <button class="btn" style="font-size:11px;padding:3px 8px;" onclick="addToBulk('Aloha Realty','Commercial weekly','Apr 2','$272.25',this)">+ Bulk</button>
-              </td>
-            </tr>
-            <tr>
-              <td><strong>Kona Coffee Co.</strong></td><td>Commercial weekly</td><td>Apr 3</td><td>$204.19</td>
-              <td><span class="badge bc">Commercial</span></td>
-              <td><span class="badge bpd" style="font-size:10px;">Card ****6678</span></td>
-              <td style="display:flex;gap:5px;padding:6px 10px;">
-                <button class="btn" style="font-size:11px;padding:3px 8px;background:#e6fffa;color:#276749;border-color:#9ae6b4;" onclick="chargeCardRow(this,'Kona Coffee Co.','$204.19')">Charge card</button>
-                <button class="btn" style="font-size:11px;padding:3px 8px;" onclick="addToBulk('Kona Coffee Co.','Commercial weekly','Apr 3','$204.19',this)">+ Bulk</button>
-              </td>
-            </tr>
-            <tr>
-              <td><strong>Pearl City Gym</strong></td><td>Commercial 3x/wk</td><td>Apr 3</td><td>$340.32</td>
-              <td><span class="badge bc">Commercial</span></td>
-              <td><span class="badge bpd" style="font-size:10px;">ACH on file</span></td>
-              <td style="display:flex;gap:5px;padding:6px 10px;">
-                <button class="btn" style="font-size:11px;padding:3px 8px;background:#ebf5ff;color:#2b6cb0;border-color:#bee3f8;" onclick="sendInvoiceRow(this,'Pearl City Gym','$340.32','net30')">Invoice NET30</button>
-                <button class="btn" style="font-size:11px;padding:3px 8px;" onclick="addToBulk('Pearl City Gym','Commercial 3x/wk','Apr 3','$340.32',this)">+ Bulk</button>
-              </td>
-            </tr>
-            <tr>
-              <td><strong>Lani P.</strong></td><td>Standard clean</td><td>Apr 3</td><td>$170.16</td>
-              <td><span class="badge br">Residential</span></td>
-              <td><span class="badge bpd" style="font-size:10px;">Card ****3344</span></td>
-              <td style="display:flex;gap:5px;padding:6px 10px;">
-                <button class="btn" style="font-size:11px;padding:3px 8px;background:#e6fffa;color:#276749;border-color:#9ae6b4;" onclick="chargeCardRow(this,'Lani P.','$170.16')">Charge card</button>
-                <button class="btn" style="font-size:11px;padding:3px 8px;background:#fafaf8;color:#999;border-color:#e0e0dd;" onclick="sendInvoiceRow(this,'Lani P.','$170.16','now')">Send invoice</button>
-              </td>
-            </tr>
           </tbody></table></div>
         </div>
 
@@ -727,10 +663,6 @@ textarea{font-family:inherit;}
             <th style="width:18%">Client</th><th style="width:18%">Service</th><th style="width:10%">Date</th>
             <th style="width:10%">Amount</th><th style="width:11%">Terms</th><th style="width:11%">Status</th><th style="width:22%">Actions</th>
           </tr></thead><tbody id="invoice-tbody">
-            <tr><td>The Morrisons</td><td>Standard clean</td><td>Apr 2</td><td>$238.22</td><td>Due now</td><td><span class="badge bpd">Paid</span></td><td><button class="btn" style="font-size:11px;padding:3px 8px;" onclick="viewReceipt('The Morrisons')">Receipt</button></td></tr>
-            <tr><td>Maui Surf Hotel</td><td>Commercial daily</td><td>Apr 2</td><td>$340.32</td><td>NET30</td><td><span class="badge bpd">Paid</span></td><td><button class="btn" style="font-size:11px;padding:3px 8px;" onclick="viewReceipt('Maui Surf Hotel')">Receipt</button></td></tr>
-            <tr><td>Aloha Realty</td><td>Commercial weekly</td><td>Mar 25</td><td>$272.25</td><td>NET30</td><td><span class="badge bpd">Paid</span></td><td><button class="btn" style="font-size:11px;padding:3px 8px;" onclick="viewReceipt('Aloha Realty')">Receipt</button></td></tr>
-            <tr><td>Kona Coffee Co.</td><td>Commercial weekly</td><td>Mar 27</td><td>$204.19</td><td>Due now</td><td><span class="badge bpd">Paid</span></td><td><button class="btn" style="font-size:11px;padding:3px 8px;" onclick="viewReceipt('Kona Coffee Co.')">Receipt</button></td></tr>
           </tbody></table></div>
         </div>
 
@@ -743,8 +675,6 @@ textarea{font-family:inherit;}
                 <th style="width:5%"><input type="checkbox" id="bulk-check-all" onchange="toggleAllBulk(this)" style="accent-color:#1D9E75;"></th>
                 <th style="width:22%">Client</th><th style="width:25%">Service</th><th style="width:15%">Date</th><th style="width:15%">Amount</th><th style="width:18%">Remove</th>
               </tr></thead><tbody id="bulk-tbody">
-                <tr><td><input type="checkbox" checked style="accent-color:#1D9E75;"></td><td>Aloha Realty</td><td>Commercial weekly</td><td>Mar 25</td><td>$272.25</td><td><button class="btn" style="font-size:11px;padding:2px 7px;" onclick="removeBulkRow(this)">Remove</button></td></tr>
-                <tr><td><input type="checkbox" checked style="accent-color:#1D9E75;"></td><td>Aloha Realty</td><td>Commercial weekly</td><td>Apr 1</td><td>$272.25</td><td><button class="btn" style="font-size:11px;padding:2px 7px;" onclick="removeBulkRow(this)">Remove</button></td></tr>
               </tbody></table></div>
               <div style="background:#fafaf8;border:1px solid #e8e8e5;border-radius:10px;padding:12px 14px;">
                 <div style="font-size:13px;font-weight:600;color:#1a1a1a;margin-bottom:10px;">Invoice settings</div>
@@ -1368,7 +1298,7 @@ textarea{font-family:inherit;}
           <div class="info-row"><span class="info-label">Notes</span><span class="info-val" id="cp-notes">—</span></div>
         </div>
         <div class="action-grid">
-          <button class="action-btn blue">Send SMS</button>
+          <button class="action-btn blue" onclick="openMsgFromCleaner()">Send SMS</button>
           <button class="action-btn amber" onclick="showCleanerEdit()">Edit profile</button>
           <button class="action-btn green full">Log hours manually</button>
           <button class="action-btn red full" onclick="deleteRecord('cleaner')">Delete cleaner</button>
@@ -1666,6 +1596,7 @@ async function loadAllData(){
     renderClientsTable();
     renderCleanersGrid();
     renderLeadsPipeline();
+    updateDashboardStats();
     console.log('Data loaded from Supabase');
   } catch(err){
     console.error('Load error:',err);
@@ -1778,6 +1709,52 @@ function renderLeadsPipeline(){
       cols[colIdx].appendChild(card);
     });
   });
+}
+
+function updateDashboardStats(){
+  var clientEntries=Object.entries(clientDB).filter(function(e){return e[0].length>=30;});
+  var leadEntries=Object.entries(leadDB).filter(function(e){return e[0].length>=30;});
+  var cleanerEntries=Object.entries(cleanerDB).filter(function(e){return e[0].length>=30;});
+
+  var totalClients=clientEntries.length;
+  var activeClients=clientEntries.filter(function(e){return e[1].status==='Active';}).length;
+  var newClients=clientEntries.filter(function(e){return e[1].status==='New';}).length;
+  var recurringClients=clientEntries.filter(function(e){return e[1].freq&&e[1].freq!=='One-time'&&e[1].freq!=='—';}).length;
+
+  var openLeads=leadEntries.filter(function(e){
+    var s=e[1].stage||'';return s!=='Closed won'&&s!=='Closed lost';
+  }).length;
+  var commercialLeads=leadEntries.filter(function(e){
+    var s=e[1].stage||'';var svc=e[1].service||'';
+    return s!=='Closed won'&&s!=='Closed lost'&&svc.toLowerCase().indexOf('commercial')>=0;
+  }).length;
+
+  var totalCleaners=cleanerEntries.length;
+
+  // Dashboard metrics
+  var el;
+  el=document.getElementById('dash-active-clients');if(el)el.textContent=activeClients||totalClients||'0';
+  el=document.getElementById('dash-active-clients-sub');if(el){el.textContent=totalClients+' total';el.className='metric-sub';}
+  el=document.getElementById('dash-open-leads');if(el)el.textContent=openLeads||'0';
+  el=document.getElementById('dash-open-leads-sub');if(el){el.textContent=commercialLeads+' commercial';el.className='metric-sub';}
+
+  // Pipeline metrics
+  el=document.getElementById('pipe-total-val');if(el)el.textContent=openLeads+' open';
+  el=document.getElementById('pipe-total-sub');if(el)el.textContent=openLeads+' leads';
+  el=document.getElementById('pipe-commercial-val');if(el)el.textContent=commercialLeads;
+  el=document.getElementById('pipe-commercial-sub');if(el)el.textContent='commercial leads';
+
+  // Clients view metrics
+  el=document.getElementById('clients-total');if(el)el.textContent=totalClients;
+  el=document.getElementById('clients-total-sub');if(el){el.textContent=activeClients+' active';el.className='metric-sub';}
+  el=document.getElementById('clients-dormant');if(el)el.textContent='—';
+  el=document.getElementById('clients-recurring');if(el)el.textContent=recurringClients;
+
+  // Cleaners view metrics
+  el=document.getElementById('cleaners-total');if(el)el.textContent=totalCleaners;
+  el=document.getElementById('cleaners-total-sub');if(el){el.textContent='on roster';el.className='metric-sub';}
+
+  console.log('[updateDashboardStats] clients='+totalClients+' (active='+activeClients+') leads='+openLeads+' cleaners='+totalCleaners);
 }
 
 var MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
@@ -2752,6 +2729,24 @@ function openMsgFromLead(){
     var initials=name.split(' ').map(function(w){return w[0]||'';}).join('').slice(0,2).toUpperCase();
     item={id:'lead-'+name.toLowerCase().replace(/[^a-z0-9]/g,'-'),name:name,type:'lead',avatar:initials,phone:phone,lastMsg:'',time:'Now',unread:false,msgs:[]};
     inboxData.unshift(item);
+  }
+  setTimeout(function(){renderInbox();openChat(item.id);},100);
+}
+
+function openMsgFromCleaner(){
+  var cdata=currentCleanerId?cleanerDB[currentCleanerId]:null;
+  if(!cdata){console.warn('[openMsgFromCleaner] No cleaner selected or not found in cleanerDB');return;}
+  var name=cdata.name;
+  var phone=cdata.phone||'—';
+  closeOverlay('cleaner-overlay');
+  var navEl=findMsgNavItem();
+  if(navEl)sv('messaging',navEl);
+  var item=inboxData.find(function(i){return i.name===name;});
+  if(!item){
+    var initials=name.split(' ').map(function(w){return w[0]||'';}).join('').slice(0,2).toUpperCase();
+    item={id:'cleaner-'+currentCleanerId,name:name,type:'cleaner',avatar:initials,phone:phone,lastMsg:'',time:'Now',unread:false,msgs:[]};
+    inboxData.unshift(item);
+    console.log('[openMsgFromCleaner] Created new thread for cleaner: '+name+' ('+phone+')');
   }
   setTimeout(function(){renderInbox();openChat(item.id);},100);
 }

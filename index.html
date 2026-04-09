@@ -1525,7 +1525,7 @@ async function quoGetMessages(conversationId) {
 
 // ── DB HELPERS ────────────────────────────────────────────────────────
 async function dbSaveClient(data){
-  const {error}=await db.from('clients').insert([{
+  var res=await db.from('clients').insert([{
     name:data.name, type:data.type||'Residential',
     phone:data.phone||null, email:data.email||null,
     address:data.address||null, payment_type:data.paytype||null,
@@ -1533,12 +1533,16 @@ async function dbSaveClient(data){
     frequency:data.freq||null, sqft:data.sqft||null,
     beds:parseInt(data.beds)||null, baths:parseFloat(data.baths)||null,
     preferred_cleaner:data.cleaner||null, status:'New',
-    notes:data.notes||null,
+    notes:data.notes||null, properties:data.properties||[],
     since:new Date().toLocaleDateString('en-US',{month:'long',year:'numeric'}),
     mrr:0, ltv:0
-  }]);
-  if(error)console.error('Save client error:',error);
-  return !error;
+  }]).select();
+  if(res.error){
+    console.error('[dbSaveClient] ERROR:', res.error);
+  } else {
+    console.log('[dbSaveClient] saved, real UUID:', res.data&&res.data[0]&&res.data[0].id);
+  }
+  return res;
 }
 
 async function dbLoadClients(){
@@ -2920,6 +2924,45 @@ async function saveNewAppt(){
   var apptBaths=(document.getElementById('na-baths')||{}).value||'';
   var apptCond=(document.getElementById('na-cond')||{}).value||'7';
   var apptNotes=(document.getElementById('na-notes')||{}).value||'';
+  // Auto-create client if name not in clientDB (booked from calendar with new name)
+  var _existingClient=_findClientByName(name);
+  if(!_existingClient){
+    var _apptPhone=(document.getElementById('na-phone')||{}).value||'';
+    var _apptEmail=(document.getElementById('na-email')||{}).value||'';
+    var _autoTempId='tmp-'+Date.now();
+    clientDB[_autoTempId]={
+      name:name, type:'Residential',
+      phone:_apptPhone||'—', email:_apptEmail||'—', address:apptAddress||'—',
+      payment:'—', since:new Date().toLocaleDateString('en-US',{month:'long',year:'numeric'}),
+      ltv:'$0', mrr:'—', jobs:'0', avg:'—',
+      service:naServiceText, freq:freq, sqft:'—',
+      bedbath:apptBeds+' bed / '+apptBaths+' bath',
+      cleaner:cleanerName, lastjob:'None yet', nextjob:'Not scheduled',
+      status:'New', notes:'', history:[], properties:[]
+    };
+    var _cRes=await dbSaveClient({
+      name:name, type:'Residential',
+      phone:_apptPhone, email:_apptEmail, address:apptAddress,
+      service:naServiceText, freq:freq, beds:apptBeds, baths:apptBaths,
+      cleaner:cleanerName
+    });
+    console.log('[saveNewAppt] auto-created client:', _cRes);
+    if(!_cRes.error && _cRes.data && _cRes.data[0]){
+      var _realClientId=_cRes.data[0].id;
+      clientDB[_realClientId]=clientDB[_autoTempId];
+      delete clientDB[_autoTempId];
+      // Add new client row to the clients table
+      var _tbody=document.querySelector('#view-clients tbody');
+      if(_tbody){
+        var _tr=document.createElement('tr');
+        _tr.className='clickable db-row';
+        _tr.setAttribute('data-cid',_realClientId);
+        _tr.innerHTML='<td>'+name+'</td><td><span class="badge br">Residential</span></td><td>—</td><td>—</td><td>'+freq+'</td><td><span class="sd sn"></span>New</td>';
+        _tr.onclick=function(){openClient(this.getAttribute('data-cid'));};
+        _tbody.insertBefore(_tr,_tbody.firstChild);
+      }
+    }
+  }
   // Calculate price FIRST so it's in the apptData entry
   var priceEl=document.getElementById('price-val');
   var total=0;
@@ -3253,18 +3296,18 @@ function saveNewLead(){
   },2000);
 }
 
-function saveNewClient(){
+async function saveNewClient(){
   var name=document.getElementById('nc-name').value;
   if(!name){document.getElementById('nc-name').style.border='1px solid #e53e3e';document.getElementById('nc-name').focus();return;}
   document.getElementById('nc-name').style.border='';
-  var id=name.toLowerCase().replace(/[^a-z0-9]/g,'-')+'-'+Date.now();
+  var tempId='tmp-'+Date.now();
   var paytype=document.getElementById('nc-paytype').value;
   var last4=document.getElementById('nc-last4').value;
   var beds=document.getElementById('nc-beds').value;
   var baths=document.getElementById('nc-baths').value;
   var type=document.getElementById('nc-type').value;
   var freq=document.getElementById('nc-freq').value;
-  clientDB[id]={
+  clientDB[tempId]={
     name:name,type:type,
     phone:document.getElementById('nc-phone').value||'—',
     email:document.getElementById('nc-email').value||'—',
@@ -3278,26 +3321,41 @@ function saveNewClient(){
     cleaner:document.getElementById('nc-cleaner').value,
     lastjob:'None yet',nextjob:'Not scheduled',status:'New',
     notes:document.getElementById('nc-notes').value||'—',
-    history:[]
+    history:[],properties:[]
   };
-  // Add to ALL client tables instantly
+  // Add to ALL client tables instantly (use data-cid for later UUID update)
   var badgeCls=type==='Commercial'?'bc':'br';
+  var newRows=[];
   document.querySelectorAll('#view-clients tbody, #view-dashboard tbody').forEach(function(tbody){
-    var tr=document.createElement('tr');tr.className='clickable';
+    var tr=document.createElement('tr');tr.className='clickable db-row';
+    tr.setAttribute('data-cid',tempId);
     tr.innerHTML='<td>'+name+'</td><td><span class="badge '+badgeCls+'">'+type+'</span></td><td>—</td><td>—</td><td>'+freq+'</td><td><span class="sd sn"></span>New</td>';
-    (function(capturedId){tr.addEventListener('click',function(){openClient(capturedId);});})(id);
+    tr.onclick=function(){openClient(this.getAttribute('data-cid'));};
     tbody.insertBefore(tr,tbody.firstChild);
+    newRows.push(tr);
   });
-  // Save to Supabase
-  dbSaveClient({
+  // Save to Supabase and get real UUID
+  var res=await dbSaveClient({
     name:name, type:type, phone:document.getElementById('nc-phone').value,
     email:document.getElementById('nc-email').value, address:document.getElementById('nc-address').value,
-    paytype:document.getElementById('nc-paytype').value, last4:document.getElementById('nc-last4').value,
+    paytype:paytype, last4:last4,
     service:document.getElementById('nc-service').value, freq:freq,
     sqft:document.getElementById('nc-sqft').value, beds:beds, baths:baths,
     cleaner:document.getElementById('nc-cleaner').value,
     notes:document.getElementById('nc-notes').value
   });
+  console.log('[saveNewClient] Supabase response:', res);
+  if(!res.error && res.data && res.data[0]){
+    var realId=res.data[0].id;
+    // Migrate temp ID to real UUID in clientDB
+    clientDB[realId]=clientDB[tempId];
+    delete clientDB[tempId];
+    // Update all DOM rows to use real UUID
+    newRows.forEach(function(tr){ tr.setAttribute('data-cid',realId); });
+    console.log('[saveNewClient] client ID migrated to real UUID:', realId);
+  } else if(res.error){
+    console.error('[saveNewClient] Supabase insert failed, client will use temp ID:', tempId);
+  }
   var s=document.getElementById('nc-success');s.textContent='Client "'+name+'" added successfully!';s.classList.add('show');
   setTimeout(function(){s.classList.remove('show');closeOverlay('new-client-overlay');
     ['nc-name','nc-phone','nc-email','nc-address','nc-last4','nc-sqft','nc-notes'].forEach(function(fid){var el=document.getElementById(fid);if(el)el.value='';});
@@ -4275,7 +4333,7 @@ function sendNewMessage(){
 
 
 /* DELETE RECORDS */
-function deleteRecord(type){
+async function deleteRecord(type){
   var id=null;
   var name='';
   var msg='';
@@ -4302,13 +4360,17 @@ function deleteRecord(type){
   }
   if(!confirm(msg))return;
 
-  // Delete from Supabase
+  // Delete from Supabase (UUID is 36 chars; temp IDs and static demo IDs are shorter)
   if(id&&id.length>20){
     var table=type==='client'?'clients':type==='lead'?'leads':'cleaners';
-    db.from(table).delete().eq('id',id).then(function(res){
-      if(res.error)console.error('Delete error:',res.error);
-      else console.log(type+' deleted from Supabase');
-    });
+    var delRes=await db.from(table).delete().eq('id',id);
+    if(delRes.error){
+      console.error('[deleteRecord] Supabase delete ERROR:', delRes.error);
+    } else {
+      console.log('[deleteRecord]', type, 'deleted from Supabase, id:', id);
+    }
+  } else {
+    console.log('[deleteRecord] local-only record, skipping Supabase delete, id:', id);
   }
 
   // Remove from local DB and UI
@@ -4328,9 +4390,9 @@ function deleteRecord(type){
     recurringAppts=recurringAppts.filter(function(r){return r.name!==name;});
     // Delete from Supabase appointments table
     if(id&&id.length>20){
-      db.from('appointments').delete().eq('client_name',name).then(function(res){
-        if(res.error)console.error('Delete appts error:',res.error);
-      });
+      var apptDelRes=await db.from('appointments').delete().eq('client_name',name);
+      if(apptDelRes.error) console.error('[deleteRecord] appts delete ERROR:', apptDelRes.error);
+      else console.log('[deleteRecord] appointments deleted for client:', name);
     }
     if(apptCount>0) renderCal();
   } else if(type==='lead'){

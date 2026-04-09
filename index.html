@@ -113,6 +113,7 @@ tr.clickable:hover td{background:#f0faf6;cursor:pointer;}
 .aa{background:#B5D4F4;color:#0C447C;}
 .ac{background:#FAC775;color:#633806;}
 .ap{background:#9FE1CB;color:#085041;}
+.ax{background:#e2e8f0;color:#475569;text-decoration:line-through;opacity:.7;}
 .more-appts{font-size:10px;color:#999;}
 /* CLEANERS */
 .cleaner-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:16px;}
@@ -163,6 +164,7 @@ tr.clickable:hover td{background:#f0faf6;cursor:pointer;}
 .s-assigned{background:#B5D4F4;color:#0C447C;}
 .s-completed{background:#FAC775;color:#633806;}
 .s-paid{background:#9FE1CB;color:#085041;}
+.s-cancelled{background:#e2e8f0;color:#475569;}
 .profile-top{display:flex;align-items:center;gap:13px;margin-bottom:16px;}
 .profile-avatar{width:54px;height:54px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:600;flex-shrink:0;}
 .profile-name{font-size:16px;font-weight:600;color:#1a1a1a;}
@@ -1167,7 +1169,7 @@ textarea{font-family:inherit;}
           <button class="action-btn blue" onclick="openMsgFromAppt()">Message client</button>
           <button class="action-btn blue full" onclick="openInviteCleaner()">Invite cleaner</button>
           <button class="action-btn amber full" onclick="showApptEdit()">Edit job</button>
-          <button class="action-btn red full">Cancel appointment</button>
+          <button class="action-btn red full" onclick="cancelAppointment()">Cancel appointment</button>
         </div>
         <div class="success-bar" id="appt-action-success" style="margin-top:10px;"></div>
       </div>
@@ -1586,7 +1588,7 @@ async function dbSaveAppointment(data){
     cleaner_pay:parseFloat(data.cleanerPay)||0,
     notes:data.notes||null,
     recurring:data.recurring||false
-  }]);
+  }]).select();
   if(res.error)console.error('Save appointment error:',res.error);
   return res;
 }
@@ -2000,7 +2002,7 @@ function renderMonth(){
     // Show all appointments - no limit
     da.forEach(function(a){
       var btn=document.createElement('button');
-      btn.className='appt a'+a.s.charAt(0);
+      btn.className='appt '+(a.s==='cancelled'?'ax':'a'+a.s.charAt(0));
       btn.textContent=(a.recurring?'\u21bb ':'')+a.t+' '+a.n;
       btn.dataset.appt=JSON.stringify(a);
       btn.dataset.key=k;
@@ -2026,7 +2028,8 @@ var CAL_COLORS={
   u:{bg:'#fce7f3',text:'#9d174d',border:'#f9a8d4'},
   a:{bg:'#dbeafe',text:'#1e40af',border:'#93c5fd'},
   c:{bg:'#fef9c3',text:'#713f12',border:'#fde68a'},
-  p:{bg:'#dcfce7',text:'#166534',border:'#86efac'}
+  p:{bg:'#dcfce7',text:'#166534',border:'#86efac'},
+  x:{bg:'#e2e8f0',text:'#64748b',border:'#cbd5e1'}
 };
 
 function parseApptHour(t){
@@ -2121,7 +2124,7 @@ function calLayoutAppts(appts,dateKey,col,compact){
 
     cluster.forEach(function(appt){
       var a=appt.a;
-      var sc=a.s?a.s.charAt(0):'u';
+      var sc=a.s==='cancelled'?'x':(a.s?a.s.charAt(0):'u');
       var clr=colorMap[sc]||colorMap.u;
       var pct=100/numSlots;
       var leftPct=appt.slot*pct;
@@ -2347,6 +2350,64 @@ function _openApptInner(a,dateKey){
 function showApptEdit(){document.getElementById('appt-view').style.display='none';document.getElementById('appt-edit').style.display='block';populateEditPropertySelector(currentClientName);}
 function hideApptEdit(){document.getElementById('appt-view').style.display='block';document.getElementById('appt-edit').style.display='none';}
 function saveApptEdit(){hideApptEdit();showToast('appt-overlay','Changes saved successfully.');}
+
+async function cancelAppointment(){
+  if(!currentAppt||!currentApptKey){
+    console.error('[cancelAppointment] no currentAppt or currentApptKey');
+    return;
+  }
+  if(!confirm('Cancel this appointment for '+currentAppt.n+'? This cannot be undone.')) return;
+
+  // Update status in apptData (in-memory)
+  var keyEntries=apptData[currentApptKey];
+  if(keyEntries){
+    for(var i=0;i<keyEntries.length;i++){
+      if(keyEntries[i]===currentAppt||(keyEntries[i].n===currentAppt.n&&keyEntries[i].t===currentAppt.t)){
+        keyEntries[i].s='cancelled';
+        break;
+      }
+    }
+  }
+  currentAppt.s='cancelled';
+
+  // Persist to Supabase
+  var dbRes;
+  if(currentAppt.dbId){
+    // Most reliable: update by Supabase row UUID
+    dbRes=await db.from('appointments').update({status:'cancelled'}).eq('id',currentAppt.dbId);
+    console.log('[cancelAppointment] updated by dbId:', currentAppt.dbId, '| response:', dbRes);
+  } else {
+    // Fallback: match by client_name + date (derived from key "YYYY-M-D")
+    var kp=currentApptKey.split('-');
+    var dateStr=kp[0]+'-'+String(kp[1]).padStart(2,'0')+'-'+String(kp[2]).padStart(2,'0');
+    dbRes=await db.from('appointments').update({status:'cancelled'})
+      .eq('client_name',currentAppt.n)
+      .eq('date',dateStr);
+    console.log('[cancelAppointment] updated by client_name+date ('+currentAppt.n+', '+dateStr+') | response:', dbRes);
+  }
+
+  if(dbRes&&dbRes.error){
+    console.error('[cancelAppointment] Supabase ERROR:', dbRes.error);
+    showPaymentToast('Error cancelling in database: '+dbRes.error.message, null, 'error');
+  } else {
+    console.log('[cancelAppointment] SUCCESS — appointment marked cancelled in Supabase');
+  }
+
+  // Update the overlay status badge
+  var sb=document.getElementById('appt-status');
+  if(sb){sb.textContent='Cancelled';sb.className='status-badge s-cancelled';}
+
+  // Show success bar and re-render calendar
+  var bar=document.getElementById('appt-action-success');
+  if(bar){bar.textContent='Appointment cancelled.';bar.classList.add('show');}
+  renderCal();
+
+  // Close overlay after brief delay
+  setTimeout(function(){
+    if(bar)bar.classList.remove('show');
+    closeOverlay('appt-overlay');
+  },1800);
+}
 
 function openClient(id){
   var d=clientDB[id];if(!d)return;
@@ -3019,6 +3080,11 @@ async function saveNewAppt(){
     notes:apptNotes, recurring:freq!=='One-time'
   });
   console.log('[saveNewAppt] Supabase response:', sbRes);
+  // Store the real dbId back into apptObj so cancelAppointment() can use it
+  if(!sbRes.error && sbRes.data && sbRes.data[0]){
+    apptObj.dbId = sbRes.data[0].id;
+    console.log('[saveNewAppt] appointment dbId stored:', apptObj.dbId);
+  }
   var success=document.getElementById('na-success');
   success.textContent='Booked! '+name+' added as '+(freq==='One-time'?'a one-time appointment':'a '+freq.toLowerCase()+' recurring appointment')+'. Will auto-populate future months.';
   success.classList.add('show');

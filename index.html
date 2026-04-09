@@ -1646,6 +1646,7 @@ async function loadAllData(){
   try{
     // Load appointments into calendar
     const appts=await dbLoadAppointments();
+    console.log('[loadAllData] Loaded '+appts.length+' real appointments from Supabase');
     appts.forEach(function(a){
       const d=new Date(a.date+'T12:00:00');
       const key=d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate();
@@ -1834,28 +1835,7 @@ var activeChatId=null;
 var currentClientName='';
 var currentLeadName='';
 
-var apptData={
-  '2026-4-2':[{n:'The Morrisons',s:'assigned',t:'8am',cleaner:'Kaimana M.'},{n:'Lani P.',s:'unassigned',t:'10am',cleaner:'Unassigned'}],
-  '2026-4-3':[{n:'Aloha Realty',s:'assigned',t:'9am',cleaner:'Alohi L.'}],
-  '2026-4-4':[{n:'Kona Coffee Co.',s:'paid',t:'7am',cleaner:'Kaimana M.'},{n:'Pearl City Gym',s:'completed',t:'11am',cleaner:'Keanu N.'}],
-  '2026-4-5':[{n:'Chen Family',s:'unassigned',t:'9am',cleaner:'Unassigned'}],
-  '2026-4-7':[{n:'Maui Surf Hotel',s:'assigned',t:'7am',cleaner:'Maile K.'},{n:'The Morrisons',s:'assigned',t:'2pm',cleaner:'Kaimana M.'},{n:'Tanaka Res.',s:'unassigned',t:'4pm',cleaner:'Unassigned'}],
-  '2026-4-8':[{n:'Aloha Realty',s:'paid',t:'9am',cleaner:'Alohi L.'},{n:'North Shore Gym',s:'unassigned',t:'1pm',cleaner:'Unassigned'}],
-  '2026-4-9':[{n:'Kona Coffee Co.',s:'assigned',t:'8am',cleaner:'Kaimana M.'}],
-  '2026-4-10':[{n:'Pearl City Gym',s:'assigned',t:'10am',cleaner:'Keanu N.'},{n:'Lani P.',s:'completed',t:'2pm',cleaner:'Leilani H.'}],
-  '2026-4-11':[{n:'Maui Surf Hotel',s:'paid',t:'7am',cleaner:'Maile K.'}],
-  '2026-4-14':[{n:'The Morrisons',s:'unassigned',t:'8am',cleaner:'Unassigned'},{n:'Aloha Realty',s:'assigned',t:'9am',cleaner:'Alohi L.'},{n:'Chen Family',s:'unassigned',t:'3pm',cleaner:'Unassigned'}],
-  '2026-4-15':[{n:'Pearl City Gym',s:'completed',t:'11am',cleaner:'Keanu N.'}],
-  '2026-4-16':[{n:'Kona Coffee Co.',s:'assigned',t:'7am',cleaner:'Kaimana M.'},{n:'Maui Surf Hotel',s:'assigned',t:'12pm',cleaner:'Maile K.'}],
-  '2026-4-17':[{n:'Lani P.',s:'unassigned',t:'9am',cleaner:'Unassigned'}],
-  '2026-4-18':[{n:'Aloha Realty',s:'paid',t:'9am',cleaner:'Alohi L.'},{n:'Pearl City Gym',s:'assigned',t:'2pm',cleaner:'Keanu N.'}],
-  '2026-4-21':[{n:'The Morrisons',s:'assigned',t:'8am',cleaner:'Kaimana M.'},{n:'Kona Coffee Co.',s:'unassigned',t:'10am',cleaner:'Unassigned'}],
-  '2026-4-22':[{n:'Maui Surf Hotel',s:'assigned',t:'7am',cleaner:'Maile K.'}],
-  '2026-4-24':[{n:'Pearl City Gym',s:'unassigned',t:'11am',cleaner:'Unassigned'},{n:'Lani P.',s:'assigned',t:'3pm',cleaner:'Leilani H.'}],
-  '2026-4-25':[{n:'Aloha Realty',s:'assigned',t:'9am',cleaner:'Alohi L.'},{n:'Chen Family',s:'unassigned',t:'1pm',cleaner:'Unassigned'}],
-  '2026-4-28':[{n:'The Morrisons',s:'unassigned',t:'8am',cleaner:'Unassigned'},{n:'Kona Coffee Co.',s:'assigned',t:'10am',cleaner:'Kaimana M.'},{n:'Maui Surf Hotel',s:'assigned',t:'3pm',cleaner:'Maile K.'}],
-  '2026-4-30':[{n:'Pearl City Gym',s:'assigned',t:'11am',cleaner:'Keanu N.'}]
-};
+var apptData={};
 
 var clientJobData={
   'The Morrisons':{service:'Standard clean',address:'1247 Kalani St, Kailua, HI',freq:'Biweekly',dur:'3.5 hrs',sqft:'1,800 sq ft',bed:'3 bed / 2 bath',cond:'Good (7/10)',base:'$227.50',disc:'$0',tax:'$10.72',total:'$238.22'},

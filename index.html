@@ -897,7 +897,7 @@ textarea{font-family:inherit;}
         </div>
       </div>
       <div class="form-two">
-        <div class="form-row"><label>Phone</label><input type="tel" id="na-phone" placeholder="(808) 555-0000"></div>
+        <div class="form-row"><label>Phone</label><input type="tel" id="na-phone" placeholder="(808) 555-0000" oninput="fmtPhone(this)"></div>
         <div class="form-row"><label>Email</label><input type="email" id="na-email" placeholder="client@email.com"></div>
       </div>
       <div class="panel-section">Property</div>
@@ -907,7 +907,7 @@ textarea{font-family:inherit;}
           <option value="manual">Enter address manually</option>
         </select>
       </div>
-      <div class="form-row" id="na-address-row">
+      <div class="form-row" id="na-address-row" style="padding-left:12px;border-left:3px solid #e8e8e5;">
         <label>Address</label>
         <input type="text" id="na-address" placeholder="123 Kalani St, Kailua, HI">
       </div>
@@ -916,51 +916,70 @@ textarea{font-family:inherit;}
           <input type="checkbox" id="na-save-property"> Save as property for this client
         </label>
       </div>
-      <div class="form-two">
-        <div class="form-row"><label>Bedrooms</label>
-          <select id="na-beds" onchange="calcPrice()">
-            <option value="1">1</option><option value="2">2</option><option value="3" selected>3</option><option value="4">4</option><option value="5">5</option><option value="6">6+</option>
-          </select>
-        </div>
-        <div class="form-row"><label>Bathrooms</label>
-          <select id="na-baths" onchange="calcPrice()">
-            <option value="1">1</option><option value="1.5">1.5</option><option value="2" selected>2</option><option value="2.5">2.5</option><option value="3">3</option><option value="4">4+</option>
-          </select>
-        </div>
-      </div>
       <div class="panel-section">Service details</div>
       <div class="form-two">
         <div class="form-row"><label>Service type</label>
           <select id="na-service" onchange="calcPrice()">
-            <option value="standard">Standard clean</option>
-            <option value="deep">Deep clean</option>
-            <option value="moveout">Move-out clean</option>
-            <option value="commercial">Commercial weekly</option>
-            <option value="airbnb">Airbnb turnover</option>
+            <option value="standard">Regular Cleaning</option>
+            <option value="deep">Deep Cleaning</option>
+            <option value="moveout">Move Out Cleaning</option>
+            <option value="airbnb">Airbnb Turnover</option>
+            <option value="commercial">Commercial Cleaning</option>
           </select>
         </div>
         <div class="form-row"><label>Frequency</label>
           <select id="na-freq">
+            <option>Every Day</option>
             <option>Weekly</option>
-            <option>Biweekly</option>
+            <option selected>Biweekly</option>
             <option>Monthly</option>
             <option>One-time</option>
           </select>
         </div>
       </div>
-      <div class="form-row"><label>Condition (1-10)</label>
-        <select id="na-cond" onchange="calcPrice()">
-          <option value="9">9-10 — Excellent</option>
-          <option value="7" selected>7-8 — Good</option>
-          <option value="5">5-6 — Average</option>
-          <option value="3">3-4 — Below avg</option>
-          <option value="1">1-2 — Poor</option>
-        </select>
+      <div id="na-residential-fields">
+        <div class="form-two">
+          <div class="form-row"><label>Bedrooms</label>
+            <select id="na-beds" onchange="calcPrice()">
+              <option value="1">1</option><option value="2">2</option><option value="3" selected>3</option><option value="4">4</option><option value="5">5</option><option value="6">6+</option>
+            </select>
+          </div>
+          <div class="form-row"><label>Bathrooms</label>
+            <select id="na-baths" onchange="calcPrice()">
+              <option value="1">1</option><option value="1.5">1.5</option><option value="2" selected>2</option><option value="2.5">2.5</option><option value="3">3</option><option value="4">4+</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-two">
+          <div class="form-row"><label>Sq ft</label>
+            <input type="number" id="na-sqft" placeholder="e.g. 1200" min="100" step="50" oninput="calcPrice()">
+          </div>
+          <div class="form-row"><label>Condition (1-10)</label>
+            <select id="na-cond" onchange="calcPrice()">
+              <option value="9">9-10 — Excellent</option>
+              <option value="7" selected>7-8 — Good</option>
+              <option value="5">5-6 — Average</option>
+              <option value="3">3-4 — Below avg</option>
+              <option value="1">1-2 — Poor</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      <div id="na-commercial-fields" style="display:none;">
+        <div class="form-row"><label>Total hours</label>
+          <input type="number" id="na-commercial-hrs" placeholder="e.g. 4" min="1" step="0.5" oninput="calcPrice()">
+        </div>
       </div>
       <div class="price-preview" id="price-preview">
         <div class="price-preview-label">Estimated price</div>
         <div class="price-preview-val" id="price-val">$238.22</div>
         <div class="price-preview-breakdown" id="price-breakdown">3.5 hrs × $65 = $227.50 + tax $10.72</div>
+        <div style="margin-top:10px;display:flex;align-items:center;gap:10px;">
+          <label style="font-size:13px;color:#666;font-weight:normal;display:flex;align-items:center;gap:6px;cursor:pointer;">
+            <input type="checkbox" id="na-price-override-chk" onchange="calcPrice()"> Override price
+          </label>
+          <input type="number" id="na-price-override-val" placeholder="Custom $" min="0" step="0.01" style="width:120px;display:none;" oninput="calcPrice()">
+        </div>
       </div>
       <div class="panel-section">Scheduling</div>
       <div class="form-two">
@@ -2826,26 +2845,60 @@ function calcPropPrice(){
 }
 
 /* PRICING CALC */
+function fmtPhone(el){
+  var digits=el.value.replace(/\D/g,'').slice(0,10);
+  if(digits.length===0){el.value='';return;}
+  if(digits.length<=3){el.value='('+digits;}
+  else if(digits.length<=6){el.value='('+digits.slice(0,3)+') '+digits.slice(3);}
+  else{el.value='('+digits.slice(0,3)+') '+digits.slice(3,6)+'-'+digits.slice(6);}
+  console.log('[fmtPhone] formatted: '+el.value);
+}
+
 function calcPrice(){
-  var beds=parseInt(document.getElementById('na-beds').value)||3;
-  var baths=parseFloat(document.getElementById('na-baths').value)||2;
-  var cond=parseInt(document.getElementById('na-cond').value)||7;
   var svcType=document.getElementById('na-service').value;
-  var baseHrs=1.0+(beds*0.5)+(baths*0.4);
-  if(svcType==='deep')baseHrs*=1.5;
-  else if(svcType==='moveout')baseHrs*=1.7;
-  else if(svcType==='commercial')baseHrs=beds*0.8+baths*0.5+1.5;
-  else if(svcType==='airbnb')baseHrs=baseHrs*0.9;
-  var condMod=1.0;
-  if(cond<=2)condMod=1.70;
-  else if(cond<=4)condMod=1.40;
-  else if(cond<=6)condMod=1.25;
-  var hrs=Math.round(baseHrs*condMod*10)/10;
+  var isCommercial=(svcType==='commercial');
+  // Toggle residential vs commercial fields
+  var resFields=document.getElementById('na-residential-fields');
+  var comFields=document.getElementById('na-commercial-fields');
+  if(resFields) resFields.style.display=isCommercial?'none':'';
+  if(comFields) comFields.style.display=isCommercial?'':'none';
+  // Compute hours
+  var hrs;
+  if(isCommercial){
+    hrs=parseFloat((document.getElementById('na-commercial-hrs')||{}).value)||4;
+  } else {
+    var beds=parseInt(document.getElementById('na-beds').value)||3;
+    var baths=parseFloat(document.getElementById('na-baths').value)||2;
+    var cond=parseInt(document.getElementById('na-cond').value)||7;
+    var baseHrs=1.0+(beds*0.5)+(baths*0.4);
+    if(svcType==='deep')baseHrs*=1.5;
+    else if(svcType==='moveout')baseHrs*=1.7;
+    else if(svcType==='airbnb')baseHrs*=0.9;
+    var condMod=1.0;
+    if(cond<=2)condMod=1.70;
+    else if(cond<=4)condMod=1.40;
+    else if(cond<=6)condMod=1.25;
+    hrs=Math.round(baseHrs*condMod*10)/10;
+  }
+  // Price override
+  var overrideChk=document.getElementById('na-price-override-chk');
+  var overrideValEl=document.getElementById('na-price-override-val');
+  var isOverride=overrideChk&&overrideChk.checked;
+  if(overrideValEl) overrideValEl.style.display=isOverride?'':'none';
   var base=Math.round(hrs*65*100)/100;
   var tax=Math.round(base*0.04712*100)/100;
-  var total=Math.round((base+tax)*100)/100;
-  document.getElementById('price-val').textContent='$'+total.toFixed(2);
-  document.getElementById('price-breakdown').textContent=hrs+' est hrs x $65 = $'+base.toFixed(2)+' + tax $'+tax.toFixed(2);
+  var total;
+  if(isOverride&&overrideValEl&&overrideValEl.value){
+    total=parseFloat(overrideValEl.value)||0;
+    document.getElementById('price-val').textContent='$'+total.toFixed(2);
+    document.getElementById('price-breakdown').textContent=hrs+' est hrs — custom price override';
+    console.log('[calcPrice] override='+total+' hrs='+hrs+' svc='+svcType);
+  } else {
+    total=Math.round((base+tax)*100)/100;
+    document.getElementById('price-val').textContent='$'+total.toFixed(2);
+    document.getElementById('price-breakdown').textContent=hrs+' est hrs x $65 = $'+base.toFixed(2)+' + tax $'+tax.toFixed(2);
+    console.log('[calcPrice] total=$'+total+' hrs='+hrs+' svc='+svcType+(isCommercial?' (commercial)':''));
+  }
 }
 
 var recurringAppts=[];
@@ -2876,12 +2929,18 @@ async function saveNewAppt(){
   var cleanerName=cleaner==='unassigned'?'Unassigned':cleaner.split(' — ')[0];
   var apptStatus=cleaner==='unassigned'?'unassigned':'assigned';
   var naService=document.getElementById('na-service');
-  var naServiceText=naService?naService.options[naService.selectedIndex].text:'Standard clean';
+  var naServiceText=naService?naService.options[naService.selectedIndex].text:'Regular Cleaning';
+  var isCommercialAppt=(naService&&naService.value==='commercial');
   // Get address — always read from na-address (applyPropertyToBooking fills it for saved properties)
   var apptAddress=(document.getElementById('na-address')||{}).value||'';
-  var apptBeds=(document.getElementById('na-beds')||{}).value||'';
-  var apptBaths=(document.getElementById('na-baths')||{}).value||'';
-  var apptCond=(document.getElementById('na-cond')||{}).value||'7';
+  var apptBeds=isCommercialAppt?'':(document.getElementById('na-beds')||{}).value||'';
+  var apptBaths=isCommercialAppt?'':(document.getElementById('na-baths')||{}).value||'';
+  var apptSqft=isCommercialAppt?'':(document.getElementById('na-sqft')||{}).value||'';
+  var apptCond=isCommercialAppt?'':(document.getElementById('na-cond')||{}).value||'7';
+  var apptComHrs=isCommercialAppt?(document.getElementById('na-commercial-hrs')||{}).value||'':'';
+  var overrideChk=document.getElementById('na-price-override-chk');
+  var overrideValEl=document.getElementById('na-price-override-val');
+  var apptPriceOverride=(overrideChk&&overrideChk.checked&&overrideValEl&&overrideValEl.value)?overrideValEl.value:'';
   var apptNotes=(document.getElementById('na-notes')||{}).value||'';
   // Auto-create client if name not in clientDB (booked from calendar with new name)
   var _existingClient=_findClientByName(name);

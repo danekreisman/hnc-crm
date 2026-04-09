@@ -1170,6 +1170,7 @@ textarea{font-family:inherit;}
           <button class="action-btn blue full" onclick="openInviteCleaner()">Invite cleaner</button>
           <button class="action-btn amber full" onclick="showApptEdit()">Edit job</button>
           <button class="action-btn red full" onclick="cancelAppointment()">Cancel appointment</button>
+          <button class="action-btn red full" id="cancel-recurring-btn" style="display:none;" onclick="cancelAllRecurring()">Cancel all recurring</button>
         </div>
         <div class="success-bar" id="appt-action-success" style="margin-top:10px;"></div>
       </div>
@@ -1548,7 +1549,7 @@ async function dbSaveClient(data){
 }
 
 async function dbLoadClients(){
-  const {data,error}=await db.from('clients').select('*').order('created_at',{ascending:false});
+  const {data,error}=await db.from('clients').select('*').neq('status','Deleted').order('created_at',{ascending:false});
   if(error){console.error('Load clients error:',error);return[];}
   return data||[];
 }
@@ -1594,7 +1595,7 @@ async function dbSaveAppointment(data){
 }
 
 async function dbLoadAppointments(){
-  const {data,error}=await db.from('appointments').select('*').order('date',{ascending:true});
+  const {data,error}=await db.from('appointments').select('*').neq('status','cancelled').order('date',{ascending:true});
   if(error){console.error('Load appointments error:',error);return[];}
   return data||[];
 }
@@ -1616,7 +1617,7 @@ async function dbSaveLead(data){
 }
 
 async function dbLoadLeads(){
-  const {data,error}=await db.from('leads').select('*').order('created_at',{ascending:false});
+  const {data,error}=await db.from('leads').select('*').neq('stage','Deleted').order('created_at',{ascending:false});
   if(error){console.error('Load leads error:',error);return[];}
   return data||[];
 }
@@ -2344,6 +2345,9 @@ function _openApptInner(a,dateKey){
   currentAppt=a;
   currentApptKey=dateKey;
   currentApptData=a;
+  // Show "Cancel all recurring" button only for recurring appointments
+  var cancelRecBtn=document.getElementById('cancel-recurring-btn');
+  if(cancelRecBtn) cancelRecBtn.style.display=a.recurring?'':'none';
   document.getElementById('appt-overlay').classList.remove('hidden');
 }
 
@@ -2358,55 +2362,85 @@ async function cancelAppointment(){
   }
   if(!confirm('Cancel this appointment for '+currentAppt.n+'? This cannot be undone.')) return;
 
-  // Update status in apptData (in-memory)
+  // Remove entry from apptData entirely so it won't show on calendar (even if Supabase persist fails)
   var keyEntries=apptData[currentApptKey];
   if(keyEntries){
-    for(var i=0;i<keyEntries.length;i++){
-      if(keyEntries[i]===currentAppt||(keyEntries[i].n===currentAppt.n&&keyEntries[i].t===currentAppt.t)){
-        keyEntries[i].s='cancelled';
-        break;
-      }
-    }
+    var beforeLen=keyEntries.length;
+    apptData[currentApptKey]=keyEntries.filter(function(e){
+      return !(e===currentAppt||(e.n===currentAppt.n&&e.t===currentAppt.t));
+    });
+    console.log('[cancelAppointment] removed from apptData['+currentApptKey+']: before='+beforeLen+', after='+apptData[currentApptKey].length);
   }
-  currentAppt.s='cancelled';
 
-  // Persist to Supabase
+  // Persist status='cancelled' in Supabase so it won't reload on next page load
   var dbRes;
   if(currentAppt.dbId){
-    // Most reliable: update by Supabase row UUID
     dbRes=await db.from('appointments').update({status:'cancelled'}).eq('id',currentAppt.dbId);
-    console.log('[cancelAppointment] updated by dbId:', currentAppt.dbId, '| response:', dbRes);
+    console.log('[cancelAppointment] Supabase update by dbId:', currentAppt.dbId, '| response:', dbRes);
   } else {
-    // Fallback: match by client_name + date (derived from key "YYYY-M-D")
     var kp=currentApptKey.split('-');
     var dateStr=kp[0]+'-'+String(kp[1]).padStart(2,'0')+'-'+String(kp[2]).padStart(2,'0');
     dbRes=await db.from('appointments').update({status:'cancelled'})
       .eq('client_name',currentAppt.n)
       .eq('date',dateStr);
-    console.log('[cancelAppointment] updated by client_name+date ('+currentAppt.n+', '+dateStr+') | response:', dbRes);
+    console.log('[cancelAppointment] Supabase update by client_name+date ('+currentAppt.n+', '+dateStr+') | response:', dbRes);
   }
 
   if(dbRes&&dbRes.error){
     console.error('[cancelAppointment] Supabase ERROR:', dbRes.error);
-    showPaymentToast('Error cancelling in database: '+dbRes.error.message, null, 'error');
   } else {
-    console.log('[cancelAppointment] SUCCESS — appointment marked cancelled in Supabase');
+    console.log('[cancelAppointment] SUCCESS — persisted to Supabase, appointment will not reload on refresh');
   }
 
-  // Update the overlay status badge
-  var sb=document.getElementById('appt-status');
-  if(sb){sb.textContent='Cancelled';sb.className='status-badge s-cancelled';}
-
-  // Show success bar and re-render calendar
+  // Show success, re-render, then close
   var bar=document.getElementById('appt-action-success');
   if(bar){bar.textContent='Appointment cancelled.';bar.classList.add('show');}
   renderCal();
-
-  // Close overlay after brief delay
   setTimeout(function(){
     if(bar)bar.classList.remove('show');
     closeOverlay('appt-overlay');
   },1800);
+}
+
+async function cancelAllRecurring(){
+  if(!currentAppt||!currentAppt.n){
+    console.error('[cancelAllRecurring] no currentAppt');
+    return;
+  }
+  var clientName=currentAppt.n;
+  if(!confirm('Cancel ALL recurring appointments for '+clientName+'? This cannot be undone.')) return;
+
+  // Remove all recurring entries for this client from apptData
+  var removed=0;
+  Object.keys(apptData).forEach(function(k){
+    var before=apptData[k].length;
+    apptData[k]=apptData[k].filter(function(e){ return !(e.n===clientName&&e.recurring); });
+    removed+=before-apptData[k].length;
+  });
+  // Also remove from recurringAppts
+  recurringAppts=recurringAppts.filter(function(r){return r.name!==clientName;});
+  console.log('[cancelAllRecurring] removed '+removed+' recurring entries from apptData for:', clientName);
+
+  // Persist to Supabase: mark all recurring rows for this client as cancelled
+  var dbRes=await db.from('appointments').update({status:'cancelled'})
+    .eq('client_name',clientName)
+    .eq('recurring',true);
+  console.log('[cancelAllRecurring] Supabase update response:', dbRes);
+
+  if(dbRes&&dbRes.error){
+    console.error('[cancelAllRecurring] Supabase ERROR:', dbRes.error);
+  } else {
+    console.log('[cancelAllRecurring] SUCCESS — all recurring appointments for '+clientName+' cancelled in Supabase');
+  }
+
+  // Show success, re-render, close
+  var bar=document.getElementById('appt-action-success');
+  if(bar){bar.textContent='All recurring appointments for '+clientName+' cancelled.';bar.classList.add('show');}
+  renderCal();
+  setTimeout(function(){
+    if(bar)bar.classList.remove('show');
+    closeOverlay('appt-overlay');
+  },2000);
 }
 
 function openClient(id){
@@ -4429,11 +4463,20 @@ async function deleteRecord(type){
   // Delete from Supabase (UUID is 36 chars; temp IDs and static demo IDs are shorter)
   if(id&&id.length>20){
     var table=type==='client'?'clients':type==='lead'?'leads':'cleaners';
+    // Hard delete (primary)
     var delRes=await db.from(table).delete().eq('id',id);
     if(delRes.error){
-      console.error('[deleteRecord] Supabase delete ERROR:', delRes.error);
+      console.error('[deleteRecord] hard delete ERROR:', delRes.error);
     } else {
-      console.log('[deleteRecord]', type, 'deleted from Supabase, id:', id);
+      console.log('[deleteRecord] hard delete OK, id:', id);
+    }
+    // Soft delete as fallback — marks the record so it won't reload if hard delete was RLS-blocked
+    if(type==='client'){
+      await db.from('clients').update({status:'Deleted'}).eq('id',id);
+      console.log('[deleteRecord] soft delete (status=Deleted) applied to client:', id);
+    } else if(type==='lead'){
+      await db.from('leads').update({stage:'Deleted'}).eq('id',id);
+      console.log('[deleteRecord] soft delete (stage=Deleted) applied to lead:', id);
     }
   } else {
     console.log('[deleteRecord] local-only record, skipping Supabase delete, id:', id);

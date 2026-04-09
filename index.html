@@ -2458,29 +2458,32 @@ async function saveApptEdit(){
     basePrice:editBase, tax:editTax, totalPrice:editTotal,
     base:'$'+editBase.toFixed(2), totalPrice:editTotal
   });
-  // Update apptData in memory
+  // Update apptData in memory immediately
   var dayArr=apptData[currentApptKey];
   if(dayArr){
     var idx=dayArr.findIndex(function(x){return x.dbId===a.dbId;});
-    if(idx>=0){dayArr[idx]=updatedAppt;console.log('[saveApptEdit] updated in-memory apptData['+currentApptKey+']['+idx+']');}
+    if(idx>=0){dayArr[idx]=updatedAppt;console.log('[saveApptEdit] immediate in-memory update: apptData['+currentApptKey+']['+idx+']');}
   }
   currentAppt=updatedAppt;
   currentApptData=updatedAppt;
-  // Persist to Supabase
+  // Render immediately — no waiting
+  renderCal();
+  console.log('[saveApptEdit] renderCal() triggered immediately');
+  hideApptEdit();
+  showToast('appt-overlay','Changes saved successfully.');
+  // Persist to Supabase in background
   if(a.dbId){
-    var sbUpdate=await dbUpdateAppointment(a.dbId,{
+    dbUpdateAppointment(a.dbId,{
       clientName:editClient, service:svcText, freq:freq,
       date:dateVal, time:newTimeStr, address:editAddr,
       beds:editBeds, baths:editBaths, sqft:editSqft, condition:editCond,
       cleanerName:cleanerVal, status:statusVal,
       basePrice:editBase, tax:editTax, totalPrice:editTotal,
       notes:editNotes, duration:editDuration
+    }).then(function(sbUpdate){
+      console.log('[saveApptEdit] Supabase persisted, error:', sbUpdate.error||'none');
     });
-    console.log('[saveApptEdit] Supabase update response:', sbUpdate);
   }
-  renderCal();
-  hideApptEdit();
-  showToast('appt-overlay','Changes saved successfully.');
 }
 
 async function cancelAppointment(){
@@ -3333,26 +3336,16 @@ async function saveNewAppt(){
     duration:apptDuration
   };
   console.log('[saveNewAppt] appointment object with duration='+apptDuration+':', apptObj);
+  // ── STEP 1: Insert into apptData immediately so UI updates without waiting for Supabase ──
+  var occDates=[];
   if(freq==='One-time'){
     var key=yr+'-'+mo+'-'+dy;
     if(!apptData[key])apptData[key]=[];
-    apptData[key].push(apptObj);
-    // Save single row to Supabase
-    var sbRes=await dbSaveAppointment({
-      clientName:name, service:naServiceText,
-      freq:freq, date:dateVal, time:timeStr,
-      address:apptAddress,
-      beds:apptBeds, baths:apptBaths, sqft:apptSqft, condition:apptCond,
-      cleanerName:cleanerName, basePrice:apptBase, tax:apptTax, totalPrice:total,
-      cleanerPay:apptCleanerPay, notes:apptNotes, recurring:false, duration:apptDuration
-    });
-    console.log('[saveNewAppt] one-time Supabase response:', sbRes);
-    if(!sbRes.error&&sbRes.data&&sbRes.data[0]){
-      apptObj.dbId=sbRes.data[0].id;
-      console.log('[saveNewAppt] appointment dbId stored:', apptObj.dbId);
-    }
+    var alreadyInMem=apptData[key].some(function(x){return x.n===name&&x.t===timeStr;});
+    if(!alreadyInMem)apptData[key].push(apptObj);
+    console.log('[saveNewAppt] immediate apptData insert key='+key+' name='+name);
   } else {
-    // Recurring: push rule to memory and batch-save all occurrences to Supabase
+    // Push recurrence rule (for future month navigation)
     recurringAppts.push({
       name:name, freq:freq,
       startYear:yr, startMonth:mo, startDay:dy,
@@ -3361,9 +3354,47 @@ async function saveNewAppt(){
       service:naServiceText, duration:apptDuration,
       address:apptAddress, beds:apptBeds, baths:apptBaths, sqft:apptSqft
     });
-    populateRecurringMonth(curYear,curMonth);
-    var occDates=_generateRecurringDates(yr,mo,dy,freq);
-    console.log('[saveNewAppt] generating '+occDates.length+' recurring occurrences for freq='+freq);
+    // Insert ALL generated occurrences into apptData directly (not just current month)
+    occDates=_generateRecurringDates(yr,mo,dy,freq);
+    var insertedCount=0;
+    occDates.forEach(function(od){
+      var oKey=od.getFullYear()+'-'+(od.getMonth()+1)+'-'+od.getDate();
+      if(!apptData[oKey])apptData[oKey]=[];
+      var exists=apptData[oKey].some(function(x){return x.n===name&&x.t===timeStr;});
+      if(!exists){
+        apptData[oKey].push(Object.assign({},apptObj,{recurring:true}));
+        insertedCount++;
+      }
+    });
+    console.log('[saveNewAppt] immediate apptData insert: '+insertedCount+'/'+occDates.length+' recurring entries for freq='+freq);
+  }
+
+  // ── STEP 2: Render calendar immediately — no waiting ──
+  renderCal();
+  console.log('[saveNewAppt] renderCal() triggered immediately');
+  var success=document.getElementById('na-success');
+  success.textContent='Booked! '+name+' — '+(freq==='One-time'?'appointment added':''+occDates.length+' '+freq.toLowerCase()+' appointments added')+'.';
+  success.classList.add('show');
+  setTimeout(function(){success.classList.remove('show');closeOverlay('new-appt-overlay');},2500);
+
+  // ── STEP 3: Persist to Supabase in background (UI already updated) ──
+  if(freq==='One-time'){
+    dbSaveAppointment({
+      clientName:name, service:naServiceText,
+      freq:freq, date:dateVal, time:timeStr,
+      address:apptAddress,
+      beds:apptBeds, baths:apptBaths, sqft:apptSqft, condition:apptCond,
+      cleanerName:cleanerName, basePrice:apptBase, tax:apptTax, totalPrice:total,
+      cleanerPay:apptCleanerPay, notes:apptNotes, recurring:false, duration:apptDuration
+    }).then(function(sbRes){
+      if(!sbRes.error&&sbRes.data&&sbRes.data[0]){
+        apptObj.dbId=sbRes.data[0].id;
+        console.log('[saveNewAppt] Supabase one-time saved, dbId='+apptObj.dbId);
+      } else if(sbRes.error){
+        console.error('[saveNewAppt] Supabase one-time error:', sbRes.error);
+      }
+    });
+  } else {
     var batchRows=occDates.map(function(od){
       var odStr=od.getFullYear()+'-'+String(od.getMonth()+1).padStart(2,'0')+'-'+String(od.getDate()).padStart(2,'0');
       return {
@@ -3379,29 +3410,32 @@ async function saveNewAppt(){
         duration_hours:apptDuration||null
       };
     });
-    var batchRes=await dbSaveAppointmentsBatch(batchRows);
-    console.log('[saveNewAppt] batch Supabase response error:', batchRes.error);
-    if(!batchRes.error&&batchRes.data&&batchRes.data[0]){
-      apptObj.dbId=batchRes.data[0].id;
-    }
+    dbSaveAppointmentsBatch(batchRows).then(function(batchRes){
+      if(!batchRes.error&&batchRes.data&&batchRes.data[0]){
+        apptObj.dbId=batchRes.data[0].id;
+        console.log('[saveNewAppt] Supabase batch saved '+batchRows.length+' rows, first dbId='+apptObj.dbId);
+      } else if(batchRes.error){
+        console.error('[saveNewAppt] Supabase batch error:', batchRes.error);
+      }
+    });
   }
-  // Save as property if checkbox is checked
+  // Property save (background — doesn't block UI)
   var savePropChk=document.getElementById('na-save-property');
   if(savePropChk&&savePropChk.checked&&apptAddress){
     var propFound=_findClientByName(name);
     if(propFound){
       var pdata=propFound.data;
       if(!Array.isArray(pdata.properties))pdata.properties=[];
-      var alreadySaved=pdata.properties.some(function(p){return p.address===apptAddress;});
-      if(!alreadySaved){
+      var alreadySavedProp=pdata.properties.some(function(p){return p.address===apptAddress;});
+      if(!alreadySavedProp){
         var newProp={address:apptAddress,beds:apptBeds,baths:apptBaths,sqft:apptSqft||'',price:apptBase.toFixed(2),notes:''};
         pdata.properties.push(newProp);
         if(propFound.id&&propFound.id.length>20){
-          await db.from('clients').update({properties:pdata.properties}).eq('id',propFound.id);
+          db.from('clients').update({properties:pdata.properties}).eq('id',propFound.id).then(function(r){
+            console.log('[saveNewAppt] property saved:', newProp.address, r.error||'ok');
+          });
         }
-        console.log('[saveNewAppt] saved property for client:', newProp);
       } else {
-        // Update existing property price/sqft if address matches
         var existingProp=pdata.properties.find(function(p){return p.address===apptAddress;});
         if(existingProp){
           existingProp.beds=apptBeds||existingProp.beds;
@@ -3409,18 +3443,14 @@ async function saveNewAppt(){
           existingProp.sqft=apptSqft||existingProp.sqft;
           existingProp.price=apptBase.toFixed(2);
           if(propFound.id&&propFound.id.length>20){
-            await db.from('clients').update({properties:pdata.properties}).eq('id',propFound.id);
+            db.from('clients').update({properties:pdata.properties}).eq('id',propFound.id).then(function(r){
+              console.log('[saveNewAppt] property updated:', apptAddress, r.error||'ok');
+            });
           }
-          console.log('[saveNewAppt] updated existing property price for:', apptAddress);
         }
       }
     }
   }
-  var success=document.getElementById('na-success');
-  success.textContent='Booked! '+name+' added as '+(freq==='One-time'?'a one-time appointment':'a '+freq.toLowerCase()+' recurring appointment')+'. Will auto-populate future months.';
-  success.classList.add('show');
-  renderCal();
-  setTimeout(function(){success.classList.remove('show');closeOverlay('new-appt-overlay');},2500);
 }
 
 function populateRecurringMonth(yr,mo){

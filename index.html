@@ -970,6 +970,12 @@ textarea{font-family:inherit;}
           <input type="number" id="na-commercial-hrs" placeholder="e.g. 4" min="1" step="0.5" oninput="calcPrice()">
         </div>
       </div>
+      <div style="margin-top:8px;padding:0 0 6px;display:flex;align-items:center;gap:10px;">
+        <label style="font-size:13px;color:#666;font-weight:normal;display:flex;align-items:center;gap:6px;cursor:pointer;">
+          <input type="checkbox" id="na-hours-override-chk" onchange="calcPrice()"> Override estimated hours
+        </label>
+        <input type="number" id="na-hours-override-val" placeholder="e.g. 4.5" min="0.5" step="0.5" style="width:100px;display:none;" oninput="calcPrice()">
+      </div>
       <div class="price-preview" id="price-preview">
         <div class="price-preview-label">Estimated price</div>
         <div class="price-preview-val" id="price-val">$238.22</div>
@@ -1112,6 +1118,12 @@ textarea{font-family:inherit;}
           <div class="form-row"><label>Total hours</label>
             <input type="number" id="edit-commercial-hrs" placeholder="e.g. 4" min="1" step="0.5" oninput="calcEditPrice()">
           </div>
+        </div>
+        <div style="margin-top:8px;padding:0 0 6px;display:flex;align-items:center;gap:10px;">
+          <label style="font-size:13px;color:#666;font-weight:normal;display:flex;align-items:center;gap:6px;cursor:pointer;">
+            <input type="checkbox" id="edit-hours-override-chk" onchange="calcEditPrice()"> Override estimated hours
+          </label>
+          <input type="number" id="edit-hours-override-val" placeholder="e.g. 4.5" min="0.5" step="0.5" style="width:100px;display:none;" oninput="calcEditPrice()">
         </div>
         <div class="form-two">
           <div class="form-row"><label>Date</label><input type="date" id="edit-date"></div>
@@ -1534,6 +1546,28 @@ async function dbSaveAppointment(data){
   return res;
 }
 
+function _generateRecurringDates(yr,mo,dy,freq){
+  var dates=[];
+  var start=new Date(yr,mo-1,dy);
+  var limits={'Every Day':30,'Weekly':26,'Biweekly':13,'Monthly':12};
+  var max=limits[freq]||12;
+  var d=new Date(start);
+  if(freq==='Every Day'||freq==='Weekly'||freq==='Biweekly'){
+    var step=freq==='Every Day'?1:freq==='Weekly'?7:14;
+    for(var i=0;i<max;i++){dates.push(new Date(d));d.setDate(d.getDate()+step);}
+  } else if(freq==='Monthly'){
+    for(var i=0;i<max;i++){dates.push(new Date(yr,mo-1+i,dy));}
+  }
+  return dates;
+}
+
+async function dbSaveAppointmentsBatch(rows){
+  var res=await db.from('appointments').insert(rows).select();
+  if(res.error)console.error('[dbSaveAppointmentsBatch] error:',res.error);
+  else console.log('[dbSaveAppointmentsBatch] inserted '+rows.length+' rows, freq='+rows[0].frequency);
+  return res;
+}
+
 async function dbUpdateAppointment(dbId,data){
   var res=await db.from('appointments').update({
     client_name:data.clientName, service:data.service,
@@ -1631,6 +1665,28 @@ async function loadAllData(){
         console.log('[loadAllData] appt loaded: '+a.client_name+' key='+key+' duration='+a.duration_hours);
       }
     });
+
+    // Rebuild recurringAppts from Supabase data so future month navigation works
+    // Supabase is sorted ascending so first occurrence per series = earliest
+    var recurSeen={};
+    appts.forEach(function(a){
+      if(!a.recurring||!a.frequency||a.frequency==='One-time')return;
+      var rKey=a.client_name+'|'+a.time+'|'+a.frequency;
+      if(recurSeen[rKey])return; // already added
+      recurSeen[rKey]=true;
+      var d=new Date(a.date+'T12:00:00');
+      recurringAppts.push({
+        name:a.client_name, freq:a.frequency,
+        startYear:d.getFullYear(), startMonth:d.getMonth()+1, startDay:d.getDate(),
+        dayOfWeek:d.getDay(), timeStr:a.time||'8am',
+        cleaner:a.cleaner_name||'Unassigned',
+        status:a.status||'assigned', active:true,
+        service:a.service, duration:a.duration_hours||null,
+        address:a.address||'', beds:a.beds||'', baths:a.baths||'', sqft:a.sqft||''
+      });
+      console.log('[loadAllData] rebuilt recurringAppt: '+a.client_name+' freq='+a.frequency+' start='+a.date);
+    });
+    console.log('[loadAllData] total recurringAppts rebuilt: '+recurringAppts.length);
 
     // Load clients into clientDB
     const clients=await dbLoadClients();
@@ -2318,6 +2374,11 @@ function _openApptInner(a,dateKey){
   // Notes
   var editNotes=document.getElementById('edit-notes');
   if(editNotes) editNotes.value=a.notes||'';
+  // Hours override — pre-fill with stored duration but leave unchecked
+  var editHoursChk=document.getElementById('edit-hours-override-chk');
+  var editHoursVal=document.getElementById('edit-hours-override-val');
+  if(editHoursChk) editHoursChk.checked=false;
+  if(editHoursVal){editHoursVal.value=a.duration||'';editHoursVal.style.display='none';}
   // Price override
   var editOverrideChk=document.getElementById('edit-price-override-chk');
   var editOverrideVal=document.getElementById('edit-price-override-val');
@@ -2360,7 +2421,13 @@ async function saveApptEdit(){
   var editSqft=isCommercial?a.sqft:(document.getElementById('edit-sqft')||{}).value||a.sqft||'';
   var editCond=isCommercial?a.condition:(document.getElementById('edit-cond')||{}).value||a.condition||7;
   var editNotes=(document.getElementById('edit-notes')||{}).value||a.notes||'';
-  var editDuration=_lastEditCalcHrs;
+  // Use hours override value if checked, else use calcEditPrice result
+  var editHoursChk=document.getElementById('edit-hours-override-chk');
+  var editHoursVal=document.getElementById('edit-hours-override-val');
+  var editDuration=(editHoursChk&&editHoursChk.checked&&editHoursVal&&editHoursVal.value)
+    ?parseFloat(editHoursVal.value)||_lastEditCalcHrs
+    :_lastEditCalcHrs;
+  console.log('[saveApptEdit] duration='+editDuration+' (override='+(editHoursChk&&editHoursChk.checked)+')');
   // Resolve price
   var overrideChk=document.getElementById('edit-price-override-chk');
   var overrideValEl=document.getElementById('edit-price-override-val');
@@ -3079,6 +3146,15 @@ function calcPrice(){
     else if(cond<=6)condMod=1.25;
     hrs=Math.round(baseHrs*condMod*10)/10;
   }
+  // Hours override
+  var hoursOverrideChk=document.getElementById('na-hours-override-chk');
+  var hoursOverrideVal=document.getElementById('na-hours-override-val');
+  var hoursOverride=hoursOverrideChk&&hoursOverrideChk.checked;
+  if(hoursOverrideVal) hoursOverrideVal.style.display=hoursOverride?'':'none';
+  if(hoursOverride&&hoursOverrideVal&&hoursOverrideVal.value){
+    hrs=parseFloat(hoursOverrideVal.value)||hrs;
+    console.log('[calcPrice] hours override applied: '+hrs+' hrs');
+  }
   // Price override
   var overrideChk=document.getElementById('na-price-override-chk');
   var overrideValEl=document.getElementById('na-price-override-val');
@@ -3126,6 +3202,15 @@ function calcEditPrice(){
     else if(cond<=4)condMod=1.40;
     else if(cond<=6)condMod=1.25;
     hrs=Math.round(baseHrs*condMod*10)/10;
+  }
+  // Hours override
+  var hoursOverrideChk=document.getElementById('edit-hours-override-chk');
+  var hoursOverrideVal=document.getElementById('edit-hours-override-val');
+  var hoursOverride=hoursOverrideChk&&hoursOverrideChk.checked;
+  if(hoursOverrideVal) hoursOverrideVal.style.display=hoursOverride?'':'none';
+  if(hoursOverride&&hoursOverrideVal&&hoursOverrideVal.value){
+    hrs=parseFloat(hoursOverrideVal.value)||hrs;
+    console.log('[calcEditPrice] hours override applied: '+hrs+' hrs');
   }
   _lastEditCalcHrs=hrs;
   var overrideChk=document.getElementById('edit-price-override-chk');
@@ -3252,9 +3337,53 @@ async function saveNewAppt(){
     var key=yr+'-'+mo+'-'+dy;
     if(!apptData[key])apptData[key]=[];
     apptData[key].push(apptObj);
+    // Save single row to Supabase
+    var sbRes=await dbSaveAppointment({
+      clientName:name, service:naServiceText,
+      freq:freq, date:dateVal, time:timeStr,
+      address:apptAddress,
+      beds:apptBeds, baths:apptBaths, sqft:apptSqft, condition:apptCond,
+      cleanerName:cleanerName, basePrice:apptBase, tax:apptTax, totalPrice:total,
+      cleanerPay:apptCleanerPay, notes:apptNotes, recurring:false, duration:apptDuration
+    });
+    console.log('[saveNewAppt] one-time Supabase response:', sbRes);
+    if(!sbRes.error&&sbRes.data&&sbRes.data[0]){
+      apptObj.dbId=sbRes.data[0].id;
+      console.log('[saveNewAppt] appointment dbId stored:', apptObj.dbId);
+    }
   } else {
-    recurringAppts.push({name:name,freq:freq,startYear:yr,startMonth:mo,startDay:dy,dayOfWeek:new Date(yr,mo-1,dy).getDay(),timeStr:timeStr,cleaner:cleanerName,status:apptStatus,active:true});
+    // Recurring: push rule to memory and batch-save all occurrences to Supabase
+    recurringAppts.push({
+      name:name, freq:freq,
+      startYear:yr, startMonth:mo, startDay:dy,
+      dayOfWeek:new Date(yr,mo-1,dy).getDay(),
+      timeStr:timeStr, cleaner:cleanerName, status:apptStatus, active:true,
+      service:naServiceText, duration:apptDuration,
+      address:apptAddress, beds:apptBeds, baths:apptBaths, sqft:apptSqft
+    });
     populateRecurringMonth(curYear,curMonth);
+    var occDates=_generateRecurringDates(yr,mo,dy,freq);
+    console.log('[saveNewAppt] generating '+occDates.length+' recurring occurrences for freq='+freq);
+    var batchRows=occDates.map(function(od){
+      var odStr=od.getFullYear()+'-'+String(od.getMonth()+1).padStart(2,'0')+'-'+String(od.getDate()).padStart(2,'0');
+      return {
+        client_name:name, service:naServiceText, frequency:freq,
+        date:odStr, time:timeStr, address:apptAddress||null,
+        beds:parseInt(apptBeds)||null, baths:parseFloat(apptBaths)||null,
+        sqft:parseInt(apptSqft)||null, condition:parseInt(apptCond)||7,
+        cleaner_name:cleanerName,
+        status:cleanerName!=='Unassigned'?'assigned':'unassigned',
+        base_price:apptBase, tax:apptTax, total_price:total,
+        cleaner_pay:apptCleanerPay,
+        notes:apptNotes||null, recurring:true,
+        duration_hours:apptDuration||null
+      };
+    });
+    var batchRes=await dbSaveAppointmentsBatch(batchRows);
+    console.log('[saveNewAppt] batch Supabase response error:', batchRes.error);
+    if(!batchRes.error&&batchRes.data&&batchRes.data[0]){
+      apptObj.dbId=batchRes.data[0].id;
+    }
   }
   // Save as property if checkbox is checked
   var savePropChk=document.getElementById('na-save-property');
@@ -3265,31 +3394,27 @@ async function saveNewAppt(){
       if(!Array.isArray(pdata.properties))pdata.properties=[];
       var alreadySaved=pdata.properties.some(function(p){return p.address===apptAddress;});
       if(!alreadySaved){
-        var newProp={address:apptAddress,beds:apptBeds,baths:apptBaths,sqft:'',price:apptBase.toFixed(2),notes:''};
+        var newProp={address:apptAddress,beds:apptBeds,baths:apptBaths,sqft:apptSqft||'',price:apptBase.toFixed(2),notes:''};
         pdata.properties.push(newProp);
         if(propFound.id&&propFound.id.length>20){
           await db.from('clients').update({properties:pdata.properties}).eq('id',propFound.id);
         }
         console.log('[saveNewAppt] saved property for client:', newProp);
+      } else {
+        // Update existing property price/sqft if address matches
+        var existingProp=pdata.properties.find(function(p){return p.address===apptAddress;});
+        if(existingProp){
+          existingProp.beds=apptBeds||existingProp.beds;
+          existingProp.baths=apptBaths||existingProp.baths;
+          existingProp.sqft=apptSqft||existingProp.sqft;
+          existingProp.price=apptBase.toFixed(2);
+          if(propFound.id&&propFound.id.length>20){
+            await db.from('clients').update({properties:pdata.properties}).eq('id',propFound.id);
+          }
+          console.log('[saveNewAppt] updated existing property price for:', apptAddress);
+        }
       }
     }
-  }
-  // Save to Supabase
-  var sbRes=await dbSaveAppointment({
-    clientName:name, service:naServiceText,
-    freq:freq, date:dateVal, time:timeStr,
-    address:apptAddress,
-    beds:apptBeds, baths:apptBaths, sqft:apptSqft, condition:apptCond,
-    cleanerName:cleanerName, basePrice:apptBase, tax:apptTax, totalPrice:total,
-    cleanerPay:apptCleanerPay,
-    notes:apptNotes, recurring:freq!=='One-time',
-    duration:apptDuration
-  });
-  console.log('[saveNewAppt] Supabase response:', sbRes);
-  // Store the real dbId back into apptObj so cancelAppointment() can use it
-  if(!sbRes.error && sbRes.data && sbRes.data[0]){
-    apptObj.dbId = sbRes.data[0].id;
-    console.log('[saveNewAppt] appointment dbId stored:', apptObj.dbId);
   }
   var success=document.getElementById('na-success');
   success.textContent='Booked! '+name+' added as '+(freq==='One-time'?'a one-time appointment':'a '+freq.toLowerCase()+' recurring appointment')+'. Will auto-populate future months.';
@@ -3302,7 +3427,6 @@ function populateRecurringMonth(yr,mo){
   recurringAppts.forEach(function(r){
     if(!r.active)return;
     var start=new Date(r.startYear,r.startMonth-1,r.startDay);
-    var monthStart=new Date(yr,mo-1,1);
     var monthEnd=new Date(yr,mo,0);
     if(monthEnd<start)return;
     var dates=[];
@@ -3316,12 +3440,24 @@ function populateRecurringMonth(yr,mo){
     } else if(r.freq==='Monthly'){
       var d=new Date(yr,mo-1,r.startDay);
       if(d>=start&&d.getMonth()+1===mo)dates.push(d);
+    } else if(r.freq==='Every Day'){
+      var d=new Date(Math.max(start.getTime(),new Date(yr,mo-1,1).getTime()));
+      var monthEnd2=new Date(yr,mo,0);
+      while(d<=monthEnd2){
+        dates.push(new Date(d));
+        d.setDate(d.getDate()+1);
+      }
     }
     dates.forEach(function(d){
       var key=d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate();
       if(!apptData[key])apptData[key]=[];
       var exists=apptData[key].some(function(a){return a.n===r.name&&a.t===r.timeStr;});
-      if(!exists)apptData[key].push({n:r.name,s:r.status,t:r.timeStr,cleaner:r.cleaner,recurring:true});
+      if(!exists)apptData[key].push({
+        n:r.name, s:r.status, t:r.timeStr, cleaner:r.cleaner, recurring:true,
+        service:r.service||'Regular Cleaning', freq:r.freq,
+        duration:r.duration||null,
+        address:r.address||'', beds:r.beds||'', baths:r.baths||'', sqft:r.sqft||''
+      });
     });
   });
 }
@@ -5914,8 +6050,11 @@ function applyPropertyToBooking(){
 
   var bedsEl = document.getElementById('na-beds');
   var bathsEl = document.getElementById('na-baths');
-  if(bedsEl) bedsEl.value = String(prop.beds);
-  if(bathsEl) bathsEl.value = String(prop.baths);
+  var sqftEl = document.getElementById('na-sqft');
+  if(bedsEl&&prop.beds) bedsEl.value = String(prop.beds);
+  if(bathsEl&&prop.baths) bathsEl.value = String(prop.baths);
+  if(sqftEl) sqftEl.value = prop.sqft||'';
+  console.log('[applyPropertyToBooking] filled beds='+prop.beds+' baths='+prop.baths+' sqft='+prop.sqft+' addr='+prop.address);
   calcPrice();
 }
 
@@ -6005,9 +6144,12 @@ function applyEditProperty(){
   // Fill beds/baths from property
   var editBeds=document.getElementById('edit-beds');
   var editBaths=document.getElementById('edit-baths');
+  var editSqftEl=document.getElementById('edit-sqft');
   if(editBeds&&prop.beds) editBeds.value=String(prop.beds);
   if(editBaths&&prop.baths) editBaths.value=String(prop.baths);
+  if(editSqftEl) editSqftEl.value=prop.sqft||'';
   if(currentAppt) currentAppt.address = prop.address;
+  console.log('[applyEditProperty] filled beds='+prop.beds+' baths='+prop.baths+' sqft='+prop.sqft);
   calcEditPrice();
 }
 

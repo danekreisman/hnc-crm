@@ -3203,15 +3203,10 @@ function sendChatMsg(){
   }
 }
 
-/* PROPERTY PRICING CALC */
+/* PROPERTY PRICING CALC — price is derived at booking time, not stored on property */
 var propPriceOverride = false;
 function calcPropPrice(){
-  if(propPriceOverride) return;
-  var beds = parseFloat(document.getElementById('prop-beds').value) || 3;
-  var baths = parseFloat(document.getElementById('prop-baths').value) || 2;
-  var baseHrs = 1.0 + (beds * 0.5) + (baths * 0.4);
-  var price = Math.round(baseHrs * 65 * 100) / 100;
-  document.getElementById('prop-price').value = price.toFixed(2);
+  // no-op: price is calculated dynamically from beds/baths/condition at booking time
 }
 
 /* PRICING CALC */
@@ -4794,12 +4789,8 @@ function openApptEditProperty(){
     document.getElementById('prop-baths').value=p.baths||'2';
     document.getElementById('prop-sqft').value=p.sqft||'';
     document.getElementById('prop-notes').value=p.notes||'';
-    document.getElementById('prop-service').value=p.service||'Standard';
-    document.getElementById('prop-frequency').value=p.frequency||'Biweekly';
-    propPriceOverride=true;
-    var overrideChk=document.getElementById('prop-price-override');
-    if(overrideChk) overrideChk.checked=true;
-    document.getElementById('prop-price').value=p.price||'';
+    var condEl=document.getElementById('prop-cond');
+    if(condEl) condEl.value=p.condition||'7';
     console.log('[openApptEditProperty] editing prop['+propIdx+'] addr='+p.address);
   } else {
     // Add new property seeded with current appt data
@@ -4812,15 +4803,10 @@ function openApptEditProperty(){
     document.getElementById('prop-baths').value=currentAppt.baths||'2';
     document.getElementById('prop-sqft').value=currentAppt.sqft||'';
     document.getElementById('prop-notes').value='';
-    document.getElementById('prop-service').value=currentAppt.service||'Standard';
-    document.getElementById('prop-frequency').value=currentAppt.frequency||'Biweekly';
-    propPriceOverride=false;
-    var overrideChk2=document.getElementById('prop-price-override');
-    if(overrideChk2) overrideChk2.checked=false;
-    document.getElementById('prop-price').value='';
+    var condEl2=document.getElementById('prop-cond');
+    if(condEl2) condEl2.value=currentAppt.condition||'7';
     console.log('[openApptEditProperty] no matching property — opening add mode for addr='+apptAddr);
   }
-  calcPropPrice();
   document.getElementById('add-property-overlay').classList.remove('hidden');
 }
 
@@ -6323,12 +6309,8 @@ function openAddProperty(context){
   document.getElementById('prop-baths').value = '2';
   document.getElementById('prop-sqft').value = '';
   document.getElementById('prop-notes').value = '';
-  document.getElementById('prop-service').value = 'Standard';
-  document.getElementById('prop-frequency').value = 'Biweekly';
-  propPriceOverride = false;
-  var overrideChk = document.getElementById('prop-price-override');
-  if(overrideChk) overrideChk.checked = false;
-  calcPropPrice();
+  var condEl = document.getElementById('prop-cond');
+  if(condEl) condEl.value = '7';
   document.getElementById('add-property-overlay').classList.remove('hidden');
 }
 
@@ -6349,12 +6331,8 @@ function editProperty(idx){
   document.getElementById('prop-baths').value = p.baths || '2';
   document.getElementById('prop-sqft').value = p.sqft || '';
   document.getElementById('prop-notes').value = p.notes || '';
-  document.getElementById('prop-service').value = p.service || 'Standard';
-  document.getElementById('prop-frequency').value = p.frequency || 'Biweekly';
-  propPriceOverride = true;
-  var overrideChk = document.getElementById('prop-price-override');
-  if(overrideChk) overrideChk.checked = true;
-  document.getElementById('prop-price').value = p.price || '';
+  var condEl = document.getElementById('prop-cond');
+  if(condEl) condEl.value = p.condition || '7';
   document.getElementById('add-property-overlay').classList.remove('hidden');
 }
 
@@ -6372,9 +6350,7 @@ async function saveProperty(){
     beds:  document.getElementById('prop-beds').value  || '—',
     baths: document.getElementById('prop-baths').value || '—',
     sqft:  document.getElementById('prop-sqft').value  || '',
-    price: document.getElementById('prop-price').value || '0',
-    service: document.getElementById('prop-service').value || 'Standard',
-    frequency: document.getElementById('prop-frequency').value || 'Biweekly',
+    condition: document.getElementById('prop-cond') ? document.getElementById('prop-cond').value : '7',
     notes: document.getElementById('prop-notes').value || ''
   };
   var isEditMode = (_editPropIdx >= 0);
@@ -6497,6 +6473,26 @@ function _findClientByName(name){
   return result;
 }
 
+function _clearNewApptPropertyFields(){
+  document.getElementById('na-address').value = '';
+  document.getElementById('na-beds').value = '3';
+  document.getElementById('na-baths').value = '2';
+  document.getElementById('na-sqft').value = '';
+  document.getElementById('na-cond').value = '7';
+  document.getElementById('na-notes').value = '';
+  var propSel = document.getElementById('na-property-select');
+  if(propSel){
+    propSel.innerHTML = '<option value="new">+ Create New Property</option>';
+    propSel.value = 'new';
+  }
+  document.getElementById('na-address-row').style.display = '';
+  var resFields = document.getElementById('na-residential-fields');
+  if(resFields) resFields.style.display = '';
+  var savePropRow = document.getElementById('na-save-prop-row');
+  if(savePropRow) savePropRow.style.display = '';
+  calcPrice();
+}
+
 function initNewApptClientAutocomplete(){
   var input = document.getElementById('na-name');
   var dropdown = document.getElementById('na-name-dropdown');
@@ -6505,7 +6501,13 @@ function initNewApptClientAutocomplete(){
   input.addEventListener('input', function(){
     var q = this.value.trim().toLowerCase();
     dropdown.innerHTML = '';
-    if(!q){ dropdown.style.display='none'; populatePropertySelector(''); return; }
+    if(!q){ dropdown.style.display='none'; _clearNewApptPropertyFields(); return; }
+
+    // Check for exact match — if no exact match, clear property fields
+    var exactMatch = Object.entries(clientDB).find(function(e){
+      return e[1].name.toLowerCase() === q;
+    });
+    if(!exactMatch){ _clearNewApptPropertyFields(); }
 
     var matches = Object.entries(clientDB).filter(function(e){
       return e[1].name.toLowerCase().indexOf(q) >= 0;
@@ -6679,14 +6681,8 @@ function openNewApptEditProperty(){
     ['prop-address','prop-sqft','prop-notes'].forEach(function(id){ var el=document.getElementById(id); if(el) el.value=''; });
     document.getElementById('prop-beds').value = '3';
     document.getElementById('prop-baths').value = '2';
-    var svcEl = document.getElementById('prop-service');
-    var freqEl = document.getElementById('prop-frequency');
-    if(svcEl) svcEl.value = 'Standard';
-    if(freqEl) freqEl.value = 'Biweekly';
-    propPriceOverride = false;
-    var overrideChk = document.getElementById('prop-price-override');
-    if(overrideChk) overrideChk.checked = false;
-    calcPropPrice();
+    var condElNA = document.getElementById('prop-cond');
+    if(condElNA) condElNA.value = '7';
     document.getElementById('add-property-overlay').classList.remove('hidden');
     return;
   }
@@ -6706,19 +6702,8 @@ function openNewApptEditProperty(){
   document.getElementById('prop-baths').value = prop.baths || '2';
   document.getElementById('prop-sqft').value = prop.sqft || '';
   document.getElementById('prop-notes').value = prop.notes || '';
-  var svcEl = document.getElementById('prop-service');
-  var freqEl = document.getElementById('prop-frequency');
-  if(svcEl) svcEl.value = prop.service || 'Standard';
-  if(freqEl) freqEl.value = prop.frequency || 'Biweekly';
-  propPriceOverride = !!(prop.price && parseFloat(prop.price) > 0);
-  var overrideChk = document.getElementById('prop-price-override');
-  if(overrideChk){
-    overrideChk.checked = propPriceOverride;
-    var priceInput = document.getElementById('prop-price-val');
-    if(priceInput) priceInput.style.display = propPriceOverride ? '' : 'none';
-    if(priceInput && propPriceOverride) priceInput.value = prop.price;
-  }
-  calcPropPrice();
+  var condElEdit = document.getElementById('prop-cond');
+  if(condElEdit) condElEdit.value = prop.condition || '7';
   document.getElementById('add-property-overlay').classList.remove('hidden');
 }
 
@@ -6786,12 +6771,8 @@ function applyEditProperty(){
     ['prop-address','prop-sqft','prop-notes'].forEach(function(id){ document.getElementById(id).value=''; });
     document.getElementById('prop-beds').value = '3';
     document.getElementById('prop-baths').value = '2';
-    document.getElementById('prop-service').value = 'Standard';
-    document.getElementById('prop-frequency').value = 'Biweekly';
-    propPriceOverride = false;
-    var overrideChk = document.getElementById('prop-price-override');
-    if(overrideChk) overrideChk.checked = false;
-    calcPropPrice();
+    var condElAE = document.getElementById('prop-cond');
+    if(condElAE) condElAE.value = '7';
     document.getElementById('add-property-overlay').classList.remove('hidden');
     return;
   }
@@ -6814,8 +6795,6 @@ function applyEditProperty(){
     if(prop.beds) parts.push(prop.beds+' bed');
     if(prop.baths) parts.push(prop.baths+' bath');
     if(prop.sqft) parts.push(prop.sqft);
-    if(prop.service) parts.push(prop.service);
-    if(prop.frequency) parts.push(prop.frequency);
     detailDiv.textContent = parts.join(' · ');
   }
   var notesDiv=document.getElementById('edit-prop-notes');
@@ -7126,24 +7105,21 @@ Your total will update automatically when you select a payment method.</textarea
     <div class="panel-body">
       <div style="font-size:12px;color:#666;margin-bottom:12px;" id="prop-client-name"></div>
       <div class="form-row"><label>Property address</label><input type="text" id="prop-address" placeholder="123 Kalani St, Kailua, HI"></div>
-      <div class="form-three">
-        <div class="form-row"><label>Bedrooms</label><input type="number" id="prop-beds" value="3" min="0" oninput="calcPropPrice()"></div>
-        <div class="form-row"><label>Bathrooms</label><input type="number" id="prop-baths" value="2" min="0" step="0.5" oninput="calcPropPrice()"></div>
-        <div class="form-row"><label>Sq footage</label><input type="text" id="prop-sqft" placeholder="1,400 sq ft"></div>
-      </div>
-      <div class="form-row">
-        <label>Price per clean ($)</label>
-        <input type="number" id="prop-price" placeholder="238.00" step="0.01">
-        <div style="margin-top:5px;font-size:11px;color:#999;display:flex;align-items:center;gap:6px;">
-          <label style="display:flex;align-items:center;gap:5px;cursor:pointer;">
-            <input type="checkbox" id="prop-price-override" onchange="propPriceOverride=this.checked;if(!this.checked)calcPropPrice();">
-            Override auto-calculated price
-          </label>
-        </div>
+      <div class="form-two">
+        <div class="form-row"><label>Bedrooms</label><input type="number" id="prop-beds" value="3" min="0"></div>
+        <div class="form-row"><label>Bathrooms</label><input type="number" id="prop-baths" value="2" min="0" step="0.5"></div>
       </div>
       <div class="form-two">
-        <div class="form-row"><label>Service type</label><select id="prop-service"><option value="Standard">Standard</option><option value="Deep Clean">Deep Clean</option><option value="Move In/Out">Move In/Out</option><option value="Post-Construction">Post-Construction</option></select></div>
-        <div class="form-row"><label>Frequency</label><select id="prop-frequency"><option value="Weekly">Weekly</option><option value="Biweekly">Biweekly</option><option value="Monthly">Monthly</option><option value="One-time">One-time</option></select></div>
+        <div class="form-row"><label>Sq footage</label><input type="text" id="prop-sqft" placeholder="1,400 sq ft"></div>
+        <div class="form-row"><label>Condition</label>
+          <select id="prop-cond">
+            <option value="9">Excellent</option>
+            <option value="7" selected>Good</option>
+            <option value="5">Average</option>
+            <option value="3">Below avg</option>
+            <option value="1">Poor</option>
+          </select>
+        </div>
       </div>
       <div class="form-row"><label>Notes</label><textarea id="prop-notes" style="min-height:50px;" placeholder="Access code, special instructions, parking..."></textarea></div>
       <div class="save-bar">

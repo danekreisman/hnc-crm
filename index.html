@@ -956,7 +956,7 @@ textarea{font-family:inherit;}
           </select>
         </div>
         <div class="form-row"><label>Frequency</label>
-          <select id="na-freq">
+          <select id="na-freq" onchange="calcPrice()">
             <option>Every Day</option>
             <option>Weekly</option>
             <option selected>Biweekly</option>
@@ -2651,35 +2651,54 @@ async function cancelAllRecurring(){
     console.error('[cancelAllRecurring] no currentAppt');
     return;
   }
-  var clientName=currentAppt.n;
-  if(!confirm('Cancel ALL recurring appointments for '+clientName+'? This cannot be undone.')) return;
+  var targetName=currentAppt.n;
+  var targetTime=currentAppt.t||'';
+  var targetAddress=currentAppt.address||'';
+  var targetSeriesId=currentAppt.seriesId||null;
+  if(!confirm('Cancel ALL recurring appointments in this series for '+targetName+'? This cannot be undone.')) return;
 
-  // Remove all recurring entries for this client from apptData
+  // Remove matching series entries from apptData
   var removed=0;
   Object.keys(apptData).forEach(function(k){
     var before=apptData[k].length;
-    apptData[k]=apptData[k].filter(function(e){ return !(e.n===clientName&&e.recurring); });
+    if(targetSeriesId){
+      apptData[k]=apptData[k].filter(function(e){ return e.seriesId!==targetSeriesId; });
+    } else {
+      apptData[k]=apptData[k].filter(function(e){
+        return !(e.n===targetName&&e.t===targetTime&&e.address===targetAddress&&e.recurring);
+      });
+    }
     removed+=before-apptData[k].length;
   });
-  // Also remove from recurringAppts
-  recurringAppts=recurringAppts.filter(function(r){return r.name!==clientName;});
-  console.log('[cancelAllRecurring] removed '+removed+' recurring entries from apptData for:', clientName);
+  // Remove from recurringAppts
+  if(targetSeriesId){
+    recurringAppts=recurringAppts.filter(function(r){ return r.seriesId!==targetSeriesId; });
+  } else {
+    recurringAppts=recurringAppts.filter(function(r){
+      return !(r.name===targetName&&r.timeStr===targetTime&&r.address===targetAddress);
+    });
+  }
+  console.log('[cancelAllRecurring] removed '+removed+' entries, seriesId='+targetSeriesId+' name='+targetName+' time='+targetTime+' addr='+targetAddress);
 
-  // Persist to Supabase: mark all recurring rows for this client as cancelled
-  var dbRes=await db.from('appointments').update({status:'cancelled'})
-    .eq('client_name',clientName)
-    .eq('recurring',true);
+  // Persist to Supabase
+  var sbQuery=db.from('appointments').update({status:'cancelled'}).eq('recurring',true);
+  if(targetSeriesId){
+    sbQuery=sbQuery.eq('series_id',targetSeriesId);
+  } else {
+    sbQuery=sbQuery.eq('client_name',targetName).eq('time',targetTime);
+    if(targetAddress) sbQuery=sbQuery.eq('address',targetAddress);
+  }
+  var dbRes=await sbQuery;
   console.log('[cancelAllRecurring] Supabase update response:', dbRes);
 
   if(dbRes&&dbRes.error){
     console.error('[cancelAllRecurring] Supabase ERROR:', dbRes.error);
   } else {
-    console.log('[cancelAllRecurring] SUCCESS — all recurring appointments for '+clientName+' cancelled in Supabase');
+    console.log('[cancelAllRecurring] SUCCESS — series cancelled in Supabase');
   }
 
-  // Show success, re-render, close
   var bar=document.getElementById('appt-action-success');
-  if(bar){bar.textContent='All recurring appointments for '+clientName+' cancelled.';bar.classList.add('show');}
+  if(bar){bar.textContent='Recurring series for '+targetName+' cancelled.';bar.classList.add('show');}
   renderCal();
   setTimeout(function(){
     if(bar)bar.classList.remove('show');
@@ -3431,6 +3450,8 @@ function calcPrice(){
 
 function showClientPricingRules(clientData){
   var el=document.getElementById('na-pricing-rules-display');
+  console.log('[pricingRules] el:', el);
+  console.log('[pricingRules] clientData:', clientData);
   if(!el) return;
   var rules=[];
   if(clientData&&clientData.flatRate&&parseFloat(clientData.flatRate)>0){
@@ -3448,6 +3469,7 @@ function showClientPricingRules(clientData){
   var freqVal=freqEl?freqEl.value:'';
   var freqDisc=freqVal==='Weekly'?'20%':freqVal==='Biweekly'?'15%':freqVal==='Monthly'?'10%':'';
   if(freqDisc) rules.push('Frequency discount: '+freqDisc+' off ('+freqVal+')');
+  console.log('[pricingRules] rules:', rules);
   if(rules.length>0){
     el.innerHTML='<strong>Active pricing rules:</strong> '+rules.join(' · ');
     el.style.display='';

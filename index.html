@@ -974,6 +974,7 @@ textarea{font-family:inherit;}
         <div class="price-preview-label">Estimated price</div>
         <div class="price-preview-val" id="price-val">$238.22</div>
         <div class="price-preview-breakdown" id="price-breakdown">3.5 hrs × $65 = $227.50 + tax $10.72</div>
+        <div id="na-pricing-rules-display" style="display:none;background:#e6fffa;border:1px solid #9ae6b4;border-radius:8px;padding:8px 11px;margin-top:8px;font-size:11px;color:#276749;"></div>
         <div id="na-cleaner-pay-line" style="font-size:11px;color:#666;margin-top:2px;display:none;">Cleaner pay: <span id="na-cleaner-pay-val">—</span></div>
         <div style="margin-top:10px;display:flex;align-items:center;gap:10px;">
           <label style="font-size:13px;color:#666;font-weight:normal;display:flex;align-items:center;gap:6px;cursor:pointer;">
@@ -1197,16 +1198,9 @@ textarea{font-family:inherit;}
         <div class="form-row"><label>Full name</label><input type="text" id="ced-name"></div>
         <div class="form-row"><label>Phone</label><input type="tel" id="ced-phone"></div>
         <div class="form-row"><label>Email</label><input type="email" id="ced-email"></div>
-        <div class="form-row"><label>Address</label><input type="text" id="ced-address"></div>
         <div class="form-two">
           <div class="form-row"><label>Payment type</label><select id="ced-paytype"><option>Stripe card</option><option>ACH</option><option>Cash</option><option>Check</option></select></div>
           <div class="form-row"><label>Last 4 digits</label><input type="text" id="ced-last4" maxlength="4" placeholder="1234"></div>
-        </div>
-        <div class="form-row"><label>Service type</label><select id="ced-service"><option>Standard clean</option><option>Deep clean</option><option>Move-out clean</option><option>Commercial weekly</option><option>Commercial daily</option></select></div>
-        <div class="form-row"><label>Frequency</label><select id="ced-freq"><option>Weekly</option><option>Biweekly</option><option>Monthly</option><option>3x/week</option><option>Daily</option><option>One-time</option></select></div>
-        <div class="form-two">
-          <div class="form-row"><label>Bedrooms</label><input type="number" id="ced-beds"></div>
-          <div class="form-row"><label>Bathrooms</label><input type="number" id="ced-baths"></div>
         </div>
         <div class="form-row"><label>Preferred cleaner</label><select id="ced-cleaner"><option>No preference</option><option>Kaimana M.</option><option>Alohi L.</option><option>Maile K.</option><option>Keanu N.</option><option>Leilani H.</option></select></div>
         <div class="form-row"><label>Notes</label><textarea id="ced-notes" style="min-height:70px;"></textarea></div>
@@ -2758,7 +2752,6 @@ function showClientEdit(){
     document.getElementById('ced-name').value=c.name||'';
     document.getElementById('ced-phone').value=c.phone||'';
     document.getElementById('ced-email').value=c.email||'';
-    document.getElementById('ced-address').value=c.address||'';
     document.getElementById('ced-notes').value=c.notes||'';
     document.getElementById('ced-flat-rate').value=c.flatRate||'';
     document.getElementById('ced-perm-discount').value=c.permDiscount||'';
@@ -2792,13 +2785,8 @@ function saveClientEdit(){
   var name=document.getElementById('ced-name').value;
   var phone=document.getElementById('ced-phone').value;
   var email=document.getElementById('ced-email').value;
-  var address=document.getElementById('ced-address').value;
   var paytype=document.getElementById('ced-paytype').value;
   var last4=document.getElementById('ced-last4').value;
-  var service=document.getElementById('ced-service').value;
-  var freq=document.getElementById('ced-freq').value;
-  var beds=document.getElementById('ced-beds').value;
-  var baths=document.getElementById('ced-baths').value;
   var cleaner=document.getElementById('ced-cleaner').value;
   var notes=document.getElementById('ced-notes').value;
 
@@ -2808,11 +2796,7 @@ function saveClientEdit(){
     c.name=name||c.name;
     c.phone=phone||c.phone;
     c.email=email||c.email;
-    c.address=address||c.address;
     c.payment=paytype+(last4?' · ****'+last4:'');
-    c.service=service||c.service;
-    c.freq=freq||c.freq;
-    c.bedbath=(beds||'?')+' bed / '+(baths||'?')+' bath';
     c.cleaner=cleaner||c.cleaner;
     c.notes=notes||c.notes;
     c.flatRate=document.getElementById('ced-flat-rate').value||'';
@@ -2825,13 +2809,8 @@ function saveClientEdit(){
       name:name||undefined,
       phone:phone||undefined,
       email:email||undefined,
-      address:address||undefined,
       payment_type:paytype||undefined,
       payment_last4:last4||undefined,
-      service:service||undefined,
-      frequency:freq||undefined,
-      beds:parseInt(beds)||undefined,
-      baths:parseFloat(baths)||undefined,
       preferred_cleaner:cleaner||undefined,
       notes:notes||undefined,
       flat_rate:parseFloat(document.getElementById('ced-flat-rate').value)||null,
@@ -3443,6 +3422,37 @@ function calcPrice(){
       if(cpOverride!=null){cpVal.textContent='$'+cpOverride.toFixed(2)+' (override)';}
       else{cpVal.textContent='$'+cp.toFixed(2)+' ('+hrs+'h × $'+cpRate+'/hr)';}
     } else {cpLine.style.display='none';}
+  }
+  // Show active pricing rules
+  var _cpEntry=_findClientByName((document.getElementById('na-name')||{}).value||'');
+  var _cpData=_cpEntry?clientDB[_cpEntry.id]:null;
+  showClientPricingRules(_cpData);
+}
+
+function showClientPricingRules(clientData){
+  var el=document.getElementById('na-pricing-rules-display');
+  if(!el) return;
+  var rules=[];
+  if(clientData&&clientData.flatRate&&parseFloat(clientData.flatRate)>0){
+    rules.push('Flat rate: $'+parseFloat(clientData.flatRate).toFixed(2)+' per clean');
+  }
+  if(clientData&&clientData.permDiscount&&parseFloat(clientData.permDiscount)>0){
+    rules.push('Permanent discount: '+clientData.permDiscount+'% off');
+  }
+  var propSel=document.getElementById('na-property-select');
+  var propIdx=propSel?parseInt(propSel.value):NaN;
+  if(!isNaN(propIdx)&&propIdx>=0&&clientData&&clientData.properties&&clientData.properties[propIdx]&&clientData.properties[propIdx].flatRate&&parseFloat(clientData.properties[propIdx].flatRate)>0){
+    rules.push('Property flat rate: $'+parseFloat(clientData.properties[propIdx].flatRate).toFixed(2));
+  }
+  var freqEl=document.getElementById('na-freq');
+  var freqVal=freqEl?freqEl.value:'';
+  var freqDisc=freqVal==='Weekly'?'20%':freqVal==='Biweekly'?'15%':freqVal==='Monthly'?'10%':'';
+  if(freqDisc) rules.push('Frequency discount: '+freqDisc+' off ('+freqVal+')');
+  if(rules.length>0){
+    el.innerHTML='<strong>Active pricing rules:</strong> '+rules.join(' · ');
+    el.style.display='';
+  } else {
+    el.style.display='none';
   }
 }
 
@@ -6618,6 +6628,7 @@ function initNewApptClientAutocomplete(){
         if(ad) ad.value = c.address !== '—' ? c.address : '';
         dropdown.style.display = 'none';
         populatePropertySelector(c.name);
+        showClientPricingRules(c);
       });
       item.addEventListener('mouseover', function(){ this.style.background='#f5f5f3'; });
       item.addEventListener('mouseout',  function(){ this.style.background=''; });

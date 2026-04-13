@@ -3450,30 +3450,38 @@ function calcPrice(){
 
 function showClientPricingRules(clientData){
   var el=document.getElementById('na-pricing-rules-display');
-  console.log('[pricingRules] el:', el);
-  console.log('[pricingRules] clientData:', clientData);
   if(!el) return;
-  var rules=[];
-  if(clientData&&clientData.flatRate&&parseFloat(clientData.flatRate)>0){
-    rules.push('Flat rate: $'+parseFloat(clientData.flatRate).toFixed(2)+' per clean');
-  }
-  if(clientData&&clientData.permDiscount&&parseFloat(clientData.permDiscount)>0){
-    rules.push('Permanent discount: '+clientData.permDiscount+'% off');
-  }
-  var propSel=document.getElementById('na-property-select');
-  var propIdx=propSel?parseInt(propSel.value):NaN;
-  if(!isNaN(propIdx)&&propIdx>=0&&clientData&&clientData.properties&&clientData.properties[propIdx]&&clientData.properties[propIdx].flatRate&&parseFloat(clientData.properties[propIdx].flatRate)>0){
-    rules.push('Property flat rate: $'+parseFloat(clientData.properties[propIdx].flatRate).toFixed(2));
-  }
+  var lines=[];
+
   var freqEl=document.getElementById('na-freq');
   var freqVal=freqEl?freqEl.value:'';
-  var freqDisc=freqVal==='Weekly'?'20%':freqVal==='Biweekly'?'15%':freqVal==='Monthly'?'10%':'';
-  if(freqDisc) rules.push('Frequency discount: '+freqDisc+' off ('+freqVal+')');
-  console.log('[pricingRules] rules:', rules);
-  if(rules.length>0){
-    el.innerHTML='<strong>Active pricing rules:</strong> '+rules.join(' · ');
-    el.style.display='';
+  var freqPct=freqVal==='Weekly'?20:freqVal==='Biweekly'?15:freqVal==='Monthly'?10:0;
+  if(freqPct>0){
+    lines.push('<span style="background:#d1fae5;color:#065f46;padding:2px 8px;border-radius:10px;font-weight:600;margin-right:4px;">'+freqPct+'% '+freqVal+' discount</span>');
+  }
+
+  if(clientData&&clientData.flatRate&&parseFloat(clientData.flatRate)>0){
+    lines.push('<span style="background:#dbeafe;color:#1e40af;padding:2px 8px;border-radius:10px;font-weight:600;margin-right:4px;">Flat rate: $'+parseFloat(clientData.flatRate).toFixed(2)+'</span>');
+  }
+
+  if(clientData&&clientData.permDiscount&&parseFloat(clientData.permDiscount)>0){
+    lines.push('<span style="background:#fef3c7;color:#92400e;padding:2px 8px;border-radius:10px;font-weight:600;margin-right:4px;">'+clientData.permDiscount+'% permanent discount</span>');
+  }
+
+  var propSel=document.getElementById('na-property-select');
+  var propIdx=propSel?parseInt(propSel.value):NaN;
+  if(!isNaN(propIdx)&&propIdx>=0&&clientData&&clientData.properties&&clientData.properties[propIdx]){
+    var pFlat=clientData.properties[propIdx].flatRate;
+    if(pFlat&&parseFloat(pFlat)>0){
+      lines.push('<span style="background:#ede9fe;color:#5b21b6;padding:2px 8px;border-radius:10px;font-weight:600;margin-right:4px;">Property flat rate: $'+parseFloat(pFlat).toFixed(2)+'</span>');
+    }
+  }
+
+  if(lines.length>0){
+    el.innerHTML='<div style="font-size:10px;font-weight:700;color:#059669;margin-bottom:5px;text-transform:uppercase;letter-spacing:.05em;">Active pricing rules</div><div>'+lines.join('')+'</div>';
+    el.style.display='block';
   } else {
+    el.innerHTML='';
     el.style.display='none';
   }
 }

@@ -1215,6 +1215,18 @@ textarea{font-family:inherit;}
           <button onclick="openAddProperty()" style="font-size:10px;padding:3px 9px;border:1px solid #9ae6b4;border-radius:20px;background:#e6fffa;color:#276749;cursor:pointer;font-family:inherit;">+ Add property</button>
         </div>
         <div id="ced-properties" style="margin-bottom:10px;"></div>
+        <div class="panel-section">Pricing rules</div>
+        <div style="font-size:11px;color:#999;margin-bottom:8px;">Leave blank to use standard pricing calculation.</div>
+        <div class="form-two">
+          <div class="form-row">
+            <label>Flat rate ($/clean)</label>
+            <input type="number" id="ced-flat-rate" placeholder="e.g. 220.00" step="0.01" min="0">
+          </div>
+          <div class="form-row">
+            <label>Permanent discount (%)</label>
+            <input type="number" id="ced-perm-discount" placeholder="e.g. 10" min="0" max="100">
+          </div>
+        </div>
         <div class="save-bar">
           <button class="btn btn-primary" onclick="saveClientEdit()">Save changes</button>
           <button class="btn" onclick="hideClientEdit()">Cancel</button>
@@ -1678,7 +1690,9 @@ async function loadAllData(){
         cleaner:c.preferred_cleaner||'No preference',
         lastjob:'None yet', nextjob:'Not scheduled',
         status:c.status||'New', notes:c.notes||'—', history:[],
-        properties:Array.isArray(c.properties)?c.properties:(c.properties?JSON.parse(JSON.stringify(c.properties)):[])
+        properties:Array.isArray(c.properties)?c.properties:(c.properties?JSON.parse(JSON.stringify(c.properties)):[]),
+        flatRate:c.flat_rate||'',
+        permDiscount:c.perm_discount||''
       };
     });
 
@@ -2746,6 +2760,8 @@ function showClientEdit(){
     document.getElementById('ced-email').value=c.email||'';
     document.getElementById('ced-address').value=c.address||'';
     document.getElementById('ced-notes').value=c.notes||'';
+    document.getElementById('ced-flat-rate').value=c.flatRate||'';
+    document.getElementById('ced-perm-discount').value=c.permDiscount||'';
     // Render properties in edit form
     var cedProps=document.getElementById('ced-properties');
     if(cedProps){
@@ -2799,6 +2815,8 @@ function saveClientEdit(){
     c.bedbath=(beds||'?')+' bed / '+(baths||'?')+' bath';
     c.cleaner=cleaner||c.cleaner;
     c.notes=notes||c.notes;
+    c.flatRate=document.getElementById('ced-flat-rate').value||'';
+    c.permDiscount=document.getElementById('ced-perm-discount').value||'';
   }
 
   // Save to Supabase if it's a real DB record (UUID)
@@ -2815,7 +2833,9 @@ function saveClientEdit(){
       beds:parseInt(beds)||undefined,
       baths:parseFloat(baths)||undefined,
       preferred_cleaner:cleaner||undefined,
-      notes:notes||undefined
+      notes:notes||undefined,
+      flat_rate:parseFloat(document.getElementById('ced-flat-rate').value)||null,
+      perm_discount:parseFloat(document.getElementById('ced-perm-discount').value)||null
     }).eq('id',currentClientId).then(function(res){
       if(res.error)console.error('Update client error:',res.error);
       else console.log('Client updated in Supabase');
@@ -3302,6 +3322,50 @@ function fmtPhone(el){
 }
 
 function calcPrice(){
+  // Check for property/client flat rate overrides first
+  var _propSelForFlat=document.getElementById('na-property-select');
+  var _propIdxForFlat=_propSelForFlat?parseInt(_propSelForFlat.value):NaN;
+  var _clientEntryForFlat=_findClientByName((document.getElementById('na-name')||{}).value||'');
+  var _clientDataForFlat=_clientEntryForFlat?clientDB[_clientEntryForFlat.id]:null;
+  // Property flat rate overrides everything
+  if(!isNaN(_propIdxForFlat)&&_propIdxForFlat>=0&&_clientDataForFlat&&_clientDataForFlat.properties&&_clientDataForFlat.properties[_propIdxForFlat]&&_clientDataForFlat.properties[_propIdxForFlat].flatRate){
+    var _propFlat=parseFloat(_clientDataForFlat.properties[_propIdxForFlat].flatRate);
+    if(_propFlat>0){
+      var _fqEl2=document.getElementById('na-freq');
+      var _fqVal2=_fqEl2?_fqEl2.value:'One-time';
+      var _fqDisc2=_fqVal2==='Weekly'?0.20:_fqVal2==='Biweekly'?0.15:_fqVal2==='Monthly'?0.10:0;
+      var _discAmt2=Math.round(_propFlat*_fqDisc2*100)/100;
+      var _discFlat2=Math.round((_propFlat-_discAmt2)*100)/100;
+      var _tax2=Math.round(_discFlat2*0.04712*100)/100;
+      var _total2=Math.round((_discFlat2+_tax2)*100)/100;
+      _lastCalcHrs=_propFlat/65;
+      document.getElementById('price-val').textContent='$'+_total2.toFixed(2);
+      document.getElementById('price-breakdown').textContent='Property flat rate $'+_propFlat.toFixed(2)+(_fqDisc2>0?' − '+(_fqDisc2*100)+'% discount':'')+' + tax $'+_tax2.toFixed(2);
+      return;
+    }
+  }
+  // Client flat rate overrides standard calculation
+  if(_clientDataForFlat&&_clientDataForFlat.flatRate&&parseFloat(_clientDataForFlat.flatRate)>0){
+    var _clientFlat=parseFloat(_clientDataForFlat.flatRate);
+    var _fqEl3=document.getElementById('na-freq');
+    var _fqVal3=_fqEl3?_fqEl3.value:'One-time';
+    var _fqDisc3=_fqVal3==='Weekly'?0.20:_fqVal3==='Biweekly'?0.15:_fqVal3==='Monthly'?0.10:0;
+    var _discAmt3=Math.round(_clientFlat*_fqDisc3*100)/100;
+    var _discClient=Math.round((_clientFlat-_discAmt3)*100)/100;
+    var _permDisc=_clientDataForFlat.permDiscount?parseFloat(_clientDataForFlat.permDiscount)/100:0;
+    var _afterPerm=Math.round(_discClient*(1-_permDisc)*100)/100;
+    var _tax3=Math.round(_afterPerm*0.04712*100)/100;
+    var _total3=Math.round((_afterPerm+_tax3)*100)/100;
+    _lastCalcHrs=_clientFlat/65;
+    document.getElementById('price-val').textContent='$'+_total3.toFixed(2);
+    var _bp='Client flat rate $'+_clientFlat.toFixed(2);
+    if(_fqDisc3>0) _bp+=' − '+(_fqDisc3*100)+'% freq discount';
+    if(_permDisc>0) _bp+=' − '+(_permDisc*100)+'% client discount';
+    _bp+=' + tax $'+_tax3.toFixed(2);
+    document.getElementById('price-breakdown').textContent=_bp;
+    return;
+  }
+
   var svcType=document.getElementById('na-service').value;
   var isCommercial=(svcType==='commercial');
   // Toggle residential vs commercial fields
@@ -3337,7 +3401,15 @@ function calcPrice(){
   if(overrideValEl) overrideValEl.style.display=isOverride?'':'none';
   _lastCalcHrs=hrs;
   var base=Math.round(hrs*65*100)/100;
-  var tax=Math.round(base*0.04712*100)/100;
+  var freqEl=document.getElementById('na-freq');
+  var freqVal=freqEl?freqEl.value:'One-time';
+  var freqDiscount=0;
+  if(freqVal==='Weekly') freqDiscount=0.20;
+  else if(freqVal==='Biweekly') freqDiscount=0.15;
+  else if(freqVal==='Monthly') freqDiscount=0.10;
+  var discountAmt=Math.round(base*freqDiscount*100)/100;
+  var discountedBase=Math.round((base-discountAmt)*100)/100;
+  var tax=Math.round(discountedBase*0.04712*100)/100;
   var total;
   if(isOverride&&overrideValEl&&overrideValEl.value){
     total=parseFloat(overrideValEl.value)||0;
@@ -3345,10 +3417,11 @@ function calcPrice(){
     document.getElementById('price-breakdown').textContent=hrs+' est hrs — custom price override';
     console.log('[calcPrice] override='+total+' hrs='+hrs+' svc='+svcType);
   } else {
-    total=Math.round((base+tax)*100)/100;
+    total=Math.round((discountedBase+tax)*100)/100;
     document.getElementById('price-val').textContent='$'+total.toFixed(2);
-    document.getElementById('price-breakdown').textContent=hrs+' est hrs x $65 = $'+base.toFixed(2)+' + tax $'+tax.toFixed(2);
-    console.log('[calcPrice] total=$'+total+' hrs='+hrs+' svc='+svcType+(isCommercial?' (commercial)':''));
+    var discountText=freqDiscount>0?' − '+(freqDiscount*100)+'% '+freqVal.toLowerCase()+' discount ($'+discountAmt.toFixed(2)+')':'';
+    document.getElementById('price-breakdown').textContent=hrs+' est hrs × $65 = $'+base.toFixed(2)+discountText+' + tax $'+tax.toFixed(2);
+    console.log('[calcPrice] total=$'+total+' hrs='+hrs+' svc='+svcType+(isCommercial?' (commercial)':'')+(freqDiscount>0?' freq='+freqVal+' disc='+freqDiscount:''));
   }
   // Cleaner pay display — use .value (cleaner name) so getCleanerRate can match cleanerDB
   var cleanerEl=document.getElementById('na-cleaner');
@@ -3406,7 +3479,15 @@ function calcEditPrice(){
   var isOverride=overrideChk&&overrideChk.checked;
   if(overrideValEl) overrideValEl.style.display=isOverride?'':'none';
   var base=Math.round(hrs*65*100)/100;
-  var tax=Math.round(base*0.04712*100)/100;
+  var editFreqEl=document.getElementById('edit-freq');
+  var editFreqVal=editFreqEl?editFreqEl.value:(currentAppt&&currentAppt.freq?currentAppt.freq:'One-time');
+  var editFreqDiscount=0;
+  if(editFreqVal==='Weekly') editFreqDiscount=0.20;
+  else if(editFreqVal==='Biweekly') editFreqDiscount=0.15;
+  else if(editFreqVal==='Monthly') editFreqDiscount=0.10;
+  var editDiscountAmt=Math.round(base*editFreqDiscount*100)/100;
+  var editDiscountedBase=Math.round((base-editDiscountAmt)*100)/100;
+  var tax=Math.round(editDiscountedBase*0.04712*100)/100;
   var total;
   if(isOverride&&overrideValEl&&overrideValEl.value){
     total=parseFloat(overrideValEl.value)||0;
@@ -3414,10 +3495,11 @@ function calcEditPrice(){
     document.getElementById('edit-price-breakdown').textContent=hrs+' est hrs — custom price override';
     console.log('[calcEditPrice] override='+total+' hrs='+hrs+' svc='+svcType);
   } else {
-    total=Math.round((base+tax)*100)/100;
+    total=Math.round((editDiscountedBase+tax)*100)/100;
     document.getElementById('edit-price-val').textContent='$'+total.toFixed(2);
-    document.getElementById('edit-price-breakdown').textContent=hrs+' est hrs × $65 = $'+base.toFixed(2)+' + tax $'+tax.toFixed(2);
-    console.log('[calcEditPrice] total=$'+total+' hrs='+hrs+' svc='+svcType+' beds='+appt.beds+' baths='+appt.baths+' cond='+appt.condition);
+    var editDiscountText=editFreqDiscount>0?' − '+(editFreqDiscount*100)+'% '+editFreqVal.toLowerCase()+' discount ($'+editDiscountAmt.toFixed(2)+')':'';
+    document.getElementById('edit-price-breakdown').textContent=hrs+' est hrs × $65 = $'+base.toFixed(2)+editDiscountText+' + tax $'+tax.toFixed(2);
+    console.log('[calcEditPrice] total=$'+total+' hrs='+hrs+' svc='+svcType+' beds='+appt.beds+' baths='+appt.baths+' cond='+appt.condition+(editFreqDiscount>0?' freq='+editFreqVal:''));
   }
   // Cleaner pay display
   var editCleanerEl=document.getElementById('edit-cleaner');
@@ -6309,6 +6391,7 @@ function openAddProperty(context){
   document.getElementById('prop-baths').value = '2';
   document.getElementById('prop-sqft').value = '';
   document.getElementById('prop-notes').value = '';
+  document.getElementById('prop-flat-rate').value = '';
   var condEl = document.getElementById('prop-cond');
   if(condEl) condEl.value = '7';
   document.getElementById('add-property-overlay').classList.remove('hidden');
@@ -6331,6 +6414,7 @@ function editProperty(idx){
   document.getElementById('prop-baths').value = p.baths || '2';
   document.getElementById('prop-sqft').value = p.sqft || '';
   document.getElementById('prop-notes').value = p.notes || '';
+  document.getElementById('prop-flat-rate').value = p.flatRate || '';
   var condEl = document.getElementById('prop-cond');
   if(condEl) condEl.value = p.condition || '7';
   document.getElementById('add-property-overlay').classList.remove('hidden');
@@ -6351,6 +6435,7 @@ async function saveProperty(){
     baths: document.getElementById('prop-baths').value || '—',
     sqft:  document.getElementById('prop-sqft').value  || '',
     condition: document.getElementById('prop-cond') ? document.getElementById('prop-cond').value : '7',
+    flatRate: document.getElementById('prop-flat-rate').value || '',
     notes: document.getElementById('prop-notes').value || ''
   };
   var isEditMode = (_editPropIdx >= 0);
@@ -7120,6 +7205,10 @@ Your total will update automatically when you select a payment method.</textarea
             <option value="1">Poor</option>
           </select>
         </div>
+      </div>
+      <div class="form-row">
+        <label>Property flat rate ($/clean) — optional</label>
+        <input type="number" id="prop-flat-rate" placeholder="e.g. 220.00 — leave blank for auto-calculation" step="0.01" min="0">
       </div>
       <div class="form-row"><label>Notes</label><textarea id="prop-notes" style="min-height:50px;" placeholder="Access code, special instructions, parking..."></textarea></div>
       <div class="save-bar">

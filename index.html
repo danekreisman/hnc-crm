@@ -776,6 +776,37 @@ textarea{font-family:inherit;}
           </div>
         </div>
 
+        <!-- MESSAGE TEMPLATES -->
+        <div style="background:#fff;border:1px solid #e8e8e5;border-radius:12px;padding:20px;margin-top:18px;">
+          <div class="panel-section" style="margin-top:0;">Invoice Message Templates</div>
+          <div style="font-size:12px;color:#999;margin-bottom:12px;">Customize the messages sent when you invoice clients. Use {client_name}, {amount}, {due_date}, {invoice_link} as placeholders.</div>
+          <div class="form-row">
+            <label>Email subject line</label>
+            <input type="text" id="tmpl-email-subject" value="Invoice from Hawaii Natural Clean" style="font-size:12px;">
+          </div>
+          <div class="form-row">
+            <label>Email body</label>
+            <textarea id="tmpl-email-body" style="min-height:100px;font-size:12px;">Hi {client_name},
+
+Please find your invoice for ${amount} attached. Payment is due {due_date}.
+
+Pay online here: {invoice_link}
+
+Thank you for choosing Hawaii Natural Clean!
+Mahalo 🌺</textarea>
+          </div>
+          <div class="form-row">
+            <label>SMS invoice message</label>
+            <textarea id="tmpl-sms-invoice" style="min-height:80px;font-size:12px;">Hi {client_name}, your invoice for ${amount} from Hawaii Natural Clean is ready. Pay here: {invoice_link}</textarea>
+          </div>
+          <div class="form-row">
+            <label>SMS payment confirmation</label>
+            <textarea id="tmpl-sms-paid" style="min-height:80px;font-size:12px;">Hi {client_name}, we received your payment of ${amount}. Thank you! See you on your next clean. 🌺</textarea>
+          </div>
+          <button class="btn btn-primary" onclick="saveMessageTemplates()" style="margin-top:8px;">Save templates</button>
+          <div class="success-bar" id="msg-tmpl-success">Templates saved!</div>
+        </div>
+
       </div>
 
       <!-- AI AGENT VIEW -->      <!-- SETTINGS VIEW -->
@@ -851,6 +882,37 @@ textarea{font-family:inherit;}
             <div style="font-size:13px;font-weight:600;margin-bottom:16px;color:#666;">Email preview</div>
             <div id="email-preview-content"></div>
           </div>
+        </div>
+
+        <!-- MESSAGE TEMPLATES -->
+        <div style="background:#fff;border:1px solid #e8e8e5;border-radius:12px;padding:20px;margin-top:18px;">
+          <div class="panel-section" style="margin-top:0;">Invoice Message Templates</div>
+          <div style="font-size:12px;color:#999;margin-bottom:12px;">Customize the messages sent when you invoice clients. Use {client_name}, {amount}, {due_date}, {invoice_link} as placeholders.</div>
+          <div class="form-row">
+            <label>Email subject line</label>
+            <input type="text" id="tmpl-email-subject" value="Invoice from Hawaii Natural Clean" style="font-size:12px;">
+          </div>
+          <div class="form-row">
+            <label>Email body</label>
+            <textarea id="tmpl-email-body" style="min-height:100px;font-size:12px;">Hi {client_name},
+
+Please find your invoice for ${amount} attached. Payment is due {due_date}.
+
+Pay online here: {invoice_link}
+
+Thank you for choosing Hawaii Natural Clean!
+Mahalo 🌺</textarea>
+          </div>
+          <div class="form-row">
+            <label>SMS invoice message</label>
+            <textarea id="tmpl-sms-invoice" style="min-height:80px;font-size:12px;">Hi {client_name}, your invoice for ${amount} from Hawaii Natural Clean is ready. Pay here: {invoice_link}</textarea>
+          </div>
+          <div class="form-row">
+            <label>SMS payment confirmation</label>
+            <textarea id="tmpl-sms-paid" style="min-height:80px;font-size:12px;">Hi {client_name}, we received your payment of ${amount}. Thank you! See you on your next clean. 🌺</textarea>
+          </div>
+          <button class="btn btn-primary" onclick="saveMessageTemplates()" style="margin-top:8px;">Save templates</button>
+          <div class="success-bar" id="msg-tmpl-success">Templates saved!</div>
         </div>
 
       </div>
@@ -1740,6 +1802,7 @@ async function loadAllData(){
     console.error('Load error:',err);
   }
   showLoadingState(false);
+  loadMessageTemplates();
   checkQuoStatus();
 }
 
@@ -3967,6 +4030,48 @@ function renderPayroll(){
   console.log('[renderPayroll] cleaners='+Object.keys(totals).length+' totalHrs='+totalHrs.toFixed(1)+' totalGross=$'+totalGross.toFixed(2));
 }
 
+/* MESSAGE TEMPLATES */
+var messageTemplates = {
+  emailSubject: 'Invoice from Hawaii Natural Clean',
+  emailBody: 'Hi {client_name},\n\nPlease find your invoice for ${amount} attached. Payment is due {due_date}.\n\nPay online here: {invoice_link}\n\nThank you for choosing Hawaii Natural Clean!\nMahalo 🌺',
+  smsInvoice: 'Hi {client_name}, your invoice for ${amount} from Hawaii Natural Clean is ready. Pay here: {invoice_link}',
+  smsPaid: 'Hi {client_name}, we received your payment of ${amount}. Thank you! See you on your next clean. 🌺'
+};
+
+function saveMessageTemplates(){
+  messageTemplates.emailSubject = document.getElementById('tmpl-email-subject').value;
+  messageTemplates.emailBody = document.getElementById('tmpl-email-body').value;
+  messageTemplates.smsInvoice = document.getElementById('tmpl-sms-invoice').value;
+  messageTemplates.smsPaid = document.getElementById('tmpl-sms-paid').value;
+  localStorage.setItem('hnc_message_templates', JSON.stringify(messageTemplates));
+  var s = document.getElementById('msg-tmpl-success');
+  s.classList.add('show');
+  setTimeout(function(){ s.classList.remove('show'); }, 2000);
+}
+
+function loadMessageTemplates(){
+  var saved = localStorage.getItem('hnc_message_templates');
+  if(saved){
+    try {
+      messageTemplates = JSON.parse(saved);
+      if(document.getElementById('tmpl-email-subject')){
+        document.getElementById('tmpl-email-subject').value = messageTemplates.emailSubject || '';
+        document.getElementById('tmpl-email-body').value = messageTemplates.emailBody || '';
+        document.getElementById('tmpl-sms-invoice').value = messageTemplates.smsInvoice || '';
+        document.getElementById('tmpl-sms-paid').value = messageTemplates.smsPaid || '';
+      }
+    } catch(e){}
+  }
+}
+
+function applyTemplate(template, vars){
+  return template
+    .replace(/{client_name}/g, vars.clientName || '')
+    .replace(/{amount}/g, vars.amount || '')
+    .replace(/{due_date}/g, vars.dueDate || 'upon receipt')
+    .replace(/{invoice_link}/g, vars.invoiceLink || '');
+}
+
 renderCal();
 loadAllData();
 </script>
@@ -5562,50 +5667,127 @@ async function oneClickInvoice(source){
 
 /* ONE-CLICK CHARGE */
 async function oneClickCharge(source){
-  var clientName = currentClientName;
-  var cdata = currentClientId ? clientDB[currentClientId] : Object.values(clientDB).find(function(c){ return c.name === clientName; });
+  var clientName = source==='appt' ? (currentAppt ? currentAppt.n : currentClientName) : currentClientName;
+  var cdata = null;
+  if(currentClientId && clientDB[currentClientId]) cdata = clientDB[currentClientId];
+  else cdata = Object.values(clientDB).find(function(c){ return c.name === clientName; });
   if(!cdata){ showPaymentToast('Client data not found.', null, 'error'); return; }
-  if(!cdata.stripeCustomerId){ showPaymentToast('No Stripe customer on file for ' + clientName + '. Send an invoice first to create their Stripe profile.', null, 'error'); return; }
+  if(!cdata.stripeCustomerId){ showPaymentToast('No Stripe profile for ' + clientName + '. Send an invoice first.', null, 'error'); return; }
 
-  var amountNum = parseFloat((cdata.mrr || '0').replace(/[$,\/a-z]/gi, '')) || 0;
-  if(amountNum === 0){ showPaymentToast('No monthly rate set for ' + clientName + '.', null, 'error'); return; }
+  var amountNum = 0;
+  if(source === 'appt' && currentAppt){
+    amountNum = parseFloat((currentAppt.total||'0').replace(/[$,]/g,'')) || 0;
+  } else {
+    amountNum = parseFloat((cdata.mrr||'0').replace(/[$,\/a-z]/gi,'')) || 0;
+  }
+  if(amountNum === 0){ showPaymentToast('No amount to charge.', null, 'error'); return; }
+
+  showPaymentToast('Loading payment methods...', null, null);
+
+  try {
+    var pmRes = await fetch('/api/stripe-invoice', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'get_payment_methods', customerId: cdata.stripeCustomerId })
+    });
+    var pmData = await pmRes.json();
+    if(!pmData.success || (pmData.cards.length === 0 && pmData.bankAccounts.length === 0)){
+      showPaymentToast('No payment methods on file for ' + clientName + '. Send an invoice first so they can save a card.', null, 'error');
+      return;
+    }
+
+    // Build all payment methods list
+    var allMethods = [];
+    pmData.cards.forEach(function(c){ allMethods.push({ id: c.id, label: c.brand.charAt(0).toUpperCase()+c.brand.slice(1) + ' ending in ' + c.last4 + ' (exp ' + c.expMonth + '/' + c.expYear + ')', last4: c.last4, type: 'card' }); });
+    pmData.bankAccounts.forEach(function(b){ allMethods.push({ id: b.id, label: b.bankName + ' ending in ' + b.last4, last4: b.last4, type: 'bank' }); });
+
+    // Show card selector modal
+    var existing = document.getElementById('charge-modal');
+    if(existing) existing.remove();
+
+    var fee = Math.round(amountNum * 0.03 * 100) / 100;
+    var total = Math.round((amountNum + fee) * 100) / 100;
+
+    var modal = document.createElement('div');
+    modal.id = 'charge-modal';
+    modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center;';
+    modal.innerHTML = '<div style="background:#fff;border-radius:14px;padding:24px;width:360px;box-shadow:0 8px 32px rgba(0,0,0,.2);">'
+      + '<div style="font-size:15px;font-weight:600;margin-bottom:4px;">Charge ' + clientName + '</div>'
+      + '<div style="font-size:12px;color:#999;margin-bottom:16px;">Select a payment method</div>'
+      + '<div id="charge-method-list" style="margin-bottom:16px;">'
+      + allMethods.map(function(m,i){
+          return '<label style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid #e8e8e5;border-radius:8px;margin-bottom:6px;cursor:pointer;">'
+            + '<input type="radio" name="charge-method" value="' + m.id + '" data-last4="' + m.last4 + '" data-label="' + m.label + '"' + (i===0?' checked':'') + '>'
+            + '<span style="font-size:12px;">' + m.label + '</span>'
+            + '</label>';
+        }).join('')
+      + '</div>'
+      + '<div id="charge-confirm-text" style="background:#f0faf6;border:1px solid #9ae6b4;border-radius:8px;padding:10px 12px;font-size:12px;color:#276749;margin-bottom:14px;">'
+      + 'Charge ' + allMethods[0].label + ' for $' + total.toFixed(2) + '?'
+      + '</div>'
+      + '<div style="display:flex;gap:8px;">'
+      + '<button onclick="confirmCharge(\'' + cdata.stripeCustomerId + '\',\'' + clientName.replace(/'/g,"&#39;") + '\',' + amountNum + ')" style="flex:1;padding:10px;background:#1D9E75;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;">Confirm charge</button>'
+      + '<button onclick="document.getElementById(\'charge-modal\').remove()" style="padding:10px 16px;border:1px solid #e8e8e5;background:#fff;border-radius:8px;font-size:13px;cursor:pointer;">Cancel</button>'
+      + '</div>'
+      + '</div>';
+
+    document.body.appendChild(modal);
+
+    // Update confirm text when radio changes
+    modal.querySelectorAll('input[name="charge-method"]').forEach(function(radio){
+      radio.addEventListener('change', function(){
+        var label = this.dataset.label;
+        document.getElementById('charge-confirm-text').textContent = 'Charge ' + label + ' for $' + total.toFixed(2) + '?';
+      });
+    });
+
+  } catch(err){
+    showPaymentToast('Error loading payment methods: ' + err.message, null, 'error');
+  }
+}
+
+async function confirmCharge(stripeCustomerId, clientName, amountNum){
+  var selected = document.querySelector('input[name="charge-method"]:checked');
+  if(!selected){ showPaymentToast('Please select a payment method.', null, 'error'); return; }
+  var pmId = selected.value;
+  var last4 = selected.dataset.last4;
   var fee = Math.round(amountNum * 0.03 * 100) / 100;
   var total = Math.round((amountNum + fee) * 100) / 100;
 
-  if(!confirm('Charge ' + clientName + ' $' + total.toFixed(2) + ' (incl. 3% card fee) to their card on file?')) return;
-
-  showPaymentToast('Charging ' + clientName + '...', null, null);
+  document.getElementById('charge-modal').remove();
+  showPaymentToast('Charging card ending in ' + last4 + '...', null, null);
 
   try {
     var response = await fetch('/api/stripe-invoice', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        action: 'charge_card',
-        customerId: cdata.stripeCustomerId,
+        action: 'charge_specific_card',
+        customerId: stripeCustomerId,
+        paymentMethodId: pmId,
         customerName: clientName,
         amount: total.toFixed(2),
-        service: cdata.service || 'Cleaning service'
+        service: 'Cleaning service'
       })
     });
     var data = await response.json();
     if(data.success){
+      showPaymentToast('$' + total.toFixed(2) + ' charged to card ending in ' + last4 + '!', null, 'success');
+      // Save to invoices in Supabase
+      var cdata = Object.values(clientDB).find(function(c){ return c.name === clientName; });
+      var cid = cdata ? Object.keys(clientDB).find(function(k){ return clientDB[k].name === clientName; }) : null;
       db.from('invoices').insert([{
         client_name: clientName,
-        client_id: currentClientId && currentClientId.length > 20 ? currentClientId : null,
-        service: cdata.service || 'Cleaning service',
+        client_id: cid && cid.length > 20 ? cid : null,
+        service: 'Cleaning service',
         amount: amountNum, tax: fee, total: total,
-        payment_method: 'card',
+        payment_method: 'card ending ' + last4,
         payment_terms: 'Due now',
         status: 'Paid',
         stripe_payment_intent_id: data.paymentIntentId || null
       }]);
-      addToInvoiceTable(clientName, cdata.service || 'Cleaning service', '$' + total.toFixed(2), 'Paid');
-      var sb = source === 'client' ? document.getElementById('client-action-success') : null;
-      if(sb){ sb.textContent = '$' + total.toFixed(2) + ' charged to card ending ' + (data.last4 || '????') + ' for ' + clientName + '!'; sb.classList.add('show'); setTimeout(function(){ sb.classList.remove('show'); }, 4000); }
-      showPaymentToast('$' + total.toFixed(2) + ' collected from ' + clientName + '!', null, 'success');
     } else {
-      showPaymentToast('Charge failed: ' + (data.error || 'No card on file'), null, 'error');
+      showPaymentToast('Charge failed: ' + (data.error || 'Unknown error'), null, 'error');
     }
   } catch(err){
     showPaymentToast('Charge error: ' + err.message, null, 'error');

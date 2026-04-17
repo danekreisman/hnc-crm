@@ -74,6 +74,22 @@ export default async function handler(req, res) {
       return res.status(200).json({ success: true, paymentIntentId: paymentIntent.id, status: paymentIntent.status, last4: pm.card.last4 });
     }
 
+    // ACTION: charge_specific_card
+    if (action === 'charge_specific_card') {
+      const { paymentMethodId } = req.body;
+      const amountCents = Math.round(parseFloat(amount) * 100);
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: amountCents,
+        currency: 'usd',
+        customer: customerId,
+        payment_method: paymentMethodId,
+        confirm: true,
+        off_session: true,
+        description: service || 'Cleaning service'
+      });
+      return res.status(200).json({ success: true, paymentIntentId: paymentIntent.id, status: paymentIntent.status });
+    }
+
     // ACTION: get_payment_methods
     if (action === 'get_payment_methods') {
       const cards = await stripe.paymentMethods.list({ customer: customerId, type: 'card' });

@@ -1186,6 +1186,7 @@ textarea{font-family:inherit;}
         <div class="action-grid" style="margin-top:14px;">
           <button class="action-btn green" onclick="oneClickInvoice('client')">Send invoice</button>
           <button class="action-btn green" id="client-charge-btn" onclick="oneClickCharge('client')">Charge card</button>
+          <button class="action-btn blue" onclick="checkClientPaymentMethods()">View payment methods</button>
           <button class="action-btn blue" onclick="openMsgFromClient()">Message</button>
           <button class="action-btn blue" onclick="scheduleFromClient()">Schedule job</button>
           <button class="action-btn amber full" onclick="showClientEdit()">Edit client</button>
@@ -1686,7 +1687,8 @@ async function loadAllData(){
         status:c.status||'New', notes:c.notes||'—', history:[],
         properties:Array.isArray(c.properties)?c.properties:(c.properties?JSON.parse(JSON.stringify(c.properties)):[]),
         flatRate:c.flat_rate||'',
-        permDiscount:c.perm_discount||''
+        permDiscount:c.perm_discount||'',
+        stripeCustomerId:c.stripe_customer_id||''
       };
     });
 
@@ -5497,85 +5499,143 @@ async function deleteRecord(type){
 }
 
 /* ONE-CLICK INVOICE */
-function oneClickInvoice(source){
-  var clientName=currentClientName;
-  var cdata=currentClientId?clientDB[currentClientId]:Object.values(clientDB).find(function(c){return c.name===clientName;});
-  if(!cdata){showPaymentToast('Client data not found.',null,'error');return;}
-  var amount=cdata.mrr&&cdata.mrr!=='—'?cdata.mrr:'—';
-  var email=cdata.email||'—';
-  var isCommercial=cdata.type==='Commercial';
-  var terms=isCommercial?'NET30':'Due now';
-  if(email==='—'){
-    showPaymentToast('No email on file for '+clientName+'. Add their email first.',null,'error');
-    return;
-  }
-  // Save invoice to Supabase
-  var amountNum=parseFloat((amount||'0').replace(/[$,\/a-z]/gi,''))||0;
-  var tax=Math.round(amountNum*0.04712*100)/100;
-  var total=Math.round((amountNum+tax)*100)/100;
-  if(currentClientId&&currentClientId.length>20){
-    db.from('invoices').insert([{
-      client_name:clientName,
-      client_id:currentClientId.length>20?currentClientId:null,
-      service:cdata.service||'Cleaning service',
-      amount:amountNum,tax:tax,total:total,
-      payment_method:'email',
-      payment_terms:terms,
-      status:'Unpaid'
-    }]).then(function(res){
-      if(res.error)console.error('Invoice save error:',res.error);
+async function oneClickInvoice(source){
+  var clientName = currentClientName;
+  var cdata = currentClientId ? clientDB[currentClientId] : Object.values(clientDB).find(function(c){ return c.name === clientName; });
+  if(!cdata){ showPaymentToast('Client data not found.', null, 'error'); return; }
+  if(!cdata.email || cdata.email === '—'){ showPaymentToast('No email on file for ' + clientName + '. Add their email first.', null, 'error'); return; }
+
+  var isCommercial = cdata.type === 'Commercial';
+  var terms = isCommercial ? 'NET30' : 'Due now';
+  var amountNum = parseFloat((cdata.mrr || '0').replace(/[$,\/a-z]/gi, '')) || 0;
+  if(amountNum === 0){ showPaymentToast('No monthly rate set for ' + clientName + '. Set MRR in client profile first.', null, 'error'); return; }
+
+  var tax = Math.round(amountNum * 0.04712 * 100) / 100;
+  var total = Math.round((amountNum + tax) * 100) / 100;
+
+  showPaymentToast('Sending invoice to ' + clientName + '...', null, null);
+
+  try {
+    var response = await fetch('/api/stripe-invoice', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'send_invoice',
+        customerName: clientName,
+        customerEmail: cdata.email,
+        customerId: cdata.stripeCustomerId || '',
+        amount: total.toFixed(2),
+        service: cdata.service || 'Cleaning service',
+        terms: terms,
+        notes: ''
+      })
     });
+    var data = await response.json();
+    if(data.success){
+      // Save Stripe customer ID back to client
+      if(data.customerId && currentClientId && currentClientId.length > 20){
+        clientDB[currentClientId].stripeCustomerId = data.customerId;
+        db.from('clients').update({ stripe_customer_id: data.customerId }).eq('id', currentClientId);
+      }
+      // Save invoice to Supabase
+      db.from('invoices').insert([{
+        client_name: clientName,
+        client_id: currentClientId && currentClientId.length > 20 ? currentClientId : null,
+        service: cdata.service || 'Cleaning service',
+        amount: amountNum, tax: tax, total: total,
+        payment_method: 'email',
+        payment_terms: terms,
+        status: 'Unpaid',
+        stripe_invoice_id: data.invoiceId || null
+      }]);
+      addToInvoiceTable(clientName, cdata.service || 'Cleaning service', '$' + total.toFixed(2), terms);
+      var sb = source === 'client' ? document.getElementById('client-action-success') : null;
+      if(sb){ sb.textContent = 'Invoice sent to ' + cdata.email + ' (' + terms + '). View: ' + (data.invoiceUrl || ''); sb.classList.add('show'); setTimeout(function(){ sb.classList.remove('show'); }, 6000); }
+      showPaymentToast('Invoice sent to ' + clientName + '! ' + (data.invoiceUrl ? 'View invoice →' : ''), null, 'success');
+    } else {
+      showPaymentToast('Invoice failed: ' + (data.error || 'Unknown error'), null, 'error');
+    }
+  } catch(err){
+    showPaymentToast('Invoice error: ' + err.message, null, 'error');
   }
-  // Add to invoice table
-  addToInvoiceTable(clientName,cdata.service||'Cleaning service','$'+total.toFixed(2),terms);
-  // Show success
-  var sb=source==='client'?document.getElementById('client-action-success'):null;
-  if(sb){
-    sb.textContent='Invoice sent to '+clientName+' at '+email+' ('+terms+'). ACH & card options included.';
-    sb.classList.add('show');
-    setTimeout(function(){sb.classList.remove('show');},4000);
-  }
-  showPaymentToast('Invoice sent to '+clientName+'!',null,'success');
 }
 
 /* ONE-CLICK CHARGE */
-function oneClickCharge(source){
-  var clientName=currentClientName;
-  var cdata=currentClientId?clientDB[currentClientId]:Object.values(clientDB).find(function(c){return c.name===clientName;});
-  if(!cdata){showPaymentToast('Client data not found.',null,'error');return;}
-  // Check if card on file
-  var hasCard=cdata.payment&&cdata.payment!=='—'&&cdata.payment.indexOf('****')>=0;
-  if(!hasCard){
-    showPaymentToast('No card on file for '+clientName+'. Send an invoice instead.',null,'error');
-    return;
-  }
-  if(!stripeConnected){openStripeConnect();return;}
-  var amountNum=parseFloat((cdata.mrr||'0').replace(/[$,\/a-z]/gi,''))||0;
-  var fee=Math.round(amountNum*0.03*100)/100;
-  var total=Math.round((amountNum+fee)*100)/100;
-  if(!confirm('Charge '+clientName+' $'+total.toFixed(2)+' (incl. 3% card fee) to '+cdata.payment+'?'))return;
-  // Save to invoices as paid
-  if(currentClientId&&currentClientId.length>20){
-    db.from('invoices').insert([{
-      client_name:clientName,
-      client_id:currentClientId.length>20?currentClientId:null,
-      service:cdata.service||'Cleaning service',
-      amount:amountNum,tax:fee,total:total,
-      payment_method:'card',
-      payment_terms:'Due now',
-      status:'Paid'
-    }]).then(function(res){
-      if(res.error)console.error('Invoice save error:',res.error);
+async function oneClickCharge(source){
+  var clientName = currentClientName;
+  var cdata = currentClientId ? clientDB[currentClientId] : Object.values(clientDB).find(function(c){ return c.name === clientName; });
+  if(!cdata){ showPaymentToast('Client data not found.', null, 'error'); return; }
+  if(!cdata.stripeCustomerId){ showPaymentToast('No Stripe customer on file for ' + clientName + '. Send an invoice first to create their Stripe profile.', null, 'error'); return; }
+
+  var amountNum = parseFloat((cdata.mrr || '0').replace(/[$,\/a-z]/gi, '')) || 0;
+  if(amountNum === 0){ showPaymentToast('No monthly rate set for ' + clientName + '.', null, 'error'); return; }
+  var fee = Math.round(amountNum * 0.03 * 100) / 100;
+  var total = Math.round((amountNum + fee) * 100) / 100;
+
+  if(!confirm('Charge ' + clientName + ' $' + total.toFixed(2) + ' (incl. 3% card fee) to their card on file?')) return;
+
+  showPaymentToast('Charging ' + clientName + '...', null, null);
+
+  try {
+    var response = await fetch('/api/stripe-invoice', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'charge_card',
+        customerId: cdata.stripeCustomerId,
+        customerName: clientName,
+        amount: total.toFixed(2),
+        service: cdata.service || 'Cleaning service'
+      })
     });
+    var data = await response.json();
+    if(data.success){
+      db.from('invoices').insert([{
+        client_name: clientName,
+        client_id: currentClientId && currentClientId.length > 20 ? currentClientId : null,
+        service: cdata.service || 'Cleaning service',
+        amount: amountNum, tax: fee, total: total,
+        payment_method: 'card',
+        payment_terms: 'Due now',
+        status: 'Paid',
+        stripe_payment_intent_id: data.paymentIntentId || null
+      }]);
+      addToInvoiceTable(clientName, cdata.service || 'Cleaning service', '$' + total.toFixed(2), 'Paid');
+      var sb = source === 'client' ? document.getElementById('client-action-success') : null;
+      if(sb){ sb.textContent = '$' + total.toFixed(2) + ' charged to card ending ' + (data.last4 || '????') + ' for ' + clientName + '!'; sb.classList.add('show'); setTimeout(function(){ sb.classList.remove('show'); }, 4000); }
+      showPaymentToast('$' + total.toFixed(2) + ' collected from ' + clientName + '!', null, 'success');
+    } else {
+      showPaymentToast('Charge failed: ' + (data.error || 'No card on file'), null, 'error');
+    }
+  } catch(err){
+    showPaymentToast('Charge error: ' + err.message, null, 'error');
   }
-  addToInvoiceTable(clientName,cdata.service||'Cleaning service','$'+total.toFixed(2),'Paid');
-  var sb=source==='client'?document.getElementById('client-action-success'):null;
-  if(sb){
-    sb.textContent='$'+total.toFixed(2)+' charged to '+cdata.payment+' for '+clientName+'!';
-    sb.classList.add('show');
-    setTimeout(function(){sb.classList.remove('show');},4000);
-  }
-  showPaymentToast('$'+total.toFixed(2)+' collected from '+clientName+'!',null,'success');
+}
+
+/* VIEW PAYMENT METHODS FOR CLIENT */
+async function checkClientPaymentMethods(){
+  var cdata = currentClientId ? clientDB[currentClientId] : null;
+  if(!cdata || !cdata.stripeCustomerId){ showPaymentToast('No Stripe profile yet. Send an invoice first.', null, 'error'); return; }
+  try {
+    var response = await fetch('/api/stripe-invoice', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'get_payment_methods', customerId: cdata.stripeCustomerId })
+    });
+    var data = await response.json();
+    if(data.success){
+      var msg = cdata.name + ' payment methods:\n';
+      if(data.cards.length > 0) msg += data.cards.map(function(c){ return '• ' + c.brand + ' ending ' + c.last4 + ' (exp ' + c.expMonth + '/' + c.expYear + ')'; }).join('\n');
+      else msg += '• No cards on file\n';
+      if(data.bankAccounts.length > 0) msg += '\n' + data.bankAccounts.map(function(b){ return '• ' + b.bankName + ' ending ' + b.last4; }).join('\n');
+      else msg += '\n• No bank accounts on file';
+      alert(msg);
+      // Update charge button state
+      var hasCard = data.cards.length > 0;
+      var chargeBtn = document.getElementById('client-charge-btn');
+      if(chargeBtn){ chargeBtn.style.opacity = hasCard ? '1' : '0.4'; chargeBtn.disabled = !hasCard; chargeBtn.title = hasCard ? 'Charge card on file' : 'No card on file — send invoice first'; }
+    }
+  } catch(err){ showPaymentToast('Error: ' + err.message, null, 'error'); }
 }
 
 /* UPDATE CHARGE BUTTON STATE based on card on file */

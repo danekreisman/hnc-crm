@@ -4330,8 +4330,7 @@ function setPeriod(btn){
             var cid = cleaner ? cleaner.id : null;
             var rate = _rateForName(cname) || 0;
             var island = cleaner ? (cleaner.islands||cleaner.island||'—') : '—';
-            var key = cid || ('name:'+cname);
-            var row = periodRows[key];
+            var row = periodRows[cid] || periodRows['name:'+cname];
             var paid = row && row.status==='paid';
             var statusPill = paid ? '<span style="background:#DEFBE8;color:#0E6B34;padding:2px 8px;border-radius:6px;font-size:11px">Paid</span>'
                                    : '<span style="background:#FFF5E0;color:#9A6A00;padding:2px 8px;border-radius:6px;font-size:11px">Unpaid</span>';
@@ -4366,7 +4365,8 @@ function setPeriod(btn){
       }
 
       function _findCleanerByName(name){
-        return Object.values(cleanerDB).find(function(c){return c.name===name;});
+        for(var k of Object.keys(cleanerDB||{})){ var c = cleanerDB[k]; if(c && c.name===name){ return Object.assign({ id: c.id || k }, c); } }
+        return null;
       }
       function _rateForName(name){
         var c = _findCleanerByName(name);

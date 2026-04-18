@@ -69,7 +69,7 @@ export default async function handler(req, res) {
                       const amountCents = Math.round(parseFloat(amount) * 100);
 
               // Support lineItems array (bulk invoice) in addition to single amount
-              const lineItems = Array.isArray(req.req.body.lineItems) ? req.body.lineItems : null;
+              const lineItems = Array.isArray(req.body.lineItems) ? req.body.lineItems : null;
               let totalCentsFromLines = 0;
               if (lineItems) {
                 for (const li of lineItems) {

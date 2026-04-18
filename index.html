@@ -1803,6 +1803,7 @@ async function loadAllData(){
   }
   showLoadingState(false);
   loadMessageTemplates();
+  loadSettings();
   checkQuoStatus();
 }
 
@@ -5100,7 +5101,7 @@ async function sendApptInvoice(method){
   var clientPhone=client?client.phone:'';
   var clientId=clientKey&&clientKey.length>20?clientKey:null;
   var cd=currentApptData||{};
-  var amountNum=parseFloat(cd.totalPrice)||0;
+  var amountNum=parseFloat(cd.totalPrice||cd.total||cd.basePrice)||0;
   var apptId=currentAppt.dbId||null;
   var termsRaw=document.getElementById('appt-inv-terms').value;
   var termsMap={'now':'Due now','net15':'NET15','net30':'NET30','net45':'NET45'};
@@ -5227,7 +5228,7 @@ function openApptCharge(){
   if(!currentAppt)return;
   var cd=currentApptData||{};
   var client=clientDB[Object.keys(clientDB).find(function(k){return clientDB[k].name===currentAppt.n;})];
-  var base=parseFloat((cd.total||'0').replace('$',''))||0;
+  var base=parseFloat(((cd.totalPrice||cd.total||cd.basePrice||'0')+'').replace('$',''))||0;
   var fee=Math.round(base*0.03*100)/100;
   var total=Math.round((base+fee)*100)/100;
   var info=document.getElementById('appt-charge-info');
@@ -5940,6 +5941,7 @@ function switchTemplate(type, btn) {
 function saveTemplate() {
   emailTemplates[currentTemplate].subject = document.getElementById('tmpl-subject').value;
   emailTemplates[currentTemplate].body = document.getElementById('tmpl-body').value;
+  localStorage.setItem('hnc_email_templates', JSON.stringify(emailTemplates));
   var s = document.getElementById('tmpl-success');
   s.classList.add('show');
   setTimeout(function(){s.classList.remove('show');}, 2000);
@@ -5964,7 +5966,29 @@ function saveSettings() {
   bizSettings.phone = document.getElementById('set-phone').value;
   bizSettings.website = document.getElementById('set-website').value;
   bizSettings.logo = document.getElementById('set-logo').value;
+  localStorage.setItem('hnc_biz_settings', JSON.stringify(bizSettings));
   showPaymentToast('Settings saved!', null, 'success');
+}
+
+function loadSettings() {
+  var savedTemplates = localStorage.getItem('hnc_email_templates');
+  if(savedTemplates){
+    try { emailTemplates = Object.assign(emailTemplates, JSON.parse(savedTemplates)); } catch(e) {}
+  }
+  var savedBiz = localStorage.getItem('hnc_biz_settings');
+  if(savedBiz){
+    try {
+      var biz = JSON.parse(savedBiz);
+      Object.assign(bizSettings, biz);
+      if(document.getElementById('set-biz-name')){
+        document.getElementById('set-biz-name').value = bizSettings.name || '';
+        document.getElementById('set-from-email').value = bizSettings.fromEmail || '';
+        document.getElementById('set-phone').value = bizSettings.phone || '';
+        document.getElementById('set-website').value = bizSettings.website || '';
+        document.getElementById('set-logo').value = bizSettings.logo || '';
+      }
+    } catch(e) {}
+  }
 }
 
 function previewLogo() {

@@ -80,27 +80,47 @@ module.exports = async (req, res) => {
       if (cResp.data) cleanerId = cResp.data.id;
     }
     var existingEventId = appt.google_event_id || null;
-    if (!cleanerId && !existingEventId) return jsonRes(res, 200, { ok: true, skipped: 'no cleaner assigned and no existing event' });
-    var integration = null;
-    if (cleanerId) {
-      var iResp = await supabase.from('cleaner_integrations').select('*').eq('cleaner_id', cleanerId).eq('provider', 'google').maybeSingle();
-      integration = iResp.data || null;
-    }
-    if (action === 'delete') {
-      if (existingEventId && integration) {
+  var ownerCleanerId = appt.google_event_cleaner_id || null;
+  var isCancelled = (appt.status === 'cancelled');
+  if (!cleanerId && !existingEventId && !isCancelled) return jsonRes(res, 200, { ok: true, skipped: 'no cleaner assigned and no existing event' });
+  async function _deleteFromOwner(reason) {
+    var ownerId = ownerCleanerId || cleanerId;
+    if (existingEventId && ownerId) {
+      var ownerIntegResp = await supabase.from('cleaner_integrations').select('*').eq('cleaner_id', ownerId).eq('provider', 'google').maybeSingle();
+      var ownerInteg = ownerIntegResp.data || null;
+      if (ownerInteg) {
         try {
-          var tokD = await getValidAccessToken(supabase, integration);
-          await fetch(CAL_EVENTS_URL + '/' + encodeURIComponent(existingEventId), { method: 'DELETE', headers: { Authorization: 'Bearer ' + tokD } });
+          var tokOwner = await getValidAccessToken(supabase, ownerInteg);
+          await fetch(CAL_EVENTS_URL + '/' + encodeURIComponent(existingEventId), { method: 'DELETE', headers: { Authorization: 'Bearer ' + tokOwner } });
         } catch (e) {}
       }
-      await supabase.from('appointments').update({ google_event_id: null }).eq('id', appointmentId);
-      return jsonRes(res, 200, { ok: true, deleted: true });
     }
-    if (!integration) {
-      if (existingEventId) await supabase.from('appointments').update({ google_event_id: null }).eq('id', appointmentId);
-      return jsonRes(res, 200, { ok: true, skipped: 'cleaner has no Google integration' });
+    await supabase.from('appointments').update({ google_event_id: null, google_event_cleaner_id: null }).eq('id', appointmentId);
+    return jsonRes(res, 200, { ok: true, deleted: true, reason: reason });
+  }
+  if (action === 'delete' || isCancelled || !cleanerId) {
+    return await _deleteFromOwner(action === 'delete' ? 'delete' : (isCancelled ? 'cancelled' : 'unassigned'));
+  }
+  if (ownerCleanerId && ownerCleanerId !== cleanerId && existingEventId) {
+    var oldOwnerIntegResp = await supabase.from('cleaner_integrations').select('*').eq('cleaner_id', ownerCleanerId).eq('provider', 'google').maybeSingle();
+    var oldOwnerInteg = oldOwnerIntegResp.data || null;
+    if (oldOwnerInteg) {
+      try {
+        var tokOld = await getValidAccessToken(supabase, oldOwnerInteg);
+        await fetch(CAL_EVENTS_URL + '/' + encodeURIComponent(existingEventId), { method: 'DELETE', headers: { Authorization: 'Bearer ' + tokOld } });
+      } catch (e) {}
     }
-    var token = await getValidAccessToken(supabase, integration);
+    existingEventId = null;
+    await supabase.from('appointments').update({ google_event_id: null, google_event_cleaner_id: null }).eq('id', appointmentId);
+  }
+  var integration = null;
+  var iResp = await supabase.from('cleaner_integrations').select('*').eq('cleaner_id', cleanerId).eq('provider', 'google').maybeSingle();
+  integration = iResp.data || null;
+  if (!integration) {
+    if (existingEventId) await supabase.from('appointments').update({ google_event_id: null, google_event_cleaner_id: null }).eq('id', appointmentId);
+    return jsonRes(res, 200, { ok: true, skipped: 'cleaner has no Google integration' });
+  }
+  var token = await getValidAccessToken(supabase, integration);
     var cleanerRecord = null; if (cleanerId) { var _cr = await supabase.from('cleaners').select('id,name,hourly_rate').eq('id', cleanerId).maybeSingle(); cleanerRecord = _cr.data || null; } var payload = buildEventPayload(appt, cleanerRecord);
     var method = 'POST';
     var url = CAL_EVENTS_URL;
@@ -111,11 +131,11 @@ module.exports = async (req, res) => {
       var r2 = await fetch(CAL_EVENTS_URL, { method: 'POST', headers: { Authorization: 'Bearer ' + token, 'content-type': 'application/json' }, body: JSON.stringify(payload) });
       var j2 = await r2.json();
       if (!r2.ok) return jsonRes(res, 502, { ok: false, error: 'Google error', detail: j2 });
-      await supabase.from('appointments').update({ google_event_id: j2.id }).eq('id', appointmentId);
+      await supabase.from('appointments').update({ google_event_id: j2.id, google_event_cleaner_id: cleanerId }).eq('id', appointmentId);
       return jsonRes(res, 200, { ok: true, event_id: j2.id, recreated: true });
     }
     if (!r.ok) return jsonRes(res, 502, { ok: false, error: 'Google error', detail: j });
-    await supabase.from('appointments').update({ google_event_id: j.id }).eq('id', appointmentId);
+    await supabase.from('appointments').update({ google_event_id: j.id, google_event_cleaner_id: cleanerId }).eq('id', appointmentId);
     return jsonRes(res, 200, { ok: true, event_id: j.id });
   } catch (err) {
     return jsonRes(res, 500, { ok: false, error: (err && err.message) ? err.message : String(err) });

@@ -5108,7 +5108,7 @@ async function renderPaymentsSection(){
           var created = i.created_at ? new Date(i.created_at).toLocaleDateString() : '—';
           var status = i.status || 'Unpaid';
           var stripeUrl = i.stripe_invoice_id ? ('https://dashboard.stripe.com/invoices/' + i.stripe_invoice_id) : null;
-          var statusColor = /paid/i.test(status) ? '#0a7a4e' : '#c46a10';
+          var statusColor = /^paid$/i.test(status) ? '#0a7a4e' : '#c46a10';
           tr.innerHTML =
             '<td>' + escapeHtmlPay(i.client_name || '') + '</td>' +
             '<td>' + escapeHtmlPay(i.service || 'Cleaning') + '</td>' +
@@ -5134,7 +5134,7 @@ async function renderPaymentsSection(){
     var thisMonth = invoices.filter(function(i){ 
       if (!i.created_at) return false;
       var d = new Date(i.created_at);
-      return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && /paid/i.test(i.status || '');
+      return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && /^paid$/i.test(i.status || '');
     });
     var collectedTotal = 0;
     thisMonth.forEach(function(i){ collectedTotal += parseFloat(i.total || i.amount || 0); });

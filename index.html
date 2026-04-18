@@ -2470,6 +2470,19 @@ function showApptEdit(){
     }
   }
   calcEditPrice();
+
+  // If saved totalPrice differs from the auto-calculated price, pre-check the override
+  var savedTotal = currentAppt && parseFloat(currentAppt.totalPrice);
+  var calcPriceEl = document.getElementById('edit-price-val');
+  var calcTotal = calcPriceEl ? parseFloat(calcPriceEl.textContent.replace('$','')) : 0;
+  var overrideChk = document.getElementById('edit-price-override-chk');
+  var overrideVal = document.getElementById('edit-price-override-val');
+  if(savedTotal && overrideChk && overrideVal && Math.abs(savedTotal - calcTotal) > 0.05){
+    overrideChk.checked = true;
+    overrideVal.value = savedTotal.toFixed(2);
+    overrideVal.style.display = '';
+    calcEditPrice();
+  }
 }
 function hideApptEdit(){document.getElementById('appt-view').style.display='block';document.getElementById('appt-edit').style.display='none';}
 async function saveApptEdit(mode){
@@ -5102,6 +5115,7 @@ async function sendApptInvoice(method){
   var clientId=clientKey&&clientKey.length>20?clientKey:null;
   var cd=currentApptData||{};
   var amountNum=parseFloat(cd.totalPrice||cd.total||cd.basePrice)||0;
+  console.log('[sendApptInvoice] amount resolved:', amountNum, 'from cd:', JSON.stringify({totalPrice:cd.totalPrice, total:cd.total, basePrice:cd.basePrice}));
   var apptId=currentAppt.dbId||null;
   var termsRaw=document.getElementById('appt-inv-terms').value;
   var termsMap={'now':'Due now','net15':'NET15','net30':'NET30','net45':'NET45'};
@@ -5116,17 +5130,19 @@ async function sendApptInvoice(method){
   btns.forEach(function(b){b.disabled=true;});
 
   try {
-    // Duplicate check: return existing invoice if already sent for this appointment
+    // Duplicate check: skip stale $0 records, only block on valid sent invoices
     if(apptId){
-      var existing=await db.from('invoices').select('id,stripe_invoice_id,invoice_url').eq('appointment_id',apptId).maybeSingle();
-      if(existing.data&&existing.data.stripe_invoice_id){
-        console.log('[sendApptInvoice] Existing invoice found:', existing.data);
+      var existing=await db.from('invoices').select('id,stripe_invoice_id,invoice_url,amount').eq('appointment_id',apptId).maybeSingle();
+      if(existing.data&&existing.data.stripe_invoice_id&&existing.data.amount>0){
+        console.log('[sendApptInvoice] Existing valid invoice found:', existing.data);
         var s=document.getElementById('appt-inv-success');
         s.textContent='Invoice already sent'+(existing.data.invoice_url?' — '+existing.data.invoice_url:'')+'.';
         s.classList.add('show');
         setTimeout(function(){s.classList.remove('show');closeOverlay('appt-invoice-overlay');},2500);
         return;
       }
+      // Clean up any stale $0 invoice records before creating a new one
+      await db.from('invoices').delete().eq('appointment_id',apptId).eq('amount',0);
     }
 
     // Build and log payload

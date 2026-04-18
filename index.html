@@ -5088,7 +5088,8 @@ async function renderPaymentsSection(){
           });
         }
       });
-            document.getElementById('pay-pending-count').textContent = appts.length;
+      }
+      document.getElementById('pay-pending-count').textContent = appts.length;
     }
     
     // Split invoices: unpaid (sent but not paid), history (all)

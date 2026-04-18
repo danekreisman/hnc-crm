@@ -266,7 +266,7 @@ function renderDashboard(ctx){
         <div style="font-weight:600">Google Calendar</div>
         <div class="status ${connected?'connected':''}">${connected ? ('Connected as ' + (integration.provider_email||'(unknown)')) : 'Not connected — your jobs will not sync to your calendar'}</div>
       </div>
-      <button class="btn ${connected?'secondary':''}" id="gcalBtn">${connected?'Reconnect':'Connect Google Calendar'}</button>
+      <button class="btn ${connected?'secondary':''}" id="gcalBtn">${connected?'Reconnect':'Connect Google Calendar'}</button> ${connected?'<button class="btn" id="gcalSyncBtn">Sync my upcoming jobs</button>':''}
     </div>`);
   wrap.appendChild(gcard);
 
@@ -319,6 +319,53 @@ function renderDashboard(ctx){
     // Re-check integration after a delay
     setTimeout(()=>boot(), 8000);
   };
+
+  const _gcalSyncBtn = wrap.querySelector('#gcalSyncBtn');
+  if (_gcalSyncBtn) {
+    _gcalSyncBtn.onclick = async () => {
+      _gcalSyncBtn.disabled = true;
+      const origText = _gcalSyncBtn.textContent;
+      _gcalSyncBtn.textContent = 'Syncing...';
+      try {
+        const result = await syncAllUpcoming(cleaner);
+        _gcalSyncBtn.textContent = 'Synced ' + result.ok + ' / ' + result.total;
+        setTimeout(() => { _gcalSyncBtn.textContent = origText; _gcalSyncBtn.disabled = false; }, 3000);
+      } catch (e) {
+        console.error('sync failed', e);
+        _gcalSyncBtn.textContent = 'Sync failed';
+        setTimeout(() => { _gcalSyncBtn.textContent = origText; _gcalSyncBtn.disabled = false; }, 3000);
+      }
+    };
+  }
+}
+
+
+async function syncAllUpcoming(cleaner){
+  // Fetch upcoming (today onwards) appointments for this cleaner, then call sync-event for each
+  const today = new Date().toISOString().slice(0,10);
+  const { data, error } = await supa
+    .from('appointments')
+    .select('id')
+    .eq('cleaner_id', cleaner.id)
+    .gte('date', today)
+    .order('date', { ascending: true });
+  if (error) { console.warn('syncAllUpcoming fetch failed', error); return { ok: 0, total: 0 }; }
+  const rows = data || [];
+  let ok = 0;
+  for (const row of rows) {
+    try {
+      const r = await fetch('/api/google/sync-event', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ appointment_id: row.id, action: 'upsert' })
+      });
+      if (r.ok) ok++;
+      else console.warn('sync-event non-ok', r.status, 'for', row.id);
+    } catch (e) {
+      console.warn('sync-event threw', e);
+    }
+  }
+  return { ok, total: rows.length };
 }
 
 async function boot(){
@@ -341,6 +388,17 @@ async function boot(){
   const [appts, integration, cfg] = await Promise.all([loadAppointments(cleaner), loadIntegration(cleaner), loadPayrollConfig()]);
   const period = currentPeriod(cfg);
   renderDashboard({ user, cleaner, appts, integration, cfg, period });
+  // Auto-run backfill sync if we just linked Calendar
+  if (integration && (location.hash.indexOf('gcal=linked') >= 0 || location.search.indexOf('gcal=linked') >= 0)) {
+    // Clear the flag from URL
+    try { history.replaceState(null, '', location.pathname); } catch(_){}
+    // Fire and forget
+    syncAllUpcoming(cleaner).then(r => {
+      console.log('[HNC] auto-sync after link:', r);
+      const btn = document.getElementById('gcalSyncBtn');
+      if (btn) { btn.textContent = 'Auto-synced ' + r.ok + ' / ' + r.total; setTimeout(()=>{ btn.textContent = 'Sync my upcoming jobs'; }, 4000); }
+    }).catch(e => console.warn('auto-sync failed', e));
+  }
 }
 
 supa.auth.onAuthStateChange((_event, _session) => { boot(); });

@@ -667,6 +667,8 @@ textarea{font-family:inherit;}
           </tbody></table></div>
         </div>
 
+        </div>
+
         <!-- SETTINGS VIEW -->
       <div id="view-settings" class="vc">
 
@@ -803,142 +805,9 @@ Mahalo 🌺</textarea>
 
       </div>
 
-      <!-- AI AGENT VIEW -->      <!-- SETTINGS VIEW -->
-      <div id="view-settings" class="vc">
+      <!-- AI AGENT VIEW -->      </div>
 
-        <!-- BUSINESS INFO -->
-        <div style="background:#fff;border:1px solid #e8e8e5;border-radius:12px;padding:20px;margin-bottom:18px;">
-          <div style="font-size:14px;font-weight:600;color:#1a1a1a;margin-bottom:14px;">Business info</div>
-          <div class="form-two">
-            <div class="form-row"><label>Business name</label><input type="text" id="set-biz-name" value="Hawaii Natural Clean"></div>
-            <div class="form-row"><label>From email</label><input type="email" id="set-from-email" value="dane@hawaiinaturalclean.com"></div>
-          </div>
-          <div class="form-two">
-            <div class="form-row"><label>Phone</label><input type="tel" id="set-phone" value="(808) 468-5356"></div>
-            <div class="form-row"><label>Website</label><input type="text" id="set-website" value="hawaiinaturalclean.com"></div>
-          </div>
-          <div class="form-row"><label>Logo URL</label><input type="text" id="set-logo" placeholder="https://hawaiinaturalclean.com/logo.png"></div>
-          <div style="display:flex;gap:8px;margin-top:4px;align-items:center;">
-            <div id="set-logo-preview" style="width:48px;height:48px;border:1px solid #e8e8e5;border-radius:8px;display:flex;align-items:center;justify-content:center;overflow:hidden;background:#fafaf8;">
-              <span style="font-size:10px;color:#999;">Logo</span>
-            </div>
-            <button class="btn" style="font-size:12px;" onclick="previewLogo()">Preview logo</button>
-          </div>
-          <div style="margin-top:12px;">
-            <button class="btn btn-primary" style="font-size:12px;" onclick="saveSettings()">Save settings</button>
-          </div>
-        </div>
-
-        <!-- EMAIL TEMPLATES -->
-        <div style="font-size:14px;font-weight:600;color:#1a1a1a;margin-bottom:12px;">Email templates</div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;" id="template-tabs">
-          <button class="template-tab active" onclick="switchTemplate('invoice',this)">Invoice</button>
-          <button class="template-tab" onclick="switchTemplate('reminder',this)">Appointment reminder</button>
-          <button class="template-tab" onclick="switchTemplate('thankyou',this)">Job complete</button>
-          <button class="template-tab" onclick="switchTemplate('receipt',this)">Payment receipt</button>
-          <button class="template-tab" onclick="switchTemplate('reactivation',this)">Reactivation</button>
-          <button class="template-tab" onclick="switchTemplate('quote',this)">Quote</button>
-          <button class="template-tab" onclick="switchTemplate('lead_followup',this)">Lead follow-up</button>
-          <button class="template-tab" onclick="switchTemplate('invoice_reminder',this)">Unpaid invoice</button>
-        </div>
-
-        <div style="background:#fff;border:1px solid #e8e8e5;border-radius:12px;padding:20px;">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
-            <div style="font-size:13px;font-weight:600;color:#1a1a1a;" id="template-title">Invoice email</div>
-            <button class="btn" style="font-size:11px;" onclick="resetTemplate()">Reset to default</button>
-          </div>
-          <div class="form-row"><label>Subject line</label><input type="text" id="tmpl-subject"></div>
-          <div class="form-row"><label>Email body</label>
-            <textarea id="tmpl-body" style="min-height:180px;font-size:12px;line-height:1.7;"></textarea>
-          </div>
-          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;">
-            <button class="tone-btn" onclick="insertTmplVar('{{client_name}}')">+ Client name</button>
-            <button class="tone-btn" onclick="insertTmplVar('{{amount}}')">+ Amount</button>
-            <button class="tone-btn" onclick="insertTmplVar('{{service}}')">+ Service</button>
-            <button class="tone-btn" onclick="insertTmplVar('{{date}}')">+ Date</button>
-            <button class="tone-btn" onclick="insertTmplVar('{{time}}')">+ Time</button>
-            <button class="tone-btn" onclick="insertTmplVar('{{cleaner}}')">+ Cleaner</button>
-            <button class="tone-btn" onclick="insertTmplVar('{{invoice_url}}')">+ Invoice link</button>
-            <button class="tone-btn" onclick="insertTmplVar('{{business_name}}')">+ Business name</button>
-            <button class="tone-btn" onclick="insertTmplVar('{{phone}}')">+ Phone</button>
-          </div>
-          <div style="display:flex;gap:8px;">
-            <button class="btn btn-primary" style="font-size:12px;" onclick="saveTemplate()">Save template</button>
-            <button class="btn" style="font-size:12px;background:#f0faf6;color:#276749;border-color:#9ae6b4;" onclick="previewTemplate()">Preview email</button>
-          </div>
-          <div class="success-bar" id="tmpl-success">Template saved!</div>
-        </div>
-
-        <!-- PREVIEW MODAL -->
-        <div id="email-preview-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;align-items:center;justify-content:center;">
-          <div style="background:#fff;border-radius:12px;width:90%;max-width:600px;max-height:80vh;overflow:auto;padding:24px;position:relative;">
-            <button onclick="closeEmailPreview()" style="position:absolute;top:12px;right:12px;background:none;border:none;font-size:18px;cursor:pointer;">&#x2715;</button>
-            <div style="font-size:13px;font-weight:600;margin-bottom:16px;color:#666;">Email preview</div>
-            <div id="email-preview-content"></div>
-          </div>
-        </div>
-
-        <!-- MESSAGE TEMPLATES -->
-        <div style="background:#fff;border:1px solid #e8e8e5;border-radius:12px;padding:20px;margin-top:18px;">
-          <div class="panel-section" style="margin-top:0;">Invoice Message Templates</div>
-          <div style="font-size:12px;color:#999;margin-bottom:12px;">Customize the messages sent when you invoice clients. Use {client_name}, {amount}, {due_date}, {invoice_link} as placeholders.</div>
-          <div class="form-row">
-            <label>Email subject line</label>
-            <input type="text" id="tmpl-email-subject" value="Invoice from Hawaii Natural Clean" style="font-size:12px;">
-          </div>
-          <div class="form-row">
-            <label>Email body</label>
-            <textarea id="tmpl-email-body" style="min-height:100px;font-size:12px;">Hi {client_name},
-
-Please find your invoice for ${amount} attached. Payment is due {due_date}.
-
-Pay online here: {invoice_link}
-
-Thank you for choosing Hawaii Natural Clean!
-Mahalo 🌺</textarea>
-          </div>
-          <div class="form-row">
-            <label>SMS invoice message</label>
-            <textarea id="tmpl-sms-invoice" style="min-height:80px;font-size:12px;">Hi {client_name}, your invoice for ${amount} from Hawaii Natural Clean is ready. Pay here: {invoice_link}</textarea>
-          </div>
-          <div class="form-row">
-            <label>SMS payment confirmation</label>
-            <textarea id="tmpl-sms-paid" style="min-height:80px;font-size:12px;">Hi {client_name}, we received your payment of ${amount}. Thank you! See you on your next clean. 🌺</textarea>
-          </div>
-          <button class="btn btn-primary" onclick="saveMessageTemplates()" style="margin-top:8px;">Save templates</button>
-          <div class="success-bar" id="msg-tmpl-success">Templates saved!</div>
-        <!-- PAYROLL SETTINGS -->
-        <div style="background:#fff;border:1px solid #eee;border-radius:10px;padding:20px;margin-top:16px">
-          <div style="font-size:11px;font-weight:600;color:#aaa;margin-bottom:12px;letter-spacing:0.5px;text-transform:uppercase">Payroll</div>
-          <div class="form-two">
-            <div class="form-row"><label>Pay frequency</label>
-              <select id="set-payroll-frequency">
-                <option value="weekly">Weekly</option>
-                <option value="biweekly">Every 2 weeks</option>
-                <option value="monthly">Monthly</option>
-              </select>
-            </div>
-            <div class="form-row"><label>Payday</label>
-              <select id="set-payroll-payday">
-                <option value="monday">Monday</option>
-                <option value="tuesday">Tuesday</option>
-                <option value="wednesday">Wednesday</option>
-                <option value="thursday">Thursday</option>
-                <option value="friday">Friday</option>
-                <option value="saturday">Saturday</option>
-                <option value="sunday">Sunday</option>
-              </select>
-            </div>
-          </div>
-          <div style="font-size:12px;color:#888;margin-top:4px">Each payday covers the previous Mon–Sun week. Payment is marked manually after you send via QuickBooks.</div>
-          <button class="btn btn-primary" onclick="savePayrollSettings()" style="margin-top:12px">Save payroll settings</button>
-          <div class="success-bar" id="payroll-settings-success">Payroll settings saved!</div>
-        </div>
-
-        </div>
-
-      </div>
-
+        <!-- SETTINGS VIEW -->
       <!-- AI AGENT VIEW -->
       <div id="view-agent" class="vc">
         <div style="max-width:680px;margin:0 auto;">

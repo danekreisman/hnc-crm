@@ -614,23 +614,6 @@ textarea{font-family:inherit;}
           <button class="btn" style="background:#553c9a;color:#fff;border-color:#553c9a;font-size:12px;flex-shrink:0;padding:7px 14px;" onclick="openStripeConnect()">Connect Stripe</button>
         </div>
 
-        <!-- PAYMENT METHOD NUDGE SETTINGS -->
-        <div style="background:#f0faf6;border:1px solid #9ae6b4;border-radius:10px;padding:12px 16px;margin-bottom:16px;">
-          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
-            <div>
-              <div style="font-size:13px;font-weight:600;color:#276749;">ACH payment incentive — active</div>
-              <div style="font-size:12px;color:#276749;margin-top:2px;">Invoices accept ACH, card, Apple Pay, Cash App, Klarna, and Link. Residential invoices default to due now.</div>
-            </div>
-            <button class="btn" style="font-size:12px;border-color:#9ae6b4;color:#276749;" onclick="openAchSettings()">Edit message</button>
-          </div>
-          <div style="margin-top:10px;background:#fff;border-radius:8px;padding:10px 12px;font-size:12px;color:#444;line-height:1.6;border:1px solid #c6f6d5;" id="ach-preview">
-            <strong>Payment options for your invoice:</strong><br>
-            Pay by ACH bank transfer — <strong>FREE</strong> (3-5 business days)<br>
-            Pay by card, ACH, Apple Pay, Cash App, Klarna, or Link<br><br>
-            We encourage ACH to keep your costs down. Click below to choose your payment method.
-          </div>
-        </div>
-
         <!-- TABS -->
         <div style="display:flex;gap:0;border-bottom:1px solid #e8e8e5;margin-bottom:16px;">
           <div class="pay-tab active" onclick="switchPayTab('pending',this)">Pending charges</div>
@@ -4987,7 +4970,7 @@ function showPaymentToast(msg,callback,type){
 
 
 /* PAYMENTS RENDER (live data) */
-async function renderPaymentsSection(){
+async function renderPaymentsSection(){ checkStripeConnectivity(); refreshCardOnFileCache();
   try {
     if (typeof db === 'undefined' || !db || !db.from) return;
     // Pull completed-but-not-invoiced appointments
@@ -5031,7 +5014,7 @@ async function renderPaymentsSection(){
       });
       groupOrder.forEach(function(key){
         var g = groups[key];
-        var hasCard = !!(g.rec && (g.rec.stripeCustomerId || g.rec.stripe_customer_id));
+        var hasCard = !!(g.rec && (g.rec.stripeCustomerId || g.rec.stripe_customer_id)) || !!(g.cid && window._cardCache && window._cardCache[g.cid] && window._cardCache[g.cid].hasCard);
         var multi = g.appts.length > 1;
         var groupId = 'pgrp-' + (g.cid || key.replace(/[^a-zA-Z0-9]/g,'_'));
         var totalStr = '$' + g.total.toFixed(2);
@@ -5048,7 +5031,7 @@ async function renderPaymentsSection(){
         var dateLabel = multi ? '—' : (g.appts[0].date || '');
         var actionBtns = '';
         if (hasCard) {
-          actionBtns += '<button class="btn-secondary" style="background:#dcfce7;color:#166534;border-color:#bbf7d0;margin-right:4px;" onclick="event.stopPropagation();chargePendingGroup(this)" title="Charge card on file">Charge card</button>';
+          actionBtns += '<button class="btn-secondary" data-charge-btn="1" style="background:#dcfce7;color:#166534;border-color:#bbf7d0;margin-right:4px;" onclick="event.stopPropagation();chargePendingGroup(this)" title="Charge card on file">Charge card</button>';
         }
         actionBtns += '<button class="btn-secondary" onclick="event.stopPropagation();invoicePendingGroup(this)">' + (multi ? 'Invoice all' : 'Send invoice') + '</button>';
         hr.innerHTML =
@@ -5078,7 +5061,7 @@ async function renderPaymentsSection(){
             var amtStr = '$' + parseFloat(a.total_price || 0).toFixed(2);
             var subActions = '';
             if (hasCard) {
-              subActions += '<button class="btn-secondary" style="background:#dcfce7;color:#166534;border-color:#bbf7d0;margin-right:4px;font-size:11px;padding:4px 8px;" onclick="chargeSinglePending(this)">Charge</button>';
+              subActions += '<button class="btn-secondary" data-charge-btn="1" style="background:#dcfce7;color:#166534;border-color:#bbf7d0;margin-right:4px;font-size:11px;padding:4px 8px;" onclick="chargeSinglePending(this)">Charge</button>';
             }
             subActions += '<button class="btn-secondary" style="font-size:11px;padding:4px 8px;" onclick="invoiceSinglePending(this)">Invoice</button>';
             sr.innerHTML =
@@ -5512,6 +5495,77 @@ async function invoicePendingAppointments(clientId, clientName, apptIds){
   }
 }
 
+// Stripe connectivity probe (toggles banner + status pill)
+var _stripeChecked = false;
+async function checkStripeConnectivity(){
+  if (_stripeChecked) return;
+  _stripeChecked = true;
+  try {
+    var resp = await fetch('/api/stripe-invoice', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ action: 'stripe_status_check' }) });
+    var data = await resp.json();
+    if (data && data.success && data.connected) {
+      try { window.stripeConnected = true; } catch(e){}
+      var badge = document.getElementById('stripe-status-badge');
+      var sub = document.getElementById('stripe-status-sub');
+      if (badge) { badge.textContent = 'Connected'; badge.style.color = '#1D9E75'; }
+      if (sub) { sub.textContent = data.keyType + ' mode'; }
+      var banner = document.getElementById('stripe-banner');
+      if (banner) banner.style.display = 'none';
+    }
+  } catch(e){ console.warn('[stripe status] err:', e); }
+}
+
+// Card-on-file cache: { clientId: { customerId, hasCard } }
+window._cardCache = window._cardCache || {};
+async function refreshCardOnFileCache(){
+  if (typeof clientDB === 'undefined') return;
+  var ids = Object.keys(clientDB).filter(function(id){ return id.length >= 30 && clientDB[id].email; });
+  for (var i = 0; i < ids.length; i++) {
+    var id = ids[i];
+    if (window._cardCache[id]) continue;
+    var c = clientDB[id];
+    try {
+      var resp = await fetch('/api/stripe-invoice', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ action: 'find_customer_cards', customerEmail: c.email }) });
+      var data = await resp.json();
+      if (data && data.success) {
+        var hasCard = (data.cards && data.cards.length > 0);
+        window._cardCache[id] = { customerId: data.customerId, hasCard: hasCard };
+        // Persist customerId to DB and clientDB for fast future reference
+        if (data.customerId && (!c.stripeCustomerId && !c.stripe_customer_id)) {
+          try { await db.from('clients').update({ stripe_customer_id: data.customerId }).eq('id', id); } catch(e){}
+          c.stripeCustomerId = data.customerId;
+        }
+      } else {
+        window._cardCache[id] = { customerId: null, hasCard: false };
+      }
+    } catch(e){ window._cardCache[id] = { customerId: null, hasCard: false }; }
+  }
+  // Re-render pending so Charge buttons appear
+  if (typeof renderPendingOnly === 'function') renderPendingOnly();
+  else if (typeof renderPaymentsSection === 'function') {
+    // Re-render only if currently on payments view to avoid loops
+    try { var v = (typeof currentView !== 'undefined') ? currentView : ''; if (v === 'payments') {
+      // Light re-render: just toggle Charge button visibility for known cached clients
+      document.querySelectorAll('.pending-group-header, .pending-sub-row').forEach(function(row){
+        var cid = row.getAttribute('data-client-id');
+        if (cid && window._cardCache[cid] && window._cardCache[cid].hasCard) {
+          // If the row doesn't already have a Charge button, fully re-render
+          if (!row.querySelector('button[data-charge-btn]')) {
+            // Trigger a render — use a small delay to avoid recursion
+            setTimeout(function(){ try { renderPaymentsSectionLight(); } catch(e){} }, 50);
+          }
+        }
+      });
+    } } catch(e){}
+  }
+}
+function renderPaymentsSectionLight(){
+  // Just rebuild pending rows by calling the full renderer (it reads cache for hasCard)
+  if (window._renderingPayments) return;
+  window._renderingPayments = true;
+  try { renderPaymentsSection(); } finally { setTimeout(function(){ window._renderingPayments = false; }, 100); }
+}
+
 // Check Stripe for any unpaid DB invoices and mark them paid if Stripe says so
 async function syncStripeInvoiceStatus(){
   try {
@@ -5565,6 +5619,7 @@ function openCustomInvoice(){
   var lines = document.getElementById('custom-inv-lines');
   lines.innerHTML = '';
   addCustomInvoiceLine();
+  refreshCustomInvoiceAppts();
   recalcCustomInvoiceTotals();
   document.getElementById('custom-invoice-overlay').classList.remove('hidden');
 }
@@ -5594,6 +5649,38 @@ function recalcCustomInvoiceTotals(){
   if (taxEl) taxEl.textContent = '$' + tax.toFixed(2);
   if (totEl) totEl.textContent = '$' + total.toFixed(2);
 }
+async function refreshCustomInvoiceAppts(){
+  var sel = document.getElementById('custom-inv-client');
+  var wrap = document.getElementById('custom-inv-attach-wrap');
+  var list = document.getElementById('custom-inv-attach-list');
+  if (!sel || !wrap || !list) return;
+  var clientId = sel.value;
+  list.innerHTML = '';
+  if (!clientId) { wrap.style.display = 'none'; return; }
+  // Find this client's name to also match name-based pending
+  var cname = '';
+  try { if (clientDB[clientId]) cname = (clientDB[clientId].name || '').toLowerCase(); } catch(e){}
+  try {
+    var apptsRes = await db.from('appointments').select('id,client_id,client_name,service,date,total_price,status,invoice_sent').eq('status','completed').order('date',{ascending:false});
+    var rows = (apptsRes.data || []).filter(function(a){
+      if (a.invoice_sent) return false;
+      if (a.client_id && a.client_id === clientId) return true;
+      if (!a.client_id && a.client_name && cname && a.client_name.toLowerCase() === cname) return true;
+      return false;
+    });
+    if (rows.length === 0) { wrap.style.display = 'none'; return; }
+    wrap.style.display = '';
+    rows.forEach(function(a){
+      var label = document.createElement('label');
+      label.style.cssText = 'display:flex;align-items:center;gap:8px;padding:4px 0;cursor:pointer;';
+      label.innerHTML = '<input type="checkbox" class="ci-attach-appt" value="' + a.id + '" data-amount="' + (a.total_price || 0) + '" data-desc="' + ((a.service || 'Cleaning') + ' — ' + (a.date || '')).replace(/"/g, '&quot;') + '">' +
+        '<span style="flex:1;">' + (a.service || 'Cleaning') + ' — ' + (a.date || '') + '</span>' +
+        '<span style="color:#666;">$' + parseFloat(a.total_price || 0).toFixed(2) + '</span>';
+      list.appendChild(label);
+    });
+  } catch(e){ console.warn('[refreshCustomInvoiceAppts] err:', e); }
+}
+
 async function sendCustomInvoice(){
   var clientId = document.getElementById('custom-inv-client').value;
   var subject = document.getElementById('custom-inv-subject').value.trim();
@@ -5638,6 +5725,15 @@ async function sendCustomInvoice(){
       showPaymentToast('Invoice failed: ' + (data.error || 'Unknown error'), null, 'error');
       return;
     }
+    // Collect attached appointment IDs
+    var attachedApptIds = [];
+    document.querySelectorAll('#custom-inv-attach-list .ci-attach-appt:checked').forEach(function(cb){ attachedApptIds.push(cb.value); });
+    var notesWithAppts = (notes || subject || 'Custom invoice');
+    if (attachedApptIds.length > 0) { notesWithAppts += '\nAppts: ' + attachedApptIds.join(','); }
+    // Mark attached appointments as invoiced so they leave Pending
+    for (var ai = 0; ai < attachedApptIds.length; ai++) {
+      try { await db.from('appointments').update({ invoice_sent: true, status: 'invoiced' }).eq('id', attachedApptIds[ai]); } catch(e){}
+    }
     await db.from('invoices').insert({
       client_name: c.name, client_id: clientId,
       service: subject || 'Custom invoice',
@@ -5645,7 +5741,7 @@ async function sendCustomInvoice(){
       status: 'unpaid',
       stripe_invoice_id: data.invoiceId || null,
       stripe_invoice_url: data.invoiceUrl || null,
-      notes: notes || subject || 'Custom invoice',
+      notes: notesWithAppts,
       created_at: new Date().toISOString()
     });
     showPaymentToast('Custom invoice sent to ' + c.name + '!', null, 'success');
@@ -8115,7 +8211,7 @@ loadSettings();
   <div class="panel" onclick="event.stopPropagation()" style="max-width:680px;">
     <div class="panel-header"><div class="panel-title">Custom invoice</div><button class="close-btn" onclick="closeOverlay('custom-invoice-overlay')">&#x2715;</button></div>
     <div class="panel-body">
-      <div class="form-row"><label>Client</label><select id="custom-inv-client"></select></div>
+      <div class="form-row"><label>Client</label><select id="custom-inv-client" onchange="refreshCustomInvoiceAppts()"></select></div>
       <div class="form-row"><label>Invoice description / subject</label><input type="text" id="custom-inv-subject" placeholder="e.g. Monthly cleaning contract — April 2026"></div>
       <div class="form-row"><label>Line items</label>
         <div id="custom-inv-lines"></div>
@@ -8130,6 +8226,7 @@ loadSettings();
         </div>
       </div>
       <div class="form-row"><label>Notes (shown on invoice)</label><textarea id="custom-inv-notes" style="min-height:60px;" placeholder="Optional note shown on invoice..."></textarea></div>
+      <div class="form-row" id="custom-inv-attach-wrap" style="display:none;"><label>Attach pending appointments (optional) — these will be marked paid when invoice is paid</label><div id="custom-inv-attach-list" style="max-height:160px;overflow-y:auto;border:1px solid #e0e0dd;border-radius:6px;padding:6px 8px;font-size:12px;"></div></div>
       <div class="info-block" style="background:#f8f8f5;padding:10px 12px;border-radius:8px;margin-top:8px;">
         <div class="info-row"><span class="info-label">Subtotal</span><span class="info-val" id="custom-inv-subtotal">$0.00</span></div>
         <div class="info-row"><span class="info-label">Tax (4%)</span><span class="info-val" id="custom-inv-taxamt">$0.00</span></div>

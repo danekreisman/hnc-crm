@@ -599,9 +599,9 @@ textarea{font-family:inherit;}
       <!-- PAYMENTS VIEW -->
       <div id="view-payments" class="vc">
         <div class="metrics">
-          <div class="metric"><div class="metric-label">Pending charges</div><div class="metric-value" id="pay-pending-count">4</div><div class="metric-sub down">Need action</div></div>
-          <div class="metric"><div class="metric-label">Outstanding</div><div class="metric-value">$1,842</div><div class="metric-sub down">4 unpaid invoices</div></div>
-          <div class="metric"><div class="metric-label">Collected this month</div><div class="metric-value">$14,280</div><div class="metric-sub up">+8% vs last mo</div></div>
+          <div class="metric"><div class="metric-label">Pending charges</div><div class="metric-value" id="pay-pending-count">0</div><div class="metric-sub down" id="pay-pending-sub">Completed, needs invoicing</div></div>
+          <div class="metric"><div class="metric-label">Outstanding</div><div class="metric-value" id="pay-outstanding-val">$0</div><div class="metric-sub down" id="pay-outstanding-sub">0 unpaid invoices</div></div>
+          <div class="metric"><div class="metric-label">Collected this month</div><div class="metric-value" id="pay-collected-val">$0</div><div class="metric-sub up" id="pay-collected-sub">This month</div></div>
           <div class="metric"><div class="metric-label">Stripe status</div><div class="metric-value" id="stripe-status-badge" style="font-size:13px;color:#b7791f;">Not connected</div><div class="metric-sub" id="stripe-status-sub">API key needed</div></div>
         </div>
 
@@ -634,22 +634,44 @@ textarea{font-family:inherit;}
         <!-- TABS -->
         <div style="display:flex;gap:0;border-bottom:1px solid #e8e8e5;margin-bottom:16px;">
           <div class="pay-tab active" onclick="switchPayTab('pending',this)">Pending charges</div>
-          <div class="pay-tab" onclick="switchPayTab('invoices',this)">All invoices</div>
+          <div class="pay-tab" onclick="switchPayTab('sent',this)">Sent — Unpaid</div>
+          <div class="pay-tab" onclick="switchPayTab('invoices',this)">Invoice history</div>
           <div class="pay-tab" onclick="switchPayTab('bulk',this)">Bulk invoice</div>
         </div>
 
         <!-- PENDING CHARGES -->
         <div id="pay-pending" class="pay-section">
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 4px 12px 4px;gap:8px;flex-wrap:wrap;">
+            <div style="color:#666;font-size:12px;">Completed appointments that haven't been invoiced yet. Select multiple from the same client to bundle into one invoice.</div>
+            <div>
+              <button class="btn-primary" id="pending-bulk-invoice-btn" onclick="createBulkInvoiceFromPending()" disabled>Create invoice from selected</button>
+            </div>
+          </div>
           <div style="font-size:12px;color:#999;margin-bottom:10px;">Completed jobs that need payment — sorted by date. Residential clients default to charge now.</div>
           <div class="tw"><table><thead><tr>
+            <th style="width:4%"><input type="checkbox" id="pending-check-all" onclick="togglePendingAll(this)"></th>
             <th style="width:18%">Client</th>
-            <th style="width:16%">Service</th>
+            <th style="width:18%">Service</th>
             <th style="width:10%">Date</th>
             <th style="width:10%">Amount</th>
             <th style="width:12%">Type</th>
-            <th style="width:14%">Payment</th>
-            <th style="width:20%">Action</th>
+            <th style="width:10%">Duration</th>
+            <th style="width:18%">Action</th>
           </tr></thead><tbody id="pending-tbody">
+          </tbody></table></div>
+        </div>
+
+        <!-- SENT (UNPAID) INVOICES -->
+        <div id="pay-sent" class="pay-section hidden">
+          <div style="padding:8px 4px 12px 4px;color:#666;font-size:12px;">Invoices that have been sent but not yet paid. Click to open in Stripe or re-send.</div>
+          <div class="tw"><table><thead><tr>
+            <th style="width:22%">Client</th>
+            <th style="width:22%">Service</th>
+            <th style="width:12%">Sent</th>
+            <th style="width:12%">Amount</th>
+            <th style="width:12%">Terms</th>
+            <th style="width:20%">Actions</th>
+          </tr></thead><tbody id="sent-tbody">
           </tbody></table></div>
         </div>
 
@@ -1802,6 +1824,7 @@ async function loadAllData(){
     console.error('Load error:',err);
   }
   try { autoCompleteExpiredBookings(); } catch(e){ console.warn('autoComplete call err:', e); }
+  try { renderPaymentsSection(); } catch(e){ console.warn('renderPayments err:', e); }
   showLoadingState(false);
   loadMessageTemplates();
   loadSettings();
@@ -1847,8 +1870,9 @@ function autoCompleteExpiredBookings(){
           }).catch(function(e){ console.warn("[autoComplete] update err:", e); });
         });
       }
-      try { if (typeof renderCalendar === "function") renderCalendar(); } catch(e){}
+      try { if (typeof renderCal === "function") renderCal(); } catch(e){}
       try { if (typeof updateDashboardStats === "function") updateDashboardStats(); } catch(e){}
+      try { if (typeof renderPaymentsSection === "function") renderPaymentsSection(); } catch(e){}
     }
   } catch(err) {
     console.error("[autoComplete] error:", err);
@@ -4995,8 +5019,247 @@ function showPaymentToast(msg,callback,type){
 }
 
 
+/* PAYMENTS RENDER (live data) */
+async function renderPaymentsSection(){
+  try {
+    if (typeof db === 'undefined' || !db || !db.from) return;
+    // Pull completed-but-not-invoiced appointments
+    var apptsRes = await db.from('appointments')
+      .select('id, client_name, client_id, service, date, time, duration_hours, base_price, tax, total_price, status, invoice_sent')
+      .eq('status', 'completed')
+      .order('date', {ascending: false});
+    var appts = (apptsRes.data || []).filter(function(a){ return !a.invoice_sent; });
+    
+    // Pull all invoices
+    var invRes = await db.from('invoices').select('*').order('created_at', {ascending: false});
+    var invoices = invRes.data || [];
+    
+    // Render Pending Charges
+    var pendingTbody = document.getElementById('pending-tbody');
+    if (pendingTbody) {
+      pendingTbody.innerHTML = '';
+      if (appts.length === 0) {
+        pendingTbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#999;padding:20px;">No pending charges — all completed bookings have been invoiced.</td></tr>';
+      } else {
+        appts.forEach(function(a){
+          var tr = document.createElement('tr');
+          tr.setAttribute('data-appt-id', a.id);
+          tr.setAttribute('data-client-id', a.client_id || '');
+          tr.setAttribute('data-client-name', a.client_name || '');
+          tr.setAttribute('data-amount', a.total_price || 0);
+          var amtStr = '$' + parseFloat(a.total_price || 0).toFixed(2);
+          var dateStr = a.date || '';
+          var dur = a.duration_hours ? (a.duration_hours + 'h') : '—';
+          tr.innerHTML =
+            '<td><input type="checkbox" class="pending-row-check" onclick="updateBulkInvoiceBtn()"></td>' +
+            '<td>' + escapeHtmlPay(a.client_name || '') + '</td>' +
+            '<td>' + escapeHtmlPay(a.service || 'Cleaning') + '</td>' +
+            '<td>' + dateStr + '</td>' +
+            '<td>' + amtStr + '</td>' +
+            '<td>' + (a.time || '') + '</td>' +
+            '<td>' + dur + '</td>' +
+            '<td><button class="btn-secondary" onclick="sendSinglePendingInvoice(this)">Send invoice</button></td>';
+          pendingTbody.appendChild(tr);
+        });
+      }
+      document.getElementById('pay-pending-count').textContent = appts.length;
+    }
+    
+    // Split invoices: unpaid (sent but not paid), history (all)
+    var unpaid = invoices.filter(function(i){ 
+      var s = (i.status||'').toLowerCase();
+      return s === 'unpaid' || s === 'open' || s === 'sent' || s === 'pending';
+    });
+    
+    // Render Sent — Unpaid
+    var sentTbody = document.getElementById('sent-tbody');
+    if (sentTbody) {
+      sentTbody.innerHTML = '';
+      if (unpaid.length === 0) {
+        sentTbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#999;padding:20px;">No unpaid invoices.</td></tr>';
+      } else {
+        unpaid.forEach(function(i){
+          var tr = document.createElement('tr');
+          var amtStr = '$' + parseFloat(i.total || i.amount || 0).toFixed(2);
+          var sent = i.created_at ? new Date(i.created_at).toLocaleDateString() : '—';
+          var stripeUrl = i.stripe_invoice_id ? ('https://dashboard.stripe.com/invoices/' + i.stripe_invoice_id) : null;
+          tr.innerHTML =
+            '<td>' + escapeHtmlPay(i.client_name || '') + '</td>' +
+            '<td>' + escapeHtmlPay(i.service || 'Cleaning') + '</td>' +
+            '<td>' + sent + '</td>' +
+            '<td>' + amtStr + '</td>' +
+            '<td>' + (i.payment_terms || '—') + '</td>' +
+            '<td>' + (stripeUrl ? '<a href="' + stripeUrl + '" target="_blank" class="btn-secondary" style="text-decoration:none;">View in Stripe</a>' : '—') + '</td>';
+          sentTbody.appendChild(tr);
+        });
+      }
+    }
+    
+    // Render Invoice History (all invoices)
+    var invTbody = document.getElementById('invoice-tbody');
+    if (invTbody) {
+      invTbody.innerHTML = '';
+      if (invoices.length === 0) {
+        invTbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#999;padding:20px;">No invoices yet.</td></tr>';
+      } else {
+        invoices.forEach(function(i){
+          var tr = document.createElement('tr');
+          var amtStr = '$' + parseFloat(i.total || i.amount || 0).toFixed(2);
+          var created = i.created_at ? new Date(i.created_at).toLocaleDateString() : '—';
+          var status = i.status || 'Unpaid';
+          var stripeUrl = i.stripe_invoice_id ? ('https://dashboard.stripe.com/invoices/' + i.stripe_invoice_id) : null;
+          var statusColor = /paid/i.test(status) ? '#0a7a4e' : '#c46a10';
+          tr.innerHTML =
+            '<td>' + escapeHtmlPay(i.client_name || '') + '</td>' +
+            '<td>' + escapeHtmlPay(i.service || 'Cleaning') + '</td>' +
+            '<td>' + created + '</td>' +
+            '<td>' + amtStr + '</td>' +
+            '<td>' + (i.payment_terms || '—') + '</td>' +
+            '<td><span style="color:' + statusColor + ';font-weight:600;">' + status + '</span></td>' +
+            '<td>' + (stripeUrl ? '<a href="' + stripeUrl + '" target="_blank" class="btn-secondary" style="text-decoration:none;">View</a>' : '—') + '</td>';
+          invTbody.appendChild(tr);
+        });
+      }
+    }
+    
+    // Update metric totals
+    var outstandingTotal = 0;
+    unpaid.forEach(function(i){ outstandingTotal += parseFloat(i.total || i.amount || 0); });
+    var outstandingEl = document.getElementById('pay-outstanding-val');
+    var outstandingSubEl = document.getElementById('pay-outstanding-sub');
+    if (outstandingEl) outstandingEl.textContent = '$' + outstandingTotal.toFixed(2);
+    if (outstandingSubEl) outstandingSubEl.textContent = unpaid.length + ' unpaid invoice' + (unpaid.length === 1 ? '' : 's');
+    
+    var now = new Date();
+    var thisMonth = invoices.filter(function(i){ 
+      if (!i.created_at) return false;
+      var d = new Date(i.created_at);
+      return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && /paid/i.test(i.status || '');
+    });
+    var collectedTotal = 0;
+    thisMonth.forEach(function(i){ collectedTotal += parseFloat(i.total || i.amount || 0); });
+    var collectedEl = document.getElementById('pay-collected-val');
+    if (collectedEl) collectedEl.textContent = '$' + collectedTotal.toFixed(2);
+    
+  } catch(err) {
+    console.error('[renderPaymentsSection] error:', err);
+  }
+}
+
+function escapeHtmlPay(s){
+  return String(s||'').replace(/[&<>"]/g, function(c){
+    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];
+  });
+}
+
+function togglePendingAll(cb){
+  document.querySelectorAll('.pending-row-check').forEach(function(x){ x.checked = cb.checked; });
+  updateBulkInvoiceBtn();
+}
+
+function updateBulkInvoiceBtn(){
+  var checks = document.querySelectorAll('.pending-row-check:checked');
+  var btn = document.getElementById('pending-bulk-invoice-btn');
+  if (!btn) return;
+  btn.disabled = checks.length === 0;
+  if (checks.length > 1) btn.textContent = 'Create 1 invoice from ' + checks.length + ' selected';
+  else if (checks.length === 1) btn.textContent = 'Create invoice (1 selected)';
+  else btn.textContent = 'Create invoice from selected';
+}
+
+async function createBulkInvoiceFromPending(){
+  var rows = Array.from(document.querySelectorAll('#pending-tbody tr')).filter(function(tr){
+    var cb = tr.querySelector('.pending-row-check');
+    return cb && cb.checked;
+  });
+  if (rows.length === 0) return;
+  // Verify all rows are same client
+  var clientIds = Array.from(new Set(rows.map(function(tr){ return tr.getAttribute('data-client-id') || ''; })));
+  if (clientIds.length > 1) {
+    showPaymentToast('All selected appointments must be from the same client.', null, 'error');
+    return;
+  }
+  var clientName = rows[0].getAttribute('data-client-name') || '';
+  var clientId = rows[0].getAttribute('data-client-id') || '';
+  var lineItems = rows.map(function(tr){
+    var tds = tr.querySelectorAll('td');
+    var service = tds[2] ? tds[2].textContent : 'Cleaning';
+    var date = tds[3] ? tds[3].textContent : '';
+    var amt = parseFloat(tr.getAttribute('data-amount')) || 0;
+    var apptId = tr.getAttribute('data-appt-id') || '';
+    return { description: service + ' — ' + date, amount: amt, apptId: apptId };
+  });
+  // Look up client email from clientDB
+  var clientEmail = null;
+  if (typeof clientDB !== 'undefined' && clientDB[clientId]) {
+    clientEmail = clientDB[clientId].email;
+  }
+  if (!clientEmail || clientEmail === '—') {
+    showPaymentToast('Client "' + clientName + '" has no email on file. Add one first.', null, 'error');
+    return;
+  }
+  var terms = 'net30';
+  showPaymentToast('Sending ' + lineItems.length + '-item invoice to ' + clientName + '...', null, null);
+  try {
+    var resp = await fetch('/api/stripe-invoice', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        action: 'send_invoice',
+        customerName: clientName,
+        customerEmail: clientEmail,
+        customerId: (typeof clientDB !== 'undefined' && clientDB[clientId] && clientDB[clientId].stripeCustomerId) || '',
+        lineItems: lineItems,
+        terms: terms,
+        service: lineItems.length + ' cleaning appointments'
+      })
+    });
+    var data = await resp.json();
+    if (data.success) {
+      // Record in invoices table + mark appts invoice_sent
+      var totalAmt = lineItems.reduce(function(s,i){ return s + i.amount; }, 0);
+      await db.from('invoices').insert([{
+        client_name: clientName,
+        client_id: (clientId && clientId.length > 20) ? clientId : null,
+        service: lineItems.length + ' cleaning appointments',
+        amount: totalAmt,
+        tax: 0,
+        total: totalAmt,
+        payment_method: 'email',
+        payment_terms: terms,
+        status: 'Unpaid',
+        stripe_invoice_id: data.invoiceId || null,
+        notes: 'Bulk invoice: ' + lineItems.map(function(li){return li.description;}).join('; ')
+      }]);
+      // Mark each appt as invoice_sent
+      var apptIds = lineItems.map(function(li){return li.apptId;}).filter(Boolean);
+      for (var k = 0; k < apptIds.length; k++) {
+        await db.from('appointments').update({invoice_sent: true}).eq('id', apptIds[k]);
+      }
+      showPaymentToast('Bulk invoice sent to ' + clientName + '! $' + totalAmt.toFixed(2) + ' across ' + lineItems.length + ' items.', null, 'success');
+      await renderPaymentsSection();
+    } else {
+      showPaymentToast('Invoice failed: ' + (data.error || 'unknown'), null, 'error');
+    }
+  } catch(e) {
+    showPaymentToast('Invoice error: ' + e.message, null, 'error');
+  }
+}
+
+async function sendSinglePendingInvoice(btn){
+  var tr = btn.closest('tr');
+  if (!tr) return;
+  // Check just this row then trigger bulk path (single-item bulk invoice)
+  document.querySelectorAll('.pending-row-check').forEach(function(x){ x.checked = false; });
+  var cb = tr.querySelector('.pending-row-check');
+  if (cb) cb.checked = true;
+  updateBulkInvoiceBtn();
+  await createBulkInvoiceFromPending();
+}
+
 /* PAYMENTS JS */
 function switchPayTab(tab, el){
+  try { renderPaymentsSection(); } catch(e){}
   document.querySelectorAll('.pay-tab').forEach(function(t){t.classList.remove('active');});
   document.querySelectorAll('.pay-section').forEach(function(s){s.style.display='none';});
   el.classList.add('active');

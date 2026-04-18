@@ -544,16 +544,15 @@ textarea{font-family:inherit;}
         </div>
         <div class="ppbar">
           <div class="ppbar-label">Pay period:</div>
-          <button class="pbtn" onclick="setPeriod(this)">Mar 16–31</button>
-          <button class="pbtn active" onclick="setPeriod(this)">Apr 1–14</button>
-          <button class="pbtn" onclick="setPeriod(this)">Apr 15–30</button>
-          <div style="flex:1"></div>
-          <button class="btn btn-primary">Send to QuickBooks</button>
-          <button class="btn" style="background:#e6fffa;color:#276749;border-color:#9ae6b4;">Run in Gusto</button>
+          <div id="payroll-period-buttons" style="display:flex;gap:6px;flex-wrap:wrap;flex:1"></div>
+          <button class="btn" onclick="exportPayrollCSV()" title="Download CSV for manual import">Export CSV</button>
+          <button class="btn" onclick="refreshPayrollPeriods()" title="Recompute periods from settings">Refresh</button>
         </div>
-        <div class="section-title">Summary</div>
-        <div class="tw" style="margin-bottom:16px;"><table><thead><tr><th style="width:20%">Cleaner</th><th style="width:12%">Island</th><th style="width:11%">Hours</th><th style="width:11%">Rate</th><th style="width:14%">Gross</th><th style="width:13%">Paid</th><th style="width:19%">Status</th></tr></thead><tbody id="payroll-tbody">
-        </tbody></table></div>
+        <div class="section-title" style="margin-top:16px">Payroll — <span id="payroll-period-label">—</span></div>
+        <div class="tw" style="margin-bottom:16px"><table>
+        <thead><tr><th style="width:22%">Cleaner</th><th style="width:10%">Island</th><th style="width:10%">Hours</th><th style="width:10%">Rate</th><th style="width:12%">Gross</th><th style="width:12%">Paid</th><th style="width:12%">Status</th><th style="width:12%">Action</th></tr></thead>
+        <tbody id="payroll-tbody"></tbody></table></div>
+        <div id="payroll-appts-detail" style="margin-top:12px"></div>
       </div>
 
       <!-- REPORTING -->
@@ -772,6 +771,34 @@ Mahalo 🌺</textarea>
           </div>
           <button class="btn btn-primary" onclick="saveMessageTemplates()" style="margin-top:8px;">Save templates</button>
           <div class="success-bar" id="msg-tmpl-success">Templates saved!</div>
+        <!-- PAYROLL SETTINGS -->
+        <div style="background:#fff;border:1px solid #eee;border-radius:10px;padding:20px;margin-top:16px">
+          <div style="font-size:11px;font-weight:600;color:#aaa;margin-bottom:12px;letter-spacing:0.5px;text-transform:uppercase">Payroll</div>
+          <div class="form-two">
+            <div class="form-row"><label>Pay frequency</label>
+              <select id="set-payroll-frequency">
+                <option value="weekly">Weekly</option>
+                <option value="biweekly">Every 2 weeks</option>
+                <option value="monthly">Monthly</option>
+              </select>
+            </div>
+            <div class="form-row"><label>Payday</label>
+              <select id="set-payroll-payday">
+                <option value="monday">Monday</option>
+                <option value="tuesday">Tuesday</option>
+                <option value="wednesday">Wednesday</option>
+                <option value="thursday">Thursday</option>
+                <option value="friday">Friday</option>
+                <option value="saturday">Saturday</option>
+                <option value="sunday">Sunday</option>
+              </select>
+            </div>
+          </div>
+          <div style="font-size:12px;color:#888;margin-top:4px">Each payday covers the previous Mon–Sun week. Payment is marked manually after you send via QuickBooks.</div>
+          <button class="btn btn-primary" onclick="savePayrollSettings()" style="margin-top:12px">Save payroll settings</button>
+          <div class="success-bar" id="payroll-settings-success">Payroll settings saved!</div>
+        </div>
+
         </div>
 
       </div>
@@ -880,6 +907,34 @@ Mahalo 🌺</textarea>
           </div>
           <button class="btn btn-primary" onclick="saveMessageTemplates()" style="margin-top:8px;">Save templates</button>
           <div class="success-bar" id="msg-tmpl-success">Templates saved!</div>
+        <!-- PAYROLL SETTINGS -->
+        <div style="background:#fff;border:1px solid #eee;border-radius:10px;padding:20px;margin-top:16px">
+          <div style="font-size:11px;font-weight:600;color:#aaa;margin-bottom:12px;letter-spacing:0.5px;text-transform:uppercase">Payroll</div>
+          <div class="form-two">
+            <div class="form-row"><label>Pay frequency</label>
+              <select id="set-payroll-frequency">
+                <option value="weekly">Weekly</option>
+                <option value="biweekly">Every 2 weeks</option>
+                <option value="monthly">Monthly</option>
+              </select>
+            </div>
+            <div class="form-row"><label>Payday</label>
+              <select id="set-payroll-payday">
+                <option value="monday">Monday</option>
+                <option value="tuesday">Tuesday</option>
+                <option value="wednesday">Wednesday</option>
+                <option value="thursday">Thursday</option>
+                <option value="friday">Friday</option>
+                <option value="saturday">Saturday</option>
+                <option value="sunday">Sunday</option>
+              </select>
+            </div>
+          </div>
+          <div style="font-size:12px;color:#888;margin-top:4px">Each payday covers the previous Mon–Sun week. Payment is marked manually after you send via QuickBooks.</div>
+          <button class="btn btn-primary" onclick="savePayrollSettings()" style="margin-top:12px">Save payroll settings</button>
+          <div class="success-bar" id="payroll-settings-success">Payroll settings saved!</div>
+        </div>
+
         </div>
 
       </div>
@@ -1515,7 +1570,40 @@ async function dbLoadCleaners(){
   return data||[];
 }
 
-async function dbSaveAppointment(data){
+      async function dbLoadSettings(key){
+        const { data, error } = await db.from('settings').select('value').eq('key', key).maybeSingle();
+        if(error){ console.error('Load settings error', error); return null; }
+        return data ? data.value : null;
+      }
+
+      async function dbSaveSettings(key, value){
+        const { error } = await db.from('settings').upsert({ key: key, value: value, updated_at: new Date().toISOString() }, { onConflict: 'key' });
+        if(error){ console.error('Save settings error', error); return false; }
+        return true;
+      }
+
+      async function dbLoadPayPeriods(){
+        const { data, error } = await db.from('pay_periods').select('*').order('period_start', { ascending: false });
+        if(error){ console.error('Load pay_periods error', error); return []; }
+        return data || [];
+      }
+
+      async function dbUpsertPayPeriod(row){
+        const { error } = await db.from('pay_periods').upsert(row, { onConflict: 'period_key,cleaner_id' });
+        if(error){ console.error('Upsert pay_period error', error); throw error; }
+        return true;
+      }
+
+      async function dbDeletePayPeriod(period_key, cleaner_id, cleaner_name){
+        let q = db.from('pay_periods').delete().eq('period_key', period_key);
+        if(cleaner_id) q = q.eq('cleaner_id', cleaner_id);
+        else q = q.eq('cleaner_name', cleaner_name).is('cleaner_id', null);
+        const { error } = await q;
+        if(error){ console.error('Delete pay_period error', error); throw error; }
+        return true;
+      }
+
+      async function dbSaveAppointment(data){
   var row={
     client_name:data.clientName, service:data.service||'Regular Cleaning',
     frequency:data.freq||'One-time', date:data.date,
@@ -1562,7 +1650,40 @@ function _generateRecurringDates(yr,mo,dy,freq){
   return dates;
 }
 
-async function dbSaveAppointmentsBatch(rows){
+      async function dbLoadSettings(key){
+        const { data, error } = await db.from('settings').select('value').eq('key', key).maybeSingle();
+        if(error){ console.error('Load settings error', error); return null; }
+        return data ? data.value : null;
+      }
+
+      async function dbSaveSettings(key, value){
+        const { error } = await db.from('settings').upsert({ key: key, value: value, updated_at: new Date().toISOString() }, { onConflict: 'key' });
+        if(error){ console.error('Save settings error', error); return false; }
+        return true;
+      }
+
+      async function dbLoadPayPeriods(){
+        const { data, error } = await db.from('pay_periods').select('*').order('period_start', { ascending: false });
+        if(error){ console.error('Load pay_periods error', error); return []; }
+        return data || [];
+      }
+
+      async function dbUpsertPayPeriod(row){
+        const { error } = await db.from('pay_periods').upsert(row, { onConflict: 'period_key,cleaner_id' });
+        if(error){ console.error('Upsert pay_period error', error); throw error; }
+        return true;
+      }
+
+      async function dbDeletePayPeriod(period_key, cleaner_id, cleaner_name){
+        let q = db.from('pay_periods').delete().eq('period_key', period_key);
+        if(cleaner_id) q = q.eq('cleaner_id', cleaner_id);
+        else q = q.eq('cleaner_name', cleaner_name).is('cleaner_id', null);
+        const { error } = await q;
+        if(error){ console.error('Delete pay_period error', error); throw error; }
+        return true;
+      }
+
+      async function dbSaveAppointmentsBatch(rows){
   var res=await db.from('appointments').insert(rows).select();
   if(res.error)console.error('[dbSaveAppointmentsBatch] error:',res.error);
   else console.log('[dbSaveAppointmentsBatch] inserted '+rows.length+' rows, freq='+rows[0].frequency);
@@ -4065,100 +4186,259 @@ function sv(view,el){
   document.getElementById('sec-btn').textContent=secs[view]||'Filter';
   if(view==='messaging')renderInbox();
   if(view==='automations')renderAutomations();
-  if(view==='settings')initTemplateEditor();
-  if(view==='payroll')renderPayroll();
+  if(view==='settings'){initTemplateEditor();initPayrollSettingsUI();};
+  if(view==='payroll')refreshPayrollPeriods();
 }
 
-function setPeriod(btn){document.querySelectorAll('.pbtn').forEach(function(b){b.classList.remove('active');});btn.classList.add('active');}
+function setPeriod(btn){
+        document.querySelectorAll('#view-payroll .pbtn').forEach(function(b){b.classList.remove('active');});
+        btn.classList.add('active');
+      }
+      // --- Payroll state ---
+      var _payrollConfig = { frequency: 'weekly', payday: 'monday', timezone: 'Pacific/Honolulu' };
+      var _payrollPeriods = [];
+      var _payrollPeriodRows = {};
+      var _currentPayrollPeriodKey = null;
 
-function renderPayroll(){
-  var tbody=document.getElementById('payroll-tbody');
-  var logTbody=document.getElementById('hours-log-tbody');
-  if(!tbody)return;
+      function _fmtShort(d){ return d.toLocaleDateString('en-US',{month:'short',day:'numeric'}); }
+      function _fmtISODate(d){ var y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,'0'), dd=String(d.getDate()).padStart(2,'0'); return y+'-'+m+'-'+dd; }
+      function _mondayOf(d){ var x=new Date(d.getFullYear(),d.getMonth(),d.getDate()); var dow=x.getDay(); var diff = (dow===0? -6 : 1-dow); x.setDate(x.getDate()+diff); return x; }
+      function _addDays(d,n){ var x=new Date(d.getFullYear(),d.getMonth(),d.getDate()); x.setDate(x.getDate()+n); return x; }
 
-  // Aggregate per-cleaner totals from all apptData
-  var totals={};
-  Object.entries(apptData).forEach(function(entry){
-    var dateKey=entry[0];
-    var appts=entry[1];
-    appts.forEach(function(a){
-      var cname=a.cleaner||'Unassigned';
-      if(cname==='Unassigned')return;
-      var hrs=parseFloat(a.duration)||0;
-      var pay=parseFloat(a.cleanerPay)||calcCleanerPay(hrs,cname);
-      if(!totals[cname])totals[cname]={hrs:0,pay:0,jobs:[]};
-      totals[cname].hrs+=hrs;
-      totals[cname].pay+=pay;
-      totals[cname].jobs.push({date:dateKey,client:a.n,hrs:hrs,pay:pay});
-    });
-  });
+      function generatePayrollPeriods(weeksPast, weeksFuture){
+        weeksPast = weeksPast||8; weeksFuture = weeksFuture||1;
+        var today = new Date();
+        var thisMon = _mondayOf(today);
+        var out = [];
+        for(var i=-weeksPast; i<=weeksFuture; i++){
+          var mon = _addDays(thisMon, i*7);
+          var sun = _addDays(mon, 6);
+          var payday = _addDays(mon, 7);
+          out.push({
+            key: _fmtISODate(mon),
+            start: mon,
+            end: sun,
+            payday: payday,
+            label: _fmtShort(mon)+' – '+_fmtShort(sun)
+          });
+        }
+        return out;
+      }
 
-  // Render payroll summary table
-  tbody.innerHTML='';
-  var totalGross=0,totalHrs=0;
-  Object.entries(totals).forEach(function(entry){
-    var cname=entry[0];var t=entry[1];
-    var rate=getCleanerRate(cname);
-    var c=Object.values(cleanerDB).find(function(x){return x.name===cname;})||{};
-    var island=c.island||c.notes||'—';
-    var hrs=Math.round(t.hrs*100)/100;
-    var gross=Math.round(t.pay*100)/100;
-    totalGross+=gross; totalHrs+=hrs;
-    tbody.innerHTML+='<tr>'
-      +'<td>'+cname+'</td>'
-      +'<td>'+island+'</td>'
-      +'<td>'+hrs.toFixed(1)+'</td>'
-      +'<td>$'+rate.toFixed(0)+'/hr</td>'
-      +'<td>$'+gross.toFixed(2)+'</td>'
-      +'<td>$0.00</td>'
-      +'<td><span class="badge bpn">Pending</span></td>'
-      +'</tr>';
-  });
-  if(tbody.innerHTML===''){
-    tbody.innerHTML='<tr><td colspan="7" style="text-align:center;color:#999;padding:16px;">No cleaner pay data yet. Create appointments with assigned cleaners and durations.</td></tr>';
-  }
+      async function loadPayrollConfig(){
+        try {
+          var r = await dbLoadSettings('payroll_config');
+          if(r && typeof r==='object'){ _payrollConfig = Object.assign({frequency:'weekly',payday:'monday',timezone:'Pacific/Honolulu'}, r); }
+        } catch(e){ console.warn('loadPayrollConfig', e); }
+      }
 
-  // Render hours log
-  if(logTbody){
-    logTbody.innerHTML='';
-    var logRows=[];
-    Object.entries(apptData).forEach(function(entry){
-      var dateKey=entry[0];var appts=entry[1];
-      appts.forEach(function(a){
-        var cname=a.cleaner||'Unassigned';
-        if(cname==='Unassigned')return;
-        var hrs=parseFloat(a.duration)||0;
-        if(!hrs)return;
-        var pay=parseFloat(a.cleanerPay)||calcCleanerPay(hrs,cname);
-        var c=Object.values(cleanerDB).find(function(x){return x.name===cname;})||{};
-        var island=c.island||'—';
-        logRows.push({date:dateKey,cname:cname,client:a.n,hrs:hrs,island:island,pay:pay});
-      });
-    });
-    logRows.sort(function(a,b){return b.date.localeCompare(a.date);});
-    logRows.slice(0,50).forEach(function(r){
-      var parts=r.date.split('-');
-      var dStr=parts[1]+'/'+parts[2]+'/'+parts[0];
-      logTbody.innerHTML+='<tr>'
-        +'<td>'+r.cname+'</td>'
-        +'<td>'+dStr+'</td>'
-        +'<td>'+r.client+'</td>'
-        +'<td>'+r.hrs.toFixed(1)+'h</td>'
-        +'<td>'+r.island+'</td>'
-        +'<td>$'+r.pay.toFixed(2)+'</td>'
-        +'</tr>';
-    });
-    if(logTbody.innerHTML===''){
-      logTbody.innerHTML='<tr><td colspan="6" style="text-align:center;color:#999;padding:16px;">No hours logged yet.</td></tr>';
-    }
-  }
+      async function loadPayPeriodRows(){
+        try {
+          var rows = await dbLoadPayPeriods();
+          _payrollPeriodRows = {};
+          (rows||[]).forEach(function(r){ if(!_payrollPeriodRows[r.period_key]) _payrollPeriodRows[r.period_key]={}; _payrollPeriodRows[r.period_key][r.cleaner_id||('name:'+r.cleaner_name)] = r; });
+        } catch(e){ console.warn('loadPayPeriodRows', e); }
+      }
 
-  // Update metrics
-  var metrics=document.querySelectorAll('#view-payroll .metric-value');
-  if(metrics[0])metrics[0].textContent='$'+totalGross.toFixed(2);
-  if(metrics[1])metrics[1].textContent=totalHrs.toFixed(1)+'h';
-  console.log('[renderPayroll] cleaners='+Object.keys(totals).length+' totalHrs='+totalHrs.toFixed(1)+' totalGross=$'+totalGross.toFixed(2));
-}
+      async function refreshPayrollPeriods(){
+        await loadPayrollConfig();
+        await loadPayPeriodRows();
+        _payrollPeriods = generatePayrollPeriods(8,1);
+        if(!_currentPayrollPeriodKey || !_payrollPeriods.find(function(p){return p.key===_currentPayrollPeriodKey;})){
+          var now = new Date();
+          var thisMonKey = _fmtISODate(_mondayOf(now));
+          _currentPayrollPeriodKey = thisMonKey;
+        }
+        var bc = document.getElementById('payroll-period-buttons');
+        if(bc){
+          bc.innerHTML = _payrollPeriods.map(function(p){
+            var active = (p.key===_currentPayrollPeriodKey)? ' active':'';
+            return '<button class="pbtn'+active+'" data-period="'+p.key+'" onclick="setPayrollPeriod(\''+p.key+'\', this)">'+p.label+'</button>';
+          }).join('');
+        }
+        renderPayroll();
+      }
+
+      function setPayrollPeriod(key, btn){
+        _currentPayrollPeriodKey = key;
+        document.querySelectorAll('#payroll-period-buttons .pbtn').forEach(function(b){b.classList.remove('active');});
+        if(btn) btn.classList.add('active');
+        renderPayroll();
+      }
+
+      function _currentPeriod(){ return _payrollPeriods.find(function(p){return p.key===_currentPayrollPeriodKey;}); }
+
+      function _apptsInPeriod(period){
+        var out = [];
+        var s = _fmtISODate(period.start), e = _fmtISODate(period.end);
+        Object.entries(apptData).forEach(function(entry){
+          var dateKey = entry[0];
+          var parts = dateKey.split('-');
+          if(parts.length!==3) return;
+          var iso = parts[0]+'-'+String(parts[1]).padStart(2,'0')+'-'+String(parts[2]).padStart(2,'0');
+          if(iso < s || iso > e) return;
+          (entry[1]||[]).forEach(function(a){ out.push(Object.assign({_date: iso}, a)); });
+        });
+        return out;
+      }
+
+      function renderPayroll(){
+        var tbody = document.getElementById('payroll-tbody');
+        var lbl = document.getElementById('payroll-period-label');
+        if(!tbody) return;
+        var period = _currentPeriod();
+        if(!period){
+          tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#999;padding:24px">Loading pay periods…</td></tr>';
+          return;
+        }
+        if(lbl) lbl.textContent = period.label + '  ·  Payday: ' + _fmtShort(period.payday);
+        var appts = _apptsInPeriod(period);
+        var totals = {};
+        appts.forEach(function(a){
+          var cname = a.cleaner || 'Unassigned';
+          if(cname==='Unassigned') return;
+          var hrs = parseFloat(a.duration)||0;
+          var pay = parseFloat(a.cleanerPay) || (typeof calcCleanerPay==='function' ? calcCleanerPay(hrs, cname) : hrs * (_rateForName(cname)||0));
+          if(!totals[cname]) totals[cname] = { hrs:0, pay:0, jobs:[] };
+          totals[cname].hrs += hrs;
+          totals[cname].pay += pay;
+          totals[cname].jobs.push({date:a._date, client:a.n, hrs:hrs, pay:pay});
+        });
+        var periodRows = _payrollPeriodRows[period.key] || {};
+        var rows = Object.entries(totals);
+        if(rows.length===0){
+          tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#999;padding:24px">No hours logged for this pay period.</td></tr>';
+        } else {
+          tbody.innerHTML = rows.map(function(e){
+            var cname = e[0], t = e[1];
+            var cleaner = _findCleanerByName(cname);
+            var cid = cleaner ? cleaner.id : null;
+            var rate = _rateForName(cname) || 0;
+            var island = cleaner ? (cleaner.islands||cleaner.island||'—') : '—';
+            var key = cid || ('name:'+cname);
+            var row = periodRows[key];
+            var paid = row && row.status==='paid';
+            var statusPill = paid ? '<span style="background:#DEFBE8;color:#0E6B34;padding:2px 8px;border-radius:6px;font-size:11px">Paid</span>'
+                                   : '<span style="background:#FFF5E0;color:#9A6A00;padding:2px 8px;border-radius:6px;font-size:11px">Unpaid</span>';
+            var cidSafe = (cid||'');
+            var cnameSafe = cname.replace(/'/g, "\\'");
+            var action = paid
+              ? '<button class="btn" style="font-size:11px;padding:4px 10px" onclick="undoCleanerPaid(\''+cidSafe+'\',\''+cnameSafe+'\')">Undo</button>'
+              : '<button class="btn btn-primary" style="font-size:11px;padding:4px 10px" onclick="markCleanerPaid(\''+cidSafe+'\',\''+cnameSafe+'\')">Mark as paid</button>';
+            var paidDisplay = paid && row.paid_amount_cents ? ('\$'+(row.paid_amount_cents/100).toFixed(2)) : (paid ? '\$'+t.pay.toFixed(2) : '—');
+            return '<tr>' +
+              '<td><a href="javascript:void(0)" onclick="showCleanerApptDetail(\''+cnameSafe+'\')">'+cname+'</a></td>' +
+              '<td>'+island+'</td>' +
+              '<td>'+t.hrs.toFixed(2)+'</td>' +
+              '<td>\$'+rate.toFixed(2)+'/hr</td>' +
+              '<td>\$'+t.pay.toFixed(2)+'</td>' +
+              '<td>'+paidDisplay+'</td>' +
+              '<td>'+statusPill+'</td>' +
+              '<td>'+action+'</td>' +
+              '</tr>';
+          }).join('');
+        }
+        var totalGross = rows.reduce(function(a,e){return a+e[1].pay;},0);
+        var totalHrs = rows.reduce(function(a,e){return a+e[1].hrs;},0);
+        var totalPaid = Object.values(periodRows).filter(function(r){return r.status==='paid';}).reduce(function(a,r){return a+((r.paid_amount_cents||0)/100);},0);
+        var m = document.querySelectorAll('#view-payroll .metric-value');
+        if(m[0]) m[0].textContent = '\$'+totalGross.toFixed(2);
+        if(m[1]) m[1].textContent = totalHrs.toFixed(1) + ' h';
+        if(m[2]) m[2].textContent = '\$'+totalPaid.toFixed(2);
+        if(m[3]) m[3].textContent = totalHrs>0 ? ('\$'+(totalGross/totalHrs).toFixed(2)+'/hr') : '—';
+        var det = document.getElementById('payroll-appts-detail');
+        if(det) det.innerHTML = '';
+      }
+
+      function _findCleanerByName(name){
+        return Object.values(cleanerDB).find(function(c){return c.name===name;});
+      }
+      function _rateForName(name){
+        var c = _findCleanerByName(name);
+        if(!c) return 0;
+        var m = String(c.rate||'').match(/[\d\.]+/);
+        return m ? parseFloat(m[0]) : 0;
+      }
+
+      function showCleanerApptDetail(cname){
+        var period = _currentPeriod(); if(!period) return;
+        var appts = _apptsInPeriod(period).filter(function(a){return a.cleaner===cname;}).sort(function(a,b){return a._date.localeCompare(b._date);});
+        var det = document.getElementById('payroll-appts-detail');
+        if(!det) return;
+        if(appts.length===0){ det.innerHTML = '<div style="color:#999;padding:8px">No appointments for '+cname+' in this period.</div>'; return; }
+        det.innerHTML = '<div class="section-title" style="margin-top:8px">'+cname+' — '+period.label+'</div>' +
+          '<div class="tw"><table><thead><tr><th>Date</th><th>Client</th><th>Hours</th><th>Pay</th></tr></thead><tbody>' +
+          appts.map(function(a){
+            var hrs = parseFloat(a.duration)||0;
+            var pay = parseFloat(a.cleanerPay) || (typeof calcCleanerPay==='function' ? calcCleanerPay(hrs, cname) : hrs*_rateForName(cname));
+            return '<tr><td>'+a._date+'</td><td>'+(a.n||'')+'</td><td>'+hrs.toFixed(2)+'</td><td>\$'+pay.toFixed(2)+'</td></tr>';
+          }).join('') +
+          '</tbody></table></div>';
+      }
+
+      async function markCleanerPaid(cid, cname){
+        var period = _currentPeriod(); if(!period) return;
+        var appts = _apptsInPeriod(period).filter(function(a){return a.cleaner===cname;});
+        var hrs = appts.reduce(function(a,x){return a+(parseFloat(x.duration)||0);},0);
+        var pay = appts.reduce(function(a,x){return a+(parseFloat(x.cleanerPay) || (typeof calcCleanerPay==='function'?calcCleanerPay(parseFloat(x.duration)||0, cname):0));},0);
+        var rate = _rateForName(cname)||0;
+        if(!confirm('Mark '+cname+' as paid for '+period.label+'?\nHours: '+hrs.toFixed(2)+'  Gross: \$'+pay.toFixed(2)+'\n\nRemember to actually send payment via QuickBooks.')) return;
+        var row = {
+          period_key: period.key,
+          period_start: _fmtISODate(period.start),
+          period_end: _fmtISODate(period.end),
+          payday: _fmtISODate(period.payday),
+          cleaner_id: cid || null,
+          cleaner_name: cname,
+          hours: hrs,
+          gross_cents: Math.round(pay*100),
+          rate_cents: Math.round(rate*100),
+          appt_ids: appts.map(function(a){return a.id;}).filter(Boolean),
+          status: 'paid',
+          paid_at: new Date().toISOString(),
+          paid_amount_cents: Math.round(pay*100)
+        };
+        try {
+          await dbUpsertPayPeriod(row);
+          await loadPayPeriodRows();
+          renderPayroll();
+        } catch(e){ alert('Save failed: '+e.message); }
+      }
+
+      async function undoCleanerPaid(cid, cname){
+        var period = _currentPeriod(); if(!period) return;
+        if(!confirm('Undo paid status for '+cname+' — '+period.label+'?')) return;
+        try {
+          await dbDeletePayPeriod(period.key, cid||null, cname);
+          await loadPayPeriodRows();
+          renderPayroll();
+        } catch(e){ alert('Undo failed: '+e.message); }
+      }
+
+      function exportPayrollCSV(){
+        var period = _currentPeriod(); if(!period){ alert('No period selected.'); return; }
+        var appts = _apptsInPeriod(period);
+        var totals = {};
+        appts.forEach(function(a){
+          var cname = a.cleaner||'Unassigned'; if(cname==='Unassigned') return;
+          var hrs = parseFloat(a.duration)||0;
+          var pay = parseFloat(a.cleanerPay) || (typeof calcCleanerPay==='function'?calcCleanerPay(hrs,cname):hrs*_rateForName(cname));
+          if(!totals[cname]) totals[cname] = { hrs:0, pay:0 };
+          totals[cname].hrs += hrs; totals[cname].pay += pay;
+        });
+        var lines = ['Cleaner,Island,Hours,Rate,Gross,Period,Payday'];
+        Object.entries(totals).forEach(function(e){
+          var cname = e[0], t=e[1];
+          var c = _findCleanerByName(cname);
+          var island = c ? (c.islands||c.island||'') : '';
+          var rate = _rateForName(cname)||0;
+          lines.push([JSON.stringify(cname), JSON.stringify(island), t.hrs.toFixed(2), rate.toFixed(2), t.pay.toFixed(2), JSON.stringify(period.label), _fmtISODate(period.payday)].join(','));
+        });
+        var blob = new Blob([lines.join('\n')], {type:'text/csv'});
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a'); a.href=url; a.download='payroll_'+period.key+'.csv'; a.click();
+        setTimeout(function(){URL.revokeObjectURL(url);},1000);
+      }
 
 /* MESSAGE TEMPLATES */
 var messageTemplates = {
@@ -4194,7 +4474,25 @@ function loadMessageTemplates(){
   }
 }
 
-function applyTemplate(template, vars){
+function savePayrollSettings(){
+        const freq = document.getElementById('set-payroll-frequency'); const pd = document.getElementById('set-payroll-payday');
+        if(!freq || !pd) return;
+        const cfg = { frequency: freq.value||'weekly', payday: pd.value||'monday', timezone: 'Pacific/Honolulu' };
+        dbSaveSettings('payroll_config', cfg).then(function(ok){
+          _payrollConfig = cfg;
+          var s = document.getElementById('payroll-settings-success');
+          if(s){ s.classList.add('show'); setTimeout(function(){s.classList.remove('show');}, 2000); }
+        });
+      }
+      async function initPayrollSettingsUI(){
+        var cfg = await dbLoadSettings('payroll_config');
+        if(cfg){ _payrollConfig = Object.assign(_payrollConfig||{}, cfg); }
+        var freq = document.getElementById('set-payroll-frequency'); var pd = document.getElementById('set-payroll-payday');
+        if(freq) freq.value = _payrollConfig.frequency || 'weekly';
+        if(pd) pd.value = _payrollConfig.payday || 'monday';
+      }
+
+      function applyTemplate(template, vars){
   return template
     .replace(/{client_name}/g, vars.clientName || '')
     .replace(/{amount}/g, vars.amount || '')

@@ -1801,10 +1801,58 @@ async function loadAllData(){
   } catch(err){
     console.error('Load error:',err);
   }
+  try { autoCompleteExpiredBookings(); } catch(e){ console.warn('autoComplete call err:', e); }
   showLoadingState(false);
   loadMessageTemplates();
   loadSettings();
   checkQuoStatus();
+}
+
+// Auto-mark bookings as completed if their start+duration is in the past
+function autoCompleteExpiredBookings(){
+  try {
+    var now = new Date();
+    var updates = [];
+    Object.keys(apptData).forEach(function(key){
+      var parts = key.split("-");
+      if (parts.length !== 3) return;
+      var yr = parseInt(parts[0],10), mo = parseInt(parts[1],10), dy = parseInt(parts[2],10);
+      apptData[key].forEach(function(a, idx){
+        if (!a) return;
+        var st = (a.s||"").toString().toLowerCase();
+        if (st === "completed" || st === "paid" || st === "cancelled") return;
+        var tStr = (a.t||"8am").toString().toLowerCase().trim();
+        var m = tStr.match(/^(\d{1,2})(?::(\d{2}))?\s*(am|pm)?$/);
+        if (!m) return;
+        var hh = parseInt(m[1],10) || 0;
+        var mm = parseInt(m[2]||"0",10) || 0;
+        var ampm = m[3];
+        if (ampm === "pm" && hh < 12) hh += 12;
+        if (ampm === "am" && hh === 12) hh = 0;
+        var startDate = new Date(yr, mo-1, dy, hh, mm, 0, 0);
+        var dur = parseFloat(a.duration) || 2;
+        var endDate = new Date(startDate.getTime() + dur*60*60*1000);
+        if (endDate <= now) {
+          a.s = "completed";
+          if (a.dbId) updates.push({dbId: a.dbId, name: a.n});
+        }
+      });
+    });
+    if (updates.length > 0) {
+      console.log("[autoComplete] marking "+updates.length+" bookings as completed");
+      if (typeof db !== "undefined" && db && db.from) {
+        updates.forEach(function(u){
+          db.from("appointments").update({status:"completed"}).eq("id", u.dbId).then(function(r){
+            if (r && r.error) console.warn("[autoComplete] db error for "+u.name+":", r.error);
+          }).catch(function(e){ console.warn("[autoComplete] update err:", e); });
+        });
+      }
+      try { if (typeof renderCalendar === "function") renderCalendar(); } catch(e){}
+      try { if (typeof updateDashboardStats === "function") updateDashboardStats(); } catch(e){}
+    }
+  } catch(err) {
+    console.error("[autoComplete] error:", err);
+  }
 }
 
 async function checkQuoStatus(){
@@ -1825,6 +1873,9 @@ async function checkQuoStatus(){
     if(statusEl){statusEl.textContent='Quo: offline';statusEl.style.color='#e53e3e';}
   }
 }
+
+// Re-check auto-completion every 2 minutes so appointments turn yellow when their time passes
+setInterval(function(){ try { autoCompleteExpiredBookings(); } catch(e){} }, 2*60*1000);
 
 function showLoadingState(loading){
   var title=document.getElementById('page-title');
@@ -2525,14 +2576,14 @@ async function saveApptEdit(mode){
   var isOverride=overrideChk&&overrideChk.checked&&overrideValEl&&overrideValEl.value;
   var editBase,editTax,editTotal;
   if(isOverride){
-    editTotal=parseFloat(overrideValEl.value)||0;
-    editTax=Math.round(editTotal*0.04712/(1.04712)*100)/100;
-    editBase=editTotal-editTax;
+    editBase=parseFloat(overrideValEl.value)||0;
+    editTax=Math.round(editBase*0.04*100)/100;
+    editTotal=Math.round((editBase+editTax)*100)/100;
   } else {
     var editPriceText=(document.getElementById('edit-price-val')||{}).textContent||'0';
     editTotal=parseFloat(editPriceText.replace('$',''))||0;
-    editTax=Math.round(editTotal*0.04712*100)/100;
-    editBase=editTotal-editTax;
+    editBase=Math.round(editTotal/1.04*100)/100;
+    editTax=Math.round((editTotal-editBase)*100)/100;
   }
   // Parse time string
   var hr24=timeVal||'08:00';
@@ -3447,7 +3498,7 @@ function calcPrice(){
       var _fqDisc2=_fqVal2==='Weekly'?0.20:_fqVal2==='Biweekly'?0.15:_fqVal2==='Monthly'?0.10:0;
       var _discAmt2=Math.round(_propFlat*_fqDisc2*100)/100;
       var _discFlat2=Math.round((_propFlat-_discAmt2)*100)/100;
-      var _tax2=Math.round(_discFlat2*0.04712*100)/100;
+      var _tax2=Math.round(_discFlat2*0.04*100)/100;
       var _total2=Math.round((_discFlat2+_tax2)*100)/100;
       _lastCalcHrs=_propFlat/65;
       document.getElementById('price-val').textContent='$'+_total2.toFixed(2);
@@ -3465,7 +3516,7 @@ function calcPrice(){
     var _discClient=Math.round((_clientFlat-_discAmt3)*100)/100;
     var _permDisc=_clientDataForFlat.permDiscount?parseFloat(_clientDataForFlat.permDiscount)/100:0;
     var _afterPerm=Math.round(_discClient*(1-_permDisc)*100)/100;
-    var _tax3=Math.round(_afterPerm*0.04712*100)/100;
+    var _tax3=Math.round(_afterPerm*0.04*100)/100;
     var _total3=Math.round((_afterPerm+_tax3)*100)/100;
     _lastCalcHrs=_clientFlat/65;
     document.getElementById('price-val').textContent='$'+_total3.toFixed(2);
@@ -3520,10 +3571,12 @@ function calcPrice(){
   else if(freqVal==='Monthly') freqDiscount=0.10;
   var discountAmt=Math.round(base*freqDiscount*100)/100;
   var discountedBase=Math.round((base-discountAmt)*100)/100;
-  var tax=Math.round(discountedBase*0.04712*100)/100;
+  var tax=Math.round(discountedBase*0.04*100)/100;
   var total;
   if(isOverride&&overrideValEl&&overrideValEl.value){
-    total=parseFloat(overrideValEl.value)||0;
+    var _ovrBase=parseFloat(overrideValEl.value)||0;
+    var _ovrTax=Math.round(_ovrBase*0.04*100)/100;
+    total=Math.round((_ovrBase+_ovrTax)*100)/100;
     document.getElementById('price-val').textContent='$'+total.toFixed(2);
     document.getElementById('price-breakdown').textContent=hrs+' est hrs — custom price override';
     console.log('[calcPrice] override='+total+' hrs='+hrs+' svc='+svcType);
@@ -3645,10 +3698,12 @@ function calcEditPrice(){
   else if(editFreqVal==='Monthly') editFreqDiscount=0.10;
   var editDiscountAmt=Math.round(base*editFreqDiscount*100)/100;
   var editDiscountedBase=Math.round((base-editDiscountAmt)*100)/100;
-  var tax=Math.round(editDiscountedBase*0.04712*100)/100;
+  var tax=Math.round(editDiscountedBase*0.04*100)/100;
   var total;
   if(isOverride&&overrideValEl&&overrideValEl.value){
-    total=parseFloat(overrideValEl.value)||0;
+    var _ovrBase2=parseFloat(overrideValEl.value)||0;
+    var _ovrTax2=Math.round(_ovrBase2*0.04*100)/100;
+    total=Math.round((_ovrBase2+_ovrTax2)*100)/100;
     document.getElementById('edit-price-val').textContent='$'+total.toFixed(2);
     document.getElementById('edit-price-breakdown').textContent=hrs+' est hrs — custom price override';
     console.log('[calcEditPrice] override='+total+' hrs='+hrs+' svc='+svcType);
@@ -3764,7 +3819,7 @@ async function saveNewAppt(){
   var priceEl=document.getElementById('price-val');
   var total=0;
   if(priceEl){total=parseFloat(priceEl.textContent.replace('$','').replace(',',''))||0;}
-  var apptTax=Math.round(total*0.04712*100)/100;
+  var apptTax=Math.round(total*0.04*100)/100;
   var apptBase=Math.round((total-apptTax)*100)/100;
   var apptDuration=_lastCalcHrs; // from calcPrice()
   var cpOvrChk=document.getElementById('na-cleaner-pay-override-chk');
@@ -5666,7 +5721,7 @@ async function oneClickInvoice(source){
   var amountNum = parseFloat((cdata.mrr || '0').replace(/[$,\/a-z]/gi, '')) || 0;
   if(amountNum === 0){ showPaymentToast('No monthly rate set for ' + clientName + '. Set MRR in client profile first.', null, 'error'); return; }
 
-  var tax = Math.round(amountNum * 0.04712 * 100) / 100;
+  var tax = Math.round(amountNum * 0.04 * 100) / 100;
   var total = Math.round((amountNum + tax) * 100) / 100;
 
   showPaymentToast('Sending invoice to ' + clientName + '...', null, null);

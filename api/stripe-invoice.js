@@ -7,7 +7,7 @@ export default async function handler(req, res) {
   try {
             const Stripe = (await import('stripe')).default;
             const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
-            const { action, customerName, customerEmail, customerId, amount, service, terms, notes, paymentIntentId } = req.body;
+            const { action, customerName, customerEmail, customerId, amount, service, terms, notes, paymentIntentId, emailSubject, emailBody } = req.body;
 
           if (action === 'debug_customer') {
                       let cust;
@@ -94,8 +94,9 @@ export default async function handler(req, res) {
                             days_until_due: (days > 0 ? days : 30),
                             auto_advance: false,
                             pending_invoice_items_behavior: 'include',
-                            footer: 'Pay by ACH bank transfer - FREE (3-5 business days). Pay by card - 3% processing fee added.',
-                            description: notes || ''
+                            payment_method_types: ['card', 'us_bank_account', 'link', 'cashapp'],
+                            footer: (emailBody || '').trim() || 'Thank you for choosing Hawaii Natural Clean.',
+                            description: (emailSubject || notes || '').trim() || 'Cleaning service invoice'
               });
 
               const finalized = await stripe.invoices.finalizeInvoice(invoice.id, { auto_advance: false });

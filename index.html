@@ -2471,17 +2471,22 @@ function showApptEdit(){
   }
   calcEditPrice();
 
-  // If saved totalPrice differs from the auto-calculated price, pre-check the override
-  var savedTotal = currentAppt && parseFloat(currentAppt.totalPrice);
+  // If the saved totalPrice differs from the auto-calculated price, pre-check the override
+  // so the custom price is preserved on save without the user needing to re-enter it.
+  var savedTotal = currentAppt ? parseFloat(currentAppt.totalPrice) : 0;
   var calcPriceEl = document.getElementById('edit-price-val');
   var calcTotal = calcPriceEl ? parseFloat(calcPriceEl.textContent.replace('$','')) : 0;
   var overrideChk = document.getElementById('edit-price-override-chk');
   var overrideVal = document.getElementById('edit-price-override-val');
-  if(savedTotal && overrideChk && overrideVal && Math.abs(savedTotal - calcTotal) > 0.05){
-    overrideChk.checked = true;
+  if(savedTotal > 0 && overrideChk && overrideVal){
+    // Always pre-populate the value field so the user can see the last saved price
     overrideVal.value = savedTotal.toFixed(2);
-    overrideVal.style.display = '';
-    calcEditPrice();
+    // Only pre-CHECK the box if the saved price meaningfully differs from calculated
+    if(Math.abs(savedTotal - calcTotal) > 0.01){
+      overrideChk.checked = true;
+      overrideVal.style.display = '';
+      calcEditPrice();
+    }
   }
 }
 function hideApptEdit(){document.getElementById('appt-view').style.display='block';document.getElementById('appt-edit').style.display='none';}
@@ -5141,8 +5146,8 @@ async function sendApptInvoice(method){
         setTimeout(function(){s.classList.remove('show');closeOverlay('appt-invoice-overlay');},2500);
         return;
       }
-      // Clean up any stale $0 invoice records before creating a new one
-      await db.from('invoices').delete().eq('appointment_id',apptId).eq('amount',0);
+      // Clean up any stale $0 or null-amount invoice records before creating a new one
+      await db.from('invoices').delete().eq('appointment_id',apptId).or('amount.eq.0,amount.is.null');
     }
 
     // Build and log payload
@@ -5989,7 +5994,19 @@ function saveSettings() {
 function loadSettings() {
   var savedTemplates = localStorage.getItem('hnc_email_templates');
   if(savedTemplates){
-    try { emailTemplates = Object.assign(emailTemplates, JSON.parse(savedTemplates)); } catch(e) {}
+    try {
+      emailTemplates = Object.assign(emailTemplates, JSON.parse(savedTemplates));
+      // Populate the active template textarea immediately — don't wait for a tab click
+      var activeTmpl = emailTemplates[currentTemplate || 'invoice'];
+      if(activeTmpl){
+        var titleEl = document.getElementById('template-title');
+        var subjectEl = document.getElementById('tmpl-subject');
+        var bodyEl = document.getElementById('tmpl-body');
+        if(titleEl) titleEl.textContent = activeTmpl.title || '';
+        if(subjectEl) subjectEl.value = activeTmpl.subject || '';
+        if(bodyEl) bodyEl.value = activeTmpl.body || '';
+      }
+    } catch(e) {}
   }
   var savedBiz = localStorage.getItem('hnc_biz_settings');
   if(savedBiz){
@@ -7265,6 +7282,10 @@ function applyEditProperty(){
 document.addEventListener('DOMContentLoaded', function(){
   initNewApptClientAutocomplete();
 });
+
+// Run immediately from localStorage — don't wait for Supabase
+loadMessageTemplates();
+loadSettings();
 
 </script>
 

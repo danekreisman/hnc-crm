@@ -27,7 +27,7 @@ module.exports = async (req, res) => {
       if (uiResp.ok) { var ui = await uiResp.json(); googleEmail = ui.email || null; }
     } catch (_) {}
     var supabase = createClient(supabaseUrl, supabaseKey, { auth: { persistSession: false } });
-    var row = { cleaner_id: cleanerId, provider: 'google', google_email: googleEmail, access_token: accessToken, refresh_token: refreshToken, scope: scope, expires_at: expiresAt, updated_at: new Date().toISOString() };
+    var row = { cleaner_id: cleanerId, provider: 'google', provider_email: googleEmail, access_token: accessToken, refresh_token: refreshToken, scope: scope, expires_at: expiresAt, updated_at: new Date().toISOString() };
     var upsertErr = null;
     {
       var r1 = await supabase.from('cleaner_integrations').upsert(row, { onConflict: 'cleaner_id,provider' });

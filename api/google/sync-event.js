@@ -27,7 +27,7 @@ async function getValidAccessToken(supabase, integration) {
   await supabase.from('cleaner_integrations').update({ access_token: refreshed.access_token, expires_at: refreshed.expires_at, updated_at: new Date().toISOString() }).eq('id', integration.id);
   return refreshed.access_token;
 }
-function buildEventPayload(appt) {
+function buildEventPayload(appt, cleaner) {
   var tz = 'Pacific/Honolulu';
   var summary = 'HNC: ' + (appt.client_name || 'Cleaning');
   var descLines = [];
@@ -36,7 +36,7 @@ function buildEventPayload(appt) {
   if (appt.beds != null || appt.baths != null) descLines.push('Beds/Baths: ' + (appt.beds != null ? appt.beds : '?') + ' / ' + (appt.baths != null ? appt.baths : '?'));
   if (appt.sqft) descLines.push('Sqft: ' + appt.sqft);
   if (appt.notes) descLines.push('Notes: ' + appt.notes);
-  if (appt.total_price != null) descLines.push('Total: $' + appt.total_price);
+  var _durH = Number(appt.duration_hours || 0); if (_durH > 0) descLines.push('Estimated hours: ' + _durH); var _rate = Number(cleaner && cleaner.hourly_rate || 0); if (_durH > 0 && _rate > 0) descLines.push('Your pay: $' + (_durH * _rate).toFixed(2));
   var base = { summary: summary, description: descLines.join('\n'), location: appt.address || '' };
   if (appt.time && /^\d{1,2}:\d{2}/.test(appt.time)) {
     var parts = appt.time.split(':').map(function(x){ return parseInt(x, 10); });
@@ -101,7 +101,7 @@ module.exports = async (req, res) => {
       return jsonRes(res, 200, { ok: true, skipped: 'cleaner has no Google integration' });
     }
     var token = await getValidAccessToken(supabase, integration);
-    var payload = buildEventPayload(appt);
+    var cleanerRecord = null; if (cleanerId) { var _cr = await supabase.from('cleaners').select('id,name,hourly_rate').eq('id', cleanerId).maybeSingle(); cleanerRecord = _cr.data || null; } var payload = buildEventPayload(appt, cleanerRecord);
     var method = 'POST';
     var url = CAL_EVENTS_URL;
     if (existingEventId) { method = 'PATCH'; url = CAL_EVENTS_URL + '/' + encodeURIComponent(existingEventId); }

@@ -4241,6 +4241,14 @@ function setPeriod(btn){
       }
 
       async function refreshPayrollPeriods(){
+        if((typeof cleanerDB === 'undefined') || Object.keys(cleanerDB||{}).length === 0){
+          if(typeof dbLoadCleaners === 'function'){
+            try { var cs = await dbLoadCleaners(); (cs||[]).forEach(function(c){
+              if(typeof cleanerDB==='undefined') window.cleanerDB = {};
+              cleanerDB[c.id] = { id:c.id, name:c.name, role:c.role||'Cleaner · '+(c.island||''), rate:'$'+(c.hourly_rate||0)+'/hr', islands:c.island||'', email:c.email, phone:c.phone };
+            }); } catch(e){ console.warn('bootstrap cleaners', e); }
+          }
+        }
         await loadPayrollConfig();
         await loadPayPeriodRows();
         _payrollPeriods = generatePayrollPeriods(8,1);
@@ -4283,6 +4291,13 @@ function setPeriod(btn){
       }
 
       function renderPayroll(){
+        // Retry guard: if cleanerDB not yet loaded, schedule a re-render once it is
+        if((typeof cleanerDB === 'undefined') || Object.keys(cleanerDB||{}).length === 0){
+          if(!window._payrollRetryScheduled){
+            window._payrollRetryScheduled = true;
+            setTimeout(function(){ window._payrollRetryScheduled = false; try { refreshPayrollPeriods(); } catch(e){} }, 700);
+          }
+        }
         var tbody = document.getElementById('payroll-tbody');
         var lbl = document.getElementById('payroll-period-label');
         if(!tbody) return;

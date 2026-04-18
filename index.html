@@ -643,7 +643,7 @@ textarea{font-family:inherit;}
           <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 4px 12px 4px;gap:8px;flex-wrap:wrap;">
             <div style="color:#666;font-size:12px;">Completed appointments that haven't been invoiced yet. Select multiple from the same client to bundle into one invoice.</div>
             <div>
-              <button class="btn-primary" id="pending-bulk-invoice-btn" onclick="createBulkInvoiceFromPending()" disabled>Create invoice from selected</button>
+              <button class="btn-primary" id="pending-bulk-invoice-btn" onclick="createBulkInvoiceFromPending()" disabled>Create invoice from selected</button> <button class="btn" style="margin-left:8px;background:#fff7ed;color:#9a3412;border-color:#fdba74;" onclick="openCustomInvoice()">+ Custom invoice</button>
             </div>
           </div>
           <div style="font-size:12px;color:#999;margin-bottom:10px;">Completed jobs that need payment — sorted by date. Residential clients default to charge now.</div>
@@ -1785,7 +1785,8 @@ async function loadAllData(){
   } catch(err){
     console.error('Load error:',err);
   }
-  try { await syncPaidAppointments(); } catch(e){ console.warn('syncPaid call err:', e); }
+  try { await syncStripeInvoiceStatus(); } catch(e){ console.warn('syncStripe call err:', e); }
+   try { await syncPaidAppointments(); } catch(e){ console.warn('syncPaid call err:', e); }
   try { autoCompleteExpiredBookings(); } catch(e){ console.warn('autoComplete call err:', e); }
   try { renderPaymentsSection(); } catch(e){ console.warn('renderPayments err:', e); }
   showLoadingState(false);
@@ -1999,7 +2000,7 @@ function updateDashboardStats(){
 
 var MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
 var curYear=2026,curMonth=4;
-var currentView='calendar';
+var currentView=(function(){try{var v=sessionStorage.getItem('hnc_currentView');return v||'calendar';}catch(e){return 'calendar';}})();
 var activeChatId=null;
 var currentClientName='';
 var currentLeadName='';
@@ -4001,12 +4002,13 @@ function handleTopCta(){
   else if(currentView==='clients'){document.getElementById('new-client-overlay').classList.remove('hidden');}
   else if(currentView==='cleaners'){document.getElementById('new-cleaner-overlay').classList.remove('hidden');}
   else if(currentView==='automations'){openNewAuto();}
-  else if(currentView==='payments'){openNewInvoice();}
+  else if(currentView==='payments'){openCustomInvoice();}
   else if(currentView==='messaging'){openNewMsgOverlay();}
 }
 
 function sv(view,el){
   currentView=view;
+  try{sessionStorage.setItem('hnc_currentView', view);}catch(e){}
   document.querySelectorAll('.vc').forEach(function(v){v.classList.remove('active');});
   document.querySelectorAll('.nav-item').forEach(function(n){n.classList.remove('active');});
   document.getElementById('view-'+view).classList.add('active');
@@ -4164,6 +4166,8 @@ function applyTemplate(template, vars){
 
 renderCal();
 loadAllData();
+// Restore last view from session (so browser refresh keeps user where they were)
+try{var _sv=sessionStorage.getItem('hnc_currentView'); if(_sv && _sv!=='calendar'){var _navItem=Array.from(document.querySelectorAll('.nav-item')).find(function(n){return (n.textContent||'').trim().toLowerCase().indexOf(_sv)>=0;}); sv(_sv, _navItem||null); if(_sv==='payments' && typeof renderPaymentsSection==='function'){setTimeout(renderPaymentsSection, 200);}}}catch(e){console.warn('restore view',e);}
 </script>
 
 <!-- NEW LEAD OVERLAY -->
@@ -5505,6 +5509,150 @@ async function invoicePendingAppointments(clientId, clientName, apptIds){
     else if (typeof renderPaymentsSection === 'function') renderPaymentsSection();
   } catch (err) {
     showPaymentToast('Invoice error: ' + err.message, null, 'error');
+  }
+}
+
+// Check Stripe for any unpaid DB invoices and mark them paid if Stripe says so
+async function syncStripeInvoiceStatus(){
+  try {
+    var unpaidInv = await db.from('invoices').select('id,stripe_invoice_id,status,notes,appointment_id').neq('status','paid').neq('status','Paid').neq('status','Void').neq('status','void');
+    if (unpaidInv.error || !unpaidInv.data) return;
+    var rows = unpaidInv.data.filter(function(r){ return r.stripe_invoice_id; });
+    for (var i = 0; i < rows.length; i++) {
+      var row = rows[i];
+      try {
+        var resp = await fetch('/api/stripe-invoice', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ action: 'retrieve_invoice', invoiceId: row.stripe_invoice_id }) });
+        var data = await resp.json();
+        if (data && data.success && data.invoice && (data.invoice.status === 'paid' || data.invoice.paid === true)) {
+          await db.from('invoices').update({ status: 'paid', paid_at: new Date().toISOString() }).eq('id', row.id);
+          var apptIds = [];
+          if (row.appointment_id) apptIds.push(row.appointment_id);
+          var m = (row.notes || '').match(/Appts?:\s*([0-9a-f,\-\s]+)/i);
+          if (m) { m[1].split(',').forEach(function(id){ id = id.trim(); if (id) apptIds.push(id); }); }
+          for (var j = 0; j < apptIds.length; j++) {
+            try { await db.from('appointments').update({ status: 'paid' }).eq('id', apptIds[j]); } catch(e){}
+          }
+        }
+      } catch(e){ console.warn('[syncStripe] retrieve err:', e); }
+    }
+  } catch (e) { console.warn('[syncStripeInvoiceStatus] err:', e); }
+}
+
+// ===== Custom invoice =====
+function openCustomInvoice(){
+  var sel = document.getElementById('custom-inv-client');
+  if (!sel) return;
+  sel.innerHTML = '';
+  var entries = [];
+  if (typeof clientDB !== 'undefined') {
+    Object.keys(clientDB).forEach(function(id){
+      if (id.length < 30) return;
+      var c = clientDB[id];
+      entries.push({ id: id, name: c.name || '(no name)', email: c.email || '' });
+    });
+  }
+  entries.sort(function(a,b){ return a.name.localeCompare(b.name); });
+  entries.forEach(function(e){
+    var opt = document.createElement('option');
+    opt.value = e.id;
+    opt.textContent = e.name + (e.email ? ' — ' + e.email : '');
+    sel.appendChild(opt);
+  });
+  document.getElementById('custom-inv-subject').value = '';
+  document.getElementById('custom-inv-notes').value = '';
+  document.getElementById('custom-inv-tax').value = 'yes';
+  document.getElementById('custom-inv-terms').value = 'NET30';
+  var lines = document.getElementById('custom-inv-lines');
+  lines.innerHTML = '';
+  addCustomInvoiceLine();
+  recalcCustomInvoiceTotals();
+  document.getElementById('custom-invoice-overlay').classList.remove('hidden');
+}
+function addCustomInvoiceLine(){
+  var container = document.getElementById('custom-inv-lines');
+  if (!container) return;
+  var row = document.createElement('div');
+  row.className = 'custom-inv-line';
+  row.style.cssText = 'display:flex;gap:6px;align-items:center;margin-bottom:6px;';
+  row.innerHTML = '<input type="text" class="ci-desc" placeholder="Description (e.g. Daily commercial cleaning — Apr 2026)" style="flex:1;padding:6px 8px;border:1px solid #e0e0dd;border-radius:6px;font-size:13px;">' +
+    '<input type="number" step="0.01" min="0" class="ci-amt" placeholder="0.00" style="width:110px;padding:6px 8px;border:1px solid #e0e0dd;border-radius:6px;font-size:13px;text-align:right;" oninput="recalcCustomInvoiceTotals()">' +
+    '<button type="button" class="btn" style="padding:4px 8px;font-size:12px;" onclick="this.parentNode.remove();recalcCustomInvoiceTotals();">✕</button>';
+  container.appendChild(row);
+}
+function recalcCustomInvoiceTotals(){
+  var subtotal = 0;
+  document.querySelectorAll('#custom-inv-lines .ci-amt').forEach(function(inp){
+    subtotal += parseFloat(inp.value || 0) || 0;
+  });
+  var taxRate = (document.getElementById('custom-inv-tax').value === 'yes') ? 0.04 : 0;
+  var tax = +(subtotal * taxRate).toFixed(2);
+  var total = +(subtotal + tax).toFixed(2);
+  var subEl = document.getElementById('custom-inv-subtotal');
+  var taxEl = document.getElementById('custom-inv-taxamt');
+  var totEl = document.getElementById('custom-inv-total');
+  if (subEl) subEl.textContent = '$' + subtotal.toFixed(2);
+  if (taxEl) taxEl.textContent = '$' + tax.toFixed(2);
+  if (totEl) totEl.textContent = '$' + total.toFixed(2);
+}
+async function sendCustomInvoice(){
+  var clientId = document.getElementById('custom-inv-client').value;
+  var subject = document.getElementById('custom-inv-subject').value.trim();
+  var notes = document.getElementById('custom-inv-notes').value.trim();
+  var terms = document.getElementById('custom-inv-terms').value;
+  var taxYes = document.getElementById('custom-inv-tax').value === 'yes';
+  if (!clientId) { showPaymentToast('Please pick a client', null, 'error'); return; }
+  var c = (typeof clientDB !== 'undefined' && clientDB[clientId]) ? clientDB[clientId] : null;
+  if (!c) { showPaymentToast('Client not found', null, 'error'); return; }
+  if (!c.email) { showPaymentToast('No email on file for ' + (c.name || 'this client'), null, 'error'); return; }
+  var lineItems = [];
+  var subtotal = 0;
+  var rows = document.querySelectorAll('#custom-inv-lines .custom-inv-line');
+  rows.forEach(function(row){
+    var desc = (row.querySelector('.ci-desc').value || '').trim();
+    var amt = parseFloat(row.querySelector('.ci-amt').value || 0) || 0;
+    if (amt > 0) {
+      lineItems.push({ description: desc || 'Service', amount: +amt.toFixed(2) });
+      subtotal += amt;
+    }
+  });
+  if (lineItems.length === 0) { showPaymentToast('Add at least one line item with an amount', null, 'error'); return; }
+  var tax = taxYes ? +(subtotal * 0.04).toFixed(2) : 0;
+  if (tax > 0) lineItems.push({ description: 'Hawaii GET tax (4%)', amount: tax });
+  var total = +(subtotal + tax).toFixed(2);
+  showPaymentToast('Sending invoice to ' + c.name + '…', null, null);
+  try {
+    var resp = await fetch('/api/stripe-invoice', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        action: 'send_invoice',
+        customerName: c.name, customerEmail: c.email,
+        amount: total.toFixed(2),
+        service: subject || 'Cleaning service',
+        terms: terms,
+        lineItems: lineItems,
+        notes: notes || subject || 'Custom invoice'
+      })
+    });
+    var data = await resp.json();
+    if (!resp.ok || data.success === false) {
+      showPaymentToast('Invoice failed: ' + (data.error || 'Unknown error'), null, 'error');
+      return;
+    }
+    await db.from('invoices').insert({
+      client_name: c.name, client_id: clientId,
+      service: subject || 'Custom invoice',
+      amount: subtotal, tax: tax, total: total,
+      status: 'unpaid',
+      stripe_invoice_id: data.invoiceId || null,
+      stripe_invoice_url: data.invoiceUrl || null,
+      notes: notes || subject || 'Custom invoice',
+      created_at: new Date().toISOString()
+    });
+    showPaymentToast('Custom invoice sent to ' + c.name + '!', null, 'success');
+    closeOverlay('custom-invoice-overlay');
+    if (typeof renderPaymentsSection === 'function') renderPaymentsSection();
+  } catch (err) {
+    showPaymentToast('Send error: ' + err.message, null, 'error');
   }
 }
 
@@ -7963,6 +8111,38 @@ loadSettings();
 </div>
 
 <!-- NEW INVOICE OVERLAY -->
+<div class="overlay hidden" id="custom-invoice-overlay" onclick="closeOverlay('custom-invoice-overlay')">
+  <div class="panel" onclick="event.stopPropagation()" style="max-width:680px;">
+    <div class="panel-header"><div class="panel-title">Custom invoice</div><button class="close-btn" onclick="closeOverlay('custom-invoice-overlay')">&#x2715;</button></div>
+    <div class="panel-body">
+      <div class="form-row"><label>Client</label><select id="custom-inv-client"></select></div>
+      <div class="form-row"><label>Invoice description / subject</label><input type="text" id="custom-inv-subject" placeholder="e.g. Monthly cleaning contract — April 2026"></div>
+      <div class="form-row"><label>Line items</label>
+        <div id="custom-inv-lines"></div>
+        <button type="button" class="btn" style="margin-top:6px;" onclick="addCustomInvoiceLine()">+ Add line item</button>
+      </div>
+      <div class="form-two">
+        <div class="form-row"><label>Apply 4% Hawaii GET tax</label>
+          <select id="custom-inv-tax" onchange="recalcCustomInvoiceTotals()"><option value="yes">Yes</option><option value="no">No</option></select>
+        </div>
+        <div class="form-row"><label>Payment terms</label>
+          <select id="custom-inv-terms"><option value="0">Due on receipt</option><option value="NET15">NET 15</option><option value="NET30" selected>NET 30</option><option value="NET60">NET 60</option></select>
+        </div>
+      </div>
+      <div class="form-row"><label>Notes (shown on invoice)</label><textarea id="custom-inv-notes" style="min-height:60px;" placeholder="Optional note shown on invoice..."></textarea></div>
+      <div class="info-block" style="background:#f8f8f5;padding:10px 12px;border-radius:8px;margin-top:8px;">
+        <div class="info-row"><span class="info-label">Subtotal</span><span class="info-val" id="custom-inv-subtotal">$0.00</span></div>
+        <div class="info-row"><span class="info-label">Tax (4%)</span><span class="info-val" id="custom-inv-taxamt">$0.00</span></div>
+        <div class="info-row" style="font-weight:600;"><span class="info-label">Total</span><span class="info-val" id="custom-inv-total">$0.00</span></div>
+      </div>
+      <div class="save-bar">
+        <button class="btn btn-primary" onclick="sendCustomInvoice()">Send invoice</button>
+        <button class="btn" onclick="closeOverlay('custom-invoice-overlay')">Cancel</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="overlay hidden" id="new-invoice-overlay" onclick="closeOverlay('new-invoice-overlay')">
   <div class="panel" onclick="event.stopPropagation()">
     <div class="panel-header"><div class="panel-title">New invoice</div><button class="close-btn" onclick="closeOverlay('new-invoice-overlay')">&#x2715;</button></div>

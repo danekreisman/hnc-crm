@@ -8732,5 +8732,84 @@ Your total will update automatically when you select a payment method.</textarea
   </div>
 </div>
 
+
+<!-- Google Maps Places Autocomplete -->
+<script>
+(function(){
+  window.HNC_MAPS_KEY = "AIzaSyCkn8UeVuv5iek_Rm3jqdozF1HGMhSuGNk";
+  window.HNC_ADDRESS_IDS = ['na-address','edit-address','led-address','nl-address','nc-address','prop-address'];
+  window.hncAttachedAutocomplete = Object.create(null);
+  window.hncInitMapsAutocomplete = function(){
+    if(!(window.google && google.maps && google.maps.places)) return;
+    // Hawaii bounding box (approx)
+    var hawaiiBounds = new google.maps.LatLngBounds(
+      new google.maps.LatLng(18.9, -160.3),
+      new google.maps.LatLng(22.3, -154.7)
+    );
+    window.HNC_ADDRESS_IDS.forEach(function(id){
+      var el = document.getElementById(id);
+      if(!el || window.hncAttachedAutocomplete[id]) return;
+      try {
+        var ac = new google.maps.places.Autocomplete(el, {
+          fields: ['formatted_address','geometry','place_id','name','address_components'],
+          types: ['address'],
+          componentRestrictions: {country:'us'},
+          bounds: hawaiiBounds,
+          strictBounds: false
+        });
+        ac.addListener('place_changed', function(){
+          var p = ac.getPlace();
+          if(!p) return;
+          var addr = p.formatted_address || (p.name ? p.name : el.value);
+          el.value = addr;
+          if(p.geometry && p.geometry.location){
+            el.dataset.lat = p.geometry.location.lat();
+            el.dataset.lng = p.geometry.location.lng();
+          } else {
+            delete el.dataset.lat; delete el.dataset.lng;
+          }
+          if(p.place_id) el.dataset.placeId = p.place_id; else delete el.dataset.placeId;
+          // Fire input/change events so the app's save logic sees the new value
+          el.dispatchEvent(new Event('input', {bubbles:true}));
+          el.dispatchEvent(new Event('change', {bubbles:true}));
+        });
+        // Prevent form submit on Enter while a suggestion is open
+        el.addEventListener('keydown', function(e){
+          if(e.key === 'Enter'){
+            var pac = document.querySelector('.pac-container');
+            if(pac && pac.style.display !== 'none' && pac.offsetParent !== null) e.preventDefault();
+          }
+        });
+        window.hncAttachedAutocomplete[id] = ac;
+      } catch(err){ console.warn('[HNC Maps] attach failed for '+id, err); }
+    });
+  };
+  // Also re-run after any modal opens (belt & suspenders)
+  window.hncScheduleMapsAttach = function(){
+    if(window.hncMapsAttachTimer) return;
+    window.hncMapsAttachTimer = setTimeout(function(){
+      window.hncMapsAttachTimer = null;
+      window.hncInitMapsAutocomplete();
+    }, 50);
+  };
+  document.addEventListener('click', window.hncScheduleMapsAttach, true);
+  document.addEventListener('focusin', function(e){
+    if(e.target && e.target.id && window.HNC_ADDRESS_IDS.indexOf(e.target.id) !== -1){
+      window.hncScheduleMapsAttach();
+    }
+  }, true);
+  // CSS tweak so .pac-container shows above modals (which use high z-index)
+  var s = document.createElement('style');
+  s.textContent = '.pac-container{z-index: 2147483647 !important;}';
+  document.head.appendChild(s);
+  // Load Maps JS (async, using callback)
+  var script = document.createElement('script');
+  script.src = 'https://maps.googleapis.com/maps/api/js?key='+encodeURIComponent(window.HNC_MAPS_KEY)+'&libraries=places&callback=hncInitMapsAutocomplete&loading=async';
+  script.async = true;
+  script.defer = true;
+  script.onerror = function(){ console.error('[HNC Maps] failed to load Maps JS'); };
+  document.head.appendChild(script);
+})();
+</script>
 </body>
 </html>

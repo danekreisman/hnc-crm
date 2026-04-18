@@ -619,14 +619,14 @@ textarea{font-family:inherit;}
           <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
             <div>
               <div style="font-size:13px;font-weight:600;color:#276749;">ACH payment incentive — active</div>
-              <div style="font-size:12px;color:#276749;margin-top:2px;">Clients are shown a 3% card fee and encouraged to pay by ACH. Residential invoices default to due now.</div>
+              <div style="font-size:12px;color:#276749;margin-top:2px;">Invoices accept ACH, card, Apple Pay, Cash App, Klarna, and Link. Residential invoices default to due now.</div>
             </div>
             <button class="btn" style="font-size:12px;border-color:#9ae6b4;color:#276749;" onclick="openAchSettings()">Edit message</button>
           </div>
           <div style="margin-top:10px;background:#fff;border-radius:8px;padding:10px 12px;font-size:12px;color:#444;line-height:1.6;border:1px solid #c6f6d5;" id="ach-preview">
             <strong>Payment options for your invoice:</strong><br>
             Pay by ACH bank transfer — <strong>FREE</strong> (3-5 business days)<br>
-            Pay by card — <strong>3% processing fee added</strong><br><br>
+            Pay by card, ACH, Apple Pay, Cash App, Klarna, or Link<br><br>
             We encourage ACH to keep your costs down. Click below to choose your payment method.
           </div>
         </div>
@@ -4951,7 +4951,7 @@ function switchPayTab(tab, el){
 
 function chargeCardRow(btn, client, amount){
   if(!stripeConnected){openStripeConnect();return;}
-  var surcharge=parseFloat(document.getElementById('ach-surcharge')?document.getElementById('ach-surcharge').value:3)||3;
+  var surcharge=0;
   var base=parseFloat(amount.replace('$',''))||0;
   var withFee=Math.round(base*(1+surcharge/100)*100)/100;
   showPaymentToast('Charging '+client+' $'+withFee.toFixed(2)+' (incl. '+surcharge+'% card fee) via Stripe...', function(){
@@ -5032,10 +5032,10 @@ function sendBulkInvoice(method){
 function openAchSettings(){document.getElementById('ach-settings-overlay').classList.remove('hidden');}
 
 function saveAchSettings(){
-  var surcharge=document.getElementById('ach-surcharge').value;
+  var surcharge=0;
   var emailMsg=document.getElementById('ach-email-msg').value;
   var preview=document.getElementById('ach-preview');
-  if(preview)preview.innerHTML='<strong>Payment options for your invoice:</strong><br>Pay by ACH bank transfer — <strong>FREE</strong> (3-5 business days)<br>Pay by card — <strong>'+surcharge+'% processing fee added</strong><br><br>We encourage ACH to keep your costs down. Click below to choose your payment method.';
+  if(preview)preview.innerHTML='<strong>Payment options for your invoice:</strong><br>Pay by ACH bank transfer — <strong>FREE</strong> (3-5 business days)<br>Pay by card, ACH, Apple Pay, Cash App, Klarna, or Link<br><br>We encourage ACH to keep your costs down. Click below to choose your payment method.';
   var s=document.getElementById('ach-save-success');s.classList.add('show');
   setTimeout(function(){s.classList.remove('show');closeOverlay('ach-settings-overlay');},1800);
 }
@@ -5155,7 +5155,9 @@ async function sendApptInvoice(method){
       amount:amountNum,
       service:cd.service||'Cleaning service',
       terms:terms,
-      notes:notes
+      notes:notes,
+      emailSubject:(typeof emailTemplates!=='undefined'&&emailTemplates.invoice)?applyTemplate(emailTemplates.invoice.subject||'',{clientName:clientName,amount:'$'+amountNum.toFixed(2),invoiceLink:''}):'',
+      emailBody:(typeof emailTemplates!=='undefined'&&emailTemplates.invoice)?applyTemplate(emailTemplates.invoice.body||'',{clientName:clientName,amount:'$'+amountNum.toFixed(2),invoiceLink:''}):''
     };
     console.log('[sendApptInvoice] Payload:', JSON.stringify(payload));
 
@@ -5212,7 +5214,7 @@ async function sendApptInvoice(method){
       fetch('/api/send-sms',{
         method:'POST',
         headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({to:clientPhone,message:'Your cleaning invoice is ready: '+invoiceUrl})
+        body:JSON.stringify({to:clientPhone,message:(typeof messageTemplates!=='undefined'&&messageTemplates.smsInvoice)?applyTemplate(messageTemplates.smsInvoice,{clientName:clientName,amount:'$'+amountNum.toFixed(2),invoiceLink:invoiceUrl}):('Your cleaning invoice is ready: '+invoiceUrl)})
       }).then(function(r){return r.json();}).then(function(d){
         console.log('[sendApptInvoice] SMS result:', JSON.stringify(d));
       }).catch(function(e){console.error('[sendApptInvoice] SMS error:',e);});
@@ -5247,7 +5249,7 @@ function openApptCharge(){
   var cd=currentApptData||{};
   var client=clientDB[Object.keys(clientDB).find(function(k){return clientDB[k].name===currentAppt.n;})];
   var base=parseFloat(((cd.totalPrice||cd.total||cd.basePrice||'0')+'').replace('$',''))||0;
-  var fee=Math.round(base*0.03*100)/100;
+  var fee=0;
   var total=Math.round((base+fee)*100)/100;
   var info=document.getElementById('appt-charge-info');
   info.innerHTML='<div class="info-row"><span class="info-label">Client</span><span class="info-val">'+currentAppt.n+'</span></div>'
@@ -5754,7 +5756,7 @@ async function oneClickCharge(source){
     var existing = document.getElementById('charge-modal');
     if(existing) existing.remove();
 
-    var fee = Math.round(amountNum * 0.03 * 100) / 100;
+    var fee = 0;
     var total = Math.round((amountNum + fee) * 100) / 100;
 
     var modal = document.createElement('div');
@@ -5800,7 +5802,7 @@ async function confirmCharge(stripeCustomerId, clientName, amountNum){
   if(!selected){ showPaymentToast('Please select a payment method.', null, 'error'); return; }
   var pmId = selected.value;
   var last4 = selected.dataset.last4;
-  var fee = Math.round(amountNum * 0.03 * 100) / 100;
+  var fee = 0;
   var total = Math.round((amountNum + fee) * 100) / 100;
 
   document.getElementById('charge-modal').remove();
@@ -5905,7 +5907,7 @@ var emailTemplates = {
   invoice: {
     title: 'Invoice email',
     subject: 'Invoice from Hawaii Natural Clean — {{amount}} due',
-    body: 'Hi {{client_name}},\n\nThank you for choosing Hawaii Natural Clean! Please find your invoice for {{service}} below.\n\nAmount due: {{amount}}\nPayment terms: Due now\n\nPay by ACH bank transfer — FREE\nPay by card — 3% processing fee added\n\n{{invoice_url}}\n\nThank you for your business!\n\n— {{business_name}}\n{{phone}}'
+    body: 'Hi {{client_name}},\n\nThank you for choosing Hawaii Natural Clean! Please find your invoice for {{service}} below.\n\nAmount due: {{amount}}\nPayment terms: Due now\n\nPay by ACH bank transfer — FREE\nPay by card — no extra fee\n\n{{invoice_url}}\n\nThank you for your business!\n\n— {{business_name}}\n{{phone}}'
   },
   reminder: {
     title: 'Appointment reminder',
@@ -5940,7 +5942,7 @@ var emailTemplates = {
   invoice_reminder: {
     title: 'Unpaid invoice reminder',
     subject: 'Reminder: Invoice for {{amount}} is outstanding',
-    body: 'Hi {{client_name}},\n\nThis is a friendly reminder that your invoice for {{amount}} is still outstanding.\n\nYou can pay online here: {{invoice_url}}\n\nPay by ACH — FREE\nPay by card — 3% fee\n\nPlease reach out if you have any questions.\n\nThank you!\n— {{business_name}}\n{{phone}}'
+    body: 'Hi {{client_name}},\n\nThis is a friendly reminder that your invoice for {{amount}} is still outstanding.\n\nYou can pay online here: {{invoice_url}}\n\nPay by ACH — FREE\nPay by card\n\nPlease reach out if you have any questions.\n\nThank you!\n— {{business_name}}\n{{phone}}'
   }
 };
 
@@ -7407,14 +7409,14 @@ loadSettings();
       <div class="form-row"><textarea id="ach-email-msg" style="min-height:100px;">Payment options for your invoice:
 
 Pay by ACH bank transfer — FREE (3-5 business days)
-Pay by card — 3% processing fee added
+Pay by card — no extra fee
 
 We encourage ACH to keep costs low for both of us. Click the payment link below to choose your method.</textarea></div>
       <div class="panel-section">Message shown on payment page</div>
       <div class="form-row"><textarea id="ach-page-msg" style="min-height:80px;">Choose how you would like to pay:
 
 ACH Bank Transfer — No fee (recommended)
-Credit / Debit Card — 3% processing fee applies
+Credit / Debit Card — no extra fee
 
 Your total will update automatically when you select a payment method.</textarea></div>
       <div class="panel-section">Residential default terms</div>
@@ -7476,7 +7478,7 @@ Your total will update automatically when you select a payment method.</textarea
       </div>
       <div style="background:#f0faf6;border:1px solid #9ae6b4;border-radius:10px;padding:11px 13px;margin-bottom:14px;">
         <div style="font-size:11px;font-weight:600;color:#276749;margin-bottom:6px;">ACH payment incentive included</div>
-        <div style="font-size:11px;color:#276749;line-height:1.6;">The invoice will show clients both payment options:<br>&#x2022; ACH bank transfer — FREE<br>&#x2022; Card payment — 3% fee added</div>
+        <div style="font-size:11px;color:#276749;line-height:1.6;">The invoice will show clients both payment options:<br>&#x2022; ACH bank transfer — FREE<br>&#x2022; Card, Apple Pay, Cash App, Klarna, or Link — no extra fee</div>
       </div>
       <div class="save-bar">
         <button class="btn btn-primary" onclick="sendApptInvoice('email')">Send via email</button>
@@ -7503,14 +7505,14 @@ Your total will update automatically when you select a payment method.</textarea
           <span>Base amount</span><span id="charge-base">—</span>
         </div>
         <div style="display:flex;justify-content:space-between;font-size:12px;color:#b7791f;padding:4px 0;border-bottom:1px solid #f0f0ee;">
-          <span>Card processing fee (3%)</span><span id="charge-fee">—</span>
+          <span>Card processing fee</span><span id="charge-fee">—</span>
         </div>
         <div style="display:flex;justify-content:space-between;font-size:14px;font-weight:700;color:#1D9E75;padding:6px 0;">
           <span>Total charged</span><span id="charge-total">—</span>
         </div>
       </div>
       <div style="background:#fffbeb;border:1px solid #f6e05e;border-radius:8px;padding:10px 12px;margin-bottom:14px;font-size:12px;color:#b7791f;line-height:1.6;">
-        <strong>Tip:</strong> Encourage clients to pay by ACH (free) instead of card to avoid the 3% fee. You can send an invoice instead and let them choose.
+        <strong>Tip:</strong> Encourage clients to pay by ACH (free) to keep costs down. You can send an invoice instead and let them choose.
       </div>
       <div class="form-row"><label>Card on file</label>
         <div id="charge-card-info" style="font-size:13px;color:#1a1a1a;padding:8px 10px;background:#fafaf8;border:1px solid #e8e8e5;border-radius:8px;">Stripe card ****4521</div>

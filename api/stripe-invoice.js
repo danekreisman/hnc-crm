@@ -185,7 +185,25 @@ export default async function handler(req, res) {
                       return res.status(200).json({ success: true, clientSecret: setupIntent.client_secret });
           }
 
-          return res.status(400).json({ error: 'Unknown action' });
+          if (action === 'stripe_status_check') {
+      const k = process.env.STRIPE_SECRET_KEY || '';
+      const keyType = k.startsWith('sk_live_') ? 'LIVE' : (k.startsWith('sk_test_') ? 'TEST' : null);
+      return res.status(200).json({ success: true, connected: !!keyType, keyType });
+    }
+    if (action === 'find_customer_cards') {
+      const email = (req.body.customerEmail || '').trim().toLowerCase();
+      if (!email) return res.status(400).json({ success: false, error: 'customerEmail required' });
+      try {
+        const list = await stripe.customers.list({ email, limit: 1 });
+        if (!list.data.length) return res.status(200).json({ success: true, customerId: null, cards: [] });
+        const cust = list.data[0];
+        const cards = await stripe.paymentMethods.list({ customer: cust.id, type: 'card' });
+        return res.status(200).json({ success: true, customerId: cust.id, cards: cards.data });
+      } catch (e) {
+        return res.status(200).json({ success: false, customerId: null, cards: [], error: e.message });
+      }
+    }
+    return res.status(400).json({ error: 'Unknown action' });
   } catch (err) {
             console.error('[stripe-invoice] Error:', err);
             return res.status(500).json({ error: err.message });

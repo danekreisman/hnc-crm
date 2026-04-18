@@ -68,8 +68,21 @@ export default async function handler(req, res) {
                       const days = daysMap[terms] !== undefined ? daysMap[terms] : 0;
                       const amountCents = Math.round(parseFloat(amount) * 100);
 
-              if (!amountCents || amountCents <= 0) {
-                            return res.status(400).json({ success: false, error: 'Invoice amount must be greater than $0. Got: ' + amount });
+              // Support lineItems array (bulk invoice) in addition to single amount
+              const lineItems = Array.isArray(body.lineItems) ? body.lineItems : null;
+              let totalCentsFromLines = 0;
+              if (lineItems) {
+                for (const li of lineItems) {
+                  const liAmtNum = parseFloat(String(li.amount || 0).replace(/[^0-9.-]/g, '')) || 0;
+                  totalCentsFromLines += Math.round(liAmtNum * 100);
+                }
+                if (totalCentsFromLines <= 0) {
+                  return res.status(400).json({ success: false, error: 'Bulk invoice total must be greater than $0.' });
+                }
+              } else {
+                if (!amountCents || amountCents <= 0) {
+                  return res.status(400).json({ success: false, error: 'Invoice amount must be greater than $0. Got: ' + amount });
+                }
               }
 
               try {
@@ -81,12 +94,37 @@ export default async function handler(req, res) {
                             console.warn('[stripe-invoice] Could not clear pending items:', e.message);
               }
 
-              await stripe.invoiceItems.create({
-                            customer: customerId2,
-                            amount: amountCents,
-                            currency: 'usd',
-                            description: service || 'Cleaning service'
-              });
+              if (lineItems) {
+                for (const li of lineItems) {
+                  const liAmtNum = parseFloat(String(li.amount || 0).replace(/[^0-9.-]/g, '')) || 0;
+                  const liAmtCents = Math.round(liAmtNum * 100);
+                  const liDesc = (li.description || 'Cleaning service').toString().slice(0, 500);
+                  if (liAmtCents > 0) {
+                    await stripe.invoiceItems.create({
+                      customer: customerId2,
+                      amount: liAmtCents,
+                      currency: 'usd',
+                      description: liDesc
+                    });
+                  }
+                }
+                const taxCents = Math.round(totalCentsFromLines * 0.04);
+                if (taxCents > 0) {
+                  await stripe.invoiceItems.create({
+                    customer: customerId2,
+                    amount: taxCents,
+                    currency: 'usd',
+                    description: 'Hawaii GET tax (4%)'
+                  });
+                }
+              } else {
+                await stripe.invoiceItems.create({
+                  customer: customerId2,
+                  amount: amountCents,
+                  currency: 'usd',
+                  description: service || 'Cleaning service'
+                });
+              }
 
               const invoice = await stripe.invoices.create({
                             customer: customerId2,

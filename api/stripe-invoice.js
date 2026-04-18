@@ -94,7 +94,7 @@ export default async function handler(req, res) {
                             days_until_due: (days > 0 ? days : 30),
                             auto_advance: false,
                             pending_invoice_items_behavior: 'include',
-                            payment_method_types: ['card', 'us_bank_account', 'link', 'cashapp'],
+                            payment_settings: { payment_method_types: ['card', 'us_bank_account', 'link', 'cashapp'] },
                             footer: (emailBody || '').trim() || 'Thank you for choosing Hawaii Natural Clean.',
                             description: (emailSubject || notes || '').trim() || 'Cleaning service invoice'
               });

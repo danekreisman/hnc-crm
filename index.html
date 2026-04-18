@@ -1085,8 +1085,8 @@ Mahalo 🌺</textarea>
         </div>
         <div class="panel-section">Actions</div>
         <div class="action-grid">
-          <button class="action-btn green" onclick="openApptInvoice()">Invoice client</button>
-          <button class="action-btn green" onclick="openApptCharge()">Charge card on file</button>
+          <button class="action-btn green" id="appt-invoice-btn" onclick="openApptInvoice()">Invoice client</button>
+          <button class="action-btn green" id="appt-charge-btn" onclick="openApptCharge()">Charge card on file</button>
           <button class="action-btn blue" onclick="openMsgFromAppt()">Message client</button>
           <button class="action-btn blue full" onclick="openInviteCleaner()">Invite cleaner</button>
           <button class="action-btn amber full" onclick="showApptEdit()">Edit job</button>
@@ -2459,6 +2459,61 @@ function _openApptInner(a,dateKey){
   var cancelRecBtn=document.getElementById('cancel-recurring-btn');
   if(cancelRecBtn) cancelRecBtn.style.display=a.recurring?'':'none';
   document.getElementById('appt-overlay').classList.remove('hidden');
+  // Disable Charge button if client has no card on file
+  try { updateApptChargeButtonState(); } catch(e){}
+}
+
+function updateApptChargeButtonState(){
+  var btn = document.getElementById('appt-charge-btn');
+  if (!btn || !currentAppt) return;
+  var clientName = currentAppt.n;
+  var clientId = '';
+  try {
+    var ck = Object.keys(clientDB).find(function(k){ return k.length>=30 && clientDB[k].name === clientName; });
+    if (ck) clientId = ck;
+  } catch(e){}
+  var rec = clientId ? clientDB[clientId] : null;
+  var hasCard = !!(rec && (rec.stripeCustomerId || rec.stripe_customer_id))
+    || !!(clientId && window._cardCache && window._cardCache[clientId] && window._cardCache[clientId].hasCard);
+  if (hasCard) {
+    btn.disabled = false;
+    btn.style.opacity = '';
+    btn.style.cursor = '';
+    btn.title = 'Charge card on file';
+  } else {
+    btn.disabled = true;
+    btn.style.opacity = '0.4';
+    btn.style.cursor = 'not-allowed';
+    btn.title = 'No card on file for this client';
+  }
+  // Also probe stripe by email (cache-aware) so the button updates without a full payments view visit
+  try {
+    if (!hasCard && clientId && rec && rec.email && (!window._cardCache || !window._cardCache[clientId])) {
+      probeClientCardOnFile(clientId, rec.email).then(function(found){
+        if (found && document.getElementById('appt-charge-btn') && currentAppt && currentAppt.n === clientName) {
+          updateApptChargeButtonState();
+        }
+      });
+    }
+  } catch(e){}
+}
+async function probeClientCardOnFile(clientId, email){
+  if (!email) return false;
+  window._cardCache = window._cardCache || {};
+  try {
+    var resp = await fetch('/api/stripe-invoice', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ action: 'find_customer_cards', customerEmail: email }) });
+    var data = await resp.json();
+    if (data && data.success) {
+      var hasCard = (data.cards && data.cards.length > 0);
+      window._cardCache[clientId] = { customerId: data.customerId, hasCard: hasCard };
+      if (data.customerId && clientDB[clientId] && !clientDB[clientId].stripeCustomerId) {
+        try { await db.from('clients').update({ stripe_customer_id: data.customerId }).eq('id', clientId); } catch(e){}
+        clientDB[clientId].stripeCustomerId = data.customerId;
+      }
+      return hasCard;
+    }
+  } catch(e){}
+  return false;
 }
 
 function showApptEdit(){
@@ -6101,22 +6156,47 @@ function openApptCharge(){
   document.getElementById('appt-charge-overlay').classList.remove('hidden');
 }
 
-function executeCharge(){
-  if(!stripeConnected){
+async function executeCharge(){
+  if (!currentAppt) return;
+  var clientName = currentAppt.n;
+  var clientKey = Object.keys(clientDB).find(function(k){ return k.length>=30 && clientDB[k].name === clientName; });
+  var client = clientKey ? clientDB[clientKey] : null;
+  if (!client) { showPaymentToast('Client record not found', null, 'error'); return; }
+  var customerId = client.stripeCustomerId || client.stripe_customer_id || (window._cardCache && window._cardCache[clientKey] && window._cardCache[clientKey].customerId);
+  if (!customerId) { showPaymentToast('No Stripe customer / card on file for ' + clientName, null, 'error'); return; }
+  var totalText = (document.getElementById('charge-total').textContent || '').replace(/[^0-9.]/g,'');
+  var amount = parseFloat(totalText) || 0;
+  if (amount <= 0) { showPaymentToast('Charge amount must be > $0', null, 'error'); return; }
+  var apptId = currentAppt.dbId || null;
+  var sb = document.getElementById('appt-action-success');
+  if (sb) { sb.textContent = 'Charging $' + amount.toFixed(2) + '…'; sb.classList.add('show'); }
+  try {
+    var resp = await fetch('/api/stripe-invoice', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ action: 'charge_card', customerId: customerId, amount: amount.toFixed(2), service: (currentApptData && currentApptData.service) || 'Cleaning' }) });
+    var data = await resp.json();
+    if (!resp.ok || data.success === false) {
+      if (sb) { sb.textContent = 'Charge failed: ' + (data.error || 'Unknown error'); }
+      showPaymentToast('Charge failed: ' + (data.error || 'Unknown'), null, 'error');
+      return;
+    }
+    if (apptId) { try { await db.from('appointments').update({ status: 'paid' }).eq('id', apptId); } catch(e){} }
+    try {
+      await db.from('invoices').insert({
+        client_name: clientName, client_id: clientKey || null,
+        service: (currentApptData && currentApptData.service) || 'Cleaning',
+        amount: amount, total: amount, status: 'paid',
+        notes: apptId ? ('Appts: ' + apptId) : 'Card charge from calendar',
+        appointment_id: apptId,
+        paid_at: new Date().toISOString(),
+        created_at: new Date().toISOString()
+      });
+    } catch(e){ console.warn('insert invoice err', e); }
     closeOverlay('appt-charge-overlay');
-    openStripeConnect();
-    return;
+    if (sb) { sb.textContent = '$' + amount.toFixed(2) + ' collected from ' + clientName + '!'; sb.classList.add('show'); setTimeout(function(){ sb.classList.remove('show'); }, 3000); }
+    if (typeof loadAllData === 'function') await loadAllData();
+  } catch (err) {
+    if (sb) { sb.textContent = 'Charge error: ' + err.message; }
+    showPaymentToast('Charge error: ' + err.message, null, 'error');
   }
-  var client=currentAppt?currentAppt.n:'client';
-  var total=document.getElementById('charge-total').textContent;
-  var s=document.getElementById('appt-charge-success');
-  s.textContent='Card charged '+total+' for '+client+'!';s.classList.add('show');
-  addToInvoiceTable(client, currentApptData&&currentApptData.service||'Cleaning service', total, 'Paid');
-  setTimeout(function(){s.classList.remove('show');closeOverlay('appt-charge-overlay');
-    var sb=document.getElementById('appt-action-success');
-    sb.textContent=total+' collected from '+client+'!';sb.classList.add('show');
-    setTimeout(function(){sb.classList.remove('show');},3000);
-  },1800);
 }
 
 function closeApptChargeToInvoice(){

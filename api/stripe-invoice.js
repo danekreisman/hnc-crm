@@ -108,15 +108,7 @@ export default async function handler(req, res) {
                     });
                   }
                 }
-                const taxCents = Math.round(totalCentsFromLines * 0.04);
-                if (taxCents > 0) {
-                  await stripe.invoiceItems.create({
-                    customer: customerId2,
-                    amount: taxCents,
-                    currency: 'usd',
-                    description: 'Hawaii GET tax (4%)'
-                  });
-                }
+                // Tax is included as a line item by the frontend (avoids double-tax).
               } else {
                 await stripe.invoiceItems.create({
                   customer: customerId2,

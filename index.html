@@ -8,7 +8,7 @@
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f5f5f3;color:#1a1a1a;font-size:14px;}
-.crm{display:flex;height:100vh;overflow:hidden;}
+.crm{display:flex;height:100vh;overflw:hidden;}
 .sidebar{width:200px;background:#fff;border-right:1px solid #e8e8e5;display:flex;flex-direction:column;flex-shrink:0;overflow-y:auto;}
 .sidebar-logo{padding:16px;border-bottom:1px solid #e8e8e5;}
 .sidebar-logo .name{font-size:13px;font-weight:600;color:#1a1a1a;}
@@ -5102,7 +5102,7 @@ function openApptInvoice(){
   info.innerHTML='<div class="info-row"><span class="info-label">Client</span><span class="info-val">'+currentAppt.n+'</span></div>'
     +'<div class="info-row"><span class="info-label">Service</span><span class="info-val">'+(cd.service||'Standard clean')+'</span></div>'
     +'<div class="info-row"><span class="info-label">Date</span><span class="info-val">'+document.getElementById('ai-date').textContent+'</span></div>'
-    +'<div class="info-row"><span class="info-label">Amount</span><span class="info-val" style="color:#1D9E75;font-size:14px;font-weight:700;">'+(cd.totalPrice?'$'+parseFloat(cd.totalPrice).toFixed(2):'—')+'</span></div>'
+    +'<div class="info-row"><span class="info-label">Amount</span><span class="info-val" style="color:#1D9E75;font-size:14px;font-weight:700;">'+(cd.totalPrice!=null&&cd.totalPrice!==''?'$'+parseFloat(cd.totalPrice||0).toFixed(2):'—')+'</span></div>'
     +'<div class="info-row"><span class="info-label">Email on file</span><span class="info-val">'+(client?client.email:'—')+'</span></div>'
     +'<div class="info-row"><span class="info-label">Phone on file</span><span class="info-val">'+(client?client.phone:'—')+'</span></div>';
   var termsSel=document.getElementById('appt-inv-terms');
@@ -5139,12 +5139,8 @@ async function sendApptInvoice(method){
     if(apptId){
       var existing=await db.from('invoices').select('id,stripe_invoice_id,invoice_url,amount').eq('appointment_id',apptId).maybeSingle();
       if(existing.data&&existing.data.stripe_invoice_id&&existing.data.amount>0){
-        console.log('[sendApptInvoice] Existing valid invoice found:', existing.data);
-        var s=document.getElementById('appt-inv-success');
-        s.textContent='Invoice already sent'+(existing.data.invoice_url?' — '+existing.data.invoice_url:'')+'.';
-        s.classList.add('show');
-        setTimeout(function(){s.classList.remove('show');closeOverlay('appt-invoice-overlay');},2500);
-        return;
+        console.log('[sendApptInvoice] Existing invoice found, deleting to allow re-send:', existing.data);
+        await db.from('invoices').delete().eq('appointment_id',apptId);
       }
       // Clean up any stale $0 or null-amount invoice records before creating a new one
       await db.from('invoices').delete().eq('appointment_id',apptId).or('amount.eq.0,amount.is.null');
@@ -5155,6 +5151,7 @@ async function sendApptInvoice(method){
       action:'send_invoice',
       customerName:clientName,
       customerEmail:clientEmail,
+      customerId:(client&&client.stripeCustomerId)||'',
       amount:amountNum,
       service:cd.service||'Cleaning service',
       terms:terms,

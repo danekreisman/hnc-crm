@@ -1,8 +1,9 @@
 {
-  "name": "hnc-crm",
-  "version": "1.0.0",
-  "description": "Hawaii Natural Clean CRM",
-  "dependencies": {
-    "stripe": "^14.25.0"
-  }
+    "name": "hnc-crm",
+    "version": "1.0.0",
+    "description": "Hawaii Natural Clean CRM",
+    "dependencies": {
+          "stripe": "^14.25.0",
+          "@supabase/supabase-js": "^2.45.0"
+    }
 }

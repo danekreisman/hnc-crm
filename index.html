@@ -636,8 +636,7 @@ textarea{font-family:inherit;}
           <div class="pay-tab active" onclick="switchPayTab('pending',this)">Pending charges</div>
           <div class="pay-tab" onclick="switchPayTab('sent',this)">Sent — Unpaid</div>
           <div class="pay-tab" onclick="switchPayTab('invoices',this)">Invoice history</div>
-          <div class="pay-tab" onclick="switchPayTab('bulk',this)">Bulk invoice</div>
-        </div>
+          </div>
 
         <!-- PENDING CHARGES -->
         <div id="pay-pending" class="pay-section">
@@ -649,14 +648,12 @@ textarea{font-family:inherit;}
           </div>
           <div style="font-size:12px;color:#999;margin-bottom:10px;">Completed jobs that need payment — sorted by date. Residential clients default to charge now.</div>
           <div class="tw"><table><thead><tr>
-            <th style="width:4%"><input type="checkbox" id="pending-check-all" onclick="togglePendingAll(this)"></th>
-            <th style="width:18%">Client</th>
-            <th style="width:18%">Service</th>
-            <th style="width:10%">Date</th>
-            <th style="width:10%">Amount</th>
-            <th style="width:12%">Type</th>
-            <th style="width:10%">Duration</th>
-            <th style="width:18%">Action</th>
+            <th style="width:8%"><input type="checkbox" id="pending-check-all" onclick="togglePendingAll(this)"></th>
+            <th style="width:24%">Client</th>
+            <th style="width:22%">Service</th>
+            <th style="width:14%">Date</th>
+            <th style="width:12%">Amount</th>
+            <th style="width:20%;text-align:right;">Action</th>
           </tr></thead><tbody id="pending-tbody">
           </tbody></table></div>
         </div>
@@ -688,42 +685,7 @@ textarea{font-family:inherit;}
           </tbody></table></div>
         </div>
 
-        <!-- BULK INVOICE -->
-        <div id="pay-bulk" class="pay-section" style="display:none;">
-          <div style="display:flex;align-items:flex-start;gap:16px;">
-            <div style="flex:1;min-width:0;">
-              <div style="font-size:12px;color:#999;margin-bottom:10px;">Select completed jobs from a commercial client and combine into one invoice. Use the "+ Bulk" buttons on Pending charges tab to add jobs here.</div>
-              <div class="tw" style="margin-bottom:12px;"><table><thead><tr>
-                <th style="width:5%"><input type="checkbox" id="bulk-check-all" onchange="toggleAllBulk(this)" style="accent-color:#1D9E75;"></th>
-                <th style="width:22%">Client</th><th style="width:25%">Service</th><th style="width:15%">Date</th><th style="width:15%">Amount</th><th style="width:18%">Remove</th>
-              </tr></thead><tbody id="bulk-tbody">
-              </tbody></table></div>
-              <div style="background:#fafaf8;border:1px solid #e8e8e5;border-radius:10px;padding:12px 14px;">
-                <div style="font-size:13px;font-weight:600;color:#1a1a1a;margin-bottom:10px;">Invoice settings</div>
-                <div class="form-two" style="margin-bottom:8px;">
-                  <div class="form-row" style="margin:0;"><label>Payment terms</label>
-                    <select id="bulk-terms"><option value="net15">NET15</option><option value="net30" selected>NET30</option><option value="net45">NET45</option><option value="net60">NET60</option></select>
-                  </div>
-                  <div class="form-row" style="margin:0;"><label>Invoice date</label><input type="date" id="bulk-date" value="2026-04-03"></div>
-                </div>
-                <div class="form-row" style="margin-bottom:8px;"><label>Notes on invoice</label><textarea id="bulk-notes" style="min-height:50px;" placeholder="e.g. Thank you for your business. Payment due by NET30 terms."></textarea></div>
-                <div style="display:flex;align-items:center;justify-content:space-between;">
-                  <div>
-                    <div style="font-size:12px;color:#999;">Total selected</div>
-                    <div style="font-size:20px;font-weight:700;color:#1D9E75;" id="bulk-total">$544.50</div>
-                  </div>
-                  <div style="display:flex;gap:8px;">
-                    <button class="btn" style="background:#ebf5ff;color:#2b6cb0;border-color:#bee3f8;font-size:12px;" onclick="sendBulkInvoice('ach')">Send ACH invoice</button>
-                    <button class="btn btn-primary" style="font-size:12px;" onclick="sendBulkInvoice('email')">Send invoice by email</button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- SETTINGS VIEW -->
+        <!-- SETTINGS VIEW -->
       <div id="view-settings" class="vc">
 
         <!-- BUSINESS INFO -->
@@ -1823,6 +1785,7 @@ async function loadAllData(){
   } catch(err){
     console.error('Load error:',err);
   }
+  try { await syncPaidAppointments(); } catch(e){ console.warn('syncPaid call err:', e); }
   try { autoCompleteExpiredBookings(); } catch(e){ console.warn('autoComplete call err:', e); }
   try { renderPaymentsSection(); } catch(e){ console.warn('renderPayments err:', e); }
   showLoadingState(false);
@@ -5038,31 +5001,94 @@ async function renderPaymentsSection(){
     var pendingTbody = document.getElementById('pending-tbody');
     if (pendingTbody) {
       pendingTbody.innerHTML = '';
-      if (appts.length === 0) {
-        pendingTbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#999;padding:20px;">No pending charges — all completed bookings have been invoiced.</td></tr>';
-      } else {
-        appts.forEach(function(a){
-          var tr = document.createElement('tr');
-          tr.setAttribute('data-appt-id', a.id);
-          tr.setAttribute('data-client-id', a.client_id || '');
-          tr.setAttribute('data-client-name', a.client_name || '');
-          tr.setAttribute('data-amount', a.total_price || 0);
-          var amtStr = '$' + parseFloat(a.total_price || 0).toFixed(2);
-          var dateStr = a.date || '';
-          var dur = a.duration_hours ? (a.duration_hours + 'h') : '—';
-          tr.innerHTML =
-            '<td><input type="checkbox" class="pending-row-check" onclick="updateBulkInvoiceBtn()"></td>' +
-            '<td>' + escapeHtmlPay(a.client_name || '') + '</td>' +
-            '<td>' + escapeHtmlPay(a.service || 'Cleaning') + '</td>' +
-            '<td>' + dateStr + '</td>' +
-            '<td>' + amtStr + '</td>' +
-            '<td>' + (a.time || '') + '</td>' +
-            '<td>' + dur + '</td>' +
-            '<td><button class="btn-secondary" onclick="sendSinglePendingInvoice(this)">Send invoice</button></td>';
-          pendingTbody.appendChild(tr);
-        });
-      }
-      document.getElementById('pay-pending-count').textContent = appts.length;
+    if (appts.length === 0) {
+      pendingTbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#999;padding:20px;">No pending charges — all completed bookings have been invoiced.</td></tr>';
+    } else {
+      // Group appointments by client (id or name)
+      var groups = {};
+      var groupOrder = [];
+      appts.forEach(function(a){
+        var cid = a.client_id || '';
+        var rec = null;
+        if (typeof clientDB !== 'undefined') {
+          if (cid && clientDB[cid]) rec = clientDB[cid];
+          if (!rec && a.client_name) {
+            for (var ck in clientDB) {
+              if ((clientDB[ck].name || '').toLowerCase() === (a.client_name || '').toLowerCase()) {
+                rec = clientDB[ck]; if (!cid) cid = ck; break;
+              }
+            }
+          }
+        }
+        var key = cid || ('name:' + (a.client_name || ''));
+        if (!groups[key]) { groups[key] = { cid: cid, name: a.client_name || '', rec: rec, appts: [], total: 0 }; groupOrder.push(key); }
+        groups[key].appts.push(a);
+        groups[key].total += parseFloat(a.total_price || 0) || 0;
+      });
+      groupOrder.forEach(function(key){
+        var g = groups[key];
+        var hasCard = !!(g.rec && (g.rec.stripeCustomerId || g.rec.stripe_customer_id));
+        var multi = g.appts.length > 1;
+        var groupId = 'pgrp-' + (g.cid || key.replace(/[^a-zA-Z0-9]/g,'_'));
+        var totalStr = '$' + g.total.toFixed(2);
+        var hr = document.createElement('tr');
+        hr.className = 'pending-group-header';
+        hr.setAttribute('data-group-id', groupId);
+        hr.setAttribute('data-client-id', g.cid || '');
+        hr.setAttribute('data-client-name', g.name);
+        hr.setAttribute('data-amount', g.total.toFixed(2));
+        if (!multi) hr.setAttribute('data-appt-id', g.appts[0].id);
+        hr.style.cssText = 'background:#fafaf8;';
+        var caret = multi ? '<span class="caret" style="display:inline-block;width:14px;color:#666;cursor:pointer;transition:transform .15s;">▶</span>' : '<span style="display:inline-block;width:14px;"></span>';
+        var jobsLabel = multi ? (g.appts.length + ' jobs bundled') : (g.appts[0].service || 'Cleaning');
+        var dateLabel = multi ? '—' : (g.appts[0].date || '');
+        var actionBtns = '';
+        if (hasCard) {
+          actionBtns += '<button class="btn-secondary" style="background:#dcfce7;color:#166534;border-color:#bbf7d0;margin-right:4px;" onclick="event.stopPropagation();chargePendingGroup(this)" title="Charge card on file">Charge card</button>';
+        }
+        actionBtns += '<button class="btn-secondary" onclick="event.stopPropagation();invoicePendingGroup(this)">' + (multi ? 'Invoice all' : 'Send invoice') + '</button>';
+        hr.innerHTML =
+          '<td style="vertical-align:middle;">' + caret + ' <input type="checkbox" class="pending-row-check" onclick="event.stopPropagation();updateBulkInvoiceBtn();"></td>' +
+          '<td style="font-weight:600;">' + escapeHtmlPay(g.name) + (multi ? ' <span style="color:#999;font-weight:400;font-size:11px;">(' + g.appts.length + ')</span>' : '') + '</td>' +
+          '<td>' + escapeHtmlPay(jobsLabel) + '</td>' +
+          '<td>' + dateLabel + '</td>' +
+          '<td style="font-weight:600;">' + totalStr + '</td>' +
+          '<td style="text-align:right;">' + actionBtns + '</td>';
+        if (multi) {
+          hr.style.cursor = 'pointer';
+          hr.addEventListener('click', function(ev){
+            if (ev.target.tagName === 'BUTTON' || ev.target.tagName === 'INPUT') return;
+            togglePendingGroup(groupId);
+          });
+        }
+        pendingTbody.appendChild(hr);
+        if (multi) {
+          g.appts.forEach(function(a){
+            var sr = document.createElement('tr');
+            sr.className = 'pending-sub-row pending-sub-' + groupId;
+            sr.setAttribute('data-appt-id', a.id);
+            sr.setAttribute('data-client-id', g.cid || '');
+            sr.setAttribute('data-client-name', g.name);
+            sr.setAttribute('data-amount', a.total_price || 0);
+            sr.style.cssText = 'display:none;background:#fff;';
+            var amtStr = '$' + parseFloat(a.total_price || 0).toFixed(2);
+            var subActions = '';
+            if (hasCard) {
+              subActions += '<button class="btn-secondary" style="background:#dcfce7;color:#166534;border-color:#bbf7d0;margin-right:4px;font-size:11px;padding:4px 8px;" onclick="chargeSinglePending(this)">Charge</button>';
+            }
+            subActions += '<button class="btn-secondary" style="font-size:11px;padding:4px 8px;" onclick="invoiceSinglePending(this)">Invoice</button>';
+            sr.innerHTML =
+              '<td style="padding-left:34px;"></td>' +
+              '<td style="color:#666;font-size:12px;">↳ ' + escapeHtmlPay(g.name) + '</td>' +
+              '<td>' + escapeHtmlPay(a.service || 'Cleaning') + '</td>' +
+              '<td>' + (a.date || '') + '</td>' +
+              '<td>' + amtStr + '</td>' +
+              '<td style="text-align:right;">' + subActions + '</td>';
+            pendingTbody.appendChild(sr);
+          });
+        }
+      });
+            document.getElementById('pay-pending-count').textContent = appts.length;
     }
     
     // Split invoices: unpaid (sent but not paid), history (all)
@@ -5189,16 +5215,27 @@ async function createBulkInvoiceFromPending(){
     var apptId = tr.getAttribute('data-appt-id') || '';
     return { description: service + ' — ' + date, amount: amt, apptId: apptId };
   });
-  // Look up client email from clientDB
+  // Look up client email from clientDB - try by id, then by name as fallback
   var clientEmail = null;
-  if (typeof clientDB !== 'undefined' && clientDB[clientId]) {
-    clientEmail = clientDB[clientId].email;
+  var clientRec = null;
+  if (typeof clientDB !== 'undefined') {
+    if (clientId && clientDB[clientId]) clientRec = clientDB[clientId];
+    if (!clientRec && clientName) {
+      for (var __ck in clientDB) {
+        if ((clientDB[__ck].name || '').toLowerCase() === clientName.toLowerCase()) {
+          clientRec = clientDB[__ck];
+          if (!clientId) clientId = __ck;
+          break;
+        }
+      }
+    }
   }
-  if (!clientEmail || clientEmail === '—') {
+  if (clientRec) clientEmail = clientRec.email;
+  if (!clientEmail || clientEmail === '-' || clientEmail === '—') {
     showPaymentToast('Client "' + clientName + '" has no email on file. Add one first.', null, 'error');
     return;
   }
-  var terms = 'net30';
+    var terms = 'net30';
   showPaymentToast('Sending ' + lineItems.length + '-item invoice to ' + clientName + '...', null, null);
   try {
     var resp = await fetch('/api/stripe-invoice', {
@@ -5257,6 +5294,246 @@ async function sendSinglePendingInvoice(btn){
   await createBulkInvoiceFromPending();
 }
 
+// ===== NEW PENDING GROUP HANDLERS (charge / invoice per row or bundled) =====
+function togglePendingGroup(groupId){
+  var sub = document.querySelectorAll('.pending-sub-' + groupId);
+  if (!sub.length) return;
+  var hidden = sub[0].style.display === 'none';
+  sub.forEach(function(r){ r.style.display = hidden ? '' : 'none'; });
+  var hdr = document.querySelector('.pending-group-header[data-group-id="' + groupId + '"] .caret');
+  if (hdr) hdr.style.transform = hidden ? 'rotate(90deg)' : 'rotate(0deg)';
+}
+
+async function chargePendingGroup(btn){
+  var hr = btn.closest('tr');
+  if (!hr) return;
+  var groupId = hr.getAttribute('data-group-id');
+  var clientId = hr.getAttribute('data-client-id') || '';
+  var clientName = hr.getAttribute('data-client-name') || '';
+  var subs = document.querySelectorAll('.pending-sub-' + groupId);
+  var apptIds = [];
+  if (subs.length > 0) {
+    subs.forEach(function(r){ apptIds.push(r.getAttribute('data-appt-id')); });
+  } else {
+    apptIds.push(hr.getAttribute('data-appt-id') || '');
+  }
+  if (!confirm('Charge ' + clientName + "'s saved card for the " + (apptIds.length || 1) + ' selected job(s)?')) return;
+  await chargePendingAppointments(clientId, clientName, apptIds);
+}
+
+async function chargeSinglePending(btn){
+  var sr = btn.closest('tr');
+  if (!sr) return;
+  var clientId = sr.getAttribute('data-client-id') || '';
+  var clientName = sr.getAttribute('data-client-name') || '';
+  var apptId = sr.getAttribute('data-appt-id') || '';
+  if (!confirm('Charge ' + clientName + "'s saved card for this job?")) return;
+  await chargePendingAppointments(clientId, clientName, [apptId]);
+}
+
+async function chargePendingAppointments(clientId, clientName, apptIds){
+  var rec = null;
+  if (typeof clientDB !== 'undefined') {
+    if (clientId && clientDB[clientId]) rec = clientDB[clientId];
+    if (!rec && clientName) {
+      for (var ck in clientDB) {
+        if ((clientDB[ck].name || '').toLowerCase() === (clientName || '').toLowerCase()) {
+          rec = clientDB[ck]; if (!clientId) clientId = ck; break;
+        }
+      }
+    }
+  }
+  var stripeCustomerId = rec ? (rec.stripeCustomerId || rec.stripe_customer_id || '') : '';
+  if (!stripeCustomerId) {
+    showPaymentToast('No Stripe customer / saved card found for ' + clientName + '. Send an invoice instead.', null, 'error');
+    return;
+  }
+  var apptRows = await db.from('appointments').select('id,total_price,base_price,tax,service').in('id', apptIds);
+  if (apptRows.error) { showPaymentToast('Error loading appointments: ' + apptRows.error.message, null, 'error'); return; }
+  var totalAmt = 0;
+  (apptRows.data || []).forEach(function(a){ totalAmt += parseFloat(a.total_price || 0) || 0; });
+  if (totalAmt <= 0) { showPaymentToast('Total amount is $0 — nothing to charge.', null, 'error'); return; }
+  showPaymentToast('Charging ' + clientName + ' $' + totalAmt.toFixed(2) + ' via saved card…', null, null);
+  try {
+    var resp = await fetch('/api/stripe-invoice', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        action: 'charge_card',
+        customerId: stripeCustomerId,
+        customerName: clientName,
+        amount: totalAmt.toFixed(2),
+        service: (apptRows.data && apptRows.data[0] && apptRows.data[0].service) || 'Cleaning service'
+      })
+    });
+    var data = await resp.json();
+    if (!resp.ok || data.success === false) {
+      showPaymentToast('Charge failed: ' + (data.error || 'Unknown error'), null, 'error');
+      return;
+    }
+    for (var i = 0; i < apptIds.length; i++) {
+      await db.from('appointments').update({ status: 'paid', invoice_sent: true }).eq('id', apptIds[i]);
+    }
+    await db.from('invoices').insert({
+      client_name: clientName,
+      client_id: clientId || null,
+      service: (apptRows.data && apptRows.data[0] && apptRows.data[0].service) || 'Cleaning',
+      amount: totalAmt,
+      tax: 0,
+      total: totalAmt,
+      payment_method: 'card',
+      payment_terms: 'now',
+      status: 'paid',
+      stripe_payment_intent_id: data.paymentIntentId || null,
+      appointment_id: apptIds[0] || null,
+      notes: 'Charged via saved card. Appts: ' + apptIds.join(', ')
+    });
+    showPaymentToast('Charged $' + totalAmt.toFixed(2) + ' from ' + clientName + '!', null, 'success');
+    if (typeof loadAllData === 'function') await loadAllData();
+    else if (typeof renderPaymentsSection === 'function') renderPaymentsSection();
+  } catch (err) {
+    showPaymentToast('Charge error: ' + err.message, null, 'error');
+  }
+}
+
+async function invoicePendingGroup(btn){
+  var hr = btn.closest('tr');
+  if (!hr) return;
+  var groupId = hr.getAttribute('data-group-id');
+  var clientId = hr.getAttribute('data-client-id') || '';
+  var clientName = hr.getAttribute('data-client-name') || '';
+  var subs = document.querySelectorAll('.pending-sub-' + groupId);
+  var apptIds = [];
+  if (subs.length > 0) {
+    subs.forEach(function(r){ apptIds.push(r.getAttribute('data-appt-id')); });
+  } else {
+    apptIds.push(hr.getAttribute('data-appt-id') || '');
+  }
+  await invoicePendingAppointments(clientId, clientName, apptIds);
+}
+
+async function invoiceSinglePending(btn){
+  var sr = btn.closest('tr');
+  if (!sr) return;
+  var clientId = sr.getAttribute('data-client-id') || '';
+  var clientName = sr.getAttribute('data-client-name') || '';
+  var apptId = sr.getAttribute('data-appt-id') || '';
+  await invoicePendingAppointments(clientId, clientName, [apptId]);
+}
+
+async function invoicePendingAppointments(clientId, clientName, apptIds){
+  var rec = null;
+  if (typeof clientDB !== 'undefined') {
+    if (clientId && clientDB[clientId]) rec = clientDB[clientId];
+    if (!rec && clientName) {
+      for (var ck in clientDB) {
+        if ((clientDB[ck].name || '').toLowerCase() === (clientName || '').toLowerCase()) {
+          rec = clientDB[ck]; if (!clientId) clientId = ck; break;
+        }
+      }
+    }
+  }
+  var clientEmail = rec ? rec.email : null;
+  if (!clientEmail || clientEmail === '-' || clientEmail === '—') {
+    showPaymentToast('Client "' + clientName + '" has no email on file. Add one first.', null, 'error');
+    return;
+  }
+  var apptRows = await db.from('appointments').select('id,total_price,base_price,tax,service,date').in('id', apptIds);
+  if (apptRows.error) { showPaymentToast('Error: ' + apptRows.error.message, null, 'error'); return; }
+  var lineItems = [];
+  var subtotal = 0, totalTax = 0;
+  (apptRows.data || []).forEach(function(a){
+    var base = parseFloat(a.base_price || 0) || 0;
+    var tax = parseFloat(a.tax || 0) || 0;
+    if (!base && !tax) {
+      var total = parseFloat(a.total_price || 0) || 0;
+      base = +(total / 1.04).toFixed(2);
+      tax = +(total - base).toFixed(2);
+    }
+    subtotal += base;
+    totalTax += tax;
+    lineItems.push({
+      description: (a.service || 'Cleaning') + ' — ' + (a.date || ''),
+      amount: base,
+      apptId: a.id
+    });
+  });
+  if (totalTax > 0) {
+    lineItems.push({ description: 'Hawaii GET tax (4%)', amount: +totalTax.toFixed(2), apptId: null });
+  }
+  showPaymentToast('Sending invoice for ' + apptIds.length + ' job(s) to ' + clientName + '…', null, null);
+  try {
+    var resp = await fetch('/api/stripe-invoice', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        action: 'send_invoice',
+        customerName: clientName,
+        customerEmail: clientEmail,
+        amount: (subtotal + totalTax).toFixed(2),
+        service: 'Cleaning service',
+        terms: 'NET30',
+        lineItems: lineItems,
+        notes: 'Invoice for ' + apptIds.length + ' completed job(s).'
+      })
+    });
+    var data = await resp.json();
+    if (!resp.ok || data.success === false) {
+      showPaymentToast('Invoice failed: ' + (data.error || 'Unknown error'), null, 'error');
+      return;
+    }
+    for (var i = 0; i < apptIds.length; i++) {
+      await db.from('appointments').update({ invoice_sent: true, status: 'invoiced' }).eq('id', apptIds[i]);
+    }
+    await db.from('invoices').insert({
+      client_name: clientName,
+      client_id: clientId || null,
+      service: 'Cleaning',
+      amount: subtotal,
+      tax: totalTax,
+      total: subtotal + totalTax,
+      payment_method: 'invoice',
+      payment_terms: 'NET30',
+      status: 'unpaid',
+      stripe_invoice_id: data.invoiceId || null,
+      appointment_id: apptIds[0] || null,
+      notes: 'Bulk invoice for ' + apptIds.length + ' jobs. Appts: ' + apptIds.join(', ')
+    });
+    showPaymentToast('Invoice sent for $' + (subtotal + totalTax).toFixed(2) + ' to ' + clientName + '!', null, 'success');
+    if (typeof loadAllData === 'function') await loadAllData();
+    else if (typeof renderPaymentsSection === 'function') renderPaymentsSection();
+  } catch (err) {
+    showPaymentToast('Invoice error: ' + err.message, null, 'error');
+  }
+}
+
+// Sync paid invoices -> mark linked appointments as paid (so calendar turns green)
+async function syncPaidAppointments(){
+  try {
+    var paidInv = await db.from('invoices').select('appointment_id,notes,status').or('status.eq.paid,status.eq.Paid');
+    if (paidInv.error || !paidInv.data) return;
+    var apptIds = [];
+    paidInv.data.forEach(function(inv){
+      if (inv.appointment_id) apptIds.push(inv.appointment_id);
+      var m = (inv.notes || '').match(/Appts?:\s*([0-9a-f,\-\s]+)/i);
+      if (m) {
+        m[1].split(',').forEach(function(id){ id = id.trim(); if (id) apptIds.push(id); });
+      }
+    });
+    if (apptIds.length === 0) return;
+    var existing = await db.from('appointments').select('id,status').in('id', apptIds);
+    if (existing.error || !existing.data) return;
+    var toUpdate = existing.data.filter(function(a){
+      var st = (a.status || '').toLowerCase();
+      return st !== 'paid' && st !== 'cancelled';
+    }).map(function(a){ return a.id; });
+    for (var i = 0; i < toUpdate.length; i++) {
+      await db.from('appointments').update({ status: 'paid' }).eq('id', toUpdate[i]);
+    }
+  } catch (e) { console.warn('[syncPaidAppointments] err:', e); }
+}
+
+
 /* PAYMENTS JS */
 function switchPayTab(tab, el){
   try { renderPaymentsSection(); } catch(e){}
@@ -5264,7 +5541,6 @@ function switchPayTab(tab, el){
   document.querySelectorAll('.pay-section').forEach(function(s){s.style.display='none';});
   el.classList.add('active');
   document.getElementById('pay-'+tab).style.display='block';
-  if(tab==='bulk')updateBulkTotal();
 }
 
 function chargeCardRow(btn, client, amount){

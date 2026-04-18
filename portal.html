@@ -1,0 +1,350 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Hawaii Natural Clean — Cleaner Portal</title>
+<style>
+  :root{
+    --bg:#0b0f14; --panel:#111823; --panel2:#0f1620; --border:#1f2a38;
+    --text:#e6edf3; --muted:#8b97a8; --accent:#4aa3ff; --accent2:#6cd3a7;
+    --danger:#ff6b6b; --warn:#f5b955;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+  a{color:var(--accent);text-decoration:none}
+  .wrap{max-width:1100px;margin:0 auto;padding:24px}
+  header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px}
+  header h1{font-size:20px;margin:0;letter-spacing:.3px}
+  header .who{font-size:13px;color:var(--muted)}
+  .btn{background:var(--accent);color:#0b0f14;border:none;border-radius:8px;padding:10px 14px;font-weight:600;cursor:pointer}
+  .btn:hover{filter:brightness(1.08)}
+  .btn.secondary{background:transparent;color:var(--text);border:1px solid var(--border)}
+  .btn.ghost{background:transparent;color:var(--muted);border:1px solid var(--border)}
+  .btn.google{background:#fff;color:#202124;display:inline-flex;align-items:center;gap:8px}
+  .btn:disabled{opacity:.6;cursor:not-allowed}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:18px;margin-bottom:16px}
+  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+  .kpi{background:var(--panel2);border:1px solid var(--border);border-radius:10px;padding:14px}
+  .kpi .label{color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.08em}
+  .kpi .value{font-size:26px;font-weight:700;margin-top:6px}
+  table{width:100%;border-collapse:collapse;font-size:14px}
+  th,td{text-align:left;padding:10px;border-bottom:1px solid var(--border)}
+  th{color:var(--muted);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.06em}
+  tr:last-child td{border-bottom:none}
+  .badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;border:1px solid var(--border)}
+  .badge.done{background:rgba(108,211,167,.12);color:var(--accent2);border-color:rgba(108,211,167,.3)}
+  .badge.assigned{background:rgba(74,163,255,.12);color:var(--accent);border-color:rgba(74,163,255,.3)}
+  .badge.pending{background:rgba(245,185,85,.12);color:var(--warn);border-color:rgba(245,185,85,.3)}
+  .badge.cancelled{background:rgba(255,107,107,.12);color:var(--danger);border-color:rgba(255,107,107,.3)}
+  .auth{max-width:420px;margin:80px auto;padding:28px}
+  .auth h2{margin:0 0 6px;font-size:22px}
+  .auth p{color:var(--muted);margin:0 0 18px;font-size:14px}
+  .auth .divider{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:12px;margin:16px 0}
+  .auth .divider::before,.auth .divider::after{content:"";flex:1;height:1px;background:var(--border)}
+  .field{display:flex;flex-direction:column;gap:6px;margin-bottom:12px}
+  .field label{font-size:12px;color:var(--muted)}
+  .field input{background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;color:var(--text);font-size:14px}
+  .field input:focus{outline:none;border-color:var(--accent)}
+  .msg{font-size:13px;margin-top:10px}
+  .msg.err{color:var(--danger)}
+  .msg.ok{color:var(--accent2)}
+  .row{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+  .link-btn{background:none;border:none;color:var(--accent);cursor:pointer;padding:0;font-size:13px}
+  .gcard{display:flex;align-items:center;justify-content:space-between;gap:12px}
+  .gcard .status{font-size:13px;color:var(--muted)}
+  .gcard .status.connected{color:var(--accent2)}
+  @media(max-width:720px){.grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script type="module">
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
+const SUPABASE_URL = 'https://hehfecnjmgsthxjxlvpz.supabase.co';
+const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhlaGZlY25qbWdzdGh4anhsdnB6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUyNDMwOTMsImV4cCI6MjA5MDgxOTA5M30.LRfDNzOjVQYUeldULv-8VFlZl6akxdHVfLBFCZDCa5o';
+const supa = createClient(SUPABASE_URL, SUPABASE_ANON, { auth: { persistSession: true, autoRefreshToken: true } });
+
+const app = document.getElementById('app');
+const $ = (html) => { const t = document.createElement('template'); t.innerHTML = html.trim(); return t.content.firstChild; };
+const fmtMoney = (n) => '$' + (Number(n||0)).toFixed(2);
+const fmtDate = (d) => { if(!d) return ''; const dt = new Date(d+'T00:00:00'); return dt.toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric'}); };
+const fmtTime = (t) => { if(!t) return ''; const [h,m]=t.split(':'); const H=parseInt(h,10); const ap=H>=12?'PM':'AM'; const h12=((H+11)%12)+1; return `${h12}:${m} ${ap}`; };
+
+function renderLogin(message){
+  app.innerHTML = '';
+  const card = $(`
+    <div class="auth card">
+      <h2>Cleaner Portal</h2>
+      <p>Sign in to view your schedule, hours, and pay.</p>
+      <button class="btn google" id="googleBtn">
+        <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+        Continue with Google
+      </button>
+      <div class="divider">or</div>
+      <form id="emailForm">
+        <div class="field"><label>Email</label><input type="email" id="email" required autocomplete="email"/></div>
+        <div class="field"><label>Password</label><input type="password" id="password" required autocomplete="current-password" minlength="6"/></div>
+        <button class="btn" style="width:100%" type="submit">Sign in</button>
+      </form>
+      <div class="row" style="margin-top:10px">
+        <button class="link-btn" id="forgot">Forgot password?</button>
+        <button class="link-btn" id="toggleMode">Need an account? Sign up</button>
+      </div>
+      <div class="msg" id="authMsg">${message||''}</div>
+    </div>`);
+  app.appendChild(card);
+
+  let mode = 'signin';
+  const toggle = card.querySelector('#toggleMode');
+  const form = card.querySelector('#emailForm');
+  const msg = card.querySelector('#authMsg');
+
+  toggle.onclick = () => {
+    mode = mode==='signin' ? 'signup' : 'signin';
+    toggle.textContent = mode==='signin' ? 'Need an account? Sign up' : 'Have an account? Sign in';
+    form.querySelector('button[type=submit]').textContent = mode==='signin' ? 'Sign in' : 'Create account';
+    msg.textContent = '';
+    msg.className = 'msg';
+  };
+
+  card.querySelector('#googleBtn').onclick = async () => {
+    msg.textContent = 'Redirecting to Google...';
+    msg.className = 'msg';
+    const { error } = await supa.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo: window.location.origin + '/portal.html' }
+    });
+    if (error) { msg.textContent = error.message; msg.className = 'msg err'; }
+  };
+
+  form.onsubmit = async (e) => {
+    e.preventDefault();
+    msg.textContent = '';
+    const email = card.querySelector('#email').value.trim();
+    const password = card.querySelector('#password').value;
+    let res;
+    if (mode === 'signin') {
+      res = await supa.auth.signInWithPassword({ email, password });
+    } else {
+      res = await supa.auth.signUp({ email, password, options: { emailRedirectTo: window.location.origin + '/portal.html' } });
+    }
+    if (res.error) { msg.textContent = res.error.message; msg.className = 'msg err'; return; }
+    if (mode === 'signup' && !res.data.session) {
+      msg.textContent = 'Check your email to confirm your account, then sign in.';
+      msg.className = 'msg ok';
+      return;
+    }
+    boot();
+  };
+
+  card.querySelector('#forgot').onclick = async () => {
+    const email = card.querySelector('#email').value.trim();
+    if (!email) { msg.textContent = 'Enter your email above first.'; msg.className='msg err'; return; }
+    const { error } = await supa.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin + '/portal.html' });
+    if (error) { msg.textContent = error.message; msg.className = 'msg err'; }
+    else { msg.textContent = 'Password reset email sent.'; msg.className = 'msg ok'; }
+  };
+}
+
+async function findCleaner(user){
+  // 1) Try auth_user_id
+  let { data: byId } = await supa.from('cleaners').select('*').eq('auth_user_id', user.id).maybeSingle();
+  if (byId) return byId;
+  // 2) Fallback by email (case-insensitive), then backfill auth_user_id
+  const email = (user.email||'').toLowerCase();
+  if (!email) return null;
+  const { data: byEmail } = await supa.from('cleaners').select('*').ilike('email', email).maybeSingle();
+  if (!byEmail) return null;
+  const { data: updated } = await supa.from('cleaners').update({ auth_user_id: user.id }).eq('id', byEmail.id).select('*').maybeSingle();
+  return updated || byEmail;
+}
+
+async function loadPayrollConfig(){
+  const { data } = await supa.from('settings').select('value').eq('key','payroll_config').maybeSingle();
+  const v = (data && data.value) || {};
+  return { payday: v.payday||'monday', frequency: v.frequency||'weekly', timezone: v.timezone||'Pacific/Honolulu' };
+}
+
+function weekdayIndex(name){
+  const map = { sunday:0, monday:1, tuesday:2, wednesday:3, thursday:4, friday:5, saturday:6 };
+  return map[(name||'monday').toLowerCase()] ?? 1;
+}
+
+// Compute the current pay period [start, end] inclusive dates as YYYY-MM-DD based on payroll config.
+// Weekly: period = [prev payday, payday-1] — i.e. the week ending on the day before payday.
+function currentPeriod(cfg){
+  const pdIdx = weekdayIndex(cfg.payday);
+  const today = new Date();
+  today.setHours(0,0,0,0);
+  // Find next payday (today or later)
+  const todayIdx = today.getDay();
+  const daysToNextPayday = (pdIdx - todayIdx + 7) % 7; // 0..6
+  const nextPayday = new Date(today); nextPayday.setDate(today.getDate() + daysToNextPayday);
+  const periodEnd = new Date(nextPayday); periodEnd.setDate(nextPayday.getDate() - 1);
+  const periodStart = new Date(periodEnd); periodStart.setDate(periodEnd.getDate() - 6);
+  const fmt = (d) => d.toISOString().slice(0,10);
+  return { start: fmt(periodStart), end: fmt(periodEnd), payday: fmt(nextPayday) };
+}
+
+async function loadAppointments(cleaner){
+  const { data, error } = await supa.from('appointments')
+    .select('id,client_name,service,date,time,duration_hours,status,total_price,cleaner_pay,cleaner_pay_override,address,notes')
+    .eq('cleaner_id', cleaner.id)
+    .order('date', { ascending: true })
+    .order('time', { ascending: true });
+  if (error) throw error;
+  return data||[];
+}
+
+async function loadIntegration(cleaner){
+  const { data } = await supa.from('cleaner_integrations')
+    .select('provider,provider_email,expires_at,scope')
+    .eq('cleaner_id', cleaner.id).eq('provider','google').maybeSingle();
+  return data;
+}
+
+function payForApt(a, cleaner){
+  if (a.cleaner_pay_override != null) return Number(a.cleaner_pay_override);
+  if (a.cleaner_pay != null) return Number(a.cleaner_pay);
+  const hrs = Number(a.duration_hours||0);
+  const rate = Number(cleaner.hourly_rate||0);
+  return hrs * rate;
+}
+
+function renderDashboard(ctx){
+  const { user, cleaner, appts, integration, cfg, period } = ctx;
+  const today = new Date().toISOString().slice(0,10);
+
+  const inPeriod = appts.filter(a => a.date >= period.start && a.date <= period.end);
+  const periodCompleted = inPeriod.filter(a => a.status === 'completed');
+  const hoursThisPeriod = periodCompleted.reduce((s,a)=>s + Number(a.duration_hours||0), 0);
+  const payThisPeriod = periodCompleted.reduce((s,a)=>s + payForApt(a, cleaner), 0);
+
+  const upcoming = appts.filter(a => a.date >= today && a.status !== 'cancelled' && a.status !== 'completed').slice(0, 25);
+  const recent = appts.filter(a => a.status === 'completed').slice(-10).reverse();
+
+  app.innerHTML = '';
+  const wrap = $(`<div class="wrap"></div>`);
+
+  const header = $(`
+    <header>
+      <h1>Hawaii Natural Clean — Portal</h1>
+      <div class="row" style="gap:12px">
+        <div class="who">${cleaner.name} · ${user.email||''}</div>
+        <button class="btn ghost" id="signOut">Sign out</button>
+      </div>
+    </header>`);
+  wrap.appendChild(header);
+
+  const kpis = $(`
+    <div class="grid">
+      <div class="kpi"><div class="label">Hours this period</div><div class="value">${hoursThisPeriod.toFixed(2)}</div></div>
+      <div class="kpi"><div class="label">Pay this period (gross)</div><div class="value">${fmtMoney(payThisPeriod)}</div></div>
+      <div class="kpi"><div class="label">Upcoming jobs</div><div class="value">${upcoming.length}</div></div>
+    </div>`);
+  wrap.appendChild(kpis);
+
+  const periodCard = $(`
+    <div class="card">
+      <div class="row">
+        <div>
+          <div style="color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.08em">Current pay period</div>
+          <div style="margin-top:4px;font-size:15px">${fmtDate(period.start)} → ${fmtDate(period.end)} · Payday ${fmtDate(period.payday)} (${cfg.frequency}, ${cfg.payday})</div>
+        </div>
+        <div style="color:var(--muted);font-size:13px">Rate: ${fmtMoney(cleaner.hourly_rate)}/hr</div>
+      </div>
+    </div>`);
+  wrap.appendChild(periodCard);
+
+  const connected = !!integration;
+  const gcard = $(`
+    <div class="card gcard">
+      <div>
+        <div style="font-weight:600">Google Calendar</div>
+        <div class="status ${connected?'connected':''}">${connected ? ('Connected as ' + (integration.provider_email||'(unknown)')) : 'Not connected — your jobs will not sync to your calendar'}</div>
+      </div>
+      <button class="btn ${connected?'secondary':''}" id="gcalBtn">${connected?'Reconnect':'Connect Google Calendar'}</button>
+    </div>`);
+  wrap.appendChild(gcard);
+
+  const upcomingCard = $(`
+    <div class="card">
+      <div style="font-weight:600;margin-bottom:10px">Upcoming jobs</div>
+      <table>
+        <thead><tr><th>Date</th><th>Time</th><th>Client</th><th>Service</th><th>Hours</th><th>Pay</th><th>Status</th></tr></thead>
+        <tbody>
+          ${upcoming.length ? upcoming.map(a => `
+            <tr>
+              <td>${fmtDate(a.date)}</td>
+              <td>${fmtTime(a.time)}</td>
+              <td>${a.client_name||''}</td>
+              <td>${a.service||''}</td>
+              <td>${Number(a.duration_hours||0).toFixed(2)}</td>
+              <td>${fmtMoney(payForApt(a, cleaner))}</td>
+              <td><span class="badge ${a.status||'assigned'}">${a.status||'assigned'}</span></td>
+            </tr>`).join('') : `<tr><td colspan="7" style="color:var(--muted)">No upcoming jobs.</td></tr>`}
+        </tbody>
+      </table>
+    </div>`);
+  wrap.appendChild(upcomingCard);
+
+  const recentCard = $(`
+    <div class="card">
+      <div style="font-weight:600;margin-bottom:10px">Recent completed</div>
+      <table>
+        <thead><tr><th>Date</th><th>Client</th><th>Service</th><th>Hours</th><th>Pay</th></tr></thead>
+        <tbody>
+          ${recent.length ? recent.map(a => `
+            <tr>
+              <td>${fmtDate(a.date)}</td>
+              <td>${a.client_name||''}</td>
+              <td>${a.service||''}</td>
+              <td>${Number(a.duration_hours||0).toFixed(2)}</td>
+              <td>${fmtMoney(payForApt(a, cleaner))}</td>
+            </tr>`).join('') : `<tr><td colspan="5" style="color:var(--muted)">No completed jobs yet.</td></tr>`}
+        </tbody>
+      </table>
+    </div>`);
+  wrap.appendChild(recentCard);
+
+  app.appendChild(wrap);
+
+  wrap.querySelector('#signOut').onclick = async () => { await supa.auth.signOut(); renderLogin(''); };
+  wrap.querySelector('#gcalBtn').onclick = () => {
+    const url = '/api/google/authorize?cleaner_id=' + encodeURIComponent(cleaner.id);
+    window.open(url, 'gcal_oauth', 'width=520,height=640');
+    // Re-check integration after a delay
+    setTimeout(()=>boot(), 8000);
+  };
+}
+
+async function boot(){
+  const { data: { session } } = await supa.auth.getSession();
+  if (!session) { renderLogin(''); return; }
+  const user = session.user;
+  const cleaner = await findCleaner(user);
+  if (!cleaner){
+    app.innerHTML = '';
+    const card = $(`
+      <div class="auth card">
+        <h2>No cleaner record linked</h2>
+        <p>Your account (${user.email}) isn't linked to a cleaner profile yet. Ask the admin to add your email to your cleaner record.</p>
+        <button class="btn secondary" id="out">Sign out</button>
+      </div>`);
+    app.appendChild(card);
+    card.querySelector('#out').onclick = async () => { await supa.auth.signOut(); renderLogin(''); };
+    return;
+  }
+  const [appts, integration, cfg] = await Promise.all([loadAppointments(cleaner), loadIntegration(cleaner), loadPayrollConfig()]);
+  const period = currentPeriod(cfg);
+  renderDashboard({ user, cleaner, appts, integration, cfg, period });
+}
+
+supa.auth.onAuthStateChange((_event, _session) => { boot(); });
+boot();
+</script>
+</body>
+</html>

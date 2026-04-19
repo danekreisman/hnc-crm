@@ -276,10 +276,10 @@ textarea{font-family:inherit;}
 .pay-tab{font-size:13px;padding:8px 16px;color:#999;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;}
 .pay-tab.active{color:#1D9E75;border-bottom-color:#1D9E75;font-weight:500;}
 .pay-tab:hover{color:#1a1a1a;}
-</style>
+/* === MOBILE STYLES === */ @media (max-width:900px){ .crm{flex-direction:column;height:auto;min-height:100vh;} .sidebar{position:fixed;top:0;left:0;bottom:0;width:80vw;max-width:280px;z-index:1100;transform:translateX(-100%);transition:transform .22s ease;box-shadow:0 10px 30px rgba(0,0,0,.15);} .crm.nav-open .sidebar{transform:translateX(0);} .nav-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:1050;display:none;} .crm.nav-open .nav-backdrop{display:block;} .main{width:100%;min-width:0;height:auto;overflow:visible;} .topbar{padding:10px 12px;flex-wrap:wrap;gap:8px;position:sticky;top:0;z-index:100;} .topbar h1{font-size:16px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;} .topbar-actions{flex-wrap:wrap;width:100%;gap:6px;} .topbar-actions input,.topbar-actions .search,.topbar-actions select{flex:1;min-width:120px;font-size:16px;} .mobile-menu-btn{display:inline-flex;align-items:center;justify-content:center;width:40px;height:40px;border:1px solid #e0e0dd;background:#fff;border-radius:8px;cursor:pointer;font-size:20px;line-height:1;padding:0;margin-right:4px;} .content{padding:14px;} .metrics{grid-template-columns:1fr 1fr;gap:8px;} .metric-value{font-size:20px;} .pipeline{grid-template-columns:1fr;gap:8px;} .two-col{grid-template-columns:1fr;gap:12px;} .form-two,.form-three{grid-template-columns:1fr;gap:10px;} .tw{overflow-x:auto;-webkit-overflow-scrolling:touch;} .tw table{table-layout:auto;min-width:560px;font-size:13px;} th,td{padding:10px 10px;} .btn{min-height:40px;font-size:14px;padding:8px 14px;} input,select,textarea{font-size:16px !important;} .overlay{align-items:stretch;justify-content:stretch;padding:0;} .overlay > *{width:100% !important;max-width:100% !important;height:100vh;max-height:100vh;border-radius:0 !important;overflow-y:auto;} .cal-day{min-height:58px;padding:3px;font-size:11px;} .cal-dow-cell{font-size:10px;padding:5px 0;} .section-title{font-size:11px;} body{font-size:14px;} .desktop-only{display:none !important;} } @media (min-width:901px){ .mobile-menu-btn,.nav-backdrop{display:none !important;} } /* === END MOBILE STYLES === */ </style>
 </head>
 <body>
-<div class="crm">
+<div class="crm"><div class="nav-backdrop" onclick="document.querySelector('.crm').classList.remove('nav-open')"></div>
   <div class="sidebar">
     <div class="sidebar-logo"><div class="name">Hawaii Natural Clean</div><div class="sub">CRM v1</div><div id="quo-status" style="font-size:10px;color:#999;margin-top:4px;">Quo: checking...</div></div>
     <div class="nav-section">Main</div>
@@ -304,7 +304,7 @@ textarea{font-family:inherit;}
   </div>
 
   <div class="main">
-    <div class="topbar">
+    <div class="topbar"><button class="mobile-menu-btn" onclick="document.querySelector('.crm').classList.toggle('nav-open')" aria-label="Menu">&#9776;</button>
       <h1 id="page-title">Calendar</h1>
       <div class="topbar-actions">
         <div id="global-search-wrap" style="position:relative;display:none;">

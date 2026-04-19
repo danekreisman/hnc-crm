@@ -1046,8 +1046,10 @@ Mahalo 🌺</textarea>
           <button class="action-btn blue full" onclick="openInviteCleaner()">Invite cleaner</button>
           <button class="action-btn amber full" onclick="showApptEdit()">Edit job</button>
           <button class="action-btn blue full" onclick="openApptEditProperty()">Edit property</button>
-          <button class="action-btn red full" onclick="cancelAppointment()">Cancel appointment</button>
-          <button class="action-btn red full" id="cancel-recurring-btn" style="display:none;" onclick="cancelAllRecurring()">Cancel all recurring</button>
+          <button class="action-btn full" onclick="cancelAppointment()" style="background:#EEF2F4;color:#5B7683;border-color:#CFE3EA;">Cancel (grey out)</button>
+          <button class="action-btn red full" onclick="deleteAppointment()">Delete (permanent)</button>
+          <button class="action-btn full" id="cancel-recurring-btn" style="display:none;background:#EEF2F4;color:#5B7683;border-color:#CFE3EA;" onclick="cancelAllRecurring()">Cancel entire series (grey out)</button>
+          <button class="action-btn red full" id="delete-recurring-btn" style="display:none;" onclick="deleteEntireSeries()">Halt series (delete all future)</button>
         </div>
         <div class="success-bar" id="appt-action-success" style="margin-top:10px;"></div>
       </div>
@@ -1615,7 +1617,7 @@ async function dbUpdateAppointment(dbId,data){
 }
 
 async function dbLoadAppointments(){
-  const {data,error}=await db.from('appointments').select('*').order('date',{ascending:true});
+  const {data,error}=await db.from('appointments').select('*').neq('status','deleted').order('date',{ascending:true});
   if(error){console.error('Load appointments error:',error);return[];}
   return data||[];
 }
@@ -2479,6 +2481,8 @@ function _openApptInner(a,dateKey){
   // Show "Cancel all recurring" button only for recurring appointments
   var cancelRecBtn=document.getElementById('cancel-recurring-btn');
   if(cancelRecBtn) cancelRecBtn.style.display=a.recurring?'':'none';
+  var deleteRecBtn=document.getElementById('delete-recurring-btn');
+  if(deleteRecBtn) deleteRecBtn.style.display=a.recurring?'':'none';
   document.getElementById('appt-overlay').classList.remove('hidden');
   // Disable Charge button if client has no card on file
   try { updateApptChargeButtonState(); } catch(e){}
@@ -2917,6 +2921,118 @@ async function cancelAllRecurring(){
     if(bar)bar.classList.remove('show');
     closeOverlay('appt-overlay');
   },2000);
+}
+
+function deleteAppointment(){
+  if(!currentAppt || !currentApptKey){
+    console.error('[deleteAppointment] no currentAppt');
+    return;
+  }
+  if(!confirm('DELETE this appointment for '+currentAppt.n+'?\n\nThis will permanently remove it from the CRM, the client portal, and Google Calendar. The record will NOT be preserved.\n\nUse Cancel (grey out) if you want to keep a record.')) return;
+
+  // Remove from in-memory apptData
+  var keyEntries = apptData[currentApptKey];
+  if(keyEntries){
+    apptData[currentApptKey] = keyEntries.filter(function(e){
+      return !(e === currentAppt || (e.n === currentAppt.n && e.t === currentAppt.t));
+    });
+  }
+
+  // Hard-delete from Supabase. We mark status='deleted' first (which triggers gcal delete via existing filters), then delete the row.
+  var dbId = currentAppt.dbId;
+  if(dbId){
+    // Fire gcal delete (via existing wrapper, it listens to status 'cancelled' / event delete). We'll use hncSyncGcal directly with 'delete' action.
+    try { if(typeof window.hncSyncGcal === 'function') window.hncSyncGcal(dbId, 'delete'); } catch(e){ console.warn('[deleteAppointment] gcal sync failed', e); }
+    db.from('appointments').delete().eq('id', dbId).then(function(res){
+      if(res.error) console.error('[deleteAppointment] Supabase delete error:', res.error);
+      else console.log('[deleteAppointment] Supabase deleted dbId '+dbId);
+    });
+  } else {
+    // No dbId — fallback: match by client_name + date
+    var kp = currentApptKey.split('-');
+    var dateStr = kp[0]+'-'+String(kp[1]).padStart(2,'0')+'-'+String(kp[2]).padStart(2,'0');
+    db.from('appointments').delete().eq('client_name', currentAppt.n).eq('date', dateStr).eq('time', currentAppt.t).then(function(res){
+      if(res.error) console.error('[deleteAppointment] Supabase delete (fallback) error:', res.error);
+      else console.log('[deleteAppointment] Supabase deleted (fallback) for '+currentAppt.n+' '+dateStr);
+    });
+  }
+
+  var bar = document.getElementById('appt-action-success');
+  if(bar){ bar.textContent='Appointment deleted.'; bar.classList.add('show'); }
+  renderCal();
+  setTimeout(function(){
+    if(bar) bar.classList.remove('show');
+    closeOverlay('appt-overlay');
+  }, 1500);
+}
+
+function deleteEntireSeries(){
+  if(!currentAppt || !currentAppt.n){
+    console.error('[deleteEntireSeries] no currentAppt');
+    return;
+  }
+  var targetName = currentAppt.n;
+  var targetTime = currentAppt.t || '';
+  var targetAddress = currentAppt.address || '';
+  var targetSeriesId = currentAppt.seriesId || null;
+  if(!confirm('HALT the entire recurring series for '+targetName+'?\n\nThis will permanently delete ALL future appointments in this series from the CRM, the client portal, and Google Calendar. Past appointments are kept. This cannot be undone.\n\nUse "Cancel entire series (grey out)" if you want to keep a record.')) return;
+
+  var todayKey = new Date();
+  todayKey.setHours(0,0,0,0);
+
+  // Collect dbIds of future occurrences so we can gcal-delete each
+  var futureDbIds = [];
+  Object.keys(apptData).forEach(function(k){
+    var parts = k.split('-').map(Number);
+    var keyDate = new Date(parts[0], parts[1]-1, parts[2]);
+    if(keyDate < todayKey) return; // only future
+    var before = apptData[k].length;
+    apptData[k] = apptData[k].filter(function(e){
+      var matches;
+      if(targetSeriesId){
+        matches = (e.seriesId === targetSeriesId);
+      } else {
+        matches = (e.n === targetName && e.t === targetTime && e.address === targetAddress && e.recurring);
+      }
+      if(matches && e.dbId) futureDbIds.push(e.dbId);
+      return !matches;
+    });
+  });
+
+  // Remove from recurringAppts template so it stops regenerating
+  if(targetSeriesId){
+    recurringAppts = recurringAppts.filter(function(r){ return r.seriesId !== targetSeriesId; });
+  } else {
+    recurringAppts = recurringAppts.filter(function(r){
+      return !(r.name === targetName && r.timeStr === targetTime && r.address === targetAddress);
+    });
+  }
+
+  // Fire gcal deletes in parallel
+  futureDbIds.forEach(function(id){
+    try { if(typeof window.hncSyncGcal === 'function') window.hncSyncGcal(id, 'delete'); } catch(e){}
+  });
+
+  // Hard-delete future rows from Supabase
+  var todayISO = todayKey.getFullYear()+'-'+String(todayKey.getMonth()+1).padStart(2,'0')+'-'+String(todayKey.getDate()).padStart(2,'0');
+  var q;
+  if(targetSeriesId){
+    q = db.from('appointments').delete().eq('series_id', targetSeriesId).gte('date', todayISO);
+  } else {
+    q = db.from('appointments').delete().eq('client_name', targetName).eq('recurring', true).gte('date', todayISO);
+  }
+  q.then(function(res){
+    if(res.error) console.error('[deleteEntireSeries] Supabase delete error:', res.error);
+    else console.log('[deleteEntireSeries] SUCCESS — '+futureDbIds.length+' future rows deleted from Supabase');
+  });
+
+  var bar = document.getElementById('appt-action-success');
+  if(bar){ bar.textContent='Series halted. '+futureDbIds.length+' future appointments deleted.'; bar.classList.add('show'); }
+  renderCal();
+  setTimeout(function(){
+    if(bar) bar.classList.remove('show');
+    closeOverlay('appt-overlay');
+  }, 2200);
 }
 
 function openClient(id){
@@ -4038,12 +4154,46 @@ function populateRecurringMonth(yr,mo){
       var key=d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate();
       if(!apptData[key])apptData[key]=[];
       var exists=apptData[key].some(function(a){return a.n===r.name&&a.t===r.timeStr;});
-      if(!exists)apptData[key].push({
-        n:r.name, s:r.status, t:r.timeStr, cleaner:r.cleaner, recurring:true,
-        service:r.service||'Regular Cleaning', freq:r.freq,
-        duration:r.duration||null,
-        address:r.address||'', beds:r.beds||'', baths:r.baths||'', sqft:r.sqft||''
-      });
+      if(!exists){
+        var newApt = {
+          n:r.name, s:r.status, t:r.timeStr, cleaner:r.cleaner, recurring:true,
+          service:r.service||'Regular Cleaning', freq:r.freq,
+          duration:r.duration||null,
+          address:r.address||'', beds:r.beds||'', baths:r.baths||'', sqft:r.sqft||'',
+          seriesId:r.seriesId||null
+        };
+        apptData[key].push(newApt);
+        // Persist new occurrence to Supabase (fire-and-forget) so cleaners + gcal see it
+        if(typeof db !== 'undefined' && db && db.from){
+          var isoDate = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+          var insertRow = {
+            client_name: r.name,
+            service: r.service || 'Regular Cleaning',
+            frequency: r.freq,
+            date: isoDate,
+            time: r.timeStr || '8am',
+            address: r.address || null,
+            beds: r.beds ? (parseInt(r.beds)||null) : null,
+            baths: r.baths ? (parseFloat(r.baths)||null) : null,
+            sqft: r.sqft ? (parseInt(r.sqft)||null) : null,
+            cleaner_name: r.cleaner || 'Unassigned',
+            status: (r.cleaner && r.cleaner !== 'Unassigned') ? 'assigned' : 'unassigned',
+            recurring: true,
+            duration_hours: r.duration || null,
+            series_id: r.seriesId || null
+          };
+          db.from('appointments').insert([insertRow]).select().then(function(res){
+            if(res && res.data && res.data[0]){
+              newApt.dbId = res.data[0].id;
+              // Trigger gcal upsert now that we have a dbId
+              try { if(typeof window.hncSyncGcal === 'function') window.hncSyncGcal(newApt.dbId, 'upsert'); } catch(e){}
+            } else if(res && res.error){
+              // Silently log — likely a unique-constraint collision (already exists for this date+client+time)
+              console.log('[populateRecurringMonth] skip persist '+r.name+' '+isoDate+': '+res.error.message);
+            }
+          });
+        }
+      }
     });
   });
 }

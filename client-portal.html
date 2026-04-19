@@ -138,7 +138,7 @@ const hoursUntil = (dateStr, timeStr) => {
 async function findClient(user){
   // Delegate to server: matches by id/email/phone or auto-creates a self-serve client row.
   try {
-    const { data: { session } } = await sb.auth.getSession();
+    const { data: { session } } = await supa.auth.getSession();
     const token = session && session.access_token;
     if (!token) return null;
     const r = await fetch('/api/portal/link-or-create', {

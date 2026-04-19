@@ -136,29 +136,24 @@ const hoursUntil = (dateStr, timeStr) => {
 };
 
 async function findClient(user){
-  // 1) auth_user_id
-  let { data: byId } = await supa.from('clients').select('*').eq('auth_user_id', user.id).maybeSingle();
-  if (byId) return byId;
-  // 2) email
-  const email = (user.email||'').toLowerCase();
-  if (email && !email.endsWith('@phone.hnc-crm.internal')) {
-    const { data: byEmail } = await supa.from('clients').select('*').ilike('email', email).maybeSingle();
-    if (byEmail) {
-      const { data: upd } = await supa.from('clients').update({ auth_user_id: user.id }).eq('id', byEmail.id).select('*').maybeSingle();
-      return upd || byEmail;
-    }
+  // Delegate to server: matches by id/email/phone or auto-creates a self-serve client row.
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    const token = session && session.access_token;
+    if (!token) return null;
+    const r = await fetch('/api/portal/link-or-create', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ access_token: token })
+    });
+    if (!r.ok) { console.error('link-or-create failed', r.status, await r.text()); return null; }
+    const j = await r.json();
+    return j && j.client ? j.client : null;
+  } catch (e) {
+    console.error('findClient error', e);
+    return null;
   }
-  // 3) phone
-  const phone = user.phone || (user.user_metadata && user.user_metadata.phone) || null;
-  if (phone) {
-    const { data: byPhone } = await supa.from('clients').select('*').eq('phone', phone).maybeSingle();
-    if (byPhone) {
-      const { data: upd } = await supa.from('clients').update({ auth_user_id: user.id }).eq('id', byPhone.id).select('*').maybeSingle();
-      return upd || byPhone;
-    }
-  }
-  return null;
-}
+}}
 
 // -------- AUTH SCREEN ---------
 function renderLogin(message){

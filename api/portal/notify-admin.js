@@ -61,7 +61,7 @@ export default async function handler(req, res) {
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({
-            from: process.env.RESEND_FROM || 'HNC Portal <portal@hawaiinaturalclean.net>',
+            from: 'Hawaii Natural Clean <dane@hawaiinaturalclean.com>',
             to: [ADMIN_EMAIL],
             subject,
             text

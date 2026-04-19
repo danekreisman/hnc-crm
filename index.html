@@ -598,6 +598,9 @@ textarea{font-family:inherit;}
             <button class="btn rep-pbtn" data-p="quarterly" onclick="repSetPeriod('quarterly')">Quarterly</button>
             <button class="btn rep-pbtn" data-p="yearly"   onclick="repSetPeriod('yearly')">Yearly</button>
           </div>
+          <select id="rep-bucket" style="padding:6px 10px;font-size:12px;border:1px solid var(--border);border-radius:var(--radius-sm);background:#fff;" onchange="repSetBucket(this.value)">
+            <option value="">All periods (compare)</option>
+          </select>
           <div style="flex:1;"></div>
           <label style="font-size:12px;color:var(--muted);">From</label>
           <input type="date" id="rep-from" onchange="repRender()">
@@ -4270,7 +4273,7 @@ function sv(view,el){
   document.getElementById('sec-btn').textContent=secs[view]||'Filter';
   if(view==='messaging')renderInbox();
   if(view==='automations')renderAutoList();
-  if(view==='reporting')repRender();
+  if(view==='reporting'){ try{ repPopulateBucketDropdown(); }catch(e){} repRender(); }
   if(view==='settings'){initTemplateEditor();initPayrollSettingsUI();};
   if(view==='payroll')refreshPayrollPeriods();
 }
@@ -5583,15 +5586,36 @@ async function autoRunAction(act, ctx, rule){
     if(act.type==='sms'){
       var to = autoTemplate(act.to, ctx);
       var body = autoTemplate(act.body, ctx);
-      if(typeof sendSMS === 'function'){ await sendSMS(to, body); }
-      else { console.log('[automation stub SMS]', {to:to, body:body}); }
+      try{
+        var rs = await fetch('/api/send-sms', {
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ to: to, message: body })
+        });
+        var rsj = await rs.json();
+        if(!rsj || rsj.success===false) console.warn('[automation SMS failed]', rsj);
+        else console.log('[automation SMS sent]', to);
+      }catch(err){ console.warn('[automation SMS error]', err); }
       autoLogRun(rule, ctx, 'sms:'+to);
     } else if(act.type==='email'){
       var eto = autoTemplate(act.to, ctx);
       var sub = autoTemplate(act.subject, ctx);
-      var eb = autoTemplate(act.body, ctx);
-      if(typeof sendEmail === 'function'){ await sendEmail(eto, sub, eb); }
-      else { console.log('[automation stub EMAIL]', {to:eto, subject:sub, body:eb}); }
+      var eb  = autoTemplate(act.body, ctx);
+      try{
+        var re = await fetch('/api/send-email', {
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({
+            to: eto, subject: sub,
+            type: 'generic',
+            clientName: ctx.client_name||'',
+            service: ctx.service||'', date: ctx.date||'',
+            time: ctx.time||'', cleaner: ctx.cleaner||'',
+            notes: eb
+          })
+        });
+        var rej = await re.json();
+        if(!rej || rej.success===false) console.warn('[automation EMAIL failed]', rej);
+        else console.log('[automation EMAIL sent]', eto);
+      }catch(err){ console.warn('[automation EMAIL error]', err); }
       autoLogRun(rule, ctx, 'email:'+eto);
     } else if(act.type==='tag'){
       var tag = autoTemplate(act.tag, ctx);
@@ -5714,13 +5738,103 @@ var _repPeriod = 'monthly';
 var _repCurrent = 'revenue';
 var _repCustomFrom = null;
 var _repCustomTo = null;
+var _repBucket = '';   // empty = compare all periods; otherwise specific bucket key
 
 function repSetPeriod(p){
   _repPeriod = p;
+  _repBucket = '';
   document.querySelectorAll('.rep-pbtn').forEach(function(b){
     b.classList.toggle('active', b.getAttribute('data-p')===p);
   });
+  repPopulateBucketDropdown();
   repRender();
+}
+
+function repSetBucket(val){
+  _repBucket = val || '';
+  repRender();
+}
+
+function repPopulateBucketDropdown(){
+  var sel = document.getElementById('rep-bucket');
+  if(!sel) return;
+  var rows = repCollectAppts();
+  var keys = {};
+  rows.forEach(function(r){
+    var k = repBucketKey(r.date, _repPeriod);
+    if(k) keys[k] = 1;
+  });
+  // Also add leads and the current date so the user has buckets to pick even when there are no appointments.
+  var now = new Date();
+  var todayStr = now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0');
+  var k2 = repBucketKey(todayStr, _repPeriod); if(k2) keys[k2] = 1;
+  // Seed +/- a few buckets so there are choices
+  for(var off=-6; off<=6; off++){
+    var ref = new Date(now);
+    if(_repPeriod==='yearly')    ref.setFullYear(now.getFullYear()+off);
+    if(_repPeriod==='quarterly') ref.setMonth(now.getMonth()+off*3);
+    if(_repPeriod==='monthly')   ref.setMonth(now.getMonth()+off);
+    if(_repPeriod==='weekly')    ref.setDate(now.getDate()+off*7);
+    var ds = ref.getFullYear()+'-'+String(ref.getMonth()+1).padStart(2,'0')+'-'+String(ref.getDate()).padStart(2,'0');
+    var kk = repBucketKey(ds, _repPeriod); if(kk) keys[kk] = 1;
+  }
+  var sorted = Object.keys(keys).sort();
+  var html = '<option value="">All periods (compare)</option>';
+  sorted.forEach(function(k){ html += '<option value="'+k+'">'+repBucketLabel(k, _repPeriod)+'</option>'; });
+  sel.innerHTML = html;
+  // Default: current period's bucket
+  var cur = repBucketKey(todayStr, _repPeriod);
+  if(cur && sorted.indexOf(cur)>=0){ sel.value = cur; _repBucket = cur; }
+  else { sel.value = ''; _repBucket = ''; }
+}
+
+function repBucketLabel(key, period){
+  if(period==='yearly')    return key;
+  if(period==='quarterly') return key; // already like '2026 Q2'
+  if(period==='monthly'){
+    var parts = key.split('-'); var y = parts[0]; var m = parseInt(parts[1],10);
+    var MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    return MONTHS[m-1]+' '+y;
+  }
+  if(period==='weekly'){
+    // key like '2026-W17'
+    var parts = key.split('-W'); var y = parseInt(parts[0],10); var w = parseInt(parts[1],10);
+    // Compute approximate Sunday of that week
+    var jan1 = new Date(y,0,1);
+    var start = new Date(jan1.getTime() + (w-1)*7*86400000 - jan1.getDay()*86400000);
+    var end = new Date(start.getTime() + 6*86400000);
+    var fmt = function(d){ return (d.getMonth()+1)+'/'+d.getDate(); };
+    return 'Week of '+fmt(start)+' – '+fmt(end)+', '+y;
+  }
+  return key;
+}
+
+function repBucketRange(key, period){
+  // Returns {from:'YYYY-MM-DD', to:'YYYY-MM-DD'} inclusive bounds of bucket key
+  if(period==='yearly'){
+    return {from: key+'-01-01', to: key+'-12-31'};
+  }
+  if(period==='quarterly'){
+    var parts = key.split(' Q'); var y = parseInt(parts[0],10); var q = parseInt(parts[1],10);
+    var mStart = (q-1)*3; var mEnd = mStart+2;
+    var endDate = new Date(y, mEnd+1, 0);
+    var fmt = function(yy,mm,dd){ return yy+'-'+String(mm).padStart(2,'0')+'-'+String(dd).padStart(2,'0'); };
+    return {from: fmt(y,mStart+1,1), to: fmt(y,mEnd+1,endDate.getDate())};
+  }
+  if(period==='monthly'){
+    var parts = key.split('-'); var y = parseInt(parts[0],10); var m = parseInt(parts[1],10);
+    var endDate = new Date(y,m,0);
+    return {from: y+'-'+String(m).padStart(2,'0')+'-01', to: y+'-'+String(m).padStart(2,'0')+'-'+String(endDate.getDate()).padStart(2,'0')};
+  }
+  if(period==='weekly'){
+    var parts = key.split('-W'); var y = parseInt(parts[0],10); var w = parseInt(parts[1],10);
+    var jan1 = new Date(y,0,1);
+    var start = new Date(jan1.getTime() + (w-1)*7*86400000 - jan1.getDay()*86400000);
+    var end = new Date(start.getTime() + 6*86400000);
+    var fmt = function(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); };
+    return {from: fmt(start), to: fmt(end)};
+  }
+  return {from:null, to:null};
 }
 function repShow(name){
   _repCurrent = name;
@@ -5734,8 +5848,11 @@ function repShow(name){
 }
 function repResetRange(){
   _repCustomFrom = null; _repCustomTo = null;
+  _repBucket = '';
   var a=document.getElementById('rep-from'); if(a) a.value='';
   var b=document.getElementById('rep-to');   if(b) b.value='';
+  var sel = document.getElementById('rep-bucket'); if(sel) sel.value='';
+  repPopulateBucketDropdown();
   repRender();
 }
 
@@ -6031,8 +6148,17 @@ function repRenderCost(){
 
 /* ---------- master render + CSV ---------- */
 function repRender(){
-  _repCustomFrom = (document.getElementById('rep-from')||{}).value || null;
-  _repCustomTo   = (document.getElementById('rep-to')  ||{}).value || null;
+  var cf = (document.getElementById('rep-from')||{}).value || null;
+  var ct = (document.getElementById('rep-to')  ||{}).value || null;
+  // Custom date range takes priority. Otherwise use the selected bucket.
+  if(cf || ct){
+    _repCustomFrom = cf; _repCustomTo = ct;
+  } else if(_repBucket){
+    var r = repBucketRange(_repBucket, _repPeriod);
+    _repCustomFrom = r.from; _repCustomTo = r.to;
+  } else {
+    _repCustomFrom = null; _repCustomTo = null;
+  }
   if(_repCurrent==='revenue')  repRenderRevenue();
   if(_repCurrent==='leads')    repRenderLeads();
   if(_repCurrent==='cleaners') repRenderCleaners();
@@ -6066,8 +6192,8 @@ function repExportCSV(){
 }
 
 // initial render (runs when view first shown)
-document.addEventListener('DOMContentLoaded', function(){ try{ repRender(); }catch(e){} });
-setTimeout(function(){ try{ repRender(); }catch(e){} }, 1500);
+document.addEventListener('DOMContentLoaded', function(){ try{ repPopulateBucketDropdown(); repRender(); }catch(e){} });
+setTimeout(function(){ try{ repPopulateBucketDropdown(); repRender(); }catch(e){} }, 1500);
 
 /* PAYMENTS */
 var stripeConnected=false;

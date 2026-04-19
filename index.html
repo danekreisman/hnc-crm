@@ -111,10 +111,10 @@ tr.clickable:hover td{background:var(--brand-50);cursor:pointer;}
 .legend{display:flex;gap:12px;align-items:center;flex-wrap:wrap;}
 .legend-item{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text-muted);}
 .ld{width:10px;height:10px;border-radius:3px;flex-shrink:0;}
-.lu{background:#F4C0D1;border:1px solid #ED93B1;}
-.la{background:#B5D4F4;border:1px solid #85B7EB;}
-.lc{background:#FAC775;border:1px solid #EF9F27;}
-.lp{background:var(--brand-200);border:1px solid var(--brand-400);}
+.lu{background:#FDE2E4;border:1px solid #F3B7BE;}
+.la{background:var(--brand-50);border:1px solid var(--brand-300);}
+.lc{background:var(--accent-gold);border:1px solid #D9C266;}
+.lp{background:#E7F7F1;border:1px solid #9ED9BF;}
 .cal-grid{background:#fff;border:1px solid var(--border);border-radius:10px;overflow:hidden;}
 .cal-dow{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));background:var(--bg-soft);border-bottom:1px solid var(--border);}
 .cal-dow-cell{font-size:11px;font-weight:600;color:var(--text-muted);text-align:center;padding:7px 0;}
@@ -140,11 +140,11 @@ tr.clickable:hover td{background:var(--brand-50);cursor:pointer;}
 .cal-day.today .dn2{color:var(--brand-500);font-weight:700;}
 .appt{font-size:10px;border-radius:4px;padding:2px 5px;margin-bottom:2px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:500;display:block;width:100%;text-align:left;border:none;}
 .appt:hover{opacity:.8;}
-.au{background:#F4C0D1;color:#72243E;}
-.aa{background:#B5D4F4;color:#0C447C;}
-.ac{background:#FAC775;color:#633806;}
-.ap{background:var(--brand-200);color:var(--brand-700);}
-.ax{background:#e2e8f0;color:#475569;text-decoration:line-through;opacity:.7;}
+.au{background:#FDE2E4;color:#8A2C3A;} /* Unassigned — soft coral */
+.aa{background:var(--brand-50);color:var(--brand-700);} /* Assigned — brand cyan */
+.ac{background:var(--accent-gold);color:var(--accent-gold-ink);} /* Completed — gold */
+.ap{background:#E7F7F1;color:#1F7A5A;} /* Paid — soft emerald */
+.ax{background:#EEF2F4;color:#8AA3AE;text-decoration:line-through;opacity:.6;border:1px dashed #CFE3EA;} /* Cancelled — greyed out */
 .more-appts{font-size:10px;color:var(--text-muted);}
 /* CLEANERS */
 .cleaner-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:16px;}
@@ -187,15 +187,15 @@ tr.clickable:hover td{background:var(--brand-50);cursor:pointer;}
 .action-btn.green{background:var(--brand-50);color:#276749;border-color:#9ae6b4;}
 .action-btn.blue{background:#ebf5ff;color:#2b6cb0;border-color:#bee3f8;}
 .action-btn.amber{background:#fffbeb;color:#b7791f;border-color:#f6e05e;}
-.action-btn.red{background:#fff5f5;color:#c53030;border-color:#feb2b2;}
-.action-btn.purple{background:#f5f0ff;color:#553c9a;border-color:#d6bcfa;}
+.action-btn.red{background:var(--danger-bg);color:var(--danger);border-color:#F3B7BE;}
+.action-btn.purple{background:var(--brand-50);color:var(--brand-700);border-color:var(--brand-300);}
 .action-btn.full{grid-column:1/-1;}
 .status-badge{display:inline-block;font-size:11px;padding:3px 10px;border-radius:20px;font-weight:500;margin-bottom:12px;}
-.s-unassigned{background:#F4C0D1;color:#72243E;}
-.s-assigned{background:#B5D4F4;color:#0C447C;}
-.s-completed{background:#FAC775;color:#633806;}
-.s-paid{background:var(--brand-200);color:var(--brand-700);}
-.s-cancelled{background:#e2e8f0;color:#475569;}
+.s-unassigned{background:#FDE2E4;color:#8A2C3A;}
+.s-assigned{background:var(--brand-50);color:var(--brand-700);}
+.s-completed{background:var(--accent-gold);color:var(--accent-gold-ink);}
+.s-paid{background:#E7F7F1;color:#1F7A5A;}
+.s-cancelled{background:#EEF2F4;color:#8AA3AE;}
 .profile-top{display:flex;align-items:center;gap:13px;margin-bottom:16px;}
 .profile-avatar{width:54px;height:54px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:600;flex-shrink:0;}
 .profile-name{font-size:16px;font-weight:600;color:var(--text);}
@@ -264,12 +264,12 @@ tr.clickable:hover td{background:var(--brand-50);cursor:pointer;}
 .ai-thinking-bar.show{display:flex;}
 .chan-toggle{display:flex;gap:6px;margin-bottom:10px;}
 .chan-btn{font-size:12px;padding:5px 12px;border-radius:8px;border:1px solid var(--border-strong);background:#fff;color:var(--text-muted);cursor:pointer;font-family:inherit;}
-.chan-btn.active-sms{background:#ebf5ff;color:#2b6cb0;border-color:#bee3f8;font-weight:500;}
-.chan-btn.active-email{background:#fffbeb;color:#b7791f;border-color:#f6e05e;font-weight:500;}
+.chan-btn.active-sms{background:var(--brand-50);color:var(--brand-700);border-color:var(--brand-300);font-weight:500;}
+.chan-btn.active-email{background:#FBF2D8;color:var(--accent-gold-ink);border-color:var(--accent-gold);font-weight:500;}
 .tone-row{display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;align-items:center;}
 .tone-label{font-size:11px;color:var(--text-muted);}
 .tone-btn{font-size:11px;padding:3px 9px;border-radius:20px;border:1px solid var(--border-strong);background:#fff;color:var(--text-muted);cursor:pointer;font-family:inherit;}
-.tone-btn.active{background:var(--brand-50);color:var(--brand-500);border-color:var(--brand-500);font-weight:500;}
+.tone-btn.active{background:var(--brand-50);color:var(--brand-700);border-color:var(--brand-500);font-weight:500;}
 .ctx-chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;}
 .ctx-chip{font-size:11px;background:var(--bg-soft);border:1px solid var(--border);border-radius:20px;padding:3px 9px;color:var(--text-muted);}
 .ctx-chip strong{color:var(--text);}
@@ -1615,7 +1615,7 @@ async function dbUpdateAppointment(dbId,data){
 }
 
 async function dbLoadAppointments(){
-  const {data,error}=await db.from('appointments').select('*').neq('status','cancelled').order('date',{ascending:true});
+  const {data,error}=await db.from('appointments').select('*').order('date',{ascending:true});
   if(error){console.error('Load appointments error:',error);return[];}
   return data||[];
 }
@@ -2817,14 +2817,16 @@ async function cancelAppointment(){
   }
   if(!confirm('Cancel this appointment for '+currentAppt.n+'? This cannot be undone.')) return;
 
-  // Remove entry from apptData entirely so it won't show on calendar (even if Supabase persist fails)
-  var keyEntries=apptData[currentApptKey];
+  // Flip the in-memory entry's status to 'cancelled' so it shows as greyed-out
+  // (record is preserved in Supabase below, and will reload that way next time).
+  var keyEntries = apptData[currentApptKey];
   if(keyEntries){
-    var beforeLen=keyEntries.length;
-    apptData[currentApptKey]=keyEntries.filter(function(e){
-      return !(e===currentAppt||(e.n===currentAppt.n&&e.t===currentAppt.t));
+    keyEntries.forEach(function(e){
+      if(e === currentAppt || (e.n === currentAppt.n && e.t === currentAppt.t)){
+        e.s = 'cancelled';
+      }
     });
-    console.log('[cancelAppointment] removed from apptData['+currentApptKey+']: before='+beforeLen+', after='+apptData[currentApptKey].length);
+    console.log('[cancelAppointment] flagged entry in apptData['+currentApptKey+'] as cancelled (preserved for records)');
   }
 
   // Persist status='cancelled' in Supabase so it won't reload on next page load

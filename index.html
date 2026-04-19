@@ -557,11 +557,12 @@ textarea{font-family:inherit;}
           <div class="metric"><div class="metric-label">Avg hrs / cleaner</div><div class="metric-value">—</div></div>
           <div class="metric"><div class="metric-label">Payroll this period</div><div class="metric-value">—</div><div class="metric-sub"></div></div>
         </div>
-        <div class="section-title">Roster — click a card to view profile</div>
-        <div class="cleaner-grid">
-        </div>
-        <div class="section-title" id="deactivated-header" style="display:none;margin-top:18px;">Deactivated cleaners <span style="color:var(--text-muted);font-weight:400;">— click to reactivate</span></div>
-        <div class="cleaner-grid deactivated-grid" id="deactivated-grid" style="display:none;opacity:.7;"></div>
+        <div style="display:flex;gap:8px;align-items:center;margin:14px 0 10px 0;border-bottom:1px solid var(--border);">
+                  <button class="ctab-btn active" id="ctab-active-btn" onclick="switchCleanerTab('active')" style="background:none;border:none;border-bottom:2px solid var(--brand-500);padding:10px 14px;font-size:14px;font-weight:600;color:var(--text);cursor:pointer;">Active roster <span id="ctab-active-count" style="color:var(--text-muted);font-weight:400;">(0)</span></button>
+                  <button class="ctab-btn" id="ctab-inactive-btn" onclick="switchCleanerTab('inactive')" style="background:none;border:none;border-bottom:2px solid transparent;padding:10px 14px;font-size:14px;font-weight:600;color:var(--text-muted);cursor:pointer;">Deactivated <span id="ctab-inactive-count" style="color:var(--text-muted);font-weight:400;">(0)</span></button>
+                </div>
+                <div id="ctab-active-pane"><div class="section-title" style="margin-top:0;">Click a card to view profile</div><div class="cleaner-grid"></div><div class="cleaner-grid-empty" id="active-empty" style="display:none;padding:40px;text-align:center;color:var(--text-muted);background:var(--panel-muted);border-radius:12px;">No active cleaners yet</div></div>
+                <div id="ctab-inactive-pane" style="display:none;"><div class="section-title" style="margin-top:0;">Deactivated cleaners <span style="color:var(--text-muted);font-weight:400;">— click a card to view profile, or hit Reactivate</span></div><div class="cleaner-grid deactivated-grid" id="deactivated-grid" style="opacity:.75;"></div><div class="cleaner-grid-empty" id="inactive-empty" style="display:none;padding:40px;text-align:center;color:var(--text-muted);background:var(--panel-muted);border-radius:12px;">No deactivated cleaners — everyone on the roster is active.</div></div>
         <div class="section-title">Hours log — this week</div>
         <div class="tw"><table><thead><tr><th style="width:18%">Cleaner</th><th style="width:13%">Date</th><th style="width:30%">Job / client</th><th style="width:10%">Hours</th><th style="width:14%">Island</th><th style="width:15%">Pay</th></tr></thead><tbody id="hours-log-tbody">
         </tbody></table></div>
@@ -1933,35 +1934,70 @@ function renderClientsTable(){
 }
 
 function renderCleanersGrid(){
-  var grid=document.querySelector('.cleaner-grid:not(.deactivated-grid)');
+  var grid=document.querySelector('#ctab-active-pane .cleaner-grid');
   var deactGrid=document.getElementById('deactivated-grid');
-  var deactHeader=document.getElementById('deactivated-header');
+  var activeEmpty=document.getElementById('active-empty');
+  var inactiveEmpty=document.getElementById('inactive-empty');
+  var activeCount=document.getElementById('ctab-active-count');
+  var inactiveCount=document.getElementById('ctab-inactive-count');
   if(!grid)return;
   var allEntries=Object.entries(cleanerDB).filter(function(e){return e[0].length>=30;});
   var active=allEntries.filter(function(e){return ((e[1]&&e[1].status)||'Active')!=='Inactive';});
   var inactive=allEntries.filter(function(e){return ((e[1]&&e[1].status)||'Active')==='Inactive';});
-  console.log('[renderCleanersGrid] Active:'+active.length+' Inactive:'+inactive.length);
+  if(activeCount) activeCount.textContent='('+active.length+')';
+  if(inactiveCount) inactiveCount.textContent='('+inactive.length+')';
   function renderCard(entry, isInactive){
     var id=entry[0];var c=entry[1];
     var card=document.createElement('div');
     card.className='cleaner-card db-card';
+    if(isInactive){ card.style.borderLeft='3px solid var(--text-muted)'; }
     var badgeClass=isInactive?'bin':'bac';
     var badgeText=isInactive?'Inactive':'Active';
-    card.innerHTML='<div class="cleaner-top"><div class="avatar" style="background:'+c.bg+';color:'+c.fg+';">'+c.initials+'</div><div><div class="cleaner-name">'+c.name+'</div><div class="cleaner-role">'+c.role+'</div></div></div>'
-      +'<div class="cleaner-stats"><div class="cs"><div class="cs-label">This week</div><div class="cs-val">'+c.week+'</div></div><div class="cs"><div class="cs-label">Rate</div><div class="cs-val">'+c.rate+'</div></div>'
-      +'<div class="cs"><div class="cs-label">Jobs this mo</div><div class="cs-val">'+c.jobs+'</div></div><div class="cs"><div class="cs-label">Status</div><div class="cs-val"><span class="badge '+badgeClass+'">'+badgeText+'</span></div></div></div>'
-      +'<div class="pb"><div class="pf" style="width:0%"></div></div>';
+    var topHtml='<div class="cleaner-top"><div class="avatar" style="background:'+c.bg+';color:'+c.fg+';">'+c.initials+'</div><div style="flex:1;"><div class="cleaner-name">'+c.name+'</div><div class="cleaner-role">'+c.role+'</div></div></div>';
+    var statsHtml='<div class="cleaner-stats"><div class="cs"><div class="cs-label">This week</div><div class="cs-val">'+c.week+'</div></div><div class="cs"><div class="cs-label">Rate</div><div class="cs-val">'+c.rate+'</div></div><div class="cs"><div class="cs-label">Jobs this mo</div><div class="cs-val">'+c.jobs+'</div></div><div class="cs"><div class="cs-label">Status</div><div class="cs-val"><span class="badge '+badgeClass+'">'+badgeText+'</span></div></div></div>';
+    var btnHtml = isInactive ? '<button class="btn btn-primary" style="margin-top:8px;width:100%;background:linear-gradient(135deg,#22c55e,#16a34a);" onclick="event.stopPropagation();quickReactivate(\''+id+'\')">Reactivate</button>' : '<div class="pb"><div class="pf" style="width:0%"></div></div>';
+    card.innerHTML=topHtml+statsHtml+btnHtml;
     (function(cid){card.addEventListener('click',function(){openCleaner(cid);});})(id);
     return card;
   }
   grid.innerHTML='';
   active.forEach(function(e){ grid.appendChild(renderCard(e,false)); });
+  if(activeEmpty) activeEmpty.style.display=active.length?'none':'block';
   if(deactGrid){
     deactGrid.innerHTML='';
     inactive.forEach(function(e){ deactGrid.appendChild(renderCard(e,true)); });
-    if(deactHeader){ deactHeader.style.display=inactive.length?'block':'none'; }
     deactGrid.style.display=inactive.length?'grid':'none';
   }
+  if(inactiveEmpty) inactiveEmpty.style.display=inactive.length?'none':'block';
+}
+
+function switchCleanerTab(which){
+  var activePane=document.getElementById('ctab-active-pane');
+  var inactivePane=document.getElementById('ctab-inactive-pane');
+  var activeBtn=document.getElementById('ctab-active-btn');
+  var inactiveBtn=document.getElementById('ctab-inactive-btn');
+  if(which==='active'){
+    if(activePane) activePane.style.display='block';
+    if(inactivePane) inactivePane.style.display='none';
+    if(activeBtn){ activeBtn.style.borderBottomColor='var(--brand-500)'; activeBtn.style.color='var(--text)'; }
+    if(inactiveBtn){ inactiveBtn.style.borderBottomColor='transparent'; inactiveBtn.style.color='var(--text-muted)'; }
+  } else {
+    if(activePane) activePane.style.display='none';
+    if(inactivePane) inactivePane.style.display='block';
+    if(activeBtn){ activeBtn.style.borderBottomColor='transparent'; activeBtn.style.color='var(--text-muted)'; }
+    if(inactiveBtn){ inactiveBtn.style.borderBottomColor='var(--brand-500)'; inactiveBtn.style.color='var(--text)'; }
+  }
+}
+
+function quickReactivate(id){
+  var c=cleanerDB[id]; if(!c) return;
+  if(!confirm('Reactivate '+c.name+'? They will reappear in all cleaner dropdowns.')) return;
+  db.from('cleaners').update({status:'Active'}).eq('id',id).then(function(res){
+    if(res.error){ alert('Error: '+res.error.message); return; }
+    c.status='Active';
+    if(typeof renderCleanersGrid==='function') renderCleanersGrid();
+    try{ populateCleanerDropdown('na-cleaner'); }catch(e){}
+  });
 }
 
 function renderLeadsPipeline(){
@@ -4392,10 +4428,37 @@ function setPeriod(btn){
         }
         var bc = document.getElementById('payroll-period-buttons');
         if(bc){
-          bc.innerHTML = _payrollPeriods.map(function(p){
-            var active = (p.key===_currentPayrollPeriodKey)? ' active':'';
-            return '<button class="pbtn'+active+'" data-period="'+p.key+'" onclick="setPayrollPeriod(\''+p.key+'\', this)">'+p.label+'</button>';
-          }).join('');
+          // Group periods by month of their start date (descending: newest first)
+          var byMonth = {}; var monthOrder = [];
+          var monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+          // sort descending so newest periods render first
+          var sorted = _payrollPeriods.slice().sort(function(a,b){ return b.start - a.start; });
+          sorted.forEach(function(p){
+            var mKey = p.start.getFullYear()+'-'+String(p.start.getMonth()+1).padStart(2,'0');
+            if(!byMonth[mKey]){ byMonth[mKey] = { label: monthNames[p.start.getMonth()]+' '+p.start.getFullYear(), periods:[] }; monthOrder.push(mKey); }
+            byMonth[mKey].periods.push(p);
+          });
+          var html = '';
+          monthOrder.forEach(function(mKey){
+            var grp = byMonth[mKey];
+            var hasActive = grp.periods.some(function(p){return p.key===_currentPayrollPeriodKey;});
+            var collapsed = !hasActive; // auto-expand the month containing the active period
+            var monthId = 'pp-month-'+mKey;
+            html += '<div class="pp-month-group" style="flex:1 1 100%;margin-bottom:8px;">';
+            html += '<div class="pp-month-header" onclick="togglePayrollMonth(\''+monthId+'\', this)" style="cursor:pointer;font-size:13px;font-weight:600;color:var(--text);padding:6px 0;display:flex;align-items:center;gap:6px;user-select:none;">';
+            html += '<span class="pp-caret" style="display:inline-block;transition:transform .2s;transform:'+(collapsed?'rotate(-90deg)':'rotate(0)')+';">▼</span>';
+            html += grp.label+' <span style="color:var(--text-muted);font-weight:400;font-size:12px;">('+grp.periods.length+' periods)</span>';
+            html += '</div>';
+            html += '<div id="'+monthId+'" class="pp-month-body" style="display:'+(collapsed?'none':'flex')+';gap:6px;flex-wrap:wrap;padding:4px 0 4px 18px;">';
+            grp.periods.forEach(function(p){
+              var active = (p.key===_currentPayrollPeriodKey)? ' active':'';
+              html += '<button class="pbtn'+active+'" data-period="'+p.key+'" onclick="setPayrollPeriod(\''+p.key+'\', this)">'+p.label+'</button>';
+            });
+            html += '</div></div>';
+          });
+          bc.innerHTML = html;
+          bc.style.flexDirection = 'column';
+          bc.style.alignItems = 'stretch';
         }
         renderPayroll();
       }
@@ -4405,6 +4468,15 @@ function setPeriod(btn){
         document.querySelectorAll('#payroll-period-buttons .pbtn').forEach(function(b){b.classList.remove('active');});
         if(btn) btn.classList.add('active');
         renderPayroll();
+      }
+
+      function togglePayrollMonth(id, header){
+        var body = document.getElementById(id);
+        if(!body) return;
+        var caret = header.querySelector('.pp-caret');
+        var collapsed = body.style.display==='none';
+        body.style.display = collapsed ? 'flex' : 'none';
+        if(caret) caret.style.transform = collapsed ? 'rotate(0)' : 'rotate(-90deg)';
       }
 
       function _currentPeriod(){ return _payrollPeriods.find(function(p){return p.key===_currentPayrollPeriodKey;}); }

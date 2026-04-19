@@ -849,6 +849,39 @@ Mahalo 🌺</textarea>
           <div class="success-bar" id="payroll-settings-success">Payroll settings saved!</div>
         </div>
 
+        <!-- IMPORT HISTORICAL BOOKINGS -->
+        <div style="background:#fff;border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:18px;">
+          <div style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:6px;">Import historical bookings</div>
+          <div style="font-size:13px;color:var(--text-muted);margin-bottom:14px;">Upload a CSV export of past bookings. The tool dedupes by client + date + price, auto-creates missing cleaners as Inactive, and tags every row with a batch ID so you can undo.</div>
+          <div id="import-dropzone" style="border:2px dashed var(--border);border-radius:10px;padding:28px;text-align:center;cursor:pointer;transition:all .15s;">
+            <input type="file" id="import-file-input" accept=".csv,.xlsx" style="display:none;" onchange="handleImportFile(event)"/>
+            <div style="font-size:14px;color:var(--text);margin-bottom:6px;">Drop CSV/XLSX here or click to choose</div>
+            <div style="font-size:12px;color:var(--text-muted);">Expected columns: Client Name, Email, Phone, Address, Booking Date, Service Type, Booking Status, Total Price, Cleaner Assigned, Cleaner Pay</div>
+          </div>
+          <div id="import-preview" style="display:none;margin-top:16px;"></div>
+          <div id="import-actions" style="display:none;margin-top:14px;display:flex;gap:10px;">
+            <button class="btn btn-primary" onclick="commitImport()" id="import-commit-btn">Commit import</button>
+            <button class="btn" onclick="cancelImport()">Cancel</button>
+          </div>
+          <div id="import-result" style="display:none;margin-top:12px;padding:10px;background:var(--brand-50);border-radius:8px;font-size:13px;"></div>
+
+          <div style="margin-top:18px;padding-top:14px;border-top:1px solid var(--border);">
+            <div style="font-size:13px;color:var(--text-muted);margin-bottom:8px;">Previous imports</div>
+            <div id="import-batches-list" style="font-size:13px;"></div>
+            <button class="btn" onclick="loadImportBatches()" style="margin-top:8px;font-size:12px;">Refresh list</button>
+          </div>
+        </div>
+
+        <!-- DANGER ZONE -->
+        <div style="background:#fff;border:1px solid #ef4444;border-radius:12px;padding:20px;margin-bottom:18px;">
+          <div style="font-size:14px;font-weight:600;color:#b91c1c;margin-bottom:6px;">Danger zone</div>
+          <div style="font-size:13px;color:var(--text-muted);margin-bottom:14px;">Destructive actions. These cannot be undone.</div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;">
+            <button class="btn" onclick="purgeAllTestData()" style="background:#fef2f2;color:#b91c1c;border:1px solid #fecaca;">Purge ALL bookings &amp; clients</button>
+          </div>
+          <div style="margin-top:10px;font-size:12px;color:var(--text-muted);">Requires typing <strong>DELETE</strong> to confirm. Deletes every row in the appointments and clients tables.</div>
+        </div>
+
         </div>
 
       </div>
@@ -10039,5 +10072,426 @@ Your total will update automatically when you select a payment method.</textarea
 })();
 </script>
   <script src="/gcal-sync.js?v=1"></script>
-<script>document.addEventListener('click',function(e){var nav=e.target.closest('.nav-item');if(nav){var crm=document.querySelector('.crm');if(crm)crm.classList.remove('nav-open');}var cell=e.target.closest('.cal-day');if(cell&&window.setCalView&&typeof window.curDay!=='undefined'){var n=cell.querySelector('.dn2');if(!n)return;var day=parseInt(n.textContent,10);if(!day)return;var tm=window.curMonth,ty=window.curYear;if(cell.classList.contains('om')){if(day>15){tm--;if(tm<1){tm=12;ty--;}}else{tm++;if(tm>12){tm=1;ty++;}}}window.curDay=day;window.curMonth=tm;window.curYear=ty;var b=document.getElementById('btn-day');if(b)window.setCalView('day',b);}},true);function scrollActivePayrollPillIntoView(){var c=document.getElementById('payroll-period-buttons');if(!c)return;var a=c.querySelector('.pbtn.active')||c.querySelector('.pbtn[style*="background"]')||c.querySelector('.pbtn:not(.pbtn)');if(a){c.scrollLeft=Math.max(0,a.offsetLeft-16);}}var _payrollObs=new MutationObserver(function(){scrollActivePayrollPillIntoView();});var _payrollContainer=document.getElementById('payroll-period-buttons');if(_payrollContainer){_payrollObs.observe(_payrollContainer,{childList:true,subtree:true,attributes:true,attributeFilter:['class','style']});_payrollContainer.addEventListener('click',function(){setTimeout(scrollActivePayrollPillIntoView,50);});}setTimeout(scrollActivePayrollPillIntoView,500);setTimeout(scrollActivePayrollPillIntoView,1500);</script></body>
+<script>document.addEventListener('click',function(e){var nav=e.target.closest('.nav-item');if(nav){var crm=document.querySelector('.crm');if(crm)crm.classList.remove('nav-open');}var cell=e.target.closest('.cal-day');if(cell&&window.setCalView&&typeof window.curDay!=='undefined'){var n=cell.querySelector('.dn2');if(!n)return;var day=parseInt(n.textContent,10);if(!day)return;var tm=window.curMonth,ty=window.curYear;if(cell.classList.contains('om')){if(day>15){tm--;if(tm<1){tm=12;ty--;}}else{tm++;if(tm>12){tm=1;ty++;}}}window.curDay=day;window.curMonth=tm;window.curYear=ty;var b=document.getElementById('btn-day');if(b)window.setCalView('day',b);}},true);function scrollActivePayrollPillIntoView(){var c=document.getElementById('payroll-period-buttons');if(!c)return;var a=c.querySelector('.pbtn.active')||c.querySelector('.pbtn[style*="background"]')||c.querySelector('.pbtn:not(.pbtn)');if(a){c.scrollLeft=Math.max(0,a.offsetLeft-16);}}var _payrollObs=new MutationObserver(function(){scrollActivePayrollPillIntoView();});var _payrollContainer=document.getElementById('payroll-period-buttons');if(_payrollContainer){_payrollObs.observe(_payrollContainer,{childList:true,subtree:true,attributes:true,attributeFilter:['class','style']});_payrollContainer.addEventListener('click',function(){setTimeout(scrollActivePayrollPillIntoView,50);});}setTimeout(scrollActivePayrollPillIntoView,500);setTimeout(scrollActivePayrollPillIntoView,1500);</script>
+<!-- ═════════ IMPORT / PURGE / UNDO FEATURES ═════════ -->
+<script>
+(function(){
+  'use strict';
+
+  // ───────── Utility: parse CSV line with quoted fields ─────────
+  function parseCSVLine(line){
+    const out = []; let cur = ''; let q = false;
+    for(let i=0;i<line.length;i++){
+      const c = line[i];
+      if(c === '"'){ if(q && line[i+1]==='"'){ cur+='"'; i++; } else { q = !q; } }
+      else if(c === ',' && !q){ out.push(cur); cur=''; }
+      else cur += c;
+    }
+    out.push(cur);
+    return out;
+  }
+
+  function parseCSVText(text){
+    const lines = text.replace(/\r\n/g,'\n').split('\n').filter(l => l.trim().length);
+    if(!lines.length) return [];
+    const header = parseCSVLine(lines[0]).map(h => h.trim().replace(/^"|"$/g,''));
+    const rows = [];
+    for(let i=1;i<lines.length;i++){
+      const cells = parseCSVLine(lines[i]).map(c => c.trim().replace(/^"|"$/g,''));
+      if(cells.every(c => !c)) continue;
+      const obj = {};
+      header.forEach((h,j) => obj[h] = cells[j]||'');
+      rows.push(obj);
+    }
+    return rows;
+  }
+
+  // ───────── Normalization maps ─────────
+  const CLEANER_MERGES = {
+    "Kelley Diane ONeill": "Kelley Diane O'Neill",
+    "Zoraida": "Zoraida (Yessy) Salgado"
+  };
+  const SERVICE_DEDUPE = {
+    'Regular Cleaning': 'Regular Clean',
+    'Deep Cleaning': 'Deep Clean',
+    'Commercial Cleaning': 'Commercial Cleaning',
+    'Move Out Clean': 'Move Out Clean',
+    'Regular Clean': 'Regular Clean',
+    'Deep Clean': 'Deep Clean',
+    'Hourly Service': 'Hourly Service',
+    'Airbnb': 'Airbnb',
+    'Carpet Cleaning': 'Carpet Cleaning',
+    'Vacation Rental Cleaning': 'Vacation Rental Cleaning',
+    'Deep Clean (Maui)': 'Deep Clean',
+    'Move Out Clean (Maui)': 'Move Out Clean',
+    'Regular Clean (Maui)': 'Regular Clean'
+  };
+  const STATUS_MAP = {
+    'Charged': 'paid',
+    'Completed': 'completed',
+    'Declined': 'cancelled',
+    'Unassigned': 'unassigned',
+    'Upcoming': 'scheduled'
+  };
+
+  function normalizeCleanerName(raw){
+    if(!raw) return [];
+    // Split on comma for multi-cleaner cells
+    return raw.split(',').map(s => s.trim()).filter(Boolean).map(name => {
+      if(name === 'Unassigned') return null;
+      return CLEANER_MERGES[name] || name;
+    }).filter(Boolean);
+  }
+
+  function normalizeService(raw){
+    return SERVICE_DEDUPE[raw] || raw || 'Regular Clean';
+  }
+
+  function parseDate(raw){
+    // MM/DD/YYYY -> YYYY-MM-DD
+    const m = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if(m){ return m[3]+'-'+m[1].padStart(2,'0')+'-'+m[2].padStart(2,'0'); }
+    return raw;
+  }
+
+  function parsePrice(raw){
+    if(!raw) return 0;
+    return parseFloat(raw.replace(/[$,]/g,'')) || 0;
+  }
+
+  // ───────── State ─────────
+  let importedRows = null;
+  let parsedRecords = null;
+
+  // ───────── File handling ─────────
+  window.handleImportFile = function(e){
+    const file = e.target.files && e.target.files[0];
+    if(!file) return;
+    const name = file.name.toLowerCase();
+    if(name.endsWith('.csv')){
+      const reader = new FileReader();
+      reader.onload = ev => processImportText(ev.target.result, file.name);
+      reader.readAsText(file);
+    } else if(name.endsWith('.xlsx') || name.endsWith('.xls')){
+      // Use SheetJS CDN on the fly
+      loadSheetJS().then(XLSX => {
+        const reader = new FileReader();
+        reader.onload = ev => {
+          const data = new Uint8Array(ev.target.result);
+          const wb = XLSX.read(data, {type:'array'});
+          const sheet = wb.Sheets[wb.SheetNames[0]];
+          const csv = XLSX.utils.sheet_to_csv(sheet);
+          processImportText(csv, file.name);
+        };
+        reader.readAsArrayBuffer(file);
+      }).catch(err => alert('Could not load xlsx parser: '+err.message));
+    } else {
+      alert('Unsupported file type. Use .csv or .xlsx');
+    }
+  };
+
+  function loadSheetJS(){
+    if(window.XLSX) return Promise.resolve(window.XLSX);
+    return new Promise((resolve,reject) => {
+      const s = document.createElement('script');
+      s.src = 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
+      s.onload = () => resolve(window.XLSX);
+      s.onerror = () => reject(new Error('xlsx CDN failed'));
+      document.head.appendChild(s);
+    });
+  }
+
+  function processImportText(text, filename){
+    const rows = parseCSVText(text);
+    if(!rows.length){ alert('No rows found in file'); return; }
+    importedRows = rows;
+    parsedRecords = rows.map(r => parseRow(r));
+    renderPreview(filename);
+  }
+
+  function parseRow(r){
+    const cleaners = normalizeCleanerName(r['Cleaner Assigned'] || r['Cleaner'] || '');
+    const service = normalizeService(r['Service Type'] || '');
+    const status = STATUS_MAP[r['Booking Status']] || 'unassigned';
+    const date = parseDate(r['Booking Date'] || '');
+    const price = parsePrice(r['Total Price'] || '');
+    const pay = parsePrice(r['Cleaner Pay'] || '');
+    return {
+      clientName: r['Client Name']||'',
+      email: r['Email']||'',
+      phone: r['Phone']||'',
+      address: r['Address']||'',
+      date: date,
+      service: service,
+      status: status,
+      totalPrice: price,
+      cleanerPay: pay,
+      cleaners: cleaners
+    };
+  }
+
+  function renderPreview(filename){
+    const preview = document.getElementById('import-preview');
+    const actions = document.getElementById('import-actions');
+    if(!preview || !parsedRecords) return;
+
+    // Compute summary
+    const uniqueClients = new Set(parsedRecords.map(r => r.clientName.toLowerCase().trim()).filter(Boolean));
+    const uniqueCleaners = new Set();
+    let multiCleanerCount = 0;
+    let unassignedCount = 0;
+    parsedRecords.forEach(r => {
+      r.cleaners.forEach(c => uniqueCleaners.add(c));
+      if(r.cleaners.length > 1) multiCleanerCount++;
+      if(r.cleaners.length === 0) unassignedCount++;
+    });
+
+    let html = '<div style="margin-bottom:10px;font-size:13px;color:var(--text);font-weight:600;">File: '+filename+' · '+parsedRecords.length+' rows parsed</div>';
+    html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;margin-bottom:12px;">';
+    html += summaryCard('Total rows', parsedRecords.length);
+    html += summaryCard('Unique clients', uniqueClients.size);
+    html += summaryCard('Unique cleaners', uniqueCleaners.size);
+    html += summaryCard('Multi-cleaner', multiCleanerCount);
+    html += summaryCard('Unassigned', unassignedCount);
+    html += '</div>';
+
+    html += '<div style="font-size:13px;font-weight:600;margin-bottom:6px;">First 5 rows preview:</div>';
+    html += '<div style="max-height:300px;overflow:auto;border:1px solid var(--border);border-radius:8px;"><table style="width:100%;font-size:12px;border-collapse:collapse;">';
+    html += '<thead style="background:var(--panel-muted);position:sticky;top:0;"><tr>'+['Client','Date','Service','Status','Total','Cleaner(s)','Pay'].map(h=>'<th style="padding:8px;text-align:left;border-bottom:1px solid var(--border);">'+h+'</th>').join('')+'</tr></thead><tbody>';
+    parsedRecords.slice(0,5).forEach(r => {
+      const cleanerDisplay = r.cleaners.length ? r.cleaners.join(', ') : '<span style="color:var(--text-muted)">—</span>';
+      html += '<tr><td style="padding:8px;border-bottom:1px solid var(--border);">'+escapeHtml(r.clientName)+'</td>'
+            + '<td style="padding:8px;border-bottom:1px solid var(--border);">'+r.date+'</td>'
+            + '<td style="padding:8px;border-bottom:1px solid var(--border);">'+escapeHtml(r.service)+'</td>'
+            + '<td style="padding:8px;border-bottom:1px solid var(--border);">'+r.status+'</td>'
+            + '<td style="padding:8px;border-bottom:1px solid var(--border);">$'+r.totalPrice.toFixed(2)+'</td>'
+            + '<td style="padding:8px;border-bottom:1px solid var(--border);">'+cleanerDisplay+'</td>'
+            + '<td style="padding:8px;border-bottom:1px solid var(--border);">$'+r.cleanerPay.toFixed(2)+'</td></tr>';
+    });
+    html += '</tbody></table></div>';
+    preview.innerHTML = html;
+    preview.style.display = 'block';
+    if(actions) actions.style.display = 'flex';
+  }
+
+  function summaryCard(label, value){
+    return '<div style="background:var(--panel-muted);padding:10px;border-radius:8px;"><div style="font-size:11px;color:var(--text-muted);">'+label+'</div><div style="font-size:18px;font-weight:600;color:var(--text);">'+value+'</div></div>';
+  }
+
+  function escapeHtml(s){
+    return String(s||'').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+  }
+
+  window.cancelImport = function(){
+    importedRows = null;
+    parsedRecords = null;
+    const preview = document.getElementById('import-preview');
+    const actions = document.getElementById('import-actions');
+    const input = document.getElementById('import-file-input');
+    if(preview){ preview.innerHTML=''; preview.style.display='none'; }
+    if(actions) actions.style.display = 'none';
+    if(input) input.value = '';
+  };
+
+  // ───────── Commit import ─────────
+  window.commitImport = async function(){
+    if(!parsedRecords || !parsedRecords.length){ alert('Nothing to import'); return; }
+    if(typeof db === 'undefined'){ alert('Database not ready'); return; }
+    const btn = document.getElementById('import-commit-btn');
+    if(btn){ btn.disabled = true; btn.textContent = 'Importing…'; }
+    const result = document.getElementById('import-result');
+    if(result){ result.style.display='block'; result.innerHTML = 'Preparing…'; }
+
+    try {
+      // Step 1: load existing cleaners, clients, appointments for dedup
+      const batchId = 'import_' + Date.now() + '_' + Math.random().toString(36).slice(2,8);
+      if(result) result.innerHTML = 'Loading existing cleaners…';
+      const cleanersRes = await db.from('cleaners').select('id,name,status');
+      if(cleanersRes.error) throw cleanersRes.error;
+      const existingCleaners = new Map();
+      (cleanersRes.data||[]).forEach(c => existingCleaners.set(c.name.toLowerCase().trim(), c));
+
+      if(result) result.innerHTML = 'Loading existing clients…';
+      const clientsRes = await db.from('clients').select('id,name');
+      if(clientsRes.error) throw clientsRes.error;
+      const existingClients = new Map();
+      (clientsRes.data||[]).forEach(c => existingClients.set(c.name.toLowerCase().trim(), c));
+
+      if(result) result.innerHTML = 'Loading existing appointments for duplicate check…';
+      const apptsRes = await db.from('appointments').select('client_name,date,total_price');
+      if(apptsRes.error) throw apptsRes.error;
+      const dupKeys = new Set();
+      (apptsRes.data||[]).forEach(a => dupKeys.add((a.client_name||'').toLowerCase().trim()+'|'+a.date+'|'+Number(a.total_price||0).toFixed(2)));
+
+      // Step 2: collect new cleaners + clients to create
+      const newCleanerNames = new Set();
+      const newClientNames = new Set();
+      parsedRecords.forEach(r => {
+        r.cleaners.forEach(name => { if(!existingCleaners.has(name.toLowerCase().trim())) newCleanerNames.add(name); });
+        if(r.clientName && !existingClients.has(r.clientName.toLowerCase().trim())) newClientNames.add(r.clientName);
+      });
+
+      // Step 3: insert new cleaners (Inactive by default)
+      if(newCleanerNames.size){
+        if(result) result.innerHTML = 'Creating '+newCleanerNames.size+' new cleaners (as Inactive)…';
+        const newCleanerPayloads = Array.from(newCleanerNames).map(name => ({ name:name, role:'Cleaner', island:'Oahu', hourly_rate:16, status:'Inactive', background_check:'Not started', notes:'Imported from historical data — please review' }));
+        const ins = await db.from('cleaners').insert(newCleanerPayloads).select('id,name,status');
+        if(ins.error) throw ins.error;
+        (ins.data||[]).forEach(c => existingCleaners.set(c.name.toLowerCase().trim(), c));
+      }
+
+      // Step 4: insert new clients (pulling contact info from the first matching row)
+      if(newClientNames.size){
+        if(result) result.innerHTML = 'Creating '+newClientNames.size+' new clients…';
+        const seen = new Set();
+        const newClientPayloads = [];
+        parsedRecords.forEach(r => {
+          const key = r.clientName.toLowerCase().trim();
+          if(!r.clientName || seen.has(key) || existingClients.has(key)) return;
+          seen.add(key);
+          newClientPayloads.push({ name:r.clientName, email:r.email||null, phone:r.phone||null, address:r.address||null, status:'active', notes:'Imported from historical data' });
+        });
+        // Insert in chunks of 500 to avoid large payload issues
+        for(let i=0;i<newClientPayloads.length;i+=500){
+          const chunk = newClientPayloads.slice(i, i+500);
+          const ins = await db.from('clients').insert(chunk).select('id,name');
+          if(ins.error) throw ins.error;
+          (ins.data||[]).forEach(c => existingClients.set(c.name.toLowerCase().trim(), c));
+        }
+      }
+
+      // Step 5: build appointment payloads, skipping duplicates
+      if(result) result.innerHTML = 'Building appointment rows…';
+      const payloads = [];
+      let skippedDup = 0;
+      parsedRecords.forEach(r => {
+        const key = (r.clientName||'').toLowerCase().trim()+'|'+r.date+'|'+Number(r.totalPrice).toFixed(2);
+        if(dupKeys.has(key)){ skippedDup++; return; }
+        dupKeys.add(key);
+        const cleanerObjs = r.cleaners.map(name => {
+          const c = existingCleaners.get(name.toLowerCase().trim());
+          return c ? { id:c.id, name:c.name, pay: r.cleaners.length ? (r.cleanerPay / r.cleaners.length) : 0 } : null;
+        }).filter(Boolean);
+        const primaryCleaner = cleanerObjs[0];
+        const client = existingClients.get((r.clientName||'').toLowerCase().trim());
+        payloads.push({
+          client_name: r.clientName || 'Unknown',
+          client_id: client ? client.id : null,
+          service: r.service,
+          frequency: 'One-time',
+          date: r.date,
+          time: '09:00',
+          address: r.address || null,
+          cleaner_name: primaryCleaner ? primaryCleaner.name : 'Unassigned',
+          cleaner_id: primaryCleaner ? primaryCleaner.id : null,
+          status: r.status,
+          base_price: r.totalPrice,
+          tax: 0,
+          total_price: r.totalPrice,
+          cleaner_pay: r.cleanerPay,
+          notes: null,
+          recurring: false,
+          cleaners_json: cleanerObjs.length ? JSON.stringify(cleanerObjs) : null,
+          import_batch_id: batchId
+        });
+      });
+
+      // Step 6: batch insert appointments in chunks
+      if(result) result.innerHTML = 'Inserting '+payloads.length+' appointments (skipping '+skippedDup+' duplicates)…';
+      let inserted = 0;
+      for(let i=0;i<payloads.length;i+=500){
+        const chunk = payloads.slice(i, i+500);
+        const ins = await db.from('appointments').insert(chunk);
+        if(ins.error) throw ins.error;
+        inserted += chunk.length;
+        if(result) result.innerHTML = 'Inserted '+inserted+' / '+payloads.length+'…';
+      }
+
+      if(result){
+        result.style.background = '#dcfce7';
+        result.innerHTML = '<strong style="color:#166534;">✓ Import complete.</strong> Inserted '+inserted+' appointments, created '+newClientNames.size+' clients, '+newCleanerNames.size+' cleaners (Inactive). Skipped '+skippedDup+' duplicates. Batch ID: <code>'+batchId+'</code>';
+      }
+      // Save batch record in localStorage for undo UI
+      const batches = JSON.parse(localStorage.getItem('hnc_import_batches')||'[]');
+      batches.unshift({ id: batchId, timestamp: new Date().toISOString(), count: inserted, newClients: newClientNames.size, newCleaners: newCleanerNames.size });
+      localStorage.setItem('hnc_import_batches', JSON.stringify(batches.slice(0,20)));
+      loadImportBatches();
+      cancelImport();
+    } catch(e){
+      console.error('Import error:', e);
+      if(result){ result.style.background = '#fee2e2'; result.innerHTML = '<strong style="color:#b91c1c;">Error:</strong> '+escapeHtml(e.message||String(e)); }
+    } finally {
+      if(btn){ btn.disabled = false; btn.textContent = 'Commit import'; }
+    }
+  };
+
+  // ───────── Batches list + undo ─────────
+  window.loadImportBatches = function(){
+    const el = document.getElementById('import-batches-list');
+    if(!el) return;
+    const batches = JSON.parse(localStorage.getItem('hnc_import_batches')||'[]');
+    if(!batches.length){ el.innerHTML = '<span style="color:var(--text-muted);">No imports yet.</span>'; return; }
+    el.innerHTML = batches.map(b => {
+      const d = new Date(b.timestamp);
+      return '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px;border:1px solid var(--border);border-radius:8px;margin-bottom:6px;">'
+        + '<div><div style="font-weight:600;">'+d.toLocaleString()+'</div><div style="font-size:12px;color:var(--text-muted);">'+b.count+' rows · '+b.newClients+' clients · '+b.newCleaners+' cleaners · <code>'+b.id+'</code></div></div>'
+        + '<button class="btn" onclick="undoImport(\''+b.id+'\')" style="background:#fef2f2;color:#b91c1c;border:1px solid #fecaca;">Undo</button>'
+        + '</div>';
+    }).join('');
+  };
+
+  window.undoImport = async function(batchId){
+    const typed = prompt('This will DELETE all '+(batchId)+' appointments.\\n\\nType UNDO to confirm:');
+    if(typed !== 'UNDO'){ alert('Cancelled.'); return; }
+    try {
+      const res = await db.from('appointments').delete().eq('import_batch_id', batchId);
+      if(res.error) throw res.error;
+      alert('Deleted all appointments from batch '+batchId);
+      const batches = JSON.parse(localStorage.getItem('hnc_import_batches')||'[]').filter(b => b.id !== batchId);
+      localStorage.setItem('hnc_import_batches', JSON.stringify(batches));
+      loadImportBatches();
+    } catch(e){
+      alert('Error: '+e.message);
+    }
+  };
+
+  // ───────── Purge test data ─────────
+  window.purgeAllTestData = async function(){
+    const typed = prompt('DANGER: This will permanently delete EVERY appointment and EVERY client.\\n\\nType DELETE to confirm:');
+    if(typed !== 'DELETE'){ alert('Cancelled — nothing was deleted.'); return; }
+    const typed2 = prompt('Last chance. Type DELETE again to actually run the purge:');
+    if(typed2 !== 'DELETE'){ alert('Cancelled — nothing was deleted.'); return; }
+    try {
+      const a = await db.from('appointments').delete().neq('id','00000000-0000-0000-0000-000000000000');
+      if(a.error) throw a.error;
+      const c = await db.from('clients').delete().neq('id','00000000-0000-0000-0000-000000000000');
+      if(c.error) throw c.error;
+      alert('Purge complete. All appointments and clients deleted. Reload the page to see the empty state.');
+      localStorage.removeItem('hnc_import_batches');
+    } catch(e){
+      alert('Error: '+e.message);
+    }
+  };
+
+  // ───────── Dropzone UX ─────────
+  document.addEventListener('DOMContentLoaded', () => {
+    const zone = document.getElementById('import-dropzone');
+    const input = document.getElementById('import-file-input');
+    if(zone && input){
+      zone.addEventListener('click', () => input.click());
+      zone.addEventListener('dragover', e => { e.preventDefault(); zone.style.background = 'var(--brand-50)'; zone.style.borderColor = 'var(--brand-500)'; });
+      zone.addEventListener('dragleave', e => { e.preventDefault(); zone.style.background = ''; zone.style.borderColor = 'var(--border)'; });
+      zone.addEventListener('drop', e => {
+        e.preventDefault(); zone.style.background = ''; zone.style.borderColor = 'var(--border)';
+        const file = e.dataTransfer.files && e.dataTransfer.files[0];
+        if(file){ input.files = e.dataTransfer.files; handleImportFile({target:{files:[file]}}); }
+      });
+    }
+    // Also run on first view so list shows up
+    setTimeout(() => { if(typeof loadImportBatches === 'function') loadImportBatches(); }, 500);
+  });
+
+})();
+</script>
+</body>
 </html>

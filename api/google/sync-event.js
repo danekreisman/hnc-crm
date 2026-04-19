@@ -82,6 +82,8 @@ module.exports = async (req, res) => {
     var existingEventId = appt.google_event_id || null;
   var ownerCleanerId = appt.google_event_cleaner_id || null;
   var isCancelled = (appt.status === 'cancelled');
+  var isUnassigned = (appt.status === 'unassigned') || (appt.cleaner_name && String(appt.cleaner_name).toLowerCase() === 'unassigned');
+  if (isUnassigned) { cleanerId = null; }
   if (!cleanerId && !existingEventId && !isCancelled) return jsonRes(res, 200, { ok: true, skipped: 'no cleaner assigned and no existing event' });
   async function _deleteFromOwner(reason) {
     var ownerId = ownerCleanerId || cleanerId;
@@ -98,7 +100,7 @@ module.exports = async (req, res) => {
     await supabase.from('appointments').update({ google_event_id: null, google_event_cleaner_id: null }).eq('id', appointmentId);
     return jsonRes(res, 200, { ok: true, deleted: true, reason: reason });
   }
-  if (action === 'delete' || isCancelled || !cleanerId) {
+  if (action === 'delete' || isCancelled || isUnassigned || !cleanerId) {
     return await _deleteFromOwner(action === 'delete' ? 'delete' : (isCancelled ? 'cancelled' : 'unassigned'));
   }
   if (ownerCleanerId && ownerCleanerId !== cleanerId && existingEventId) {

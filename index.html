@@ -5,155 +5,186 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Hawaii Natural Clean — CRM</title>
+<link rel="icon" href="/hnc-logo.png">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
+/* ===== HNC Design Tokens — brand palette (3BB8E3 / 59C7E2 / 79D3E1 / A5E6E9 / F2E19B) ===== */
+:root{
+  --brand-500:#3BB8E3; --brand-400:#59C7E2; --brand-300:#79D3E1;
+  --brand-200:#A5E6E9; --brand-50:#EAF7FB;
+  --brand-600:#1F9EC6; --brand-700:#16758F;
+  --accent-gold:#F2E19B; --accent-gold-ink:#7A5A00;
+  --bg:#FFFFFF; --bg-soft:#F7FBFC;
+  --bg-wash: radial-gradient(1100px 520px at 8% -10%, #EAF7FB 0%, transparent 55%),
+             radial-gradient(900px 480px at 110% 0%, #F4FBFD 0%, transparent 60%), #FFFFFF;
+  --panel:#FFFFFF; --panel-muted:#F7FBFC; --panel-glass:rgba(255,255,255,.72);
+  --border:#E3EEF2; --border-strong:#CFE3EA; --border-focus:#79D3E1;
+  --text:#0F1C24; --text-muted:#5B7683; --text-subtle:#8AA3AE; --text-on-brand:#FFFFFF;
+  --ok:#2FB88A; --ok-bg:#E7F7F1;
+  --warn:#D9A520; --warn-bg:#FBF2D8;
+  --danger:#E16B6B; --danger-bg:#FCE9E9;
+  --info:#3BB8E3; --info-bg:#EAF7FB;
+  --radius-sm:8px; --radius:12px; --radius-lg:16px;
+  --shadow-sm:0 1px 2px rgba(15,42,53,.04), 0 1px 1px rgba(15,42,53,.03);
+  --shadow:0 8px 24px -10px rgba(31,158,198,.18), 0 2px 6px rgba(15,42,53,.05);
+  --shadow-lg:0 20px 40px -18px rgba(31,158,198,.25), 0 6px 14px rgba(15,42,53,.06);
+  --glow:0 0 0 1px rgba(59,184,227,.35), 0 0 22px rgba(59,184,227,.25);
+  --ring:0 0 0 3px rgba(121,211,225,.45);
+  --blur:saturate(140%) blur(14px);
+}
 *{box-sizing:border-box;margin:0;padding:0;}
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f5f5f3;color:#1a1a1a;font-size:14px;}
-.crm{display:flex;height:100vh;overflw:hidden;}
-.sidebar{width:200px;background:#fff;border-right:1px solid #e8e8e5;display:flex;flex-direction:column;flex-shrink:0;overflow-y:auto;}
-.sidebar-logo{padding:16px;border-bottom:1px solid #e8e8e5;}
-.sidebar-logo .name{font-size:13px;font-weight:600;color:#1a1a1a;}
-.sidebar-logo .sub{font-size:11px;color:#999;margin-top:2px;}
-.nav-section{padding:12px 16px 4px;font-size:10px;font-weight:600;color:#bbb;text-transform:uppercase;letter-spacing:.08em;}
-.nav-item{display:flex;align-items:center;gap:9px;padding:8px 16px;font-size:13px;color:#666;cursor:pointer;border-left:2px solid transparent;}
-.nav-item:hover{background:#f9f9f7;color:#1a1a1a;}
-.nav-item.active{background:#f0faf6;color:#1D9E75;border-left-color:#1D9E75;font-weight:500;}
-.nav-icon{width:15px;height:15px;flex-shrink:0;opacity:.6;}
+body{font-family:'Inter','SF Pro Text',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg-wash);color:var(--text);font-size:13.5px;letter-spacing:-.005em;-webkit-font-smoothing:antialiased;}
+.crm{display:flex;height:100vh;overflow:hidden;}
+.sidebar{width:220px;background:var(--panel-glass);backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;overflow-y:auto;}
+.sidebar-logo{padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;}
+.sidebar-logo-img{height:32px;width:auto;display:block;filter:drop-shadow(0 2px 6px rgba(59,184,227,.22));flex-shrink:0;}
+.sidebar-logo-text{min-width:0;}
+.sidebar-logo .name{font-size:13px;font-weight:600;color:var(--text);letter-spacing:-.005em;line-height:1.2;}
+.sidebar-logo .sub{font-size:10.5px;color:var(--text-muted);margin-top:1px;}
+.quo-status{font-size:10px;color:var(--text-subtle);margin-top:4px;}
+.nav-section{padding:14px 16px 4px;font-size:10px;font-weight:600;color:var(--text-subtle);text-transform:uppercase;letter-spacing:.12em;}
+.nav-item{display:flex;align-items:center;gap:10px;padding:8px 12px;margin:2px 8px;border-radius:10px;font-size:13px;color:var(--text-muted);cursor:pointer;border-left:none;transition:background .15s ease,color .15s ease,box-shadow .2s ease;}
+.nav-item:hover{background:var(--brand-50);color:var(--text);}
+.nav-item.active{background:linear-gradient(135deg,rgba(59,184,227,.18),rgba(165,230,233,.25));color:var(--brand-700);font-weight:600;box-shadow:inset 0 0 0 1px rgba(59,184,227,.3),0 4px 14px -6px rgba(59,184,227,.35);}
+.nav-icon{width:15px;height:15px;flex-shrink:0;opacity:.75;}
 .nav-item.active .nav-icon{opacity:1;}
 .main{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0;}
-.topbar{padding:12px 20px;background:#fff;border-bottom:1px solid #e8e8e5;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
-.topbar h1{font-size:15px;font-weight:600;color:#1a1a1a;}
+.topbar{padding:12px 22px;background:var(--panel-glass);backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
+.topbar h1{font-size:15px;font-weight:650;color:var(--text);letter-spacing:-.01em;}
 .topbar-actions{display:flex;gap:8px;}
-.btn{font-size:12px;padding:6px 12px;border-radius:8px;border:1px solid #e0e0dd;background:#fff;color:#1a1a1a;cursor:pointer;font-family:inherit;}
-.btn:hover{background:#f5f5f3;}
-.btn-primary{background:#1D9E75;color:#fff;border-color:#1D9E75;}
-.btn-primary:hover{background:#0F6E56;}
+.btn{font-size:12.5px;padding:7px 13px;border-radius:10px;border:1px solid var(--border-strong);background:var(--panel);color:var(--text);cursor:pointer;font-family:inherit;box-shadow:var(--shadow-sm);transition:transform .08s ease,box-shadow .2s ease,background .15s ease,border-color .15s ease;}
+.btn:hover{background:var(--brand-50);border-color:var(--brand-300);}
+.btn:active{transform:translateY(1px);}
+.btn:focus-visible{outline:none;box-shadow:var(--ring);}
+.btn-primary{background:linear-gradient(135deg,var(--brand-500),var(--brand-400));color:var(--text-on-brand);border:1px solid transparent;box-shadow:0 6px 18px -6px rgba(59,184,227,.55),inset 0 1px 0 rgba(255,255,255,.3);}
+.btn-primary:hover{filter:brightness(1.04);box-shadow:var(--glow);}
 .content{flex:1;overflow-y:auto;padding:20px;}
 .vc{display:none;}.vc.active{display:block;}
 .metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:18px;}
-.metric{background:#fff;border:1px solid #e8e8e5;border-radius:10px;padding:12px 14px;}
-.metric-label{font-size:11px;color:#999;margin-bottom:4px;}
-.metric-value{font-size:22px;font-weight:600;color:#1a1a1a;}
-.metric-sub{font-size:11px;color:#999;margin-top:2px;}
-.up{color:#1D9E75;}.down{color:#e53e3e;}
-.section-title{font-size:11px;font-weight:600;color:#999;margin-bottom:8px;text-transform:uppercase;letter-spacing:.06em;}
-.tw{background:#fff;border:1px solid #e8e8e5;border-radius:10px;overflow:hidden;margin-bottom:16px;}
+.metric{background:#fff;border:1px solid var(--border);border-radius:10px;padding:12px 14px;}
+.metric-label{font-size:11px;color:var(--text-muted);margin-bottom:4px;}
+.metric-value{font-size:22px;font-weight:600;color:var(--text);}
+.metric-sub{font-size:11px;color:var(--text-muted);margin-top:2px;}
+.up{color:var(--brand-500);}.down{color:#e53e3e;}
+.section-title{font-size:11px;font-weight:600;color:var(--text-muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:.06em;}
+.tw{background:#fff;border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:16px;}
 table{width:100%;border-collapse:collapse;font-size:12px;table-layout:fixed;}
-th{font-size:11px;font-weight:600;color:#999;padding:8px 12px;text-align:left;border-bottom:1px solid #e8e8e5;background:#fafaf8;}
-td{padding:9px 12px;color:#1a1a1a;border-bottom:1px solid #f0f0ee;vertical-align:middle;}
+th{font-size:11px;font-weight:600;color:var(--text-muted);padding:8px 12px;text-align:left;border-bottom:1px solid var(--border);background:var(--bg-soft);}
+td{padding:9px 12px;color:var(--text);border-bottom:1px solid var(--border);vertical-align:middle;}
 tr:last-child td{border-bottom:none;}
-tr.clickable:hover td{background:#f0faf6;cursor:pointer;}
+tr.clickable:hover td{background:var(--brand-50);cursor:pointer;}
 .badge{display:inline-block;font-size:10px;padding:2px 7px;border-radius:20px;font-weight:500;}
-.bc{background:#ebf5ff;color:#2b6cb0;}.br{background:#e6fffa;color:#276749;}.bg2{background:#fffbeb;color:#b7791f;}.bh{background:#fff5f5;color:#c53030;}
-.bac{background:#e6fffa;color:#276749;}.bin{background:#f5f5f3;color:#999;border:1px solid #e8e8e5;}
-.bpd{background:#e6fffa;color:#276749;}.bpn{background:#fffbeb;color:#b7791f;}.bpt{background:#ebf5ff;color:#2b6cb0;}
-.task-list{background:#fff;border:1px solid #e8e8e5;border-radius:10px;overflow:hidden;}
-.ti{display:flex;align-items:flex-start;gap:8px;padding:9px 12px;border-bottom:1px solid #f0f0ee;}
+.bc{background:#ebf5ff;color:#2b6cb0;}.br{background:var(--brand-50);color:#276749;}.bg2{background:#fffbeb;color:#b7791f;}.bh{background:#fff5f5;color:#c53030;}
+.bac{background:var(--brand-50);color:#276749;}.bin{background:var(--bg-soft);color:var(--text-muted);border:1px solid var(--border);}
+.bpd{background:var(--brand-50);color:#276749;}.bpn{background:#fffbeb;color:#b7791f;}.bpt{background:#ebf5ff;color:#2b6cb0;}
+.task-list{background:#fff;border:1px solid var(--border);border-radius:10px;overflow:hidden;}
+.ti{display:flex;align-items:flex-start;gap:8px;padding:9px 12px;border-bottom:1px solid var(--border);}
 .ti:last-child{border-bottom:none;}
 .tch{width:14px;height:14px;border-radius:3px;border:1.5px solid #ddd;margin-top:1px;flex-shrink:0;cursor:pointer;display:flex;align-items:center;justify-content:center;}
-.tch.done{background:#1D9E75;border-color:#1D9E75;}
+.tch.done{background:var(--brand-500);border-color:var(--brand-500);}
 .tch.done::after{content:'';display:block;width:7px;height:4px;border-left:1.5px solid #fff;border-bottom:1.5px solid #fff;transform:rotate(-45deg) translateY(-1px);}
 .tb{flex:1;min-width:0;}
-.tt{font-size:12px;color:#1a1a1a;}
-.tt.dt{text-decoration:line-through;color:#bbb;}
-.tm{font-size:11px;color:#999;margin-top:2px;}
+.tt{font-size:12px;color:var(--text);}
+.tt.dt{text-decoration:line-through;color:var(--text-subtle);}
+.tm{font-size:11px;color:var(--text-muted);margin-top:2px;}
 .pd{display:inline-block;width:6px;height:6px;border-radius:50%;margin-right:3px;}
 .ph2{background:#e53e3e;}.pmm{background:#dd6b20;}
 .sd{display:inline-block;width:6px;height:6px;border-radius:50%;margin-right:4px;}
-.sa{background:#1D9E75;}.si{background:#ccc;}.sn{background:#3182ce;}
+.sa{background:var(--brand-500);}.si{background:#ccc;}.sn{background:#3182ce;}
 .two-col{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);gap:14px;}
 .pipeline{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:18px;}
-.pipe-col{background:#fafaf8;border:1px solid #e8e8e5;border-radius:10px;padding:10px;}
+.pipe-col{background:var(--bg-soft);border:1px solid var(--border);border-radius:10px;padding:10px;}
 .pipe-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
-.pipe-label{font-size:11px;font-weight:600;color:#666;}
-.pipe-count{font-size:11px;background:#fff;border:1px solid #e8e8e5;border-radius:20px;padding:1px 7px;color:#999;}
-.deal-card{background:#fff;border:1px solid #e8e8e5;border-radius:8px;padding:9px 11px;margin-bottom:6px;cursor:pointer;}
-.deal-card:hover{border-color:#1D9E75;box-shadow:0 1px 4px rgba(29,158,117,.1);}
-.deal-name{font-size:12px;font-weight:500;color:#1a1a1a;margin-bottom:3px;}
+.pipe-label{font-size:11px;font-weight:600;color:var(--text-muted);}
+.pipe-count{font-size:11px;background:#fff;border:1px solid var(--border);border-radius:20px;padding:1px 7px;color:var(--text-muted);}
+.deal-card{background:#fff;border:1px solid var(--border);border-radius:8px;padding:9px 11px;margin-bottom:6px;cursor:pointer;}
+.deal-card:hover{border-color:var(--brand-500);box-shadow:0 1px 4px rgba(59,184,227,.15);}
+.deal-name{font-size:12px;font-weight:500;color:var(--text);margin-bottom:3px;}
 .deal-type{font-size:11px;margin-bottom:4px;}
-.deal-val{font-size:12px;color:#1D9E75;font-weight:600;}
+.deal-val{font-size:12px;color:var(--brand-500);font-weight:600;}
 /* CALENDAR */
 .cal-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
 .cal-nav{display:flex;align-items:center;gap:10px;}
-.cal-month{font-size:15px;font-weight:600;color:#1a1a1a;min-width:120px;}
-.cal-arrow{background:#fff;border:1px solid #e8e8e5;border-radius:8px;width:28px;height:28px;cursor:pointer;color:#666;font-size:16px;display:flex;align-items:center;justify-content:center;line-height:1;}
-.cal-arrow:hover{background:#f5f5f3;}
+.cal-month{font-size:15px;font-weight:600;color:var(--text);min-width:120px;}
+.cal-arrow{background:#fff;border:1px solid var(--border);border-radius:8px;width:28px;height:28px;cursor:pointer;color:var(--text-muted);font-size:16px;display:flex;align-items:center;justify-content:center;line-height:1;}
+.cal-arrow:hover{background:var(--bg-soft);}
 .legend{display:flex;gap:12px;align-items:center;flex-wrap:wrap;}
-.legend-item{display:flex;align-items:center;gap:5px;font-size:11px;color:#666;}
+.legend-item{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text-muted);}
 .ld{width:10px;height:10px;border-radius:3px;flex-shrink:0;}
 .lu{background:#F4C0D1;border:1px solid #ED93B1;}
 .la{background:#B5D4F4;border:1px solid #85B7EB;}
 .lc{background:#FAC775;border:1px solid #EF9F27;}
-.lp{background:#9FE1CB;border:1px solid #5DCAA5;}
-.cal-grid{background:#fff;border:1px solid #e8e8e5;border-radius:10px;overflow:hidden;}
-.cal-dow{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));background:#fafaf8;border-bottom:1px solid #e8e8e5;}
-.cal-dow-cell{font-size:11px;font-weight:600;color:#999;text-align:center;padding:7px 0;}
+.lp{background:var(--brand-200);border:1px solid var(--brand-400);}
+.cal-grid{background:#fff;border:1px solid var(--border);border-radius:10px;overflow:hidden;}
+.cal-dow{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));background:var(--bg-soft);border-bottom:1px solid var(--border);}
+.cal-dow-cell{font-size:11px;font-weight:600;color:var(--text-muted);text-align:center;padding:7px 0;}
 .cal-days{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));}
-.cal-view-btn{padding:5px 12px;font-size:12px;border:none;background:#fff;color:#666;cursor:pointer;font-family:inherit;}
-.cal-view-btn.active{background:#1D9E75;color:#fff;}
-.cal-view-btn:hover:not(.active){background:#f5f5f3;}
-.time-grid{display:grid;grid-template-columns:50px 1fr;border:1px solid #e8e8e5;border-radius:10px;overflow:hidden;background:#fff;}
-.time-label{font-size:10px;color:#999;padding:0 8px;text-align:right;height:60px;display:flex;align-items:flex-start;padding-top:4px;border-right:1px solid #f0f0ee;}
-.time-slot{height:60px;border-bottom:1px solid #f5f5f3;position:relative;}
-.time-slot:hover{background:#fafaf8;}
+.cal-view-btn{padding:5px 12px;font-size:12px;border:none;background:#fff;color:var(--text-muted);cursor:pointer;font-family:inherit;}
+.cal-view-btn.active{background:var(--brand-500);color:#fff;}
+.cal-view-btn:hover:not(.active){background:var(--bg-soft);}
+.time-grid{display:grid;grid-template-columns:50px 1fr;border:1px solid var(--border);border-radius:10px;overflow:hidden;background:#fff;}
+.time-label{font-size:10px;color:var(--text-muted);padding:0 8px;text-align:right;height:60px;display:flex;align-items:flex-start;padding-top:4px;border-right:1px solid var(--border);}
+.time-slot{height:60px;border-bottom:1px solid var(--bg-soft);position:relative;}
+.time-slot:hover{background:var(--bg-soft);}
 .day-appt-block{position:absolute;left:4px;right:4px;border-radius:6px;padding:3px 7px;font-size:11px;font-weight:500;cursor:pointer;overflow:hidden;z-index:1;}
-.week-col-header{text-align:center;padding:8px 4px;font-size:12px;font-weight:600;color:#1a1a1a;border-right:1px solid #f0f0ee;}
-.week-col-header.today-col{color:#1D9E75;}
-.week-day-col{border-right:1px solid #f0f0ee;position:relative;}
-.more-appts{font-size:10px;color:#1D9E75;padding:1px 4px;cursor:pointer;font-weight:500;}
+.week-col-header{text-align:center;padding:8px 4px;font-size:12px;font-weight:600;color:var(--text);border-right:1px solid var(--border);}
+.week-col-header.today-col{color:var(--brand-500);}
+.week-day-col{border-right:1px solid var(--border);position:relative;}
+.more-appts{font-size:10px;color:var(--brand-500);padding:1px 4px;cursor:pointer;font-weight:500;}
 .more-appts:hover{text-decoration:underline;}
-.cal-day{min-height:80px;border-right:1px solid #f0f0ee;border-bottom:1px solid #f0f0ee;padding:5px;}
+.cal-day{min-height:80px;border-right:1px solid var(--border);border-bottom:1px solid var(--border);padding:5px;}
 .cal-day:nth-child(7n){border-right:none;}
 .cal-day.om .dn2{opacity:.3;}
-.cal-day.today{background:#f0faf6;}
-.dn2{font-size:11px;color:#666;margin-bottom:3px;font-weight:500;}
-.cal-day.today .dn2{color:#1D9E75;font-weight:700;}
+.cal-day.today{background:var(--brand-50);}
+.dn2{font-size:11px;color:var(--text-muted);margin-bottom:3px;font-weight:500;}
+.cal-day.today .dn2{color:var(--brand-500);font-weight:700;}
 .appt{font-size:10px;border-radius:4px;padding:2px 5px;margin-bottom:2px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:500;display:block;width:100%;text-align:left;border:none;}
 .appt:hover{opacity:.8;}
 .au{background:#F4C0D1;color:#72243E;}
 .aa{background:#B5D4F4;color:#0C447C;}
 .ac{background:#FAC775;color:#633806;}
-.ap{background:#9FE1CB;color:#085041;}
+.ap{background:var(--brand-200);color:var(--brand-700);}
 .ax{background:#e2e8f0;color:#475569;text-decoration:line-through;opacity:.7;}
-.more-appts{font-size:10px;color:#999;}
+.more-appts{font-size:10px;color:var(--text-muted);}
 /* CLEANERS */
 .cleaner-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:16px;}
-.cleaner-card{background:#fff;border:1px solid #e8e8e5;border-radius:10px;padding:13px;cursor:pointer;}
-.cleaner-card:hover{border-color:#1D9E75;box-shadow:0 2px 8px rgba(29,158,117,.1);}
+.cleaner-card{background:#fff;border:1px solid var(--border);border-radius:10px;padding:13px;cursor:pointer;}
+.cleaner-card:hover{border-color:var(--brand-500);box-shadow:0 2px 8px rgba(59,184,227,.15);}
 .cleaner-top{display:flex;align-items:center;gap:10px;margin-bottom:10px;}
 .avatar{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;flex-shrink:0;}
-.cleaner-name{font-size:13px;font-weight:600;color:#1a1a1a;}
-.cleaner-role{font-size:11px;color:#999;margin-top:1px;}
+.cleaner-name{font-size:13px;font-weight:600;color:var(--text);}
+.cleaner-role{font-size:11px;color:var(--text-muted);margin-top:1px;}
 .cleaner-stats{display:grid;grid-template-columns:1fr 1fr;gap:6px;}
-.cs{background:#fafaf8;border-radius:8px;padding:6px 8px;}
-.cs-label{font-size:10px;color:#999;}
-.cs-val{font-size:13px;font-weight:600;color:#1a1a1a;margin-top:1px;}
-.pb{height:4px;background:#f0f0ee;border-radius:2px;overflow:hidden;margin-top:8px;}
-.pf{height:100%;border-radius:2px;background:#1D9E75;}
+.cs{background:var(--bg-soft);border-radius:8px;padding:6px 8px;}
+.cs-label{font-size:10px;color:var(--text-muted);}
+.cs-val{font-size:13px;font-weight:600;color:var(--text);margin-top:1px;}
+.pb{height:4px;background:var(--border);border-radius:2px;overflow:hidden;margin-top:8px;}
+.pf{height:100%;border-radius:2px;background:var(--brand-500);}
 /* PAYROLL */
 .ppbar{display:flex;align-items:center;gap:8px;margin-bottom:14px;flex-wrap:wrap;}
-.ppbar-label{font-size:13px;font-weight:600;color:#1a1a1a;}
-.pbtn{font-size:11px;padding:4px 10px;border-radius:8px;border:1px solid #e0e0dd;background:#fff;color:#666;cursor:pointer;font-family:inherit;}
-.pbtn.active{background:#f0faf6;color:#1D9E75;border-color:#1D9E75;font-weight:500;}
+.ppbar-label{font-size:13px;font-weight:600;color:var(--text);}
+.pbtn{font-size:11px;padding:4px 10px;border-radius:8px;border:1px solid var(--border-strong);background:#fff;color:var(--text-muted);cursor:pointer;font-family:inherit;}
+.pbtn.active{background:var(--brand-50);color:var(--brand-500);border-color:var(--brand-500);font-weight:500;}
 /* OVERLAY */
 .overlay{position:fixed;inset:0;background:rgba(0,0,0,.4);display:flex;align-items:flex-start;justify-content:flex-end;z-index:1000;}
 .overlay.hidden{display:none;}
 .panel{width:380px;height:100%;background:#fff;overflow-y:auto;box-shadow:-4px 0 24px rgba(0,0,0,.1);}
 .panel-wide{width:480px;}
-.panel-header{padding:14px 16px;border-bottom:1px solid #e8e8e5;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:#fff;z-index:1;}
-.panel-title{font-size:14px;font-weight:600;color:#1a1a1a;}
-.close-btn{background:#fff;border:1px solid #e8e8e5;border-radius:8px;width:28px;height:28px;cursor:pointer;color:#666;font-size:16px;display:flex;align-items:center;justify-content:center;}
-.close-btn:hover{background:#f5f5f3;}
+.panel-header{padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:#fff;z-index:1;}
+.panel-title{font-size:14px;font-weight:600;color:var(--text);}
+.close-btn{background:#fff;border:1px solid var(--border);border-radius:8px;width:28px;height:28px;cursor:pointer;color:var(--text-muted);font-size:16px;display:flex;align-items:center;justify-content:center;}
+.close-btn:hover{background:var(--bg-soft);}
 .panel-body{padding:16px;}
-.info-block{background:#fafaf8;border-radius:10px;padding:11px 13px;margin-bottom:12px;}
-.info-row{display:flex;justify-content:space-between;align-items:flex-start;padding:5px 0;border-bottom:1px solid #f0f0ee;}
+.info-block{background:var(--bg-soft);border-radius:10px;padding:11px 13px;margin-bottom:12px;}
+.info-row{display:flex;justify-content:space-between;align-items:flex-start;padding:5px 0;border-bottom:1px solid var(--border);}
 .info-row:last-child{border-bottom:none;}
-.info-label{font-size:11px;color:#999;flex-shrink:0;width:130px;}
-.info-val{font-size:12px;color:#1a1a1a;text-align:right;font-weight:500;}
-.panel-section{font-size:11px;font-weight:600;color:#999;text-transform:uppercase;letter-spacing:.06em;margin:14px 0 8px;}
+.info-label{font-size:11px;color:var(--text-muted);flex-shrink:0;width:130px;}
+.info-val{font-size:12px;color:var(--text);text-align:right;font-weight:500;}
+.panel-section{font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;margin:14px 0 8px;}
 .action-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:4px;}
-.action-btn{font-size:12px;padding:9px 10px;border-radius:8px;border:1px solid #e0e0dd;background:#fff;color:#1a1a1a;cursor:pointer;font-family:inherit;text-align:center;}
-.action-btn:hover{background:#f5f5f3;}
-.action-btn.green{background:#e6fffa;color:#276749;border-color:#9ae6b4;}
+.action-btn{font-size:12px;padding:9px 10px;border-radius:8px;border:1px solid var(--border-strong);background:#fff;color:var(--text);cursor:pointer;font-family:inherit;text-align:center;}
+.action-btn:hover{background:var(--bg-soft);}
+.action-btn.green{background:var(--brand-50);color:#276749;border-color:#9ae6b4;}
 .action-btn.blue{background:#ebf5ff;color:#2b6cb0;border-color:#bee3f8;}
 .action-btn.amber{background:#fffbeb;color:#b7791f;border-color:#f6e05e;}
 .action-btn.red{background:#fff5f5;color:#c53030;border-color:#feb2b2;}
@@ -163,125 +194,125 @@ tr.clickable:hover td{background:#f0faf6;cursor:pointer;}
 .s-unassigned{background:#F4C0D1;color:#72243E;}
 .s-assigned{background:#B5D4F4;color:#0C447C;}
 .s-completed{background:#FAC775;color:#633806;}
-.s-paid{background:#9FE1CB;color:#085041;}
+.s-paid{background:var(--brand-200);color:var(--brand-700);}
 .s-cancelled{background:#e2e8f0;color:#475569;}
 .profile-top{display:flex;align-items:center;gap:13px;margin-bottom:16px;}
 .profile-avatar{width:54px;height:54px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:600;flex-shrink:0;}
-.profile-name{font-size:16px;font-weight:600;color:#1a1a1a;}
-.profile-role{font-size:12px;color:#999;margin-top:2px;}
+.profile-name{font-size:16px;font-weight:600;color:var(--text);}
+.profile-role{font-size:12px;color:var(--text-muted);margin-top:2px;}
 .stat-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:12px;}
-.stat-box{background:#fafaf8;border-radius:8px;padding:9px 11px;}
-.stat-box-label{font-size:10px;color:#999;}
-.stat-box-val{font-size:16px;font-weight:600;color:#1a1a1a;margin-top:2px;}
-.job-history-item{padding:8px 0;border-bottom:1px solid #f0f0ee;display:flex;justify-content:space-between;align-items:center;}
+.stat-box{background:var(--bg-soft);border-radius:8px;padding:9px 11px;}
+.stat-box-label{font-size:10px;color:var(--text-muted);}
+.stat-box-val{font-size:16px;font-weight:600;color:var(--text);margin-top:2px;}
+.job-history-item{padding:8px 0;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;}
 .job-history-item:last-child{border-bottom:none;}
 .form-row{margin-bottom:10px;}
-.form-row label{display:block;font-size:11px;color:#999;margin-bottom:4px;font-weight:500;}
-.form-row input,.form-row select,.form-row textarea{width:100%;padding:7px 10px;border:1px solid #e0e0dd;border-radius:8px;font-size:12px;font-family:inherit;color:#1a1a1a;background:#fff;}
-.form-row input:focus,.form-row select:focus,.form-row textarea:focus{outline:none;border-color:#1D9E75;}
+.form-row label{display:block;font-size:11px;color:var(--text-muted);margin-bottom:4px;font-weight:500;}
+.form-row input,.form-row select,.form-row textarea{width:100%;padding:7px 10px;border:1px solid var(--border-strong);border-radius:8px;font-size:12px;font-family:inherit;color:var(--text);background:#fff;}
+.form-row input:focus,.form-row select:focus,.form-row textarea:focus{outline:none;border-color:var(--brand-500);}
 .form-two{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
 .form-three{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;}
 .save-bar{display:flex;gap:8px;margin-top:14px;}
-.price-preview{background:#f0faf6;border:1px solid #9ae6b4;border-radius:10px;padding:12px 14px;margin:12px 0;}
+.price-preview{background:var(--brand-50);border:1px solid #9ae6b4;border-radius:10px;padding:12px 14px;margin:12px 0;}
 .price-preview-label{font-size:11px;color:#276749;margin-bottom:4px;}
-.price-preview-val{font-size:22px;font-weight:700;color:#1D9E75;}
-.price-preview-breakdown{font-size:11px;color:#666;margin-top:4px;}
+.price-preview-val{font-size:22px;font-weight:700;color:var(--brand-500);}
+.price-preview-breakdown{font-size:11px;color:var(--text-muted);margin-top:4px;}
 /* MESSAGING INBOX */
-.inbox-layout{display:grid;grid-template-columns:260px 1fr;height:calc(100vh - 120px);background:#fff;border:1px solid #e8e8e5;border-radius:10px;overflow:hidden;}
-.inbox-list{border-right:1px solid #e8e8e5;overflow-y:auto;}
-.inbox-search{padding:10px 12px;border-bottom:1px solid #e8e8e5;}
-.inbox-search input{width:100%;padding:6px 10px;border:1px solid #e0e0dd;border-radius:8px;font-size:12px;font-family:inherit;background:#fafaf8;}
-.inbox-search input:focus{outline:none;border-color:#1D9E75;}
-.inbox-item{padding:10px 12px;border-bottom:1px solid #f0f0ee;cursor:pointer;display:flex;gap:9px;align-items:flex-start;}
-.inbox-item:hover{background:#fafaf8;}
-.inbox-item.active{background:#f0faf6;border-left:2px solid #1D9E75;}
-.inbox-avatar{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;flex-shrink:0;background:#e6fffa;color:#276749;}
+.inbox-layout{display:grid;grid-template-columns:260px 1fr;height:calc(100vh - 120px);background:#fff;border:1px solid var(--border);border-radius:10px;overflow:hidden;}
+.inbox-list{border-right:1px solid var(--border);overflow-y:auto;}
+.inbox-search{padding:10px 12px;border-bottom:1px solid var(--border);}
+.inbox-search input{width:100%;padding:6px 10px;border:1px solid var(--border-strong);border-radius:8px;font-size:12px;font-family:inherit;background:var(--bg-soft);}
+.inbox-search input:focus{outline:none;border-color:var(--brand-500);}
+.inbox-item{padding:10px 12px;border-bottom:1px solid var(--border);cursor:pointer;display:flex;gap:9px;align-items:flex-start;}
+.inbox-item:hover{background:var(--bg-soft);}
+.inbox-item.active{background:var(--brand-50);border-left:2px solid var(--brand-500);}
+.inbox-avatar{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;flex-shrink:0;background:var(--brand-50);color:#276749;}
 .inbox-info{flex:1;min-width:0;}
-.inbox-name{font-size:12px;font-weight:600;color:#1a1a1a;}
-.inbox-preview{font-size:11px;color:#999;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px;}
-.inbox-time{font-size:10px;color:#bbb;flex-shrink:0;}
-.inbox-unread{width:7px;height:7px;border-radius:50%;background:#1D9E75;margin-top:4px;flex-shrink:0;}
+.inbox-name{font-size:12px;font-weight:600;color:var(--text);}
+.inbox-preview{font-size:11px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px;}
+.inbox-time{font-size:10px;color:var(--text-subtle);flex-shrink:0;}
+.inbox-unread{width:7px;height:7px;border-radius:50%;background:var(--brand-500);margin-top:4px;flex-shrink:0;}
 .chat-area{display:flex;flex-direction:column;}
-.chat-header{padding:12px 16px;border-bottom:1px solid #e8e8e5;display:flex;align-items:center;justify-content:space-between;}
-.chat-header-name{font-size:13px;font-weight:600;color:#1a1a1a;}
-.chat-header-sub{font-size:11px;color:#999;}
+.chat-header{padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
+.chat-header-name{font-size:13px;font-weight:600;color:var(--text);}
+.chat-header-sub{font-size:11px;color:var(--text-muted);}
 .chat-messages{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:10px;}
 .msg-bubble{max-width:75%;padding:9px 12px;border-radius:12px;font-size:12px;line-height:1.5;}
-.msg-in{background:#f5f5f3;color:#1a1a1a;align-self:flex-start;border-bottom-left-radius:4px;}
-.msg-out{background:#1D9E75;color:#fff;align-self:flex-end;border-bottom-right-radius:4px;}
-.msg-time{font-size:10px;color:#bbb;margin-top:3px;}
+.msg-in{background:var(--bg-soft);color:var(--text);align-self:flex-start;border-bottom-left-radius:4px;}
+.msg-out{background:var(--brand-500);color:#fff;align-self:flex-end;border-bottom-right-radius:4px;}
+.msg-time{font-size:10px;color:var(--text-subtle);margin-top:3px;}
 .msg-time.out{text-align:right;}
-.chat-input-area{padding:12px 16px;border-top:1px solid #e8e8e5;}
+.chat-input-area{padding:12px 16px;border-top:1px solid var(--border);}
 .chat-tabs{display:flex;gap:6px;margin-bottom:8px;}
-.chat-tab{font-size:11px;padding:4px 10px;border-radius:20px;border:1px solid #e0e0dd;background:#fff;color:#666;cursor:pointer;font-family:inherit;}
+.chat-tab{font-size:11px;padding:4px 10px;border-radius:20px;border:1px solid var(--border-strong);background:#fff;color:var(--text-muted);cursor:pointer;font-family:inherit;}
 .chat-tab.active-sms{background:#ebf5ff;color:#2b6cb0;border-color:#bee3f8;font-weight:500;}
 .chat-tab.active-email{background:#fffbeb;color:#b7791f;border-color:#f6e05e;font-weight:500;}
 .chat-compose{display:flex;gap:8px;align-items:flex-end;}
-.chat-compose textarea{flex:1;min-height:60px;max-height:120px;border:1px solid #e0e0dd;border-radius:8px;padding:8px 10px;font-size:12px;font-family:inherit;resize:none;background:#fafaf8;}
-.chat-compose textarea:focus{outline:none;border-color:#1D9E75;}
+.chat-compose textarea{flex:1;min-height:60px;max-height:120px;border:1px solid var(--border-strong);border-radius:8px;padding:8px 10px;font-size:12px;font-family:inherit;resize:none;background:var(--bg-soft);}
+.chat-compose textarea:focus{outline:none;border-color:var(--brand-500);}
 .chat-compose-btns{display:flex;flex-direction:column;gap:6px;}
 .ai-draft-btn{font-size:11px;padding:6px 10px;border-radius:8px;background:#f5f0ff;color:#553c9a;border:1px solid #d6bcfa;cursor:pointer;font-family:inherit;white-space:nowrap;}
 .ai-draft-btn:hover{background:#ede9fe;}
-.send-btn{font-size:11px;padding:6px 10px;border-radius:8px;background:#1D9E75;color:#fff;border:none;cursor:pointer;font-family:inherit;}
-.send-btn:hover{background:#0F6E56;}
+.send-btn{font-size:11px;padding:6px 10px;border-radius:8px;background:var(--brand-500);color:#fff;border:none;cursor:pointer;font-family:inherit;}
+.send-btn:hover{background:var(--brand-600);}
 .dot-pulse{display:flex;gap:3px;align-items:center;}
 .dot-pulse span{width:5px;height:5px;border-radius:50%;background:#9ae6b4;animation:pulse 1.2s infinite;}
 .dot-pulse span:nth-child(2){animation-delay:.2s;}
 .dot-pulse span:nth-child(3){animation-delay:.4s;}
 @keyframes pulse{0%,80%,100%{opacity:.3;transform:scale(.8);}40%{opacity:1;transform:scale(1);}}
-.ai-thinking-bar{display:none;align-items:center;gap:6px;font-size:11px;color:#999;padding:4px 0;}
+.ai-thinking-bar{display:none;align-items:center;gap:6px;font-size:11px;color:var(--text-muted);padding:4px 0;}
 .ai-thinking-bar.show{display:flex;}
 .chan-toggle{display:flex;gap:6px;margin-bottom:10px;}
-.chan-btn{font-size:12px;padding:5px 12px;border-radius:8px;border:1px solid #e0e0dd;background:#fff;color:#666;cursor:pointer;font-family:inherit;}
+.chan-btn{font-size:12px;padding:5px 12px;border-radius:8px;border:1px solid var(--border-strong);background:#fff;color:var(--text-muted);cursor:pointer;font-family:inherit;}
 .chan-btn.active-sms{background:#ebf5ff;color:#2b6cb0;border-color:#bee3f8;font-weight:500;}
 .chan-btn.active-email{background:#fffbeb;color:#b7791f;border-color:#f6e05e;font-weight:500;}
 .tone-row{display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;align-items:center;}
-.tone-label{font-size:11px;color:#999;}
-.tone-btn{font-size:11px;padding:3px 9px;border-radius:20px;border:1px solid #e0e0dd;background:#fff;color:#666;cursor:pointer;font-family:inherit;}
-.tone-btn.active{background:#f0faf6;color:#1D9E75;border-color:#1D9E75;font-weight:500;}
+.tone-label{font-size:11px;color:var(--text-muted);}
+.tone-btn{font-size:11px;padding:3px 9px;border-radius:20px;border:1px solid var(--border-strong);background:#fff;color:var(--text-muted);cursor:pointer;font-family:inherit;}
+.tone-btn.active{background:var(--brand-50);color:var(--brand-500);border-color:var(--brand-500);font-weight:500;}
 .ctx-chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;}
-.ctx-chip{font-size:11px;background:#f5f5f3;border:1px solid #e8e8e5;border-radius:20px;padding:3px 9px;color:#666;}
-.ctx-chip strong{color:#1a1a1a;}
+.ctx-chip{font-size:11px;background:var(--bg-soft);border:1px solid var(--border);border-radius:20px;padding:3px 9px;color:var(--text-muted);}
+.ctx-chip strong{color:var(--text);}
 .cleaner-check-list{display:flex;flex-direction:column;gap:6px;margin-bottom:10px;}
-.cleaner-check-list label{display:flex;align-items:center;gap:8px;font-size:12px;color:#1a1a1a;cursor:pointer;}
+.cleaner-check-list label{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text);cursor:pointer;}
 .report-two{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);gap:14px;}
-.success-bar{background:#e6fffa;border:1px solid #9ae6b4;border-radius:8px;padding:8px 12px;font-size:12px;color:#276749;margin-bottom:12px;display:none;}
+.success-bar{background:var(--brand-50);border:1px solid #9ae6b4;border-radius:8px;padding:8px 12px;font-size:12px;color:#276749;margin-bottom:12px;display:none;}
 .success-bar.show{display:block;}
 textarea{font-family:inherit;}
-.agent-suggestion{font-size:11px;padding:4px 10px;border-radius:20px;border:1px solid #e0e0dd;background:#fff;color:#666;cursor:pointer;font-family:inherit;}
+.agent-suggestion{font-size:11px;padding:4px 10px;border-radius:20px;border:1px solid var(--border-strong);background:#fff;color:var(--text-muted);cursor:pointer;font-family:inherit;}
 .agent-suggestion:hover{background:#f5f0ff;color:#553c9a;border-color:#d6bcfa;}
 .agent-bubble-user{background:#553c9a;color:#fff;padding:10px 14px;border-radius:12px;border-bottom-right-radius:4px;font-size:13px;line-height:1.6;align-self:flex-end;max-width:80%;}
-.agent-bubble-ai{background:#fff;border:1px solid #e8e8e5;padding:12px 14px;border-radius:12px;border-bottom-left-radius:4px;font-size:13px;line-height:1.7;color:#1a1a1a;max-width:90%;}
+.agent-bubble-ai{background:#fff;border:1px solid var(--border);padding:12px 14px;border-radius:12px;border-bottom-left-radius:4px;font-size:13px;line-height:1.7;color:var(--text);max-width:90%;}
 .agent-bubble-ai strong{font-weight:600;}
-.agent-thinking{display:flex;align-items:center;gap:8px;font-size:12px;color:#999;padding:4px 0;}
-.template-tab{font-size:12px;padding:5px 12px;border-radius:20px;border:1px solid #e0e0dd;background:#fff;color:#666;cursor:pointer;font-family:inherit;}
-.template-tab.active{background:#1D9E75;color:#fff;border-color:#1D9E75;}
-.template-tab:hover:not(.active){background:#f5f5f3;}
-.auto-card{background:#fff;border:1px solid #e8e8e5;border-radius:10px;padding:14px 16px;margin-bottom:10px;display:flex;align-items:flex-start;gap:14px;}
-.auto-card:hover{border-color:#e0e0dd;}
+.agent-thinking{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text-muted);padding:4px 0;}
+.template-tab{font-size:12px;padding:5px 12px;border-radius:20px;border:1px solid var(--border-strong);background:#fff;color:var(--text-muted);cursor:pointer;font-family:inherit;}
+.template-tab.active{background:var(--brand-500);color:#fff;border-color:var(--brand-500);}
+.template-tab:hover:not(.active){background:var(--bg-soft);}
+.auto-card{background:#fff;border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:10px;display:flex;align-items:flex-start;gap:14px;}
+.auto-card:hover{border-color:var(--border-strong);}
 .auto-toggle{flex-shrink:0;margin-top:2px;}
-.auto-toggle input{width:36px;height:20px;cursor:pointer;accent-color:#1D9E75;}
+.auto-toggle input{width:36px;height:20px;cursor:pointer;accent-color:var(--brand-500);}
 .auto-body{flex:1;min-width:0;}
-.auto-name{font-size:13px;font-weight:600;color:#1a1a1a;margin-bottom:3px;}
-.auto-desc{font-size:12px;color:#666;margin-bottom:6px;}
+.auto-name{font-size:13px;font-weight:600;color:var(--text);margin-bottom:3px;}
+.auto-desc{font-size:12px;color:var(--text-muted);margin-bottom:6px;}
 .auto-meta{display:flex;gap:8px;flex-wrap:wrap;}
 .auto-tag{font-size:10px;padding:2px 8px;border-radius:20px;font-weight:500;}
 .auto-trigger-tag{background:#ebf5ff;color:#2b6cb0;}
-.auto-action-tag{background:#e6fffa;color:#276749;}
-.auto-count{background:#f5f5f3;color:#666;}
+.auto-action-tag{background:var(--brand-50);color:#276749;}
+.auto-count{background:var(--bg-soft);color:var(--text-muted);}
 .auto-actions{display:flex;gap:6px;align-items:center;flex-shrink:0;}
-.pay-action-btn{font-size:11px;padding:4px 9px;border-radius:6px;border:1px solid #e0e0dd;background:#fff;color:#1a1a1a;cursor:pointer;font-family:inherit;}
-.pay-action-btn:hover{background:#f5f5f3;}
-.pay-action-btn.green{background:#e6fffa;color:#276749;border-color:#9ae6b4;}
-.pay-tab{font-size:13px;padding:8px 16px;color:#999;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;}
-.pay-tab.active{color:#1D9E75;border-bottom-color:#1D9E75;font-weight:500;}
-.pay-tab:hover{color:#1a1a1a;}
-#payroll-period-buttons{flex-wrap:nowrap !important;overflow-x:auto !important;-webkit-overflow-scrolling:touch;scroll-behavior:smooth;padding:2px 2px 6px 2px;scrollbar-width:thin;max-width:100%;} #payroll-period-buttons::-webkit-scrollbar{height:4px;} #payroll-period-buttons::-webkit-scrollbar-thumb{background:#d0d0cd;border-radius:2px;} #payroll-period-buttons .pbtn{flex:0 0 auto;white-space:nowrap;} /* === MOBILE STYLES === */ @media (max-width:900px){ .crm{flex-direction:column;height:auto;min-height:100vh;} .sidebar{position:fixed;top:0;left:0;bottom:0;width:80vw;max-width:280px;z-index:1100;transform:translateX(-100%);transition:transform .22s ease;box-shadow:0 10px 30px rgba(0,0,0,.15);} .crm.nav-open .sidebar{transform:translateX(0);} .nav-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:1050;display:none;} .crm.nav-open .nav-backdrop{display:block;} .main{width:100%;min-width:0;height:auto;overflow:visible;} .topbar{padding:10px 12px;flex-wrap:wrap;gap:8px;position:sticky;top:0;z-index:100;} .topbar h1{font-size:16px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;} .topbar-actions{flex-wrap:wrap;width:100%;gap:6px;} .topbar-actions input,.topbar-actions .search,.topbar-actions select{flex:1;min-width:120px;font-size:16px;} .mobile-menu-btn{display:inline-flex;align-items:center;justify-content:center;width:40px;height:40px;border:1px solid #e0e0dd;background:#fff;border-radius:8px;cursor:pointer;font-size:20px;line-height:1;padding:0;margin-right:4px;} .content{padding:14px;} .metrics{grid-template-columns:1fr 1fr;gap:8px;} .metric-value{font-size:20px;} .pipeline{grid-template-columns:1fr;gap:8px;} .two-col{grid-template-columns:1fr;gap:12px;} .form-two,.form-three{grid-template-columns:1fr;gap:10px;} .tw{overflow-x:auto;-webkit-overflow-scrolling:touch;} .tw table{table-layout:auto;min-width:560px;font-size:13px;} th,td{padding:10px 10px;} .btn{min-height:40px;font-size:14px;padding:8px 14px;} input,select,textarea{font-size:16px !important;} .overlay{align-items:stretch;justify-content:stretch;padding:0;} .overlay{overscroll-behavior:contain;} .overlay > *{width:100% !important;max-width:100% !important;height:100dvh;max-height:100dvh;border-radius:0 !important;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;} .cal-header{flex-wrap:wrap;gap:8px;} .cal-nav{flex:1;min-width:0;} .cal-month{font-size:14px;min-width:0;} .cal-view-btn{padding:8px 14px;font-size:14px;min-height:36px;} .legend{display:none !important;} .cal-day{min-height:58px;padding:3px;font-size:11px;} .cal-dow-cell{font-size:10px;padding:5px 0;} .section-title{font-size:11px;} body{font-size:14px;} .desktop-only{display:none !important;} } @media (min-width:901px){ .mobile-menu-btn,.nav-backdrop{display:none !important;} } /* === END MOBILE STYLES === */ </style>
+.pay-action-btn{font-size:11px;padding:4px 9px;border-radius:6px;border:1px solid var(--border-strong);background:#fff;color:var(--text);cursor:pointer;font-family:inherit;}
+.pay-action-btn:hover{background:var(--bg-soft);}
+.pay-action-btn.green{background:var(--brand-50);color:#276749;border-color:#9ae6b4;}
+.pay-tab{font-size:13px;padding:8px 16px;color:var(--text-muted);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;}
+.pay-tab.active{color:var(--brand-500);border-bottom-color:var(--brand-500);font-weight:500;}
+.pay-tab:hover{color:var(--text);}
+#payroll-period-buttons{flex-wrap:nowrap !important;overflow-x:auto !important;-webkit-overflow-scrolling:touch;scroll-behavior:smooth;padding:2px 2px 6px 2px;scrollbar-width:thin;max-width:100%;} #payroll-period-buttons::-webkit-scrollbar{height:4px;} #payroll-period-buttons::-webkit-scrollbar-thumb{background:var(--border-strong);border-radius:2px;} #payroll-period-buttons .pbtn{flex:0 0 auto;white-space:nowrap;} /* === MOBILE STYLES === */ @media (max-width:900px){ .crm{flex-direction:column;height:auto;min-height:100vh;} .sidebar{position:fixed;top:0;left:0;bottom:0;width:80vw;max-width:280px;z-index:1100;transform:translateX(-100%);transition:transform .22s ease;box-shadow:0 10px 30px rgba(0,0,0,.15);} .crm.nav-open .sidebar{transform:translateX(0);} .nav-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:1050;display:none;} .crm.nav-open .nav-backdrop{display:block;} .main{width:100%;min-width:0;height:auto;overflow:visible;} .topbar{padding:10px 12px;flex-wrap:wrap;gap:8px;position:sticky;top:0;z-index:100;} .topbar h1{font-size:16px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;} .topbar-actions{flex-wrap:wrap;width:100%;gap:6px;} .topbar-actions input,.topbar-actions .search,.topbar-actions select{flex:1;min-width:120px;font-size:16px;} .mobile-menu-btn{display:inline-flex;align-items:center;justify-content:center;width:40px;height:40px;border:1px solid var(--border-strong);background:#fff;border-radius:8px;cursor:pointer;font-size:20px;line-height:1;padding:0;margin-right:4px;} .content{padding:14px;} .metrics{grid-template-columns:1fr 1fr;gap:8px;} .metric-value{font-size:20px;} .pipeline{grid-template-columns:1fr;gap:8px;} .two-col{grid-template-columns:1fr;gap:12px;} .form-two,.form-three{grid-template-columns:1fr;gap:10px;} .tw{overflow-x:auto;-webkit-overflow-scrolling:touch;} .tw table{table-layout:auto;min-width:560px;font-size:13px;} th,td{padding:10px 10px;} .btn{min-height:40px;font-size:14px;padding:8px 14px;} input,select,textarea{font-size:16px !important;} .overlay{align-items:stretch;justify-content:stretch;padding:0;} .overlay{overscroll-behavior:contain;} .overlay > *{width:100% !important;max-width:100% !important;height:100dvh;max-height:100dvh;border-radius:0 !important;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;} .cal-header{flex-wrap:wrap;gap:8px;} .cal-nav{flex:1;min-width:0;} .cal-month{font-size:14px;min-width:0;} .cal-view-btn{padding:8px 14px;font-size:14px;min-height:36px;} .legend{display:none !important;} .cal-day{min-height:58px;padding:3px;font-size:11px;} .cal-dow-cell{font-size:10px;padding:5px 0;} .section-title{font-size:11px;} body{font-size:14px;} .desktop-only{display:none !important;} } @media (min-width:901px){ .mobile-menu-btn,.nav-backdrop{display:none !important;} } /* === END MOBILE STYLES === */ </style>
 </head>
 <body>
 <div class="crm"><div class="nav-backdrop" onclick="document.querySelector('.crm').classList.remove('nav-open')"></div>
   <div class="sidebar">
-    <div class="sidebar-logo"><div class="name">Hawaii Natural Clean</div><div class="sub">CRM v1</div><div id="quo-status" style="font-size:10px;color:#999;margin-top:4px;">Quo: checking...</div></div>
+    <div class="sidebar-logo"><img src="/hnc-logo.png" alt="Hawaii Natural Clean" class="sidebar-logo-img"><div class="sidebar-logo-text"><div class="name">Hawaii Natural Clean</div><div class="sub">CRM v1</div><div id="quo-status" class="quo-status">Quo: checking...</div></div></div>
     <div class="nav-section">Main</div>
     <div class="nav-item" onclick="sv('dashboard',this)"><svg class="nav-icon" viewBox="0 0 16 16" fill="none"><rect x="1" y="1" width="6" height="6" rx="1" fill="currentColor"/><rect x="9" y="1" width="6" height="6" rx="1" fill="currentColor"/><rect x="1" y="9" width="6" height="6" rx="1" fill="currentColor" opacity=".4"/><rect x="9" y="9" width="6" height="6" rx="1" fill="currentColor" opacity=".4"/></svg>Dashboard</div>
     <div class="nav-item active" onclick="sv('calendar',this)"><svg class="nav-icon" viewBox="0 0 16 16" fill="none"><rect x="1" y="3" width="14" height="12" rx="2" stroke="currentColor" stroke-width="1.3"/><path d="M5 1v4M11 1v4M1 7h14" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>Calendar</div>
@@ -308,9 +339,9 @@ textarea{font-family:inherit;}
       <h1 id="page-title">Calendar</h1>
       <div class="topbar-actions">
         <div id="global-search-wrap" style="position:relative;display:none;">
-          <input type="text" id="global-search" placeholder="Search..." style="padding:6px 12px 6px 30px;border:1px solid #e0e0dd;border-radius:8px;font-size:12px;font-family:inherit;background:#fafaf8;width:200px;outline:none;" oninput="runGlobalSearch(this.value)" onfocus="this.style.borderColor='#1D9E75'" onblur="this.style.borderColor='#e0e0dd'">
-          <svg style="position:absolute;left:9px;top:50%;transform:translateY(-50%);opacity:.4;" width="13" height="13" viewBox="0 0 16 16" fill="none"><circle cx="6.5" cy="6.5" r="5" stroke="#1a1a1a" stroke-width="1.5"/><path d="M10.5 10.5l3 3" stroke="#1a1a1a" stroke-width="1.5" stroke-linecap="round"/></svg>
-          <div id="search-results" style="display:none;position:absolute;top:36px;right:0;background:#fff;border:1px solid #e0e0dd;border-radius:10px;box-shadow:0 4px 16px rgba(0,0,0,.1);width:300px;max-height:320px;overflow-y:auto;z-index:999;"></div>
+          <input type="text" id="global-search" placeholder="Search..." style="padding:6px 12px 6px 30px;border:1px solid var(--border-strong);border-radius:8px;font-size:12px;font-family:inherit;background:var(--bg-soft);width:200px;outline:none;" oninput="runGlobalSearch(this.value)" onfocus="this.style.borderColor='var(--brand-500)'" onblur="this.style.borderColor='var(--border-strong)'">
+          <svg style="position:absolute;left:9px;top:50%;transform:translateY(-50%);opacity:.4;" width="13" height="13" viewBox="0 0 16 16" fill="none"><circle cx="6.5" cy="6.5" r="5" stroke="var(--text)" stroke-width="1.5"/><path d="M10.5 10.5l3 3" stroke="var(--text)" stroke-width="1.5" stroke-linecap="round"/></svg>
+          <div id="search-results" style="display:none;position:absolute;top:36px;right:0;background:#fff;border:1px solid var(--border-strong);border-radius:10px;box-shadow:0 4px 16px rgba(0,0,0,.1);width:300px;max-height:320px;overflow-y:auto;z-index:999;"></div>
         </div>
         <button class="btn" id="sec-btn">Month view</button>
         <button class="btn btn-primary" id="top-cta" onclick="handleTopCta()">+ New appointment</button>
@@ -327,7 +358,7 @@ textarea{font-family:inherit;}
             <button class="cal-arrow" id="next-btn">&rsaquo;</button>
           </div>
           <div style="display:flex;align-items:center;gap:8px;">
-            <div style="display:flex;border:1px solid #e0e0dd;border-radius:8px;overflow:hidden;">
+            <div style="display:flex;border:1px solid var(--border-strong);border-radius:8px;overflow:hidden;">
               <button class="cal-view-btn active" onclick="setCalView('month',this)" id="btn-month">Month</button>
               <button class="cal-view-btn" onclick="setCalView('week',this)" id="btn-week">Week</button>
               <button class="cal-view-btn" onclick="setCalView('day',this)" id="btn-day">Day</button>
@@ -413,18 +444,18 @@ textarea{font-family:inherit;}
 
           <!-- WON -->
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
-            <div style="width:10px;height:10px;border-radius:50%;background:#1D9E75;"></div>
-            <div style="font-size:13px;font-weight:600;color:#1a1a1a;">Closed won</div>
-            <div style="font-size:11px;color:#999;margin-left:4px;">Booked and converted to clients</div>
+            <div style="width:10px;height:10px;border-radius:50%;background:var(--brand-500);"></div>
+            <div style="font-size:13px;font-weight:600;color:var(--text);">Closed won</div>
+            <div style="font-size:11px;color:var(--text-muted);margin-left:4px;">Booked and converted to clients</div>
           </div>
-          <div style="background:#fafaf8;border:1px solid #e8e8e5;border-radius:10px;overflow:hidden;margin-bottom:20px;">
+          <div style="background:var(--bg-soft);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:20px;">
             <table style="width:100%;border-collapse:collapse;">
-              <thead><tr style="background:#f5f5f3;">
-                <th style="padding:8px 14px;text-align:left;font-size:11px;color:#999;font-weight:500;">Name</th>
-                <th style="padding:8px 14px;text-align:left;font-size:11px;color:#999;font-weight:500;">Service</th>
-                <th style="padding:8px 14px;text-align:left;font-size:11px;color:#999;font-weight:500;">Value</th>
-                <th style="padding:8px 14px;text-align:left;font-size:11px;color:#999;font-weight:500;">Source</th>
-                <th style="padding:8px 14px;text-align:left;font-size:11px;color:#999;font-weight:500;">Date won</th>
+              <thead><tr style="background:var(--bg-soft);">
+                <th style="padding:8px 14px;text-align:left;font-size:11px;color:var(--text-muted);font-weight:500;">Name</th>
+                <th style="padding:8px 14px;text-align:left;font-size:11px;color:var(--text-muted);font-weight:500;">Service</th>
+                <th style="padding:8px 14px;text-align:left;font-size:11px;color:var(--text-muted);font-weight:500;">Value</th>
+                <th style="padding:8px 14px;text-align:left;font-size:11px;color:var(--text-muted);font-weight:500;">Source</th>
+                <th style="padding:8px 14px;text-align:left;font-size:11px;color:var(--text-muted);font-weight:500;">Date won</th>
                 <th style="padding:8px 14px;"></th>
               </tr></thead>
               <tbody id="won-leads-tbody">
@@ -435,17 +466,17 @@ textarea{font-family:inherit;}
           <!-- LOST -->
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
             <div style="width:10px;height:10px;border-radius:50%;background:#e53e3e;"></div>
-            <div style="font-size:13px;font-weight:600;color:#1a1a1a;">Closed lost</div>
-            <div style="font-size:11px;color:#999;margin-left:4px;">Leads that did not convert</div>
+            <div style="font-size:13px;font-weight:600;color:var(--text);">Closed lost</div>
+            <div style="font-size:11px;color:var(--text-muted);margin-left:4px;">Leads that did not convert</div>
           </div>
-          <div style="background:#fafaf8;border:1px solid #e8e8e5;border-radius:10px;overflow:hidden;">
+          <div style="background:var(--bg-soft);border:1px solid var(--border);border-radius:10px;overflow:hidden;">
             <table style="width:100%;border-collapse:collapse;">
-              <thead><tr style="background:#f5f5f3;">
-                <th style="padding:8px 14px;text-align:left;font-size:11px;color:#999;font-weight:500;">Name</th>
-                <th style="padding:8px 14px;text-align:left;font-size:11px;color:#999;font-weight:500;">Service</th>
-                <th style="padding:8px 14px;text-align:left;font-size:11px;color:#999;font-weight:500;">Value</th>
-                <th style="padding:8px 14px;text-align:left;font-size:11px;color:#999;font-weight:500;">Reason</th>
-                <th style="padding:8px 14px;text-align:left;font-size:11px;color:#999;font-weight:500;">Date lost</th>
+              <thead><tr style="background:var(--bg-soft);">
+                <th style="padding:8px 14px;text-align:left;font-size:11px;color:var(--text-muted);font-weight:500;">Name</th>
+                <th style="padding:8px 14px;text-align:left;font-size:11px;color:var(--text-muted);font-weight:500;">Service</th>
+                <th style="padding:8px 14px;text-align:left;font-size:11px;color:var(--text-muted);font-weight:500;">Value</th>
+                <th style="padding:8px 14px;text-align:left;font-size:11px;color:var(--text-muted);font-weight:500;">Reason</th>
+                <th style="padding:8px 14px;text-align:left;font-size:11px;color:var(--text-muted);font-weight:500;">Date lost</th>
                 <th style="padding:8px 14px;"></th>
               </tr></thead>
               <tbody id="lost-leads-tbody">
@@ -476,7 +507,7 @@ textarea{font-family:inherit;}
         </div>
         <div class="two-col">
           <div><div class="section-title">Open tasks</div><div class="task-list" id="open-tasks-list">
-            <div class="ti"><div class="tb"><div class="tt" style="color:#bbb;font-size:11px;">No tasks yet — add tasks from your workflow.</div></div></div>
+            <div class="ti"><div class="tb"><div class="tt" style="color:var(--text-subtle);font-size:11px;">No tasks yet — add tasks from your workflow.</div></div></div>
           </div></div>
           <div><div class="section-title">Completed</div><div class="task-list" id="done-tasks-list">
           </div></div>
@@ -498,7 +529,7 @@ textarea{font-family:inherit;}
               </div>
             </div>
             <div class="chat-messages" id="chat-messages">
-              <div style="text-align:center;color:#bbb;font-size:12px;margin-top:40px;">Select a conversation to start messaging</div>
+              <div style="text-align:center;color:var(--text-subtle);font-size:12px;margin-top:40px;">Select a conversation to start messaging</div>
             </div>
             <div class="chat-input-area" id="chat-input-area" style="display:none;">
               <div class="chat-tabs">
@@ -575,7 +606,7 @@ textarea{font-family:inherit;}
           <div>
             <div class="section-title">Dormant watch</div>
             <div class="task-list" id="dormant-watch-list">
-              <div class="ti"><div class="tb"><div class="tt" style="color:#bbb;font-size:11px;">No dormant clients — data loads from Supabase.</div></div></div>
+              <div class="ti"><div class="tb"><div class="tt" style="color:var(--text-subtle);font-size:11px;">No dormant clients — data loads from Supabase.</div></div></div>
             </div>
           </div>
         </div>
@@ -608,13 +639,13 @@ textarea{font-family:inherit;}
         <div id="stripe-banner" style="background:#fffbeb;border:1px solid #f6e05e;border-radius:10px;padding:12px 16px;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;gap:12px;">
           <div>
             <div style="font-size:13px;font-weight:600;color:#b7791f;">Connect Stripe to enable real payments</div>
-            <div style="font-size:12px;color:#666;margin-top:2px;">Charge cards, send ACH invoices, bulk invoice commercial clients, and auto-collect payments.</div>
+            <div style="font-size:12px;color:var(--text-muted);margin-top:2px;">Charge cards, send ACH invoices, bulk invoice commercial clients, and auto-collect payments.</div>
           </div>
           <button class="btn" style="background:#553c9a;color:#fff;border-color:#553c9a;font-size:12px;flex-shrink:0;padding:7px 14px;" onclick="openStripeConnect()">Connect Stripe</button>
         </div>
 
         <!-- TABS -->
-        <div style="display:flex;gap:0;border-bottom:1px solid #e8e8e5;margin-bottom:16px;">
+        <div style="display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:16px;">
           <div class="pay-tab active" onclick="switchPayTab('pending',this)">Pending charges</div>
           <div class="pay-tab" onclick="switchPayTab('sent',this)">Sent — Unpaid</div>
           <div class="pay-tab" onclick="switchPayTab('invoices',this)">Invoice history</div>
@@ -623,12 +654,12 @@ textarea{font-family:inherit;}
         <!-- PENDING CHARGES -->
         <div id="pay-pending" class="pay-section">
           <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 4px 12px 4px;gap:8px;flex-wrap:wrap;">
-            <div style="color:#666;font-size:12px;">Completed appointments that haven't been invoiced yet. Select multiple from the same client to bundle into one invoice.</div>
+            <div style="color:var(--text-muted);font-size:12px;">Completed appointments that haven't been invoiced yet. Select multiple from the same client to bundle into one invoice.</div>
             <div>
               <button class="btn-primary" id="pending-bulk-invoice-btn" onclick="createBulkInvoiceFromPending()" disabled>Create invoice from selected</button> <button class="btn" style="margin-left:8px;background:#fff7ed;color:#9a3412;border-color:#fdba74;" onclick="openCustomInvoice()">+ Custom invoice</button>
             </div>
           </div>
-          <div style="font-size:12px;color:#999;margin-bottom:10px;">Completed jobs that need payment — sorted by date. Residential clients default to charge now.</div>
+          <div style="font-size:12px;color:var(--text-muted);margin-bottom:10px;">Completed jobs that need payment — sorted by date. Residential clients default to charge now.</div>
           <div class="tw"><table><thead><tr>
             <th style="width:8%"><input type="checkbox" id="pending-check-all" onclick="togglePendingAll(this)"></th>
             <th style="width:24%">Client</th>
@@ -642,7 +673,7 @@ textarea{font-family:inherit;}
 
         <!-- SENT (UNPAID) INVOICES -->
         <div id="pay-sent" class="pay-section hidden">
-          <div style="padding:8px 4px 12px 4px;color:#666;font-size:12px;">Invoices that have been sent but not yet paid. Click to open in Stripe or re-send.</div>
+          <div style="padding:8px 4px 12px 4px;color:var(--text-muted);font-size:12px;">Invoices that have been sent but not yet paid. Click to open in Stripe or re-send.</div>
           <div class="tw"><table><thead><tr>
             <th style="width:22%">Client</th>
             <th style="width:22%">Service</th>
@@ -657,7 +688,7 @@ textarea{font-family:inherit;}
         <!-- ALL INVOICES -->
         <div id="pay-invoices" class="pay-section" style="display:none;">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
-            <div style="font-size:12px;color:#999;">All invoices and payment history</div>
+            <div style="font-size:12px;color:var(--text-muted);">All invoices and payment history</div>
             <button class="btn btn-primary" onclick="openNewInvoice()" style="font-size:12px;padding:5px 11px;">+ New invoice</button>
           </div>
           <div class="tw"><table><thead><tr>
@@ -673,8 +704,8 @@ textarea{font-family:inherit;}
       <div id="view-settings" class="vc">
 
         <!-- BUSINESS INFO -->
-        <div style="background:#fff;border:1px solid #e8e8e5;border-radius:12px;padding:20px;margin-bottom:18px;">
-          <div style="font-size:14px;font-weight:600;color:#1a1a1a;margin-bottom:14px;">Business info</div>
+        <div style="background:#fff;border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:18px;">
+          <div style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:14px;">Business info</div>
           <div class="form-two">
             <div class="form-row"><label>Business name</label><input type="text" id="set-biz-name" value="Hawaii Natural Clean"></div>
             <div class="form-row"><label>From email</label><input type="email" id="set-from-email" value="dane@hawaiinaturalclean.com"></div>
@@ -685,8 +716,8 @@ textarea{font-family:inherit;}
           </div>
           <div class="form-row"><label>Logo URL</label><input type="text" id="set-logo" placeholder="https://hawaiinaturalclean.com/logo.png"></div>
           <div style="display:flex;gap:8px;margin-top:4px;align-items:center;">
-            <div id="set-logo-preview" style="width:48px;height:48px;border:1px solid #e8e8e5;border-radius:8px;display:flex;align-items:center;justify-content:center;overflow:hidden;background:#fafaf8;">
-              <span style="font-size:10px;color:#999;">Logo</span>
+            <div id="set-logo-preview" style="width:48px;height:48px;border:1px solid var(--border);border-radius:8px;display:flex;align-items:center;justify-content:center;overflow:hidden;background:var(--bg-soft);">
+              <span style="font-size:10px;color:var(--text-muted);">Logo</span>
             </div>
             <button class="btn" style="font-size:12px;" onclick="previewLogo()">Preview logo</button>
           </div>
@@ -696,7 +727,7 @@ textarea{font-family:inherit;}
         </div>
 
         <!-- EMAIL TEMPLATES -->
-        <div style="font-size:14px;font-weight:600;color:#1a1a1a;margin-bottom:12px;">Email templates</div>
+        <div style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:12px;">Email templates</div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;" id="template-tabs">
           <button class="template-tab active" onclick="switchTemplate('invoice',this)">Invoice</button>
           <button class="template-tab" onclick="switchTemplate('reminder',this)">Appointment reminder</button>
@@ -708,9 +739,9 @@ textarea{font-family:inherit;}
           <button class="template-tab" onclick="switchTemplate('invoice_reminder',this)">Unpaid invoice</button>
         </div>
 
-        <div style="background:#fff;border:1px solid #e8e8e5;border-radius:12px;padding:20px;">
+        <div style="background:#fff;border:1px solid var(--border);border-radius:12px;padding:20px;">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
-            <div style="font-size:13px;font-weight:600;color:#1a1a1a;" id="template-title">Invoice email</div>
+            <div style="font-size:13px;font-weight:600;color:var(--text);" id="template-title">Invoice email</div>
             <button class="btn" style="font-size:11px;" onclick="resetTemplate()">Reset to default</button>
           </div>
           <div class="form-row"><label>Subject line</label><input type="text" id="tmpl-subject"></div>
@@ -730,7 +761,7 @@ textarea{font-family:inherit;}
           </div>
           <div style="display:flex;gap:8px;">
             <button class="btn btn-primary" style="font-size:12px;" onclick="saveTemplate()">Save template</button>
-            <button class="btn" style="font-size:12px;background:#f0faf6;color:#276749;border-color:#9ae6b4;" onclick="previewTemplate()">Preview email</button>
+            <button class="btn" style="font-size:12px;background:var(--brand-50);color:#276749;border-color:#9ae6b4;" onclick="previewTemplate()">Preview email</button>
           </div>
           <div class="success-bar" id="tmpl-success">Template saved!</div>
         </div>
@@ -739,15 +770,15 @@ textarea{font-family:inherit;}
         <div id="email-preview-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;align-items:center;justify-content:center;">
           <div style="background:#fff;border-radius:12px;width:90%;max-width:600px;max-height:80vh;overflow:auto;padding:24px;position:relative;">
             <button onclick="closeEmailPreview()" style="position:absolute;top:12px;right:12px;background:none;border:none;font-size:18px;cursor:pointer;">&#x2715;</button>
-            <div style="font-size:13px;font-weight:600;margin-bottom:16px;color:#666;">Email preview</div>
+            <div style="font-size:13px;font-weight:600;margin-bottom:16px;color:var(--text-muted);">Email preview</div>
             <div id="email-preview-content"></div>
           </div>
         </div>
 
         <!-- MESSAGE TEMPLATES -->
-        <div style="background:#fff;border:1px solid #e8e8e5;border-radius:12px;padding:20px;margin-top:18px;">
+        <div style="background:#fff;border:1px solid var(--border);border-radius:12px;padding:20px;margin-top:18px;">
           <div class="panel-section" style="margin-top:0;">Invoice Message Templates</div>
-          <div style="font-size:12px;color:#999;margin-bottom:12px;">Customize the messages sent when you invoice clients. Use {client_name}, {amount}, {due_date}, {invoice_link} as placeholders.</div>
+          <div style="font-size:12px;color:var(--text-muted);margin-bottom:12px;">Customize the messages sent when you invoice clients. Use {client_name}, {amount}, {due_date}, {invoice_link} as placeholders.</div>
           <div class="form-row">
             <label>Email subject line</label>
             <input type="text" id="tmpl-email-subject" value="Invoice from Hawaii Natural Clean" style="font-size:12px;">
@@ -813,12 +844,12 @@ Mahalo 🌺</textarea>
         <div style="max-width:680px;margin:0 auto;">
           <div style="text-align:center;padding:20px 0 18px;">
             <div style="width:52px;height:52px;border-radius:50%;background:#f5f0ff;border:1px solid #d6bcfa;display:flex;align-items:center;justify-content:center;margin:0 auto 10px;font-size:24px;">&#10024;</div>
-            <div style="font-size:17px;font-weight:600;color:#1a1a1a;margin-bottom:5px;">Hawaii Natural Clean AI Agent</div>
-            <div style="font-size:12px;color:#999;max-width:420px;margin:0 auto;">Ask anything about your business, create bookings, generate reports, or get smart recommendations.</div>
+            <div style="font-size:17px;font-weight:600;color:var(--text);margin-bottom:5px;">Hawaii Natural Clean AI Agent</div>
+            <div style="font-size:12px;color:var(--text-muted);max-width:420px;margin:0 auto;">Ask anything about your business, create bookings, generate reports, or get smart recommendations.</div>
           </div>
           <div id="agent-messages" style="display:flex;flex-direction:column;gap:12px;margin-bottom:16px;min-height:120px;"></div>
-          <div style="background:#fff;border:1.5px solid #e0e0dd;border-radius:12px;padding:12px 14px;">
-            <textarea id="agent-input" style="width:100%;min-height:68px;border:none;outline:none;font-size:13px;font-family:inherit;resize:none;color:#1a1a1a;background:transparent;" placeholder="Ask anything... e.g. How many bookings this month? Or: Which clients are dormant? Or: Show revenue summary"></textarea>
+          <div style="background:#fff;border:1.5px solid var(--border-strong);border-radius:12px;padding:12px 14px;">
+            <textarea id="agent-input" style="width:100%;min-height:68px;border:none;outline:none;font-size:13px;font-family:inherit;resize:none;color:var(--text);background:transparent;" placeholder="Ask anything... e.g. How many bookings this month? Or: Which clients are dormant? Or: Show revenue summary"></textarea>
             <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;flex-wrap:wrap;gap:8px;">
               <div style="display:flex;gap:5px;flex-wrap:wrap;">
                 <button class="agent-suggestion" onclick="runSuggestion(this)">Bookings this month</button>
@@ -846,7 +877,7 @@ Mahalo 🌺</textarea>
       <div class="form-row"><label>Full name</label>
         <div style="position:relative;">
           <input type="text" id="na-name" placeholder="Search existing client or enter new name..." style="width:100%;" autocomplete="off">
-          <div id="na-name-dropdown" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #e0e0dd;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.12);z-index:200;max-height:220px;overflow-y:auto;margin-top:2px;"></div>
+          <div id="na-name-dropdown" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid var(--border-strong);border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.12);z-index:200;max-height:220px;overflow-y:auto;margin-top:2px;"></div>
         </div>
       </div>
       <div class="form-two">
@@ -893,7 +924,7 @@ Mahalo 🌺</textarea>
         </div>
       </div>
       <div id="na-save-prop-row" class="form-row" style="display:none;">
-        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:normal;font-size:13px;color:#666;">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:normal;font-size:13px;color:var(--text-muted);">
           <input type="checkbox" id="na-save-property"> Save as property for this client
         </label>
       </div>
@@ -927,22 +958,22 @@ Mahalo 🌺</textarea>
         <div class="price-preview-label">Estimated price</div>
         <div class="price-preview-val" id="price-val">$238.22</div>
         <div class="price-preview-breakdown" id="price-breakdown">3.5 hrs × $65 = $227.50 + tax $10.72</div>
-        <div id="na-pricing-rules-display" style="display:none;background:#e6fffa;border:1px solid #9ae6b4;border-radius:8px;padding:8px 11px;margin-top:8px;font-size:11px;color:#276749;"></div>
-        <div id="na-cleaner-pay-line" style="font-size:11px;color:#666;margin-top:2px;display:none;">Cleaner pay: <span id="na-cleaner-pay-val">—</span></div>
+        <div id="na-pricing-rules-display" style="display:none;background:var(--brand-50);border:1px solid #9ae6b4;border-radius:8px;padding:8px 11px;margin-top:8px;font-size:11px;color:#276749;"></div>
+        <div id="na-cleaner-pay-line" style="font-size:11px;color:var(--text-muted);margin-top:2px;display:none;">Cleaner pay: <span id="na-cleaner-pay-val">—</span></div>
         <div style="margin-top:10px;display:flex;align-items:center;gap:10px;">
-          <label style="font-size:13px;color:#666;font-weight:normal;display:flex;align-items:center;gap:6px;cursor:pointer;">
+          <label style="font-size:13px;color:var(--text-muted);font-weight:normal;display:flex;align-items:center;gap:6px;cursor:pointer;">
             <input type="checkbox" id="na-price-override-chk" onchange="calcPrice()"> Override price
           </label>
           <input type="number" id="na-price-override-val" placeholder="Custom $" min="0" step="0.01" style="width:120px;display:none;" oninput="calcPrice()">
         </div>
         <div style="margin-top:6px;display:flex;align-items:center;gap:10px;">
-          <label style="font-size:13px;color:#666;font-weight:normal;display:flex;align-items:center;gap:6px;cursor:pointer;">
+          <label style="font-size:13px;color:var(--text-muted);font-weight:normal;display:flex;align-items:center;gap:6px;cursor:pointer;">
             <input type="checkbox" id="na-cleaner-pay-override-chk" onchange="calcPrice()"> Override cleaner pay
           </label>
           <input type="number" id="na-cleaner-pay-override-val" placeholder="Custom pay $" min="0" step="0.01" style="width:130px;display:none;" oninput="calcPrice()">
         </div>
         <div style="margin-top:6px;display:flex;align-items:center;gap:10px;">
-          <label style="font-size:13px;color:#666;font-weight:normal;display:flex;align-items:center;gap:6px;cursor:pointer;">
+          <label style="font-size:13px;color:var(--text-muted);font-weight:normal;display:flex;align-items:center;gap:6px;cursor:pointer;">
             <input type="checkbox" id="na-hours-override-chk" onchange="calcPrice()"> Override estimated hours
           </label>
           <input type="number" id="na-hours-override-val" placeholder="e.g. 4.5" min="0.5" step="0.5" style="width:100px;display:none;" oninput="calcPrice()">
@@ -999,9 +1030,9 @@ Mahalo 🌺</textarea>
         <div class="panel-section">Pricing</div>
         <div class="info-block">
           <div class="info-row"><span class="info-label">Base price</span><span class="info-val" id="ai-base">—</span></div>
-          <div class="info-row"><span class="info-label">Discount</span><span class="info-val" id="ai-disc" style="color:#1D9E75;">—</span></div>
+          <div class="info-row"><span class="info-label">Discount</span><span class="info-val" id="ai-disc" style="color:var(--brand-500);">—</span></div>
           <div class="info-row"><span class="info-label">Tax (4.712%)</span><span class="info-val" id="ai-tax">—</span></div>
-          <div class="info-row"><span class="info-label" style="font-weight:600;">Total</span><span class="info-val" id="ai-total" style="font-size:15px;color:#1D9E75;">—</span></div>
+          <div class="info-row"><span class="info-label" style="font-weight:600;">Total</span><span class="info-val" id="ai-total" style="font-size:15px;color:var(--brand-500);">—</span></div>
         </div>
         <div class="panel-section">Notes</div>
         <div class="info-block">
@@ -1032,13 +1063,13 @@ Mahalo 🌺</textarea>
           </div>
           <button class="btn" onclick="openApptEditProperty()" style="flex-shrink:0;margin-bottom:0;white-space:nowrap;">Edit property</button>
         </div>
-        <div class="form-row" id="edit-address-row" style="padding-left:12px;border-left:3px solid #e8e8e5;">
+        <div class="form-row" id="edit-address-row" style="padding-left:12px;border-left:3px solid var(--border);">
           <label>Address</label>
           <input type="text" id="edit-address" placeholder="123 Kalani St, Kailua, HI">
         </div>
-        <div id="edit-property-info" style="display:none;background:#f9f9f7;border:1px solid #e8e8e5;border-radius:8px;padding:8px 12px;margin-bottom:10px;font-size:12px;color:#444;">
+        <div id="edit-property-info" style="display:none;background:var(--bg-soft);border:1px solid var(--border);border-radius:8px;padding:8px 12px;margin-bottom:10px;font-size:12px;color:#444;">
           <div id="edit-prop-addr" style="font-weight:500;margin-bottom:2px;"></div>
-          <div id="edit-prop-detail" style="color:#999;font-size:11px;"></div>
+          <div id="edit-prop-detail" style="color:var(--text-muted);font-size:11px;"></div>
           <div id="edit-prop-notes" style="color:#aaa;font-size:11px;margin-top:3px;font-style:italic;display:none;"></div>
         </div>
         <div class="form-two">
@@ -1054,21 +1085,21 @@ Mahalo 🌺</textarea>
           <div class="price-preview-label">Estimated price</div>
           <div class="price-preview-val" id="edit-price-val">—</div>
           <div class="price-preview-breakdown" id="edit-price-breakdown"></div>
-          <div id="edit-cleaner-pay-line" style="font-size:11px;color:#666;margin-top:2px;display:none;">Cleaner pay: <span id="edit-cleaner-pay-val">—</span></div>
+          <div id="edit-cleaner-pay-line" style="font-size:11px;color:var(--text-muted);margin-top:2px;display:none;">Cleaner pay: <span id="edit-cleaner-pay-val">—</span></div>
           <div style="margin-top:10px;display:flex;align-items:center;gap:10px;">
-            <label style="font-size:13px;color:#666;font-weight:normal;display:flex;align-items:center;gap:6px;cursor:pointer;">
+            <label style="font-size:13px;color:var(--text-muted);font-weight:normal;display:flex;align-items:center;gap:6px;cursor:pointer;">
               <input type="checkbox" id="edit-price-override-chk" onchange="calcEditPrice()"> Override price
             </label>
             <input type="number" id="edit-price-override-val" placeholder="Custom $" min="0" step="0.01" style="width:120px;display:none;" oninput="calcEditPrice()">
           </div>
           <div style="margin-top:6px;display:flex;align-items:center;gap:10px;">
-            <label style="font-size:13px;color:#666;font-weight:normal;display:flex;align-items:center;gap:6px;cursor:pointer;">
+            <label style="font-size:13px;color:var(--text-muted);font-weight:normal;display:flex;align-items:center;gap:6px;cursor:pointer;">
               <input type="checkbox" id="edit-cleaner-pay-override-chk" onchange="calcEditPrice()"> Override cleaner pay
             </label>
             <input type="number" id="edit-cleaner-pay-override-val" placeholder="Custom pay $" min="0" step="0.01" style="width:130px;display:none;" oninput="calcEditPrice()">
           </div>
           <div style="margin-top:6px;display:flex;align-items:center;gap:10px;">
-            <label style="font-size:13px;color:#666;font-weight:normal;display:flex;align-items:center;gap:6px;cursor:pointer;">
+            <label style="font-size:13px;color:var(--text-muted);font-weight:normal;display:flex;align-items:center;gap:6px;cursor:pointer;">
               <input type="checkbox" id="edit-hours-override-chk" onchange="calcEditPrice()"> Override hours
             </label>
             <input type="number" id="edit-hours-override-val" placeholder="e.g. 4.5" min="0.5" step="0.5" style="width:100px;display:none;" oninput="calcEditPrice()">
@@ -1091,7 +1122,7 @@ Mahalo 🌺</textarea>
     <div class="panel-body">
       <div id="client-view">
         <div class="profile-top">
-          <div class="profile-avatar" id="cl-av" style="background:#e6fffa;color:#276749;">TM</div>
+          <div class="profile-avatar" id="cl-av" style="background:var(--brand-50);color:#276749;">TM</div>
           <div><div class="profile-name" id="cl-name">—</div><div class="profile-role" id="cl-type">—</div><span class="badge" id="cl-status" style="margin-top:6px;display:inline-block;">Active</span></div>
         </div>
         <div class="panel-section">Contact</div>
@@ -1127,15 +1158,15 @@ Mahalo 🌺</textarea>
           <button onclick="generateClientSummary()" style="font-size:10px;padding:3px 9px;border:1px solid #d6bcfa;border-radius:20px;background:#f5f0ff;color:#553c9a;cursor:pointer;font-family:inherit;">&#x2728; Generate</button>
         </div>
         <div id="cl-ai-summary" style="background:#f5f0ff;border:1px solid #e9d8fd;border-radius:10px;padding:12px 13px;margin-bottom:10px;font-size:12px;color:#44337a;line-height:1.7;display:none;"></div>
-        <div id="cl-ai-thinking" style="display:none;font-size:12px;color:#999;padding:8px 0;">&#x2728; Generating summary...</div>
+        <div id="cl-ai-thinking" style="display:none;font-size:12px;color:var(--text-muted);padding:8px 0;">&#x2728; Generating summary...</div>
 
         <div class="panel-section" style="display:flex;align-items:center;justify-content:space-between;">
           <span>Properties</span>
-          <button onclick="openAddProperty()" style="font-size:10px;padding:3px 9px;border:1px solid #9ae6b4;border-radius:20px;background:#e6fffa;color:#276749;cursor:pointer;font-family:inherit;">+ Add property</button>
+          <button onclick="openAddProperty()" style="font-size:10px;padding:3px 9px;border:1px solid #9ae6b4;border-radius:20px;background:var(--brand-50);color:#276749;cursor:pointer;font-family:inherit;">+ Add property</button>
         </div>
         <div id="cl-properties" style="margin-bottom:4px;"></div>
         <div class="panel-section">Notes</div>
-        <div class="info-block"><div style="font-size:12px;color:#1a1a1a;line-height:1.6;" id="cl-notes">—</div></div>
+        <div class="info-block"><div style="font-size:12px;color:var(--text);line-height:1.6;" id="cl-notes">—</div></div>
         <div class="action-grid" style="margin-top:14px;">
           <button class="action-btn green" onclick="oneClickInvoice('client')">Send invoice</button>
           <button class="action-btn green" id="client-charge-btn" onclick="oneClickCharge('client')">Charge card</button>
@@ -1160,11 +1191,11 @@ Mahalo 🌺</textarea>
         <div class="form-row"><label>Notes</label><textarea id="ced-notes" style="min-height:70px;"></textarea></div>
         <div class="panel-section" style="display:flex;align-items:center;justify-content:space-between;margin-top:14px;">
           <span>Properties</span>
-          <button onclick="openAddProperty()" style="font-size:10px;padding:3px 9px;border:1px solid #9ae6b4;border-radius:20px;background:#e6fffa;color:#276749;cursor:pointer;font-family:inherit;">+ Add property</button>
+          <button onclick="openAddProperty()" style="font-size:10px;padding:3px 9px;border:1px solid #9ae6b4;border-radius:20px;background:var(--brand-50);color:#276749;cursor:pointer;font-family:inherit;">+ Add property</button>
         </div>
         <div id="ced-properties" style="margin-bottom:10px;"></div>
         <div class="panel-section">Pricing rules</div>
-        <div style="font-size:11px;color:#999;margin-bottom:8px;">Leave blank to use standard pricing calculation.</div>
+        <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px;">Leave blank to use standard pricing calculation.</div>
         <div class="form-two">
           <div class="form-row">
             <label>Flat rate ($/clean)</label>
@@ -1191,7 +1222,7 @@ Mahalo 🌺</textarea>
     <div class="panel-body">
       <div id="lead-view">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
-          <div><div style="font-size:16px;font-weight:600;" id="lead-name">—</div><div style="font-size:12px;color:#999;margin-top:2px;" id="lead-type-line">—</div></div>
+          <div><div style="font-size:16px;font-weight:600;" id="lead-name">—</div><div style="font-size:12px;color:var(--text-muted);margin-top:2px;" id="lead-type-line">—</div></div>
           <span class="badge" id="lead-stage-badge" style="font-size:11px;padding:3px 9px;">New inquiry</span>
         </div>
         <div class="panel-section">Contact</div>
@@ -1203,7 +1234,7 @@ Mahalo 🌺</textarea>
         </div>
         <div class="panel-section">Opportunity</div>
         <div class="info-block">
-          <div class="info-row"><span class="info-label">Est. value</span><span class="info-val" id="lead-value" style="color:#1D9E75;font-size:14px;">—</span></div>
+          <div class="info-row"><span class="info-label">Est. value</span><span class="info-val" id="lead-value" style="color:var(--brand-500);font-size:14px;">—</span></div>
           <div class="info-row"><span class="info-label">Service type</span><span class="info-val" id="lead-service">—</span></div>
           <div class="info-row"><span class="info-label">Property size</span><span class="info-val" id="lead-sqft">—</span></div>
           <div class="info-row"><span class="info-label">Lead source</span><span class="info-val" id="lead-source">—</span></div>
@@ -1216,13 +1247,13 @@ Mahalo 🌺</textarea>
           <div class="info-row"><span class="info-label">Assigned to</span><span class="info-val" id="lead-assigned">—</span></div>
         </div>
         <div class="panel-section">AI summary</div>
-        <div id="lead-ai-thinking" style="display:none;font-size:12px;color:#999;padding:8px 0;">&#x2728; Generating summary...</div>
+        <div id="lead-ai-thinking" style="display:none;font-size:12px;color:var(--text-muted);padding:8px 0;">&#x2728; Generating summary...</div>
         <div id="lead-ai-summary" style="background:#f5f0ff;border:1px solid #e9d8fd;border-radius:10px;padding:12px 13px;margin-bottom:10px;font-size:12px;color:#44337a;line-height:1.7;display:none;"></div>
         <div class="panel-section">Notes</div>
-        <div class="info-block"><div style="font-size:12px;color:#1a1a1a;line-height:1.6;" id="lead-notes">—</div></div>
+        <div class="info-block"><div style="font-size:12px;color:var(--text);line-height:1.6;" id="lead-notes">—</div></div>
         <div class="panel-section">Send quote</div>
         <div class="info-block" style="padding:12px 13px;">
-          <div style="font-size:11px;color:#999;margin-bottom:8px;">Generate and send a quote to this lead</div>
+          <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px;">Generate and send a quote to this lead</div>
           <div class="form-two" style="margin-bottom:8px;">
             <div class="form-row" style="margin:0;"><label>Est. price</label><input type="text" id="quote-price" placeholder="e.g. $950/mo"></div>
             <div class="form-row" style="margin:0;"><label>Valid for</label><select id="quote-validity"><option>7 days</option><option>14 days</option><option>30 days</option></select></div>
@@ -1273,7 +1304,7 @@ Mahalo 🌺</textarea>
     <div class="panel-body">
       <div id="cleaner-view">
         <div class="profile-top">
-          <div class="profile-avatar" id="cp-av" style="background:#9FE1CB;color:#085041;">KM</div>
+          <div class="profile-avatar" id="cp-av" style="background:var(--brand-200);color:var(--brand-700);">KM</div>
           <div><div class="profile-name" id="cp-name">—</div><div class="profile-role" id="cp-role">—</div><span class="badge bac" id="cp-status" style="margin-top:6px;display:inline-block;">Active</span></div>
         </div>
         <div class="panel-section">Contact</div>
@@ -1715,7 +1746,7 @@ async function loadAllData(){
     const cleaners=await dbLoadCleaners();
     cleaners.forEach(function(c){
       const initials=c.name.split(' ').map(function(w){return w[0]||'';}).join('').slice(0,2).toUpperCase();
-      const colors=[['#9FE1CB','#085041'],['#B5D4F4','#0C447C'],['#CECBF6','#3C3489'],['#FAC775','#633806'],['#F5C4B3','#712B13'],['#F4C0D1','#72243E']];
+      const colors=[['var(--brand-200)','var(--brand-700)'],['#B5D4F4','#0C447C'],['#CECBF6','#3C3489'],['#FAC775','#633806'],['#F5C4B3','#712B13'],['#F4C0D1','#72243E']];
       const col=colors[Object.keys(cleanerDB).length%colors.length];
       cleanerDB[c.id]={
         name:c.name, role:(c.role||'Cleaner')+' · '+(c.island||'Oahu'),
@@ -1826,7 +1857,7 @@ async function checkQuoStatus(){
     });
     var data=await response.json();
     if(data.success){
-      if(statusEl){statusEl.textContent='Quo: connected';statusEl.style.color='#1D9E75';}
+      if(statusEl){statusEl.textContent='Quo: connected';statusEl.style.color='var(--brand-500)';}
     } else {
       if(statusEl){statusEl.textContent='Quo: check API key';statusEl.style.color='#e53e3e';}
     }
@@ -2125,11 +2156,11 @@ function calBuildTimeGrid(container,totalHeight){
   for(var h=CAL_START_HOUR;h<=CAL_END_HOUR;h++){
     var top=(h-CAL_START_HOUR)*CAL_PX_HR;
     var line=document.createElement('div');
-    line.style.cssText='position:absolute;left:0;right:0;top:'+top+'px;border-top:1px solid #e8e8e5;pointer-events:none;';
+    line.style.cssText='position:absolute;left:0;right:0;top:'+top+'px;border-top:1px solid var(--border);pointer-events:none;';
     container.appendChild(line);
     if(h<CAL_END_HOUR){
       var half=document.createElement('div');
-      half.style.cssText='position:absolute;left:0;right:0;top:'+(top+30)+'px;border-top:1px dashed #f0f0ee;pointer-events:none;';
+      half.style.cssText='position:absolute;left:0;right:0;top:'+(top+30)+'px;border-top:1px dashed var(--border);pointer-events:none;';
       container.appendChild(half);
     }
   }
@@ -2137,13 +2168,13 @@ function calBuildTimeGrid(container,totalHeight){
 
 function calBuildTimeLabelCol(height){
   var col=document.createElement('div');
-  col.style.cssText='width:55px;flex-shrink:0;position:relative;height:'+height+'px;border-right:1px solid #e8e8e5;background:#fff;';
+  col.style.cssText='width:55px;flex-shrink:0;position:relative;height:'+height+'px;border-right:1px solid var(--border);background:#fff;';
   for(var h=CAL_START_HOUR;h<=CAL_END_HOUR;h++){
     var top=(h-CAL_START_HOUR)*CAL_PX_HR;
     var lbl=document.createElement('div');
     var dh=h%12||12;
     var ampm=h>=12?'pm':'am';
-    lbl.style.cssText='position:absolute;right:6px;font-size:10px;color:#bbb;line-height:1;white-space:nowrap;';
+    lbl.style.cssText='position:absolute;right:6px;font-size:10px;color:var(--text-subtle);line-height:1;white-space:nowrap;';
     if(h===CAL_START_HOUR){
       lbl.style.top=(top+3)+'px';
     } else {
@@ -2245,21 +2276,21 @@ function renderWeek(){
   grid.style.cssText='';
 
   var outerWrap=document.createElement('div');
-  outerWrap.style.cssText='border:1px solid #e8e8e5;border-radius:10px;overflow:hidden;background:#fff;';
+  outerWrap.style.cssText='border:1px solid var(--border);border-radius:10px;overflow:hidden;background:#fff;';
 
   // Sticky header: corner + 7 day headers
   var headerRow=document.createElement('div');
-  headerRow.style.cssText='display:flex;border-bottom:1px solid #e8e8e5;background:#fafaf8;position:sticky;top:0;z-index:10;';
+  headerRow.style.cssText='display:flex;border-bottom:1px solid var(--border);background:var(--bg-soft);position:sticky;top:0;z-index:10;';
   var cornerCell=document.createElement('div');
-  cornerCell.style.cssText='width:55px;flex-shrink:0;border-right:1px solid #e8e8e5;';
+  cornerCell.style.cssText='width:55px;flex-shrink:0;border-right:1px solid var(--border);';
   headerRow.appendChild(cornerCell);
   for(var di=0;di<7;di++){
     var d=new Date(startDate);d.setDate(d.getDate()+di);
     var isT=d.toDateString()===today.toDateString();
     var hdr=document.createElement('div');
-    hdr.style.cssText='flex:1;text-align:center;padding:8px 4px;border-right:1px solid #f0f0ee;cursor:pointer;user-select:none;'+(isT?'background:#f0faf6;':'');
-    hdr.innerHTML='<div style="font-size:11px;color:#999;text-transform:uppercase;letter-spacing:.05em;">'+days[di]+'</div>'
-      +'<div style="font-size:16px;font-weight:700;'+(isT?'color:#1D9E75;':'color:#1a1a1a;')+'margin-top:2px;">'+d.getDate()+'</div>';
+    hdr.style.cssText='flex:1;text-align:center;padding:8px 4px;border-right:1px solid var(--border);cursor:pointer;user-select:none;'+(isT?'background:var(--brand-50);':'');
+    hdr.innerHTML='<div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;">'+days[di]+'</div>'
+      +'<div style="font-size:16px;font-weight:700;'+(isT?'color:var(--brand-500);':'color:var(--text);')+'margin-top:2px;">'+d.getDate()+'</div>';
     (function(day){
       hdr.addEventListener('click',function(){
         curDay=day.getDate();curMonth=day.getMonth()+1;curYear=day.getFullYear();
@@ -2286,7 +2317,7 @@ function renderWeek(){
     var isT=d.toDateString()===today.toDateString();
 
     var col=document.createElement('div');
-    col.style.cssText='flex:1;position:relative;height:'+CAL_TOTAL_H+'px;border-right:1px solid #f0f0ee;'+(isT?'background:#fafffe;':'background:#fff;');
+    col.style.cssText='flex:1;position:relative;height:'+CAL_TOTAL_H+'px;border-right:1px solid var(--border);'+(isT?'background:#fafffe;':'background:#fff;');
     calBuildTimeGrid(col,CAL_TOTAL_H);
 
     var appts=da.map(function(a){
@@ -2318,13 +2349,13 @@ function renderDay(day){
   grid.innerHTML='';
 
   var outerWrap=document.createElement('div');
-  outerWrap.style.cssText='border:1px solid #e8e8e5;border-radius:10px;overflow:hidden;background:#fff;';
+  outerWrap.style.cssText='border:1px solid var(--border);border-radius:10px;overflow:hidden;background:#fff;';
 
   // Header
   var hdr=document.createElement('div');
-  hdr.style.cssText='background:#fafaf8;padding:10px 14px;border-bottom:1px solid #e8e8e5;display:flex;justify-content:space-between;align-items:center;';
-  hdr.innerHTML='<div style="font-size:13px;font-weight:600;color:#1a1a1a;">'+dayNames[date.getDay()]+', '+MONTHS[curMonth-1]+' '+day+'</div>'
-    +'<div style="font-size:12px;color:#999;">'+da.length+' appointment'+(da.length!==1?'s':'')+'</div>';
+  hdr.style.cssText='background:var(--bg-soft);padding:10px 14px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;';
+  hdr.innerHTML='<div style="font-size:13px;font-weight:600;color:var(--text);">'+dayNames[date.getDay()]+', '+MONTHS[curMonth-1]+' '+day+'</div>'
+    +'<div style="font-size:12px;color:var(--text-muted);">'+da.length+' appointment'+(da.length!==1?'s':'')+'</div>';
   outerWrap.appendChild(hdr);
 
   // Scrollable area
@@ -2892,7 +2923,7 @@ function openClient(id){
   currentClientId=id;
   var initials=d.name.split(' ').map(function(w){return w[0];}).join('').slice(0,2).toUpperCase();
   var av=document.getElementById('cl-av');av.textContent=initials;
-  av.style.background=d.type==='Commercial'?'#ebf5ff':'#e6fffa';
+  av.style.background=d.type==='Commercial'?'#ebf5ff':'var(--brand-50)';
   av.style.color=d.type==='Commercial'?'#2b6cb0':'#276749';
   document.getElementById('cl-title').textContent=d.name;
   document.getElementById('cl-name').textContent=d.name;
@@ -2906,7 +2937,7 @@ function openClient(id){
   var hist=document.getElementById('cl-history');hist.innerHTML='';
   d.history.forEach(function(h){
     var row=document.createElement('div');row.className='job-history-item';
-    row.innerHTML='<div><div style="font-size:12px;font-weight:500;">'+h.date+' — '+h.svc+'</div></div><div style="text-align:right;"><div style="font-size:12px;font-weight:600;color:#1D9E75;">'+h.amt+'</div><div style="font-size:10px;color:'+(h.paid?'#276749':'#b7791f')+';">'+(h.paid?'Paid':'Pending')+'</div></div>';
+    row.innerHTML='<div><div style="font-size:12px;font-weight:500;">'+h.date+' — '+h.svc+'</div></div><div style="text-align:right;"><div style="font-size:12px;font-weight:600;color:var(--brand-500);">'+h.amt+'</div><div style="font-size:10px;color:'+(h.paid?'#276749':'#b7791f')+';">'+(h.paid?'Paid':'Pending')+'</div></div>';
     hist.appendChild(row);
   });
   // Render properties
@@ -2915,17 +2946,17 @@ function openClient(id){
     propsEl.innerHTML = '';
     var props = d.properties || [];
     if(props.length === 0){
-      propsEl.innerHTML = '<div style="font-size:12px;color:#999;padding:4px 0;">No properties saved yet.</div>';
+      propsEl.innerHTML = '<div style="font-size:12px;color:var(--text-muted);padding:4px 0;">No properties saved yet.</div>';
     } else {
       props.forEach(function(p, idx){
         var card = document.createElement('div');
-        card.style.cssText = 'background:#fafaf8;border:1px solid #e8e8e5;border-radius:8px;padding:10px 12px;margin-bottom:6px;';
+        card.style.cssText = 'background:var(--bg-soft);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:6px;';
         card.innerHTML = '<div style="display:flex;justify-content:space-between;align-items:flex-start;">'
           +'<div>'
-            +'<div style="font-size:12px;font-weight:600;color:#1a1a1a;">'+p.address+'</div>'
-            +'<div style="font-size:11px;color:#666;margin-top:2px;">'+p.beds+' bed / '+p.baths+' bath'+(p.sqft?' · '+p.sqft:'')+'</div>'
-            +'<div style="font-size:12px;color:#1D9E75;font-weight:600;margin-top:3px;">$'+p.price+' per clean</div>'
-            +(p.notes?'<div style="font-size:11px;color:#999;margin-top:2px;">'+p.notes+'</div>':'')
+            +'<div style="font-size:12px;font-weight:600;color:var(--text);">'+p.address+'</div>'
+            +'<div style="font-size:11px;color:var(--text-muted);margin-top:2px;">'+p.beds+' bed / '+p.baths+' bath'+(p.sqft?' · '+p.sqft:'')+'</div>'
+            +'<div style="font-size:12px;color:var(--brand-500);font-weight:600;margin-top:3px;">$'+p.price+' per clean</div>'
+            +(p.notes?'<div style="font-size:11px;color:var(--text-muted);margin-top:2px;">'+p.notes+'</div>':'')
           +'</div>'
           +'<div style="display:flex;gap:6px;">'
             +'<button onclick="editProperty('+idx+')" style="font-size:10px;color:#2b6cb0;background:none;border:none;cursor:pointer;padding:2px;">Edit</button>'
@@ -2959,14 +2990,14 @@ function showClientEdit(){
     if(cedProps){
       var props=c.properties||[];
       if(props.length===0){
-        cedProps.innerHTML='<div style="font-size:11px;color:#999;padding:4px 0;">No properties yet. Click + Add property.</div>';
+        cedProps.innerHTML='<div style="font-size:11px;color:var(--text-muted);padding:4px 0;">No properties yet. Click + Add property.</div>';
       } else {
         cedProps.innerHTML='';
         props.forEach(function(p,idx){
           var row=document.createElement('div');
-          row.style.cssText='display:flex;align-items:center;justify-content:space-between;background:#fafaf8;border:1px solid #e8e8e5;border-radius:8px;padding:8px 11px;margin-bottom:5px;';
-          row.innerHTML='<div><div style="font-size:11px;font-weight:600;color:#1a1a1a;">'+p.address+'</div>'
-            +'<div style="font-size:10px;color:#999;margin-top:1px;">'+p.beds+'bd / '+p.baths+'ba'+(p.price?' · $'+p.price+'/clean':'')+'</div></div>'
+          row.style.cssText='display:flex;align-items:center;justify-content:space-between;background:var(--bg-soft);border:1px solid var(--border);border-radius:8px;padding:8px 11px;margin-bottom:5px;';
+          row.innerHTML='<div><div style="font-size:11px;font-weight:600;color:var(--text);">'+p.address+'</div>'
+            +'<div style="font-size:10px;color:var(--text-muted);margin-top:1px;">'+p.beds+'bd / '+p.baths+'ba'+(p.price?' · $'+p.price+'/clean':'')+'</div></div>'
             +'<div style="display:flex;gap:6px;">'
             +'<button style="font-size:10px;color:#2b6cb0;background:none;border:none;cursor:pointer;padding:2px 4px;" onclick="editProperty('+idx+')">Edit</button>'
             +'<button style="font-size:10px;color:#e53e3e;background:none;border:none;cursor:pointer;padding:2px 4px;" onclick="removeProperty('+idx+')">&#x2715;</button>'
@@ -3034,7 +3065,7 @@ function openLead(id){
   document.getElementById('lead-name').textContent=d.name;
   document.getElementById('lead-type-line').textContent=d.service+' · '+d.sqft;
   var sb=document.getElementById('lead-stage-badge');sb.textContent=d.stage;
-  var stageColors={'New inquiry':'background:#ebf5ff;color:#2b6cb0;','Quoted':'background:#fffbeb;color:#b7791f;','Follow-up':'background:#fff5f5;color:#c53030;','Closed won':'background:#e6fffa;color:#276749;','Closed lost':'background:#f5f5f3;color:#999;'};
+  var stageColors={'New inquiry':'background:#ebf5ff;color:#2b6cb0;','Quoted':'background:#fffbeb;color:#b7791f;','Follow-up':'background:#fff5f5;color:#c53030;','Closed won':'background:var(--brand-50);color:#276749;','Closed lost':'background:var(--bg-soft);color:var(--text-muted);'};
   sb.style.cssText=stageColors[d.stage]||'';
   ['contact','phone','email','address','value','service','sqft','source','date','action','due','assigned','notes'].forEach(function(f){
     var el=document.getElementById('lead-'+f);if(el)el.textContent=d[f]||'—';
@@ -3219,7 +3250,7 @@ function closeOverlay(id){document.getElementById(id).classList.add('hidden');}
 function showToast(overlayId,msg){
   var panel=document.getElementById(overlayId).querySelector('.panel-body');
   var t=document.createElement('div');
-  t.style.cssText='background:#e6fffa;border:1px solid #9ae6b4;border-radius:8px;padding:8px 12px;font-size:12px;color:#276749;margin-bottom:12px;';
+  t.style.cssText='background:var(--brand-50);border:1px solid #9ae6b4;border-radius:8px;padding:8px 12px;font-size:12px;color:#276749;margin-bottom:12px;';
   t.textContent=msg;
   panel.insertBefore(t,panel.firstChild);
   setTimeout(function(){t.remove();},3000);
@@ -4172,7 +4203,7 @@ function setPeriod(btn){
         if(!tbody) return;
         var period = _currentPeriod();
         if(!period){
-          tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#999;padding:24px">Loading pay periods…</td></tr>';
+          tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:24px">Loading pay periods…</td></tr>';
           return;
         }
         if(lbl) lbl.textContent = period.label + '  ·  Payday: ' + _fmtShort(period.payday);
@@ -4191,7 +4222,7 @@ function setPeriod(btn){
         var periodRows = _payrollPeriodRows[period.key] || {};
         var rows = Object.entries(totals);
         if(rows.length===0){
-          tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#999;padding:24px">No hours logged for this pay period.</td></tr>';
+          tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:24px">No hours logged for this pay period.</td></tr>';
         } else {
           tbody.innerHTML = rows.map(function(e){
             var cname = e[0], t = e[1];
@@ -4249,7 +4280,7 @@ function setPeriod(btn){
         var appts = _apptsInPeriod(period).filter(function(a){return a.cleaner===cname;}).sort(function(a,b){return a._date.localeCompare(b._date);});
         var det = document.getElementById('payroll-appts-detail');
         if(!det) return;
-        if(appts.length===0){ det.innerHTML = '<div style="color:#999;padding:8px">No appointments for '+cname+' in this period.</div>'; return; }
+        if(appts.length===0){ det.innerHTML = '<div style="color:var(--text-muted);padding:8px">No appointments for '+cname+' in this period.</div>'; return; }
         det.innerHTML = '<div class="section-title" style="margin-top:8px">'+cname+' — '+period.label+'</div>' +
           '<div class="tw"><table><thead><tr><th>Date</th><th>Client</th><th>Hours</th><th>Pay</th></tr></thead><tbody>' +
           appts.map(function(a){
@@ -4664,7 +4695,7 @@ function saveNewCleaner(){
   if(!name){document.getElementById('ncl-name').style.border='1px solid #e53e3e';document.getElementById('ncl-name').focus();return;}
   document.getElementById('ncl-name').style.border='';
   var initials=name.split(' ').map(function(w){return w[0]||'';}).join('').slice(0,2).toUpperCase();
-  var colors=[['#9FE1CB','#085041'],['#B5D4F4','#0C447C'],['#CECBF6','#3C3489'],['#FAC775','#633806'],['#F5C4B3','#712B13'],['#F4C0D1','#72243E']];
+  var colors=[['var(--brand-200)','var(--brand-700)'],['#B5D4F4','#0C447C'],['#CECBF6','#3C3489'],['#FAC775','#633806'],['#F5C4B3','#712B13'],['#F4C0D1','#72243E']];
   var c=colors[Object.keys(cleanerDB).length%colors.length];
   var id=name.toLowerCase().replace(/[^a-z0-9]/g,'-')+'-'+Date.now();
   var role=document.getElementById('ncl-role').value;
@@ -5139,7 +5170,7 @@ function saveStripeConnect(){
   var s=document.getElementById('stripe-success');s.classList.add('show');
   // Update the warning banner
   var banner=document.querySelector('#view-payments .metrics .metric:last-child .metric-value');
-  if(banner){banner.textContent='Connected';banner.style.color='#1D9E75';banner.nextElementSibling.textContent='Stripe active';}
+  if(banner){banner.textContent='Connected';banner.style.color='var(--brand-500)';banner.nextElementSibling.textContent='Stripe active';}
   setTimeout(function(){s.classList.remove('show');closeOverlay('stripe-overlay');},2000);
 }
 
@@ -5196,7 +5227,7 @@ function updateInvoiceStatus(client,amount,status){
 
 function showPaymentToast(msg,callback,type){
   var toast=document.createElement('div');
-  toast.style.cssText='position:fixed;bottom:24px;right:24px;background:'+(type==='success'?'#e6fffa':'#fff')+';border:1px solid '+(type==='success'?'#9ae6b4':'#e8e8e5')+';border-radius:10px;padding:12px 16px;font-size:13px;color:'+(type==='success'?'#276749':'#1a1a1a')+';z-index:9999;box-shadow:0 4px 16px rgba(0,0,0,.1);max-width:320px;';
+  toast.style.cssText='position:fixed;bottom:24px;right:24px;background:'+(type==='success'?'var(--brand-50)':'#fff')+';border:1px solid '+(type==='success'?'#9ae6b4':'var(--border)')+';border-radius:10px;padding:12px 16px;font-size:13px;color:'+(type==='success'?'#276749':'var(--text)')+';z-index:9999;box-shadow:0 4px 16px rgba(0,0,0,.1);max-width:320px;';
   toast.textContent=msg;
   document.body.appendChild(toast);
   setTimeout(function(){
@@ -5226,7 +5257,7 @@ async function renderPaymentsSection(){ checkStripeConnectivity(); refreshCardOn
     if (pendingTbody) {
       pendingTbody.innerHTML = '';
     if (appts.length === 0) {
-      pendingTbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#999;padding:20px;">No pending charges — all completed bookings have been invoiced.</td></tr>';
+      pendingTbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:20px;">No pending charges — all completed bookings have been invoiced.</td></tr>';
     } else {
       // Group appointments by client (id or name)
       var groups = {};
@@ -5262,8 +5293,8 @@ async function renderPaymentsSection(){ checkStripeConnectivity(); refreshCardOn
         hr.setAttribute('data-client-name', g.name);
         hr.setAttribute('data-amount', g.total.toFixed(2));
         if (!multi) hr.setAttribute('data-appt-id', g.appts[0].id);
-        hr.style.cssText = 'background:#fafaf8;';
-        var caret = multi ? '<span class="caret" style="display:inline-block;width:14px;color:#666;cursor:pointer;transition:transform .15s;">▶</span>' : '<span style="display:inline-block;width:14px;"></span>';
+        hr.style.cssText = 'background:var(--bg-soft);';
+        var caret = multi ? '<span class="caret" style="display:inline-block;width:14px;color:var(--text-muted);cursor:pointer;transition:transform .15s;">▶</span>' : '<span style="display:inline-block;width:14px;"></span>';
         var jobsLabel = multi ? (g.appts.length + ' jobs bundled') : (g.appts[0].service || 'Cleaning');
         var dateLabel = multi ? '—' : (g.appts[0].date || '');
         var actionBtns = '';
@@ -5273,7 +5304,7 @@ async function renderPaymentsSection(){ checkStripeConnectivity(); refreshCardOn
         actionBtns += '<button class="btn-secondary" onclick="event.stopPropagation();invoicePendingGroup(this)">' + (multi ? 'Invoice all' : 'Send invoice') + '</button>';
         hr.innerHTML =
           '<td style="vertical-align:middle;">' + caret + ' <input type="checkbox" class="pending-row-check" onclick="event.stopPropagation();updateBulkInvoiceBtn();"></td>' +
-          '<td style="font-weight:600;">' + escapeHtmlPay(g.name) + (multi ? ' <span style="color:#999;font-weight:400;font-size:11px;">(' + g.appts.length + ')</span>' : '') + '</td>' +
+          '<td style="font-weight:600;">' + escapeHtmlPay(g.name) + (multi ? ' <span style="color:var(--text-muted);font-weight:400;font-size:11px;">(' + g.appts.length + ')</span>' : '') + '</td>' +
           '<td>' + escapeHtmlPay(jobsLabel) + '</td>' +
           '<td>' + dateLabel + '</td>' +
           '<td style="font-weight:600;">' + totalStr + '</td>' +
@@ -5303,7 +5334,7 @@ async function renderPaymentsSection(){ checkStripeConnectivity(); refreshCardOn
             subActions += '<button class="btn-secondary" style="font-size:11px;padding:4px 8px;" onclick="invoiceSinglePending(this)">Invoice</button>';
             sr.innerHTML =
               '<td style="padding-left:34px;"></td>' +
-              '<td style="color:#666;font-size:12px;">↳ ' + escapeHtmlPay(g.name) + '</td>' +
+              '<td style="color:var(--text-muted);font-size:12px;">↳ ' + escapeHtmlPay(g.name) + '</td>' +
               '<td>' + escapeHtmlPay(a.service || 'Cleaning') + '</td>' +
               '<td>' + (a.date || '') + '</td>' +
               '<td>' + amtStr + '</td>' +
@@ -5327,7 +5358,7 @@ async function renderPaymentsSection(){ checkStripeConnectivity(); refreshCardOn
     if (sentTbody) {
       sentTbody.innerHTML = '';
       if (unpaid.length === 0) {
-        sentTbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#999;padding:20px;">No unpaid invoices.</td></tr>';
+        sentTbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:20px;">No unpaid invoices.</td></tr>';
       } else {
         unpaid.forEach(function(i){
           var tr = document.createElement('tr');
@@ -5351,7 +5382,7 @@ async function renderPaymentsSection(){ checkStripeConnectivity(); refreshCardOn
     if (invTbody) {
       invTbody.innerHTML = '';
       if (invoices.length === 0) {
-        invTbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#999;padding:20px;">No invoices yet.</td></tr>';
+        invTbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:20px;">No invoices yet.</td></tr>';
       } else {
         invoices.forEach(function(i){
           var tr = document.createElement('tr');
@@ -5744,7 +5775,7 @@ async function checkStripeConnectivity(){
       try { window.stripeConnected = true; } catch(e){}
       var badge = document.getElementById('stripe-status-badge');
       var sub = document.getElementById('stripe-status-sub');
-      if (badge) { badge.textContent = 'Connected'; badge.style.color = '#1D9E75'; }
+      if (badge) { badge.textContent = 'Connected'; badge.style.color = 'var(--brand-500)'; }
       if (sub) { sub.textContent = data.keyType + ' mode'; }
       var banner = document.getElementById('stripe-banner');
       if (banner) banner.style.display = 'none';
@@ -5866,8 +5897,8 @@ function addCustomInvoiceLine(){
   var row = document.createElement('div');
   row.className = 'custom-inv-line';
   row.style.cssText = 'display:flex;gap:6px;align-items:center;margin-bottom:6px;';
-  row.innerHTML = '<input type="text" class="ci-desc" placeholder="Description (e.g. Daily commercial cleaning — Apr 2026)" style="flex:1;padding:6px 8px;border:1px solid #e0e0dd;border-radius:6px;font-size:13px;">' +
-    '<input type="number" step="0.01" min="0" class="ci-amt" placeholder="0.00" style="width:110px;padding:6px 8px;border:1px solid #e0e0dd;border-radius:6px;font-size:13px;text-align:right;" oninput="recalcCustomInvoiceTotals()">' +
+  row.innerHTML = '<input type="text" class="ci-desc" placeholder="Description (e.g. Daily commercial cleaning — Apr 2026)" style="flex:1;padding:6px 8px;border:1px solid var(--border-strong);border-radius:6px;font-size:13px;">' +
+    '<input type="number" step="0.01" min="0" class="ci-amt" placeholder="0.00" style="width:110px;padding:6px 8px;border:1px solid var(--border-strong);border-radius:6px;font-size:13px;text-align:right;" oninput="recalcCustomInvoiceTotals()">' +
     '<button type="button" class="btn" style="padding:4px 8px;font-size:12px;" onclick="this.parentNode.remove();recalcCustomInvoiceTotals();">✕</button>';
   container.appendChild(row);
 }
@@ -5912,7 +5943,7 @@ async function refreshCustomInvoiceAppts(){
       label.style.cssText = 'display:flex;align-items:center;gap:8px;padding:4px 0;cursor:pointer;';
       label.innerHTML = '<input type="checkbox" class="ci-attach-appt" value="' + a.id + '" data-amount="' + (a.total_price || 0) + '" data-desc="' + ((a.service || 'Cleaning') + ' — ' + (a.date || '')).replace(/"/g, '&quot;') + '">' +
         '<span style="flex:1;">' + (a.service || 'Cleaning') + ' — ' + (a.date || '') + '</span>' +
-        '<span style="color:#666;">$' + parseFloat(a.total_price || 0).toFixed(2) + '</span>';
+        '<span style="color:var(--text-muted);">$' + parseFloat(a.total_price || 0).toFixed(2) + '</span>';
       list.appendChild(label);
     });
   } catch(e){ console.warn('[refreshCustomInvoiceAppts] err:', e); }
@@ -6051,7 +6082,7 @@ function sendInvoiceRow(btn, client, amount, terms){
 function addToBulk(client, service, date, amount, btn){
   var tbody=document.getElementById('bulk-tbody');
   var tr=document.createElement('tr');
-  tr.innerHTML='<td><input type="checkbox" checked style="accent-color:#1D9E75;"></td>'
+  tr.innerHTML='<td><input type="checkbox" checked style="accent-color:var(--brand-500);"></td>'
     +'<td>'+client+'</td><td>'+service+'</td><td>'+date+'</td><td>'+amount+'</td>'
     +'<td><button class="btn" style="font-size:11px;padding:2px 7px;" onclick="removeBulkRow(this)">Remove</button></td>';
   tr.querySelector('input[type=checkbox]').addEventListener('change', updateBulkTotal);
@@ -6178,7 +6209,7 @@ function openApptInvoice(){
   info.innerHTML='<div class="info-row"><span class="info-label">Client</span><span class="info-val">'+currentAppt.n+'</span></div>'
     +'<div class="info-row"><span class="info-label">Service</span><span class="info-val">'+(cd.service||'Standard clean')+'</span></div>'
     +'<div class="info-row"><span class="info-label">Date</span><span class="info-val">'+document.getElementById('ai-date').textContent+'</span></div>'
-    +'<div class="info-row"><span class="info-label">Amount</span><span class="info-val" style="color:#1D9E75;font-size:14px;font-weight:700;">'+(cd.totalPrice!=null&&cd.totalPrice!==''?'$'+parseFloat(cd.totalPrice||0).toFixed(2):'—')+'</span></div>'
+    +'<div class="info-row"><span class="info-label">Amount</span><span class="info-val" style="color:var(--brand-500);font-size:14px;font-weight:700;">'+(cd.totalPrice!=null&&cd.totalPrice!==''?'$'+parseFloat(cd.totalPrice||0).toFixed(2):'—')+'</span></div>'
     +'<div class="info-row"><span class="info-label">Email on file</span><span class="info-val">'+(client?client.email:'—')+'</span></div>'
     +'<div class="info-row"><span class="info-label">Phone on file</span><span class="info-val">'+(client?client.phone:'—')+'</span></div>';
   var termsSel=document.getElementById('appt-inv-terms');
@@ -6420,13 +6451,13 @@ function openInviteCleaner(){
     var id=entry[0];var c=entry[1];
     if(c.notes&&c.notes.indexOf('leave')>=0)return;
     var label=document.createElement('label');
-    label.style.cssText='display:flex;align-items:center;gap:10px;padding:8px 10px;background:#fafaf8;border:1px solid #e8e8e5;border-radius:8px;cursor:pointer;font-size:12px;';
-    label.innerHTML='<input type="checkbox" value="'+id+'" style="accent-color:#1D9E75;width:15px;height:15px;" onchange="updateInvitePreview()">'
+    label.style.cssText='display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--bg-soft);border:1px solid var(--border);border-radius:8px;cursor:pointer;font-size:12px;';
+    label.innerHTML='<input type="checkbox" value="'+id+'" style="accent-color:var(--brand-500);width:15px;height:15px;" onchange="updateInvitePreview()">'
       +'<div style="flex:1;">'
-        +'<div style="font-weight:600;color:#1a1a1a;">'+c.name+'</div>'
-        +'<div style="color:#999;font-size:11px;">'+c.role+' · '+c.rate+'</div>'
+        +'<div style="font-weight:600;color:var(--text);">'+c.name+'</div>'
+        +'<div style="color:var(--text-muted);font-size:11px;">'+c.role+' · '+c.rate+'</div>'
       +'</div>'
-      +'<div style="font-size:11px;color:#1D9E75;font-weight:500;">'+(id===currentAppt.cleaner.toLowerCase().replace(/[^a-z]/g,'')?'Currently assigned':'Available')+'</div>';
+      +'<div style="font-size:11px;color:var(--brand-500);font-weight:500;">'+(id===currentAppt.cleaner.toLowerCase().replace(/[^a-z]/g,'')?'Currently assigned':'Available')+'</div>';
     list.appendChild(label);
   });
 
@@ -6865,21 +6896,21 @@ async function oneClickCharge(source){
     modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center;';
     modal.innerHTML = '<div style="background:#fff;border-radius:14px;padding:24px;width:360px;box-shadow:0 8px 32px rgba(0,0,0,.2);">'
       + '<div style="font-size:15px;font-weight:600;margin-bottom:4px;">Charge ' + clientName + '</div>'
-      + '<div style="font-size:12px;color:#999;margin-bottom:16px;">Select a payment method</div>'
+      + '<div style="font-size:12px;color:var(--text-muted);margin-bottom:16px;">Select a payment method</div>'
       + '<div id="charge-method-list" style="margin-bottom:16px;">'
       + allMethods.map(function(m,i){
-          return '<label style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid #e8e8e5;border-radius:8px;margin-bottom:6px;cursor:pointer;">'
+          return '<label style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--border);border-radius:8px;margin-bottom:6px;cursor:pointer;">'
             + '<input type="radio" name="charge-method" value="' + m.id + '" data-last4="' + m.last4 + '" data-label="' + m.label + '"' + (i===0?' checked':'') + '>'
             + '<span style="font-size:12px;">' + m.label + '</span>'
             + '</label>';
         }).join('')
       + '</div>'
-      + '<div id="charge-confirm-text" style="background:#f0faf6;border:1px solid #9ae6b4;border-radius:8px;padding:10px 12px;font-size:12px;color:#276749;margin-bottom:14px;">'
+      + '<div id="charge-confirm-text" style="background:var(--brand-50);border:1px solid #9ae6b4;border-radius:8px;padding:10px 12px;font-size:12px;color:#276749;margin-bottom:14px;">'
       + 'Charge ' + allMethods[0].label + ' for $' + total.toFixed(2) + '?'
       + '</div>'
       + '<div style="display:flex;gap:8px;">'
-      + '<button onclick="confirmCharge(\'' + cdata.stripeCustomerId + '\',\'' + clientName.replace(/'/g,"&#39;") + '\',' + amountNum + ')" style="flex:1;padding:10px;background:#1D9E75;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;">Confirm charge</button>'
-      + '<button onclick="document.getElementById(\'charge-modal\').remove()" style="padding:10px 16px;border:1px solid #e8e8e5;background:#fff;border-radius:8px;font-size:13px;cursor:pointer;">Cancel</button>'
+      + '<button onclick="confirmCharge(\'' + cdata.stripeCustomerId + '\',\'' + clientName.replace(/'/g,"&#39;") + '\',' + amountNum + ')" style="flex:1;padding:10px;background:var(--brand-500);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;">Confirm charge</button>'
+      + '<button onclick="document.getElementById(\'charge-modal\').remove()" style="padding:10px 16px;border:1px solid var(--border);background:#fff;border-radius:8px;font-size:13px;cursor:pointer;">Cancel</button>'
       + '</div>'
       + '</div>';
 
@@ -7148,7 +7179,7 @@ function previewTemplate() {
     '{{date}}': 'April 14, 2026',
     '{{time}}': '9:00 AM',
     '{{cleaner}}': 'Kaimana M.',
-    '{{invoice_url}}': '<a href="#" style="color:#1D9E75;">Click here to pay →</a>',
+    '{{invoice_url}}': '<a href="#" style="color:var(--brand-500);">Click here to pay →</a>',
     '{{business_name}}': bizSettings.name,
     '{{phone}}': bizSettings.phone
   };
@@ -7157,10 +7188,10 @@ function previewTemplate() {
     body = body.replace(new RegExp(e[0].replace(/[{}]/g,'\$&'),'g'), e[1]);
   });
   var logoHtml = bizSettings.logo ? '<img src="'+bizSettings.logo+'" style="height:40px;margin-bottom:20px;"><br>' : '';
-  var html = '<div style="font-family:sans-serif;padding:20px;background:#f9f9f7;border-radius:8px;">'
+  var html = '<div style="font-family:sans-serif;padding:20px;background:var(--bg-soft);border-radius:8px;">'
     + logoHtml
-    + '<div style="font-size:11px;color:#999;margin-bottom:4px;">Subject: <strong>'+subject+'</strong></div>'
-    + '<hr style="border:none;border-top:1px solid #e8e8e5;margin:12px 0;">'
+    + '<div style="font-size:11px;color:var(--text-muted);margin-bottom:4px;">Subject: <strong>'+subject+'</strong></div>'
+    + '<hr style="border:none;border-top:1px solid var(--border);margin:12px 0;">'
     + '<div style="font-size:13px;line-height:1.8;white-space:pre-wrap;">'+body+'</div>'
     + '</div>';
   document.getElementById('email-preview-content').innerHTML = html;
@@ -7182,7 +7213,7 @@ function buildEmailHtml(type, data) {
     '{{date}}': data.date || '',
     '{{time}}': data.time || '',
     '{{cleaner}}': data.cleaner || '',
-    '{{invoice_url}}': data.invoiceUrl ? '<a href="'+data.invoiceUrl+'" style="display:inline-block;background:#1D9E75;color:#fff;padding:10px 20px;border-radius:8px;text-decoration:none;font-weight:600;">Pay Invoice →</a>' : '',
+    '{{invoice_url}}': data.invoiceUrl ? '<a href="'+data.invoiceUrl+'" style="display:inline-block;background:var(--brand-500);color:#fff;padding:10px 20px;border-radius:8px;text-decoration:none;font-weight:600;">Pay Invoice →</a>' : '',
     '{{business_name}}': bizSettings.name,
     '{{phone}}': bizSettings.phone
   };
@@ -7192,10 +7223,10 @@ function buildEmailHtml(type, data) {
     subject = subject.replace(new RegExp(key,'g'), e[1]);
   });
   var logoHtml = bizSettings.logo ? '<img src="'+bizSettings.logo+'" style="height:48px;margin-bottom:20px;"><br>' : '';
-  var html = '<div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:32px 24px;color:#1a1a1a;">'
+  var html = '<div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:32px 24px;color:var(--text);">'
     + logoHtml
     + '<div style="font-size:13px;line-height:1.8;white-space:pre-wrap;">'+body+'</div>'
-    + '<p style="color:#999;font-size:11px;margin-top:32px;padding-top:16px;border-top:1px solid #e8e8e5;">'+bizSettings.name+' &middot; '+bizSettings.website+'</p>'
+    + '<p style="color:var(--text-muted);font-size:11px;margin-top:32px;padding-top:16px;border-top:1px solid var(--border);">'+bizSettings.name+' &middot; '+bizSettings.website+'</p>'
     + '</div>';
   return { subject: subject, html: html };
 }
@@ -7290,12 +7321,12 @@ function scheduleLeadAppointment(){
   if(wonTbody){
     var today=new Date().toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
     var wtr=document.createElement('tr');
-    wtr.style.borderTop='1px solid #e8e8e5';
+    wtr.style.borderTop='1px solid var(--border)';
     wtr.innerHTML='<td style="padding:9px 14px;font-size:12px;font-weight:600;">'+lead.name+'</td>'
-      +'<td style="padding:9px 14px;font-size:12px;color:#666;">'+(lead.service||'—')+'</td>'
-      +'<td style="padding:9px 14px;font-size:12px;color:#1D9E75;font-weight:600;">'+(lead.value||'—')+'</td>'
-      +'<td style="padding:9px 14px;font-size:12px;color:#666;">'+(lead.source||'—')+'</td>'
-      +'<td style="padding:9px 14px;font-size:12px;color:#666;">'+today+'</td>'
+      +'<td style="padding:9px 14px;font-size:12px;color:var(--text-muted);">'+(lead.service||'—')+'</td>'
+      +'<td style="padding:9px 14px;font-size:12px;color:var(--brand-500);font-weight:600;">'+(lead.value||'—')+'</td>'
+      +'<td style="padding:9px 14px;font-size:12px;color:var(--text-muted);">'+(lead.source||'—')+'</td>'
+      +'<td style="padding:9px 14px;font-size:12px;color:var(--text-muted);">'+today+'</td>'
       +'<td style="padding:9px 14px;"><button class="btn" style="font-size:11px;padding:3px 9px;" data-id="'+clientId+'" onclick="openClient(this.dataset.id)">View client</button></td>';
     wonTbody.insertBefore(wtr, wonTbody.firstChild);
   }
@@ -7388,10 +7419,10 @@ function convertLeadToClient(){
   var tbody = document.getElementById('hidden-leads-tbody');
   if(tbody){
     var tr = document.createElement('tr');
-    tr.style.borderTop = '1px solid #e8e8e5';
+    tr.style.borderTop = '1px solid var(--border)';
     tr.innerHTML = '<td style="padding:8px 12px;font-size:12px;font-weight:600;">'+lead.name+'</td>'
-      +'<td style="padding:8px 12px;font-size:12px;color:#666;">'+(lead.service||'—')+'</td>'
-      +'<td style="padding:8px 12px;font-size:12px;color:#1D9E75;">'+(lead.value||'—')+'</td>'
+      +'<td style="padding:8px 12px;font-size:12px;color:var(--text-muted);">'+(lead.service||'—')+'</td>'
+      +'<td style="padding:8px 12px;font-size:12px;color:var(--brand-500);">'+(lead.value||'—')+'</td>'
       +'<td style="padding:8px 12px;"><span class="badge bpd" style="font-size:10px;">Won → Client</span></td>'
       +'<td style="padding:8px 12px;"><button class="btn" style="font-size:11px;padding:3px 8px;" onclick="openClient(this.dataset.id)" data-id="'+id+'">View</button></td>';
     tbody.insertBefore(tr, tbody.firstChild);
@@ -7438,16 +7469,16 @@ function markLeadLost(){
   if(tbody){
     var today = new Date().toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
     var tr = document.createElement('tr');
-    tr.style.borderTop = '1px solid #e8e8e5';
+    tr.style.borderTop = '1px solid var(--border)';
     var lid = currentLeadId;
     tr.innerHTML = '<td style="padding:9px 14px;font-size:12px;font-weight:600;">'+lead.name+'</td>'
-      +'<td style="padding:9px 14px;font-size:12px;color:#666;">'+(lead.service||'—')+'</td>'
-      +'<td style="padding:9px 14px;font-size:12px;color:#999;">'+(lead.value||'—')+'</td>'
-      +'<td style="padding:9px 14px;font-size:12px;color:#666;">'+reason+'</td>'
-      +'<td style="padding:9px 14px;font-size:12px;color:#666;">'+today+'</td>'
+      +'<td style="padding:9px 14px;font-size:12px;color:var(--text-muted);">'+(lead.service||'—')+'</td>'
+      +'<td style="padding:9px 14px;font-size:12px;color:var(--text-muted);">'+(lead.value||'—')+'</td>'
+      +'<td style="padding:9px 14px;font-size:12px;color:var(--text-muted);">'+reason+'</td>'
+      +'<td style="padding:9px 14px;font-size:12px;color:var(--text-muted);">'+today+'</td>'
       +'<td style="padding:9px 14px;display:flex;gap:4px;">'
         +'<button class="btn" style="font-size:11px;padding:3px 9px;" data-id="'+lid+'" onclick="openLead(this.dataset.id)">View</button>'
-        +'<button class="btn" style="font-size:11px;padding:3px 9px;background:#f0faf6;color:#276749;border-color:#9ae6b4;" data-id="'+lid+'" onclick="reactivateLead(this.dataset.id)">Reactivate</button>'
+        +'<button class="btn" style="font-size:11px;padding:3px 9px;background:var(--brand-50);color:#276749;border-color:#9ae6b4;" data-id="'+lid+'" onclick="reactivateLead(this.dataset.id)">Reactivate</button>'
       +'</td>';
     tbody.insertBefore(tr, tbody.firstChild);
   }
@@ -7501,12 +7532,12 @@ scheduleLeadAppointment = function(){
     if(tbody){
       var today = new Date().toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
       var tr = document.createElement('tr');
-      tr.style.borderTop = '1px solid #e8e8e5';
+      tr.style.borderTop = '1px solid var(--border)';
       tr.innerHTML = '<td style="padding:9px 14px;font-size:12px;font-weight:600;">'+lead.name+'</td>'
-        +'<td style="padding:9px 14px;font-size:12px;color:#666;">'+(lead.service||'—')+'</td>'
-        +'<td style="padding:9px 14px;font-size:12px;color:#1D9E75;font-weight:600;">'+(lead.value||'—')+'</td>'
-        +'<td style="padding:9px 14px;font-size:12px;color:#666;">'+(lead.source||'—')+'</td>'
-        +'<td style="padding:9px 14px;font-size:12px;color:#666;">'+today+'</td>'
+        +'<td style="padding:9px 14px;font-size:12px;color:var(--text-muted);">'+(lead.service||'—')+'</td>'
+        +'<td style="padding:9px 14px;font-size:12px;color:var(--brand-500);font-weight:600;">'+(lead.value||'—')+'</td>'
+        +'<td style="padding:9px 14px;font-size:12px;color:var(--text-muted);">'+(lead.source||'—')+'</td>'
+        +'<td style="padding:9px 14px;font-size:12px;color:var(--text-muted);">'+today+'</td>'
         +'<td style="padding:9px 14px;"><button class="btn" style="font-size:11px;padding:3px 9px;" data-id="'+lid+'" onclick="openLead(this.dataset.id)">View</button></td>';
       tbody.insertBefore(tr, tbody.firstChild);
     }
@@ -7594,24 +7625,24 @@ function runGlobalSearch(q){
   });
 
   if(hits.length===0){
-    results.innerHTML='<div style="padding:14px;font-size:12px;color:#999;text-align:center;">No results for "'+q+'"</div>';
+    results.innerHTML='<div style="padding:14px;font-size:12px;color:var(--text-muted);text-align:center;">No results for "'+q+'"</div>';
     results.style.display='block';
     return;
   }
 
-  var typeColors={Client:'#ebf5ff',Cleaner:'#f0faf6',Lead:'#fffbeb',Appointment:'#f5f0ff'};
+  var typeColors={Client:'#ebf5ff',Cleaner:'var(--brand-50)',Lead:'#fffbeb',Appointment:'#f5f0ff'};
   var typeText={Client:'#2b6cb0',Cleaner:'#276749',Lead:'#b7791f',Appointment:'#553c9a'};
   results.innerHTML='';
   hits.slice(0,8).forEach(function(h){
-    var bg=typeColors[h.type]||'#f5f5f3';
-    var tc=typeText[h.type]||'#666';
+    var bg=typeColors[h.type]||'var(--bg-soft)';
+    var tc=typeText[h.type]||'var(--text-muted)';
     var item=document.createElement('div');
-    item.style.cssText='display:flex;align-items:center;gap:10px;padding:10px 14px;cursor:pointer;border-bottom:1px solid #f5f5f3;';
+    item.style.cssText='display:flex;align-items:center;gap:10px;padding:10px 14px;cursor:pointer;border-bottom:1px solid var(--bg-soft);';
     item.innerHTML='<span style="font-size:10px;padding:2px 7px;border-radius:10px;background:'+bg+';color:'+tc+';font-weight:500;flex-shrink:0;">'+h.type+'</span>'
-      +'<div style="min-width:0;"><div style="font-size:12px;font-weight:600;color:#1a1a1a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+h.name+'</div>'
-      +(h.sub?'<div style="font-size:11px;color:#999;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+h.sub+'</div>':'')
+      +'<div style="min-width:0;"><div style="font-size:12px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+h.name+'</div>'
+      +(h.sub?'<div style="font-size:11px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+h.sub+'</div>':'')
       +'</div>';
-    item.addEventListener('mouseover',function(){this.style.background='#f5f5f3';});
+    item.addEventListener('mouseover',function(){this.style.background='var(--bg-soft)';});
     item.addEventListener('mouseout',function(){this.style.background='';});
     (function(id,type){item.addEventListener('click',function(){selectSearchResult(id,type);});})(h.id,h.type);
     results.appendChild(item);
@@ -8078,9 +8109,9 @@ function initNewApptClientAutocomplete(){
     matches.slice(0,8).forEach(function(e){
       var id = e[0], c = e[1];
       var item = document.createElement('div');
-      item.style.cssText = 'padding:9px 12px;cursor:pointer;font-size:12px;border-bottom:1px solid #f5f5f3;';
-      item.innerHTML = '<div style="font-weight:600;color:#1a1a1a;">'+c.name+'</div>'
-        +'<div style="font-size:11px;color:#999;margin-top:1px;">'+c.type+' · '+(c.phone!=='—'?c.phone:c.email)+'</div>';
+      item.style.cssText = 'padding:9px 12px;cursor:pointer;font-size:12px;border-bottom:1px solid var(--bg-soft);';
+      item.innerHTML = '<div style="font-weight:600;color:var(--text);">'+c.name+'</div>'
+        +'<div style="font-size:11px;color:var(--text-muted);margin-top:1px;">'+c.type+' · '+(c.phone!=='—'?c.phone:c.email)+'</div>';
       item.addEventListener('mousedown', function(ev){ ev.preventDefault(); });
       item.addEventListener('click', function(){
         input.value = c.name;
@@ -8094,20 +8125,20 @@ function initNewApptClientAutocomplete(){
         populatePropertySelector(c.name);
         showClientPricingRules(c);
       });
-      item.addEventListener('mouseover', function(){ this.style.background='#f5f5f3'; });
+      item.addEventListener('mouseover', function(){ this.style.background='var(--bg-soft)'; });
       item.addEventListener('mouseout',  function(){ this.style.background=''; });
       dropdown.appendChild(item);
     });
 
     // "Create new client" option
     var newItem = document.createElement('div');
-    newItem.style.cssText = 'padding:9px 12px;cursor:pointer;font-size:12px;color:#1D9E75;font-weight:600;';
+    newItem.style.cssText = 'padding:9px 12px;cursor:pointer;font-size:12px;color:var(--brand-500);font-weight:600;';
     newItem.textContent = '+ New client: "' + input.value + '"';
     newItem.addEventListener('mousedown', function(ev){ ev.preventDefault(); });
     newItem.addEventListener('click', function(){
       dropdown.style.display='none';
     });
-    newItem.addEventListener('mouseover', function(){ this.style.background='#f0faf6'; });
+    newItem.addEventListener('mouseover', function(){ this.style.background='var(--brand-50)'; });
     newItem.addEventListener('mouseout',  function(){ this.style.background=''; });
     dropdown.appendChild(newItem);
 
@@ -8456,7 +8487,7 @@ loadSettings();
         </div>
       </div>
       <div class="form-row"><label>Stripe secret key</label><input type="password" id="stripe-key" placeholder="sk_live_..."></div>
-      <div style="font-size:11px;color:#999;margin-top:-6px;margin-bottom:12px;">Your key is stored locally and never shared. Get it from dashboard.stripe.com &rarr; Developers &rarr; API keys.</div>
+      <div style="font-size:11px;color:var(--text-muted);margin-top:-6px;margin-bottom:12px;">Your key is stored locally and never shared. Get it from dashboard.stripe.com &rarr; Developers &rarr; API keys.</div>
       <div class="form-row"><label>Business name on invoices</label><input type="text" id="stripe-biz" value="Hawaii Natural Clean" placeholder="Your business name"></div>
       <div class="form-row"><label>Reply-to email</label><input type="email" id="stripe-email" placeholder="billing@hawaiinaturalclean.com"></div>
       <div class="save-bar">
@@ -8488,7 +8519,7 @@ loadSettings();
         </div>
       </div>
       <div class="form-row"><label>Notes (shown on invoice)</label><textarea id="custom-inv-notes" style="min-height:60px;" placeholder="Optional note shown on invoice..."></textarea></div>
-      <div class="form-row" id="custom-inv-attach-wrap" style="display:none;"><label>Attach pending appointments (optional) — these will be marked paid when invoice is paid</label><div id="custom-inv-attach-list" style="max-height:160px;overflow-y:auto;border:1px solid #e0e0dd;border-radius:6px;padding:6px 8px;font-size:12px;"></div></div>
+      <div class="form-row" id="custom-inv-attach-wrap" style="display:none;"><label>Attach pending appointments (optional) — these will be marked paid when invoice is paid</label><div id="custom-inv-attach-list" style="max-height:160px;overflow-y:auto;border:1px solid var(--border-strong);border-radius:6px;padding:6px 8px;font-size:12px;"></div></div>
       <div class="info-block" style="background:#f8f8f5;padding:10px 12px;border-radius:8px;margin-top:8px;">
         <div class="info-row"><span class="info-label">Subtotal</span><span class="info-val" id="custom-inv-subtotal">$0.00</span></div>
         <div class="info-row"><span class="info-label">Tax (4%)</span><span class="info-val" id="custom-inv-taxamt">$0.00</span></div>
@@ -8535,9 +8566,9 @@ loadSettings();
     <div class="panel-body">
       <div class="panel-section">Card surcharge</div>
       <div class="info-block">
-        <div class="info-row"><span class="info-label">Card surcharge %</span><span class="info-val"><input type="number" id="ach-surcharge" value="3" min="0" max="10" step="0.5" style="width:60px;padding:3px 6px;border:1px solid #e0e0dd;border-radius:6px;font-size:12px;text-align:center;"></span></div>
-        <div class="info-row"><span class="info-label">ACH settlement</span><span class="info-val" style="color:#999;">3-5 business days</span></div>
-        <div class="info-row"><span class="info-label">Show on</span><span class="info-val" style="color:#1D9E75;">Email + payment page</span></div>
+        <div class="info-row"><span class="info-label">Card surcharge %</span><span class="info-val"><input type="number" id="ach-surcharge" value="3" min="0" max="10" step="0.5" style="width:60px;padding:3px 6px;border:1px solid var(--border-strong);border-radius:6px;font-size:12px;text-align:center;"></span></div>
+        <div class="info-row"><span class="info-label">ACH settlement</span><span class="info-val" style="color:var(--text-muted);">3-5 business days</span></div>
+        <div class="info-row"><span class="info-label">Show on</span><span class="info-val" style="color:var(--brand-500);">Email + payment page</span></div>
       </div>
       <div class="panel-section">Message shown on invoice email</div>
       <div class="form-row"><textarea id="ach-email-msg" style="min-height:100px;">Payment options for your invoice:
@@ -8577,9 +8608,9 @@ Your total will update automatically when you select a payment method.</textarea
       <div class="panel-section">Select cleaners to invite</div>
       <div id="invite-cleaner-list" style="display:flex;flex-direction:column;gap:7px;margin-bottom:14px;"></div>
       <div class="panel-section">SMS message</div>
-      <div style="background:#fafaf8;border:1px solid #e8e8e5;border-radius:10px;padding:12px 13px;margin-bottom:12px;">
-        <div style="font-size:11px;color:#999;margin-bottom:6px;">Preview — sent to each selected cleaner</div>
-        <div id="invite-msg-preview" style="font-size:13px;color:#1a1a1a;line-height:1.7;white-space:pre-wrap;"></div>
+      <div style="background:var(--bg-soft);border:1px solid var(--border);border-radius:10px;padding:12px 13px;margin-bottom:12px;">
+        <div style="font-size:11px;color:var(--text-muted);margin-bottom:6px;">Preview — sent to each selected cleaner</div>
+        <div id="invite-msg-preview" style="font-size:13px;color:var(--text);line-height:1.7;white-space:pre-wrap;"></div>
       </div>
       <div class="form-row"><label>Add a note (optional)</label><textarea id="invite-note" style="min-height:50px;" placeholder="Any special instructions for this job..."></textarea></div>
       <div class="save-bar">
@@ -8610,7 +8641,7 @@ Your total will update automatically when you select a payment method.</textarea
       <div class="form-row"><label>Notes on invoice</label>
         <textarea id="appt-inv-notes" style="min-height:50px;" placeholder="Optional note..."></textarea>
       </div>
-      <div style="background:#f0faf6;border:1px solid #9ae6b4;border-radius:10px;padding:11px 13px;margin-bottom:14px;">
+      <div style="background:var(--brand-50);border:1px solid #9ae6b4;border-radius:10px;padding:11px 13px;margin-bottom:14px;">
         <div style="font-size:11px;font-weight:600;color:#276749;margin-bottom:6px;">ACH payment incentive included</div>
         <div style="font-size:11px;color:#276749;line-height:1.6;">The invoice will show clients both payment options:<br>&#x2022; ACH bank transfer — FREE<br>&#x2022; Card, Apple Pay, Cash App, Klarna, or Link — no extra fee</div>
       </div>
@@ -8631,17 +8662,17 @@ Your total will update automatically when you select a payment method.</textarea
     <div class="panel-body">
       <div class="panel-section">Charge details</div>
       <div class="info-block" id="appt-charge-info"></div>
-      <div style="background:#fafaf8;border:1px solid #e8e8e5;border-radius:10px;padding:12px 13px;margin-bottom:14px;">
+      <div style="background:var(--bg-soft);border:1px solid var(--border);border-radius:10px;padding:12px 13px;margin-bottom:14px;">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-          <div style="font-size:13px;font-weight:600;color:#1a1a1a;">Payment breakdown</div>
+          <div style="font-size:13px;font-weight:600;color:var(--text);">Payment breakdown</div>
         </div>
-        <div style="display:flex;justify-content:space-between;font-size:12px;color:#666;padding:4px 0;border-bottom:1px solid #f0f0ee;">
+        <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text-muted);padding:4px 0;border-bottom:1px solid var(--border);">
           <span>Base amount</span><span id="charge-base">—</span>
         </div>
-        <div style="display:flex;justify-content:space-between;font-size:12px;color:#b7791f;padding:4px 0;border-bottom:1px solid #f0f0ee;">
+        <div style="display:flex;justify-content:space-between;font-size:12px;color:#b7791f;padding:4px 0;border-bottom:1px solid var(--border);">
           <span>Card processing fee</span><span id="charge-fee">—</span>
         </div>
-        <div style="display:flex;justify-content:space-between;font-size:14px;font-weight:700;color:#1D9E75;padding:6px 0;">
+        <div style="display:flex;justify-content:space-between;font-size:14px;font-weight:700;color:var(--brand-500);padding:6px 0;">
           <span>Total charged</span><span id="charge-total">—</span>
         </div>
       </div>
@@ -8649,7 +8680,7 @@ Your total will update automatically when you select a payment method.</textarea
         <strong>Tip:</strong> Encourage clients to pay by ACH (free) to keep costs down. You can send an invoice instead and let them choose.
       </div>
       <div class="form-row"><label>Card on file</label>
-        <div id="charge-card-info" style="font-size:13px;color:#1a1a1a;padding:8px 10px;background:#fafaf8;border:1px solid #e8e8e5;border-radius:8px;">Stripe card ****4521</div>
+        <div id="charge-card-info" style="font-size:13px;color:var(--text);padding:8px 10px;background:var(--bg-soft);border:1px solid var(--border);border-radius:8px;">Stripe card ****4521</div>
       </div>
       <div class="save-bar">
         <button class="btn btn-primary" onclick="executeCharge()">Charge card now</button>
@@ -8700,7 +8731,7 @@ Your total will update automatically when you select a payment method.</textarea
   <div class="panel" onclick="event.stopPropagation()">
     <div class="panel-header"><div class="panel-title">Add property</div><button class="close-btn" onclick="closeOverlay('add-property-overlay')">&#x2715;</button></div>
     <div class="panel-body">
-      <div style="font-size:12px;color:#666;margin-bottom:12px;" id="prop-client-name"></div>
+      <div style="font-size:12px;color:var(--text-muted);margin-bottom:12px;" id="prop-client-name"></div>
       <div class="form-row"><label>Property address</label><input type="text" id="prop-address" placeholder="123 Kalani St, Kailua, HI"></div>
       <div class="form-two">
         <div class="form-row"><label>Bedrooms</label><input type="number" id="prop-beds" value="3" min="0"></div>

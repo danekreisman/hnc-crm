@@ -560,6 +560,8 @@ textarea{font-family:inherit;}
         <div class="section-title">Roster — click a card to view profile</div>
         <div class="cleaner-grid">
         </div>
+        <div class="section-title" id="deactivated-header" style="display:none;margin-top:18px;">Deactivated cleaners <span style="color:var(--text-muted);font-weight:400;">— click to reactivate</span></div>
+        <div class="cleaner-grid deactivated-grid" id="deactivated-grid" style="display:none;opacity:.7;"></div>
         <div class="section-title">Hours log — this week</div>
         <div class="tw"><table><thead><tr><th style="width:18%">Cleaner</th><th style="width:13%">Date</th><th style="width:30%">Job / client</th><th style="width:10%">Hours</th><th style="width:14%">Island</th><th style="width:15%">Pay</th></tr></thead><tbody id="hours-log-tbody">
         </tbody></table></div>
@@ -1348,6 +1350,7 @@ Mahalo 🌺</textarea>
         <div class="action-grid">
           <button class="action-btn blue" onclick="openMsgFromCleaner()">Send SMS</button>
           <button class="action-btn amber" onclick="showCleanerEdit()">Edit profile</button>
+          <button class="action-btn full" id="cp-toggle-active" onclick="toggleCleanerActive()" style="background:#fef3c7;color:#92400e;">Deactivate cleaner</button>
           <button class="action-btn green full">Log hours manually</button>
           <button class="action-btn red full" onclick="deleteRecord('cleaner')">Delete cleaner</button>
         </div>
@@ -1774,7 +1777,8 @@ async function loadAllData(){
         week:'0 hrs', month:'0 hrs', paid:'$0',
         jobs:'0', alltime:'0', islands:c.island||'Oahu',
         bgcheck:c.background_check||'Not started',
-        notes:c.notes||'—'
+        notes:c.notes||'—',
+        status:c.status||'Active'
       };
     });
 
@@ -1929,22 +1933,35 @@ function renderClientsTable(){
 }
 
 function renderCleanersGrid(){
-  var grid=document.querySelector('.cleaner-grid');
+  var grid=document.querySelector('.cleaner-grid:not(.deactivated-grid)');
+  var deactGrid=document.getElementById('deactivated-grid');
+  var deactHeader=document.getElementById('deactivated-header');
   if(!grid)return;
-  var cleanerEntries=Object.entries(cleanerDB).filter(function(e){return e[0].length>=30;});
-  console.log('[renderCleanersGrid] Rendering '+cleanerEntries.length+' real cleaners from Supabase');
-  grid.innerHTML=''; // Clear all cards
-  cleanerEntries.forEach(function(entry){
+  var allEntries=Object.entries(cleanerDB).filter(function(e){return e[0].length>=30;});
+  var active=allEntries.filter(function(e){return ((e[1]&&e[1].status)||'Active')!=='Inactive';});
+  var inactive=allEntries.filter(function(e){return ((e[1]&&e[1].status)||'Active')==='Inactive';});
+  console.log('[renderCleanersGrid] Active:'+active.length+' Inactive:'+inactive.length);
+  function renderCard(entry, isInactive){
     var id=entry[0];var c=entry[1];
     var card=document.createElement('div');
     card.className='cleaner-card db-card';
+    var badgeClass=isInactive?'bin':'bac';
+    var badgeText=isInactive?'Inactive':'Active';
     card.innerHTML='<div class="cleaner-top"><div class="avatar" style="background:'+c.bg+';color:'+c.fg+';">'+c.initials+'</div><div><div class="cleaner-name">'+c.name+'</div><div class="cleaner-role">'+c.role+'</div></div></div>'
       +'<div class="cleaner-stats"><div class="cs"><div class="cs-label">This week</div><div class="cs-val">'+c.week+'</div></div><div class="cs"><div class="cs-label">Rate</div><div class="cs-val">'+c.rate+'</div></div>'
-      +'<div class="cs"><div class="cs-label">Jobs this mo</div><div class="cs-val">'+c.jobs+'</div></div><div class="cs"><div class="cs-label">Status</div><div class="cs-val"><span class="badge bac">Active</span></div></div></div>'
+      +'<div class="cs"><div class="cs-label">Jobs this mo</div><div class="cs-val">'+c.jobs+'</div></div><div class="cs"><div class="cs-label">Status</div><div class="cs-val"><span class="badge '+badgeClass+'">'+badgeText+'</span></div></div></div>'
       +'<div class="pb"><div class="pf" style="width:0%"></div></div>';
     (function(cid){card.addEventListener('click',function(){openCleaner(cid);});})(id);
-    grid.appendChild(card);
-  });
+    return card;
+  }
+  grid.innerHTML='';
+  active.forEach(function(e){ grid.appendChild(renderCard(e,false)); });
+  if(deactGrid){
+    deactGrid.innerHTML='';
+    inactive.forEach(function(e){ deactGrid.appendChild(renderCard(e,true)); });
+    if(deactHeader){ deactHeader.style.display=inactive.length?'block':'none'; }
+    deactGrid.style.display=inactive.length?'grid':'none';
+  }
 }
 
 function renderLeadsPipeline(){
@@ -3315,8 +3332,11 @@ function openCleaner(id){
   document.getElementById('cp-name').textContent=d.name;
   document.getElementById('cp-role').textContent=d.role;
   var st=document.getElementById('cp-status');
-  st.textContent=id==='tr'?'Inactive':'Active';
-  st.className='badge '+(id==='tr'?'bin':'bac');
+  var isInactive=(d.status||'Active')==='Inactive';
+  st.textContent=isInactive?'Inactive':'Active';
+  st.className='badge '+(isInactive?'bin':'bac');
+  var toggleBtn=document.getElementById('cp-toggle-active');
+  if(toggleBtn){ toggleBtn.textContent=isInactive?'Reactivate cleaner':'Deactivate cleaner'; toggleBtn.style.background=isInactive?'#dcfce7':'#fef3c7'; toggleBtn.style.color=isInactive?'#166534':'#92400e'; }
   ['phone','email','loc','start','rate','week','month','paid','jobs','alltime','islands','notes'].forEach(function(f){
     document.getElementById('cp-'+f).textContent=d[f]||'—';
   });
@@ -3324,6 +3344,31 @@ function openCleaner(id){
   hideCleanerEdit();
   document.getElementById('cleaner-overlay').classList.remove('hidden');
 }
+
+function toggleCleanerActive(){
+  if(!currentCleanerId||!cleanerDB[currentCleanerId]){ alert('No cleaner selected'); return; }
+  var c=cleanerDB[currentCleanerId];
+  var isInactive=(c.status||'Active')==='Inactive';
+  var newStatus=isInactive?'Active':'Inactive';
+  var verb=isInactive?'reactivate':'deactivate';
+  if(!confirm('Are you sure you want to '+verb+' '+c.name+'?')) return;
+  db.from('cleaners').update({status:newStatus}).eq('id',currentCleanerId).then(function(res){
+    if(res.error){ alert('Error: '+res.error.message); return; }
+    c.status=newStatus;
+    // Update UI
+    var st=document.getElementById('cp-status');
+    if(st){ st.textContent=newStatus; st.className='badge '+(newStatus==='Inactive'?'bin':'bac'); }
+    var btn=document.getElementById('cp-toggle-active');
+    if(btn){
+      btn.textContent=newStatus==='Inactive'?'Reactivate cleaner':'Deactivate cleaner';
+      btn.style.background=newStatus==='Inactive'?'#dcfce7':'#fef3c7';
+      btn.style.color=newStatus==='Inactive'?'#166534':'#92400e';
+    }
+    if(typeof renderCleanersGrid==='function') renderCleanersGrid();
+    if(typeof populateCleanerDropdown==='function'){ try{ populateCleanerDropdown('na-cleaner'); }catch(e){} }
+  });
+}
+
 
 function showCleanerEdit(){
   if(currentCleanerId&&cleanerDB[currentCleanerId]){
@@ -3603,7 +3648,7 @@ function populateCleanerDropdown(selectId, currentValue){
     unassOpt.textContent='Unassigned';
     sel.appendChild(unassOpt);
   }
-  var entries=Object.entries(cleanerDB).filter(function(e){return e[0].length>=30;});
+  var entries=Object.entries(cleanerDB).filter(function(e){ if(e[0].length<30) return false; var st=(e[1]&&e[1].status)||'Active'; return isEditDropdown||st!=='Inactive'; });
   console.log('[populateCleanerDropdown] source: cleanerDB, cleaners found:', entries.length, '| select:', selectId);
   entries.forEach(function(entry){
     var c=entry[1];

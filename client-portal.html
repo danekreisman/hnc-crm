@@ -1,0 +1,721 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Hawaii Natural Clean — Client Portal</title>
+<link rel="icon" href="/hnc-logo.png" />
+<style>
+  :root{
+    --bg:#ffffff;
+    --bg-soft:#f4fafc;
+    --panel:#ffffff;
+    --panel2:#f7fbfc;
+    --border:#d7e7ec;
+    --text:#173641;
+    --muted:#6a8793;
+    --accent:#2fb8d4;
+    --accent-dark:#1f99b2;
+    --accent-soft:#e5f6fa;
+    --success:#3aa57a;
+    --warn:#d89a2a;
+    --danger:#d9534f;
+    --shadow:0 2px 6px rgba(20,70,90,.06);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;background:var(--bg-soft);color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;}
+  a{color:var(--accent-dark);text-decoration:none}
+  a:hover{text-decoration:underline}
+  .wrap{max-width:1080px;margin:0 auto;padding:24px 20px 80px}
+  header.topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;gap:16px;flex-wrap:wrap}
+  header.topbar .brand{display:flex;align-items:center;gap:12px}
+  header.topbar .brand img{height:54px;width:auto;display:block}
+  header.topbar .brand .sub{color:var(--muted);font-size:13px;margin-top:2px}
+  header.topbar .who{font-size:13px;color:var(--muted)}
+  .btn{background:var(--accent);color:#fff;border:none;border-radius:8px;padding:10px 16px;font-weight:600;cursor:pointer;font-size:14px;transition:background .15s}
+  .btn:hover{background:var(--accent-dark)}
+  .btn:disabled{opacity:.55;cursor:not-allowed}
+  .btn.secondary{background:#fff;color:var(--accent-dark);border:1px solid var(--accent)}
+  .btn.secondary:hover{background:var(--accent-soft)}
+  .btn.ghost{background:transparent;color:var(--muted);border:1px solid var(--border)}
+  .btn.ghost:hover{background:var(--bg-soft);color:var(--text)}
+  .btn.danger{background:var(--danger)}
+  .btn.danger:hover{background:#b83b37}
+  .btn.google{background:#fff;color:#3c4043;border:1px solid #dadce0;display:inline-flex;align-items:center;gap:10px;width:100%;justify-content:center}
+  .btn.google:hover{background:#f8f9fa}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:20px;margin-bottom:16px;box-shadow:var(--shadow)}
+  .card h3{margin:0 0 14px;font-size:16px;letter-spacing:.01em}
+  .row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+  .row.between{justify-content:space-between}
+  .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+  @media(max-width:720px){.grid3{grid-template-columns:1fr}}
+  .kpi{background:var(--panel2);border:1px solid var(--border);border-radius:12px;padding:14px}
+  .kpi .label{color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.08em}
+  .kpi .value{font-size:22px;font-weight:700;margin-top:6px}
+  table{width:100%;border-collapse:collapse;font-size:14px}
+  th,td{text-align:left;padding:10px 8px;border-bottom:1px solid var(--border);vertical-align:top}
+  th{color:var(--muted);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.06em}
+  tr:last-child td{border-bottom:none}
+  .badge{display:inline-block;padding:2px 10px;border-radius:999px;font-size:11px;border:1px solid var(--border);background:var(--panel2);color:var(--muted)}
+  .badge.ok{background:#e7f6ee;color:var(--success);border-color:#c5e6d4}
+  .badge.info{background:var(--accent-soft);color:var(--accent-dark);border-color:#b4e3ec}
+  .badge.warn{background:#fdf1d8;color:var(--warn);border-color:#f1d693}
+  .badge.bad{background:#fbe1e0;color:var(--danger);border-color:#f0b3b1}
+  .tabs{display:flex;gap:4px;margin-bottom:16px;border-bottom:1px solid var(--border);overflow-x:auto}
+  .tab{background:transparent;border:none;padding:10px 14px;font-size:14px;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;font-weight:600}
+  .tab:hover{color:var(--text)}
+  .tab.active{color:var(--accent-dark);border-bottom-color:var(--accent)}
+  .field{display:flex;flex-direction:column;gap:6px;margin-bottom:12px}
+  .field label{font-size:12px;color:var(--muted);font-weight:600;letter-spacing:.02em;text-transform:uppercase}
+  .field input,.field select,.field textarea{background:#fff;border:1px solid var(--border);border-radius:8px;padding:10px 12px;color:var(--text);font-size:14px;font-family:inherit}
+  .field input:focus,.field select:focus,.field textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+  .auth{max-width:440px;margin:40px auto;padding:32px}
+  .auth h2{margin:8px 0 4px;font-size:22px;text-align:center}
+  .auth p.sub{color:var(--muted);margin:0 0 20px;font-size:14px;text-align:center}
+  .auth .divider{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:12px;margin:16px 0;text-transform:uppercase;letter-spacing:.08em}
+  .auth .divider::before,.auth .divider::after{content:"";flex:1;height:1px;background:var(--border)}
+  .auth .logo-wrap{display:flex;justify-content:center;margin-bottom:10px}
+  .auth .logo-wrap img{height:68px;width:auto}
+  .pill-tabs{display:flex;gap:4px;background:var(--bg-soft);border:1px solid var(--border);border-radius:10px;padding:4px;margin-bottom:18px}
+  .pill-tab{flex:1;text-align:center;padding:8px 10px;border-radius:7px;font-size:13px;font-weight:600;color:var(--muted);cursor:pointer;background:transparent;border:none;transition:.15s}
+  .pill-tab.active{background:#fff;color:var(--accent-dark);box-shadow:0 1px 2px rgba(20,70,90,.08)}
+  .msg{font-size:13px;margin-top:10px;text-align:center}
+  .msg.err{color:var(--danger)}
+  .msg.ok{color:var(--success)}
+  .muted{color:var(--muted);font-size:13px}
+  .link-btn{background:none;border:none;color:var(--accent-dark);cursor:pointer;padding:0;font-size:13px;font-weight:600}
+  .link-btn:hover{text-decoration:underline}
+  dialog.modal{border:none;border-radius:14px;padding:0;box-shadow:0 20px 60px rgba(20,70,90,.25);max-width:500px;width:92%}
+  dialog.modal::backdrop{background:rgba(20,70,90,.45)}
+  dialog.modal .m-body{padding:22px 24px}
+  dialog.modal h3{margin:0 0 12px;font-size:18px}
+  dialog.modal .m-foot{padding:14px 24px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:10px;background:var(--bg-soft);border-radius:0 0 14px 14px}
+  .empty{color:var(--muted);padding:16px;text-align:center;font-size:14px}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script type="module">
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
+// Same Supabase project as the cleaner portal + CRM
+const SUPABASE_URL = 'https://hehfecnjmgsthxjxlvpz.supabase.co';
+const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhlaGZlY25qbWdzdGh4anhsdnB6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUyNDMwOTMsImV4cCI6MjA5MDgxOTA5M30.LRfDNzOjVQYUeldULv-8VFlZl6akxdHVfLBFCZDCa5o';
+const supa = createClient(SUPABASE_URL, SUPABASE_ANON, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }});
+
+const app = document.getElementById('app');
+const $ = (html) => { const t=document.createElement('template'); t.innerHTML=html.trim(); return t.content.firstChild; };
+const escapeHtml = (s) => String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmtMoney = (n) => '$' + (Number(n||0)).toFixed(2);
+const fmtDate = (d) => { if(!d) return ''; const dt=new Date(String(d)+'T00:00:00'); return dt.toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric',year:'numeric'}); };
+const fmtDateShort = (d) => { if(!d) return ''; const dt=new Date(String(d)+'T00:00:00'); return dt.toLocaleDateString(undefined,{month:'short',day:'numeric'}); };
+const fmtTime = (t) => {
+  if(!t) return '';
+  const s = String(t).trim();
+  let m = s.match(/^(\d{1,2})\s*(am|pm)$/i);
+  if (m) return parseInt(m[1],10)+':00 '+m[2].toUpperCase();
+  m = s.match(/^(\d{1,2}):(\d{2})\s*(am|pm)$/i);
+  if (m) return parseInt(m[1],10)+':'+m[2]+' '+m[3].toUpperCase();
+  m = s.match(/^(\d{1,2}):(\d{2})/);
+  if (m) { const H=parseInt(m[1],10); return ((H+11)%12+1)+':'+m[2]+' '+(H>=12?'PM':'AM'); }
+  return s;
+};
+const todayISO = () => new Date().toISOString().slice(0,10);
+const hoursUntil = (dateStr, timeStr) => {
+  if(!dateStr) return Infinity;
+  // parse best-effort time
+  const s = String(timeStr||'8am').trim();
+  let H=8, M=0;
+  let m = s.match(/^(\d{1,2})\s*(am|pm)$/i);
+  if (m) { H=parseInt(m[1],10)%12 + (/pm/i.test(m[2])?12:0); }
+  else { m = s.match(/^(\d{1,2}):(\d{2})\s*(am|pm)?$/i);
+    if(m){ H=parseInt(m[1],10); M=parseInt(m[2],10); if(m[3] && /pm/i.test(m[3]) && H<12)H+=12; if(m[3] && /am/i.test(m[3]) && H===12)H=0; } }
+  const dt = new Date(String(dateStr)+'T00:00:00'); dt.setHours(H, M, 0, 0);
+  return (dt.getTime() - Date.now()) / 3600000;
+};
+
+async function findClient(user){
+  // 1) auth_user_id
+  let { data: byId } = await supa.from('clients').select('*').eq('auth_user_id', user.id).maybeSingle();
+  if (byId) return byId;
+  // 2) email
+  const email = (user.email||'').toLowerCase();
+  if (email && !email.endsWith('@phone.hnc-crm.internal')) {
+    const { data: byEmail } = await supa.from('clients').select('*').ilike('email', email).maybeSingle();
+    if (byEmail) {
+      const { data: upd } = await supa.from('clients').update({ auth_user_id: user.id }).eq('id', byEmail.id).select('*').maybeSingle();
+      return upd || byEmail;
+    }
+  }
+  // 3) phone
+  const phone = user.phone || (user.user_metadata && user.user_metadata.phone) || null;
+  if (phone) {
+    const { data: byPhone } = await supa.from('clients').select('*').eq('phone', phone).maybeSingle();
+    if (byPhone) {
+      const { data: upd } = await supa.from('clients').update({ auth_user_id: user.id }).eq('id', byPhone.id).select('*').maybeSingle();
+      return upd || byPhone;
+    }
+  }
+  return null;
+}
+
+// -------- AUTH SCREEN ---------
+function renderLogin(message){
+  app.innerHTML='';
+  const card = $(`
+  <div class="auth card">
+    <div class="logo-wrap"><img src="/hnc-logo.png" alt="Hawaii Natural Clean" /></div>
+    <h2>Client Portal</h2>
+    <p class="sub">Sign in to view appointments, pay invoices, and request changes.</p>
+    <div class="pill-tabs">
+      <button class="pill-tab active" data-m="phone">Phone</button>
+      <button class="pill-tab" data-m="google">Google</button>
+      <button class="pill-tab" data-m="email">Email</button>
+    </div>
+    <div id="auth-body"></div>
+    <div class="msg" id="authMsg">${message?escapeHtml(message):''}</div>
+  </div>`);
+  app.appendChild(card);
+
+  const body = card.querySelector('#auth-body');
+  const msg  = card.querySelector('#authMsg');
+  const setMsg = (t,cls) => { msg.textContent=t||''; msg.className='msg'+(cls?' '+cls:''); };
+
+  function renderMode(mode){
+    card.querySelectorAll('.pill-tab').forEach(b => b.classList.toggle('active', b.dataset.m===mode));
+    setMsg('');
+    if (mode==='phone') renderPhone();
+    else if (mode==='google') renderGoogle();
+    else renderEmail();
+  }
+
+  function renderGoogle(){
+    body.innerHTML='';
+    const btn = $(`<button class="btn google">
+      <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+      Continue with Google</button>`);
+    body.appendChild(btn);
+    btn.onclick = async () => {
+      setMsg('Redirecting to Google…');
+      const { error } = await supa.auth.signInWithOAuth({ provider:'google', options:{ redirectTo: location.origin + '/client-portal.html' }});
+      if (error) setMsg(error.message,'err');
+    };
+  }
+
+  function renderPhone(){
+    body.innerHTML='';
+    const form = $(`<form id="phoneForm">
+      <div class="field"><label>Phone number</label>
+        <input type="tel" id="phone" required placeholder="(808) 555-1234" autocomplete="tel"/></div>
+      <button class="btn" style="width:100%" type="submit">Send code</button>
+    </form>`);
+    body.appendChild(form);
+    form.onsubmit = async (e) => {
+      e.preventDefault();
+      setMsg('Sending code…');
+      const phone = form.querySelector('#phone').value.trim();
+      const r = await fetch('/api/portal/send-otp', { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({ phone }) });
+      const j = await r.json().catch(()=>({success:false,error:'Bad response'}));
+      if (!j.success) { setMsg(j.error||'Could not send code','err'); return; }
+      renderOtp(j.phone, j.clientHint);
+    };
+  }
+
+  function renderOtp(phone, hint){
+    body.innerHTML='';
+    const greeting = hint && hint.firstName ? `Hi ${escapeHtml(hint.firstName)}! ` : '';
+    const form = $(`<form id="otpForm">
+      <p class="muted" style="text-align:center">${greeting}We texted a 6-digit code to ${escapeHtml(phone)}.</p>
+      <div class="field"><label>Verification code</label>
+        <input type="text" inputmode="numeric" pattern="\\d{6}" id="code" required maxlength="6" autocomplete="one-time-code" style="letter-spacing:.5em;text-align:center;font-size:18px"/></div>
+      <button class="btn" style="width:100%" type="submit">Verify</button>
+      <div class="row between" style="margin-top:10px">
+        <button type="button" class="link-btn" id="resend">Resend code</button>
+        <button type="button" class="link-btn" id="changePhone">Use a different phone</button>
+      </div>
+    </form>`);
+    body.appendChild(form);
+    form.querySelector('#changePhone').onclick = () => renderPhone();
+    form.querySelector('#resend').onclick = async () => {
+      setMsg('Sending new code…');
+      const r = await fetch('/api/portal/send-otp', { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({ phone }) });
+      const j = await r.json().catch(()=>({success:false}));
+      setMsg(j.success?'New code sent.':(j.error||'Failed to send'), j.success?'ok':'err');
+    };
+    form.onsubmit = async (e) => {
+      e.preventDefault();
+      setMsg('Verifying…');
+      const code = form.querySelector('#code').value.trim();
+      const r = await fetch('/api/portal/verify-otp', { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({ phone, code }) });
+      const j = await r.json().catch(()=>({success:false,error:'Bad response'}));
+      if (!j.success) { setMsg(j.error||'Verification failed','err'); return; }
+      // Exchange the email OTP for a session
+      const { error } = await supa.auth.verifyOtp({ email: j.email, token: j.emailOtp, type: 'magiclink' });
+      if (error) { setMsg(error.message,'err'); return; }
+      boot();
+    };
+  }
+
+  function renderEmail(){
+    body.innerHTML='';
+    let mode = 'signin';
+    const form = $(`<form id="emailForm">
+      <div class="field"><label>Email</label><input type="email" id="email" required autocomplete="email"/></div>
+      <div class="field"><label>Password</label><input type="password" id="password" required autocomplete="current-password" minlength="6"/></div>
+      <button class="btn" style="width:100%" type="submit">Sign in</button>
+      <div class="row between" style="margin-top:10px">
+        <button type="button" class="link-btn" id="forgot">Forgot password?</button>
+        <button type="button" class="link-btn" id="toggleMode">Need an account? Sign up</button>
+      </div>
+    </form>`);
+    body.appendChild(form);
+    const submitBtn = form.querySelector('button[type=submit]');
+    const toggle = form.querySelector('#toggleMode');
+    toggle.onclick = () => {
+      mode = mode==='signin'?'signup':'signin';
+      toggle.textContent = mode==='signin'?'Need an account? Sign up':'Have an account? Sign in';
+      submitBtn.textContent = mode==='signin'?'Sign in':'Create account';
+    };
+    form.querySelector('#forgot').onclick = async () => {
+      const email = form.querySelector('#email').value.trim();
+      if(!email){ setMsg('Enter your email first','err'); return; }
+      const { error } = await supa.auth.resetPasswordForEmail(email, { redirectTo: location.origin+'/client-portal.html' });
+      setMsg(error?error.message:'Password reset email sent.', error?'err':'ok');
+    };
+    form.onsubmit = async (e) => {
+      e.preventDefault();
+      setMsg('');
+      const email = form.querySelector('#email').value.trim();
+      const password = form.querySelector('#password').value;
+      const res = mode==='signin'
+        ? await supa.auth.signInWithPassword({ email, password })
+        : await supa.auth.signUp({ email, password, options:{ emailRedirectTo: location.origin+'/client-portal.html' }});
+      if (res.error) { setMsg(res.error.message,'err'); return; }
+      if (mode==='signup' && !res.data.session) { setMsg('Check your email to confirm your account, then sign in.','ok'); return; }
+      boot();
+    };
+  }
+
+  card.querySelectorAll('.pill-tab').forEach(b => b.onclick = () => renderMode(b.dataset.m));
+  renderMode('phone');
+}
+
+
+// -------- DASHBOARD / APP SHELL --------
+let CTX = null;
+
+async function loadData(client){
+  const [apptRes, invRes, requestsRes] = await Promise.all([
+    supa.from('appointments')
+      .select('id,client_id,client_name,service,date,time,duration_hours,base_price,tax,total_price,status,invoice_sent,address,notes,cleaner_name,recurring')
+      .eq('client_id', client.id).order('date',{ascending:true}).order('time',{ascending:true}),
+    supa.from('invoices')
+      .select('id,stripe_invoice_id,status,notes,appointment_id,amount,created_at')
+      .order('created_at', { ascending: false }).limit(100),
+    supa.from('client_portal_requests')
+      .select('id,kind,status,payload,appointment_id,created_at')
+      .eq('auth_user_id', (await supa.auth.getUser()).data.user.id)
+      .order('created_at',{ascending:false}).limit(30)
+  ]);
+  return { appts: apptRes.data||[], invoices: invRes.data||[], requests: requestsRes.data||[] };
+}
+
+function renderShell(client, user){
+  app.innerHTML='';
+  const wrap = $(`<div class="wrap">
+    <header class="topbar">
+      <div class="brand">
+        <img src="/hnc-logo.png" alt="HNC" />
+        <div><div style="font-weight:700;font-size:18px">Hawaii Natural Clean</div><div class="sub">Client Portal</div></div>
+      </div>
+      <div class="row" style="gap:14px">
+        <div class="who">${escapeHtml(client.name||'')} ${user.email && !user.email.endsWith('@phone.hnc-crm.internal') ? '· '+escapeHtml(user.email) : ''}</div>
+        <button class="btn ghost" id="signOut">Sign out</button>
+      </div>
+    </header>
+    <div class="tabs" id="tabs">
+      <button class="tab active" data-t="upcoming">Upcoming</button>
+      <button class="tab" data-t="history">History</button>
+      <button class="tab" data-t="book">Book a cleaning</button>
+      <button class="tab" data-t="invoices">Invoices</button>
+      <button class="tab" data-t="profile">Profile</button>
+    </div>
+    <div id="content"></div>
+  </div>`);
+  app.appendChild(wrap);
+  wrap.querySelector('#signOut').onclick = async () => { await supa.auth.signOut(); renderLogin(''); };
+  wrap.querySelectorAll('.tab').forEach(t => t.onclick = () => switchTab(t.dataset.t));
+  switchTab('upcoming');
+}
+
+function switchTab(name){
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.t===name));
+  const c = document.getElementById('content');
+  c.innerHTML='<div class="empty">Loading…</div>';
+  if(name==='upcoming') renderUpcoming(c);
+  else if(name==='history') renderHistory(c);
+  else if(name==='book') renderBook(c);
+  else if(name==='invoices') renderInvoices(c);
+  else if(name==='profile') renderProfile(c);
+}
+
+function statusBadge(status){
+  const s = String(status||'').toLowerCase();
+  if (['completed','paid'].includes(s)) return `<span class="badge ok">${escapeHtml(status)}</span>`;
+  if (['cancelled','denied'].includes(s)) return `<span class="badge bad">${escapeHtml(status)}</span>`;
+  if (['pending','requested','new'].includes(s)) return `<span class="badge warn">${escapeHtml(status)}</span>`;
+  return `<span class="badge info">${escapeHtml(status||'scheduled')}</span>`;
+}
+
+function renderUpcoming(c){
+  const today = todayISO();
+  const up = CTX.appts.filter(a => a.date >= today && !['cancelled','completed'].includes(String(a.status||'').toLowerCase()));
+  const next = up[0];
+  const pending = CTX.requests.filter(r => r.status==='pending');
+  c.innerHTML = '';
+  c.appendChild($(`
+    <div class="grid3">
+      <div class="kpi"><div class="label">Next cleaning</div>
+        <div class="value">${next?fmtDateShort(next.date):'—'}</div>
+        <div class="muted" style="margin-top:4px">${next?escapeHtml(fmtTime(next.time)+' · '+(next.service||'')):'No upcoming visit booked'}</div></div>
+      <div class="kpi"><div class="label">Total upcoming</div><div class="value">${up.length}</div></div>
+      <div class="kpi"><div class="label">Pending requests</div><div class="value">${pending.length}</div>
+        <div class="muted" style="margin-top:4px">${pending.length?'Awaiting admin approval':'None'}</div></div>
+    </div>
+  `));
+  const card = $(`<div class="card"><h3>Upcoming cleanings</h3><div id="upList"></div></div>`);
+  c.appendChild(card);
+  const list = card.querySelector('#upList');
+  if (!up.length) { list.innerHTML='<div class="empty">You have no upcoming cleanings. Use the “Book a cleaning” tab to request one.</div>'; return; }
+  const table = $(`<table><thead><tr><th>Date</th><th>Time</th><th>Service</th><th>Status</th><th></th></tr></thead><tbody></tbody></table>`);
+  const tb = table.querySelector('tbody');
+  up.forEach(a => {
+    const row = $(`<tr>
+      <td>${fmtDate(a.date)}</td>
+      <td>${escapeHtml(fmtTime(a.time))}</td>
+      <td>${escapeHtml(a.service||'Cleaning')}${a.recurring?' <span class="badge info" style="margin-left:6px">recurring</span>':''}</td>
+      <td>${statusBadge(a.status)}</td>
+      <td style="text-align:right;white-space:nowrap">
+        <button class="btn secondary" data-act="reschedule" data-id="${a.id}" style="padding:6px 10px;font-size:12px">Reschedule</button>
+        <button class="btn ghost" data-act="cancel" data-id="${a.id}" style="padding:6px 10px;font-size:12px">Cancel</button>
+      </td></tr>`);
+    tb.appendChild(row);
+  });
+  list.appendChild(table);
+  list.querySelectorAll('button[data-act]').forEach(b => b.onclick = () => {
+    const a = CTX.appts.find(x => x.id===b.dataset.id);
+    if (b.dataset.act==='reschedule') openReschedule(a);
+    if (b.dataset.act==='cancel') openCancel(a);
+  });
+  if (pending.length) {
+    const pc = $(`<div class="card"><h3>Your pending requests</h3></div>`);
+    const pt = $(`<table><thead><tr><th>Submitted</th><th>Type</th><th>Details</th><th>Status</th></tr></thead><tbody></tbody></table>`);
+    const ptb = pt.querySelector('tbody');
+    pending.forEach(r => {
+      ptb.appendChild($(`<tr>
+        <td>${new Date(r.created_at).toLocaleString()}</td>
+        <td>${escapeHtml(r.kind.replace('_',' '))}</td>
+        <td class="muted">${escapeHtml(summarizePayload(r.payload))}</td>
+        <td>${statusBadge(r.status)}</td></tr>`));
+    });
+    pc.appendChild(pt);
+    c.appendChild(pc);
+  }
+}
+
+function summarizePayload(p){
+  if (!p) return '';
+  const bits = [];
+  if (p.newDate) bits.push('New date: '+p.newDate);
+  if (p.newTime) bits.push('at '+p.newTime);
+  if (p.service) bits.push(p.service);
+  if (p.reason) bits.push('“'+p.reason+'”');
+  if (p.note) bits.push('“'+p.note+'”');
+  return bits.join(' · ');
+}
+
+function renderHistory(c){
+  const today = todayISO();
+  const past = CTX.appts.filter(a => a.date < today || String(a.status||'').toLowerCase()==='completed' || String(a.status||'').toLowerCase()==='cancelled').slice().reverse();
+  c.innerHTML='';
+  const card = $(`<div class="card"><h3>Cleaning history</h3><div id="hist"></div></div>`);
+  c.appendChild(card);
+  const el = card.querySelector('#hist');
+  if (!past.length) { el.innerHTML='<div class="empty">No past visits yet.</div>'; return; }
+  const table = $(`<table><thead><tr><th>Date</th><th>Service</th><th>Cleaner</th><th>Status</th><th style="text-align:right">Total</th></tr></thead><tbody></tbody></table>`);
+  const tb = table.querySelector('tbody');
+  past.forEach(a => {
+    tb.appendChild($(`<tr>
+      <td>${fmtDate(a.date)}</td>
+      <td>${escapeHtml(a.service||'Cleaning')}</td>
+      <td>${escapeHtml(a.cleaner_name||'')}</td>
+      <td>${statusBadge(a.status)}</td>
+      <td style="text-align:right">${fmtMoney(a.total_price)}</td></tr>`));
+  });
+  el.appendChild(table);
+}
+
+function renderBook(c){
+  c.innerHTML='';
+  const card = $(`<div class="card"><h3>Request a cleaning</h3>
+    <p class="muted" style="margin-top:-6px">Tell us what you need and we'll confirm availability and pricing shortly.</p>
+    <div class="grid3">
+      <div class="field"><label>Service</label>
+        <select id="bk-service">
+          <option value="Regular Cleaning">Regular Cleaning</option>
+          <option value="Deep Cleaning">Deep Cleaning</option>
+          <option value="Move Out Cleaning">Move Out Cleaning</option>
+          <option value="Airbnb Turnover">Airbnb Turnover</option>
+          <option value="Commercial Cleaning">Commercial Cleaning</option>
+        </select></div>
+      <div class="field"><label>Preferred date</label><input type="date" id="bk-date" min="${todayISO()}"/></div>
+      <div class="field"><label>Preferred time</label>
+        <select id="bk-time">
+          <option>8:00 AM</option><option>9:00 AM</option><option>10:00 AM</option>
+          <option>11:00 AM</option><option>12:00 PM</option><option>1:00 PM</option>
+          <option>2:00 PM</option><option>3:00 PM</option><option>4:00 PM</option>
+        </select></div>
+    </div>
+    <div class="grid3">
+      <div class="field"><label>Bedrooms</label><input type="number" id="bk-beds" min="0" value="2"/></div>
+      <div class="field"><label>Bathrooms</label><input type="number" id="bk-baths" min="0" step="0.5" value="2"/></div>
+      <div class="field"><label>Square feet (optional)</label><input type="number" id="bk-sqft" min="0"/></div>
+    </div>
+    <div class="field"><label>Address</label><input type="text" id="bk-address" placeholder="Service address"/></div>
+    <div class="field"><label>Notes for your cleaner</label><textarea id="bk-notes" rows="3" placeholder="Gate codes, pets, entry instructions…"></textarea></div>
+    <div class="row between">
+      <div class="muted">We'll confirm the final price before scheduling.</div>
+      <button class="btn" id="bk-submit">Send request</button>
+    </div>
+  </div>`);
+  c.appendChild(card);
+  // prefill address from client profile
+  const addr = (CTX.client.address||'');
+  card.querySelector('#bk-address').value = addr;
+  card.querySelector('#bk-beds').value = CTX.client.beds || 2;
+  card.querySelector('#bk-baths').value = CTX.client.baths || 2;
+  card.querySelector('#bk-sqft').value = CTX.client.sqft || '';
+  card.querySelector('#bk-submit').onclick = async (e) => {
+    const btn = e.currentTarget;
+    const payload = {
+      service: card.querySelector('#bk-service').value,
+      newDate: card.querySelector('#bk-date').value,
+      newTime: card.querySelector('#bk-time').value,
+      beds: parseInt(card.querySelector('#bk-beds').value)||null,
+      baths: parseFloat(card.querySelector('#bk-baths').value)||null,
+      sqft: parseInt(card.querySelector('#bk-sqft').value)||null,
+      address: card.querySelector('#bk-address').value,
+      notes: card.querySelector('#bk-notes').value
+    };
+    if (!payload.newDate) { alert('Please pick a date.'); return; }
+    btn.disabled = true; btn.textContent = 'Sending…';
+    await submitRequest('new_booking', null, payload);
+    btn.textContent = 'Sent ✓';
+    setTimeout(() => switchTab('upcoming'), 800);
+  };
+}
+
+async function submitRequest(kind, appointmentId, payload){
+  const { data: { user } } = await supa.auth.getUser();
+  const { data, error } = await supa.from('client_portal_requests').insert({
+    kind, appointment_id: appointmentId, client_id: CTX.client.id, auth_user_id: user.id, payload
+  }).select('id').single();
+  if (error) { alert('Could not submit request: '+error.message); return null; }
+  // fire admin notification (non-blocking)
+  fetch('/api/portal/notify-admin', { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({ requestId: data.id }) }).catch(()=>{});
+  // refresh local requests
+  CTX.requests = [{ id: data.id, kind, status:'pending', payload, appointment_id: appointmentId, created_at: new Date().toISOString() }, ...CTX.requests];
+  return data.id;
+}
+
+function openReschedule(a){
+  const dlg = $(`<dialog class="modal" id="rs-dlg">
+    <div class="m-body">
+      <h3>Reschedule cleaning</h3>
+      <p class="muted">Current: ${fmtDate(a.date)} at ${escapeHtml(fmtTime(a.time))}</p>
+      <div class="grid3">
+        <div class="field"><label>New date</label><input type="date" id="rs-date" min="${todayISO()}"/></div>
+        <div class="field"><label>New time</label>
+          <select id="rs-time">
+            <option>8:00 AM</option><option>9:00 AM</option><option>10:00 AM</option>
+            <option>11:00 AM</option><option>12:00 PM</option><option>1:00 PM</option>
+            <option>2:00 PM</option><option>3:00 PM</option><option>4:00 PM</option>
+          </select></div>
+        <div class="field"><label>Reason (optional)</label><input type="text" id="rs-reason"/></div>
+      </div>
+    </div>
+    <div class="m-foot">
+      <button class="btn ghost" id="rs-cancel">Cancel</button>
+      <button class="btn" id="rs-ok">Submit request</button>
+    </div></dialog>`);
+  document.body.appendChild(dlg);
+  dlg.showModal();
+  dlg.querySelector('#rs-cancel').onclick = () => { dlg.close(); dlg.remove(); };
+  dlg.querySelector('#rs-ok').onclick = async () => {
+    const payload = {
+      originalDate: a.date, originalTime: a.time,
+      newDate: dlg.querySelector('#rs-date').value,
+      newTime: dlg.querySelector('#rs-time').value,
+      reason: dlg.querySelector('#rs-reason').value
+    };
+    if (!payload.newDate) { alert('Pick a new date'); return; }
+    await submitRequest('reschedule', a.id, payload);
+    dlg.close(); dlg.remove();
+    switchTab('upcoming');
+  };
+}
+
+function openCancel(a){
+  const hrs = hoursUntil(a.date, a.time);
+  const canSelfServe = hrs > 24;
+  const dlg = $(`<dialog class="modal">
+    <div class="m-body">
+      <h3>Cancel cleaning</h3>
+      <p class="muted">${fmtDate(a.date)} at ${escapeHtml(fmtTime(a.time))}</p>
+      ${canSelfServe
+        ? '<p>This is more than 24 hours away, so we can cancel it right now.</p>'
+        : '<p>This cleaning is within 24 hours. We will send your request to the admin for review — there may be a cancellation fee.</p>'}
+      <div class="field"><label>Reason (optional)</label><input type="text" id="cn-reason"/></div>
+    </div>
+    <div class="m-foot">
+      <button class="btn ghost" id="cn-back">Keep it</button>
+      <button class="btn danger" id="cn-ok">${canSelfServe?'Cancel cleaning':'Request cancellation'}</button>
+    </div></dialog>`);
+  document.body.appendChild(dlg); dlg.showModal();
+  dlg.querySelector('#cn-back').onclick = () => { dlg.close(); dlg.remove(); };
+  dlg.querySelector('#cn-ok').onclick = async () => {
+    const reason = dlg.querySelector('#cn-reason').value;
+    await submitRequest('cancel', a.id, { reason, hoursUntil: Math.round(hrs), selfServe: canSelfServe });
+    dlg.close(); dlg.remove();
+    // For self-serve cancels we optimistically update the local row; the admin will still confirm via CRM trigger.
+    if (canSelfServe) { a.status = 'pending_cancel'; }
+    switchTab('upcoming');
+  };
+}
+
+function renderInvoices(c){
+  c.innerHTML='';
+  // Map invoice rows to their appointment (for context)
+  const byAppt = new Map(CTX.appts.map(a => [a.id, a]));
+  const mine = CTX.invoices.filter(i => !i.appointment_id || byAppt.has(i.appointment_id));
+  const unpaid = mine.filter(i => !['paid','Paid'].includes(String(i.status||'')));
+  const paid = mine.filter(i => ['paid','Paid'].includes(String(i.status||'')));
+  const card = $(`<div class="card"><h3>Unpaid invoices</h3><div id="inv-unpaid"></div></div>`);
+  c.appendChild(card);
+  const uEl = card.querySelector('#inv-unpaid');
+  if (!unpaid.length) { uEl.innerHTML='<div class="empty">You have no open invoices. 🌺</div>'; }
+  else {
+    const t = $(`<table><thead><tr><th>Date</th><th>Service</th><th>Status</th><th style="text-align:right">Amount</th><th></th></tr></thead><tbody></tbody></table>`);
+    unpaid.forEach(inv => {
+      const appt = byAppt.get(inv.appointment_id);
+      t.querySelector('tbody').appendChild($(`<tr>
+        <td>${appt?fmtDate(appt.date):new Date(inv.created_at).toLocaleDateString()}</td>
+        <td>${escapeHtml(appt?appt.service:(inv.notes||'Cleaning service'))}</td>
+        <td>${statusBadge(inv.status||'unpaid')}</td>
+        <td style="text-align:right">${fmtMoney(inv.amount || (appt&&appt.total_price))}</td>
+        <td style="text-align:right"><button class="btn" data-pay="${inv.id}" ${!inv.stripe_invoice_id?'disabled title="Awaiting Stripe link"':''}>Pay now</button></td></tr>`));
+    });
+    uEl.appendChild(t);
+    uEl.querySelectorAll('button[data-pay]').forEach(b => b.onclick = async () => {
+      const id = b.dataset.pay; const inv = mine.find(x=>x.id===id);
+      if (!inv || !inv.stripe_invoice_id) return;
+      b.disabled = true; b.textContent = 'Opening…';
+      const r = await fetch('/api/stripe-invoice', { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({ action:'retrieve_invoice', invoiceId: inv.stripe_invoice_id }) });
+      const j = await r.json().catch(()=>({}));
+      if (j.success && j.invoice && j.invoice.hosted_invoice_url) window.open(j.invoice.hosted_invoice_url, '_blank');
+      else alert('Could not open invoice.');
+      b.disabled = false; b.textContent = 'Pay now';
+    });
+  }
+  const paidCard = $(`<div class="card"><h3>Paid invoices</h3><div id="inv-paid"></div></div>`);
+  c.appendChild(paidCard);
+  const pEl = paidCard.querySelector('#inv-paid');
+  if (!paid.length) { pEl.innerHTML='<div class="empty">No paid invoices yet.</div>'; }
+  else {
+    const t = $(`<table><thead><tr><th>Date</th><th>Service</th><th>Status</th><th style="text-align:right">Amount</th></tr></thead><tbody></tbody></table>`);
+    paid.slice(0,20).forEach(inv => {
+      const appt = byAppt.get(inv.appointment_id);
+      t.querySelector('tbody').appendChild($(`<tr>
+        <td>${appt?fmtDate(appt.date):new Date(inv.created_at).toLocaleDateString()}</td>
+        <td>${escapeHtml(appt?appt.service:(inv.notes||'Cleaning service'))}</td>
+        <td>${statusBadge('Paid')}</td>
+        <td style="text-align:right">${fmtMoney(inv.amount || (appt&&appt.total_price))}</td></tr>`));
+    });
+    pEl.appendChild(t);
+  }
+  const note = $(`<p class="muted" style="text-align:center;margin-top:6px">Paying an invoice securely through Stripe will save your card on file for faster future payments.</p>`);
+  c.appendChild(note);
+}
+
+function renderProfile(c){
+  c.innerHTML='';
+  const cl = CTX.client;
+  const card = $(`<div class="card"><h3>Your profile</h3>
+    <div class="grid3">
+      <div class="field"><label>Name</label><input id="pf-name" value="${escapeHtml(cl.name||'')}"/></div>
+      <div class="field"><label>Email</label><input id="pf-email" type="email" value="${escapeHtml(cl.email||'')}"/></div>
+      <div class="field"><label>Phone</label><input id="pf-phone" value="${escapeHtml(cl.phone||'')}"/></div>
+    </div>
+    <div class="field"><label>Service address</label><input id="pf-address" value="${escapeHtml(cl.address||'')}"/></div>
+    <div class="field"><label>Notes for your cleaner (gate codes, pets, preferences)</label>
+      <textarea id="pf-notes" rows="3">${escapeHtml(cl.notes||'')}</textarea></div>
+    <div class="row between">
+      <div class="muted">Changes to phone or email will be reviewed by the admin before taking effect on your account.</div>
+      <button class="btn" id="pf-save">Save changes</button>
+    </div>
+  </div>`);
+  c.appendChild(card);
+  card.querySelector('#pf-save').onclick = async (e) => {
+    const btn = e.currentTarget; btn.disabled = true; btn.textContent='Saving…';
+    // Address + notes: update directly (client owns these)
+    const addrUpdate = {
+      address: card.querySelector('#pf-address').value,
+      notes: card.querySelector('#pf-notes').value
+    };
+    const { error } = await supa.from('clients').update(addrUpdate).eq('id', cl.id);
+    if (error) { btn.disabled=false; btn.textContent='Save changes'; alert(error.message); return; }
+    // Name / email / phone: submit as a portal request
+    const nameChanged = (cl.name||'') !== (card.querySelector('#pf-name').value||'');
+    const emailChanged = (cl.email||'') !== (card.querySelector('#pf-email').value||'');
+    const phoneChanged = (cl.phone||'') !== (card.querySelector('#pf-phone').value||'');
+    if (nameChanged || emailChanged || phoneChanged) {
+      await submitRequest('profile_update', null, {
+        name: card.querySelector('#pf-name').value,
+        email: card.querySelector('#pf-email').value,
+        phone: card.querySelector('#pf-phone').value
+      });
+    }
+    Object.assign(cl, addrUpdate);
+    btn.textContent='Saved ✓'; setTimeout(()=>{btn.textContent='Save changes'; btn.disabled=false;},1500);
+  };
+}
+
+// -------- BOOT --------
+async function boot(){
+  const { data: { session } } = await supa.auth.getSession();
+  if (!session) { renderLogin(''); return; }
+  const user = session.user;
+  const client = await findClient(user);
+  if (!client) {
+    app.innerHTML = '';
+    const card = $(`<div class="auth card">
+      <div class="logo-wrap"><img src="/hnc-logo.png" alt="HNC"/></div>
+      <h2>Account not linked yet</h2>
+      <p class="sub">Your sign-in isn't linked to a client record with us yet. Please contact Hawaii Natural Clean and we'll get you set up.</p>
+      <button class="btn ghost" id="out" style="width:100%">Sign out</button>
+    </div>`);
+    app.appendChild(card);
+    card.querySelector('#out').onclick = async () => { await supa.auth.signOut(); renderLogin(''); };
+    return;
+  }
+  const data = await loadData(client);
+  CTX = { user, client, ...data };
+  renderShell(client, user);
+}
+
+supa.auth.onAuthStateChange((_e, _s) => { boot(); });
+boot();
+</script>
+</body>
+</html>

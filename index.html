@@ -615,12 +615,12 @@ textarea{font-family:inherit;}
       <!-- AUTOMATIONS VIEW -->
       <div id="view-automations" class="vc">
         <div class="metrics" style="grid-template-columns:repeat(3,minmax(0,1fr));">
-          <div class="metric"><div class="metric-label">Active automations</div><div class="metric-value" id="auto-active-count">6</div><div class="metric-sub up">Running</div></div>
-          <div class="metric"><div class="metric-label">Triggered today</div><div class="metric-value">4</div><div class="metric-sub">Messages sent</div></div>
-          <div class="metric"><div class="metric-label">Est. time saved</div><div class="metric-value">3.2h</div><div class="metric-sub up">This week</div></div>
+          <div class="metric"><div class="metric-label">Active automations</div><div class="metric-value" id="auto-active-count">0</div><div class="metric-sub up">Running</div></div>
+          <div class="metric"><div class="metric-label">Triggered today</div><div class="metric-value" id="auto-today-count">0</div><div class="metric-sub">Actions fired</div></div>
+          <div class="metric"><div class="metric-label">Total rules</div><div class="metric-value" id="auto-total-count">0</div><div class="metric-sub">In your library</div></div>
         </div>
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
-          <div class="section-title" style="margin:0;">Automation rules</div>
+          <div class="section-title" style="margin:0;">Custom automations</div>
           <button class="btn btn-primary" onclick="openNewAuto()" style="font-size:12px;padding:6px 12px;">+ New automation</button>
         </div>
         <div id="auto-list"></div>
@@ -5221,93 +5221,456 @@ document.getElementById('agent-input').addEventListener('keydown',function(e){
 });
 
 
-/* AUTOMATIONS */
-var automations=[
-  {id:1,name:'24hr appointment reminder',trigger:'24h-before',triggerLabel:'24h before appointment',action:'sms-client',actionLabel:'SMS to client',msg:'Hi {{client_name}}! Just a reminder your cleaning is tomorrow at {{time}} with {{cleaner}}. See you then! — Hawaii Natural Clean',active:true,fired:47},
-  {id:2,name:'2hr appointment reminder',trigger:'2h-before',triggerLabel:'2h before appointment',action:'sms-cleaner',actionLabel:'SMS to cleaner',msg:'Hey {{cleaner}}! Reminder: {{client_name}} appointment today at {{time}}. Address is in the app. — HNC',active:true,fired:47},
-  {id:3,name:'Job complete thank-you',trigger:'on-complete',triggerLabel:'Job marked complete',action:'sms-client',actionLabel:'SMS to client',msg:'Hi {{client_name}}! Your home is all cleaned up! Hope everything looks great. Let us know if you need anything. — Hawaii Natural Clean',active:true,fired:38},
-  {id:4,name:'Review request',trigger:'2h-after',triggerLabel:'2h after job complete',action:'sms-client',actionLabel:'SMS to client',msg:'Hi {{client_name}}! We hope you love how your home looks. Would you mind leaving us a quick Google review? It helps a lot! hawaiinaturalclean.com/review — Thank you!',active:true,fired:31},
-  {id:5,name:'Dormant client reactivation',trigger:'60-dormant',triggerLabel:'Client inactive 60 days',action:'sms-client',actionLabel:'SMS to client',msg:'Hi {{client_name}}! It has been a while. We would love to have you back — we are offering 10% off your next booking this month. Reply to schedule! — Hawaii Natural Clean',active:true,fired:8},
-  {id:6,name:'Auto-invoice on completion',trigger:'on-complete',triggerLabel:'Job marked complete',action:'send-invoice',actionLabel:'Send invoice',msg:'Invoice for cleaning services — {{date}}',active:true,fired:38},
-  {id:7,name:'Unpaid invoice reminder',trigger:'invoice-unpaid',triggerLabel:'Invoice unpaid 3 days',action:'sms-client',actionLabel:'SMS to client',msg:'Hi {{client_name}}! Just a reminder your invoice of {{amount}} is still outstanding. You can pay at hawaiinaturalclean.com/pay — Thank you!',active:false,fired:0},
-  {id:8,name:'Daily jobs summary to cleaners',trigger:'daily-6pm-before',triggerLabel:'Day before at 6:00 PM',action:'sms-cleaner-all',actionLabel:'SMS to each cleaner',msg:'Aloha {{cleaner}}! Here are your jobs for tomorrow:\n\n{{jobs_list}}\n\nReply if you have any questions. See you tomorrow! — Hawaii Natural Clean',active:true,fired:12}
+/* ============================================================
+   AUTOMATIONS  (power builder, clean slate)
+   Storage: Supabase table 'automations' with localStorage mirror.
+   Evaluator: hncFireEvent(evt, ctx) is called from app code to
+   run any rules whose trigger matches evt and whose conditions
+   pass against ctx. Time-based triggers (before_24h, etc.) run
+   via a 60-second interval that scans upcoming appointments.
+============================================================ */
+
+var automations = [];
+var AUTO_LS_KEY = 'hnc.automations.v1';
+var AUTO_RUNS_LS_KEY = 'hnc.automations.runs.v1';
+var automationRuns = [];
+var _autoEditingId = null;
+
+/* ---- condition schema ----
+   field: one of
+     event            (equals trigger key)
+     service_type     (string)
+     recurrence       (none|weekly|biweekly|monthly)
+     is_first_time    (true|false)
+     client_tag       (string)
+     day_of_week      (0-6, Sun=0)
+     hour_of_day      (0-23)
+     total_amount     (number)
+     cleaner_id       (string)
+     status           (string)
+   op: eq, neq, gt, gte, lt, lte, contains, in
+   value: string / number / comma-list
+*/
+var AUTO_FIELDS = [
+  {k:'service_type',    label:'Service type',      type:'string'},
+  {k:'recurrence',      label:'Recurrence',        type:'enum', opts:['none','weekly','biweekly','monthly']},
+  {k:'is_first_time',   label:'First-time client', type:'bool'},
+  {k:'client_tag',      label:'Client tag',        type:'string'},
+  {k:'day_of_week',     label:'Day of week',       type:'enum', opts:['0','1','2','3','4','5','6'], labels:['Sun','Mon','Tue','Wed','Thu','Fri','Sat']},
+  {k:'hour_of_day',     label:'Hour of day (0-23)',type:'number'},
+  {k:'total_amount',    label:'Total amount ($)',  type:'number'},
+  {k:'cleaner_id',      label:'Assigned cleaner',  type:'string'},
+  {k:'status',          label:'Status',            type:'string'}
+];
+var AUTO_OPS = [
+  {k:'eq',label:'equals'},
+  {k:'neq',label:'does not equal'},
+  {k:'gt',label:'greater than'},
+  {k:'gte',label:'greater or equal'},
+  {k:'lt',label:'less than'},
+  {k:'lte',label:'less or equal'},
+  {k:'contains',label:'contains'},
+  {k:'in',label:'is one of (comma list)'}
+];
+var AUTO_ACTIONS = [
+  {k:'sms',     label:'Send SMS',        fields:['to','body']},
+  {k:'email',   label:'Send email',      fields:['to','subject','body']},
+  {k:'tag',     label:'Add tag to client',fields:['tag']},
+  {k:'assign',  label:'Assign cleaner',  fields:['cleaner_id']},
+  {k:'task',    label:'Create task',     fields:['title','due_hours']},
+  {k:'webhook', label:'POST webhook',    fields:['url','body']}
 ];
 
-function renderAutomations(){
-  var list=document.getElementById('auto-list');
-  if(!list)return;
-  list.innerHTML='';
-  automations.forEach(function(a){
-    var card=document.createElement('div');card.className='auto-card';
-    card.innerHTML='<label class="auto-toggle" title="'+(a.active?'Active — click to disable':'Inactive — click to enable')+'">'
-      +'<input type="checkbox" '+(a.active?'checked':'')+' onchange="toggleAuto('+a.id+',this.checked)">'
-      +'</label>'
-      +'<div class="auto-body">'
-        +'<div class="auto-name">'+a.name+'</div>'
-        +'<div class="auto-desc">'+a.msg.substring(0,80)+(a.msg.length>80?'...':'')+'</div>'
-        +'<div class="auto-meta">'
-          +'<span class="auto-tag auto-trigger-tag">&#x26A1; '+a.triggerLabel+'</span>'
-          +'<span class="auto-tag auto-action-tag">&#x27A4; '+a.actionLabel+'</span>'
-          +'<span class="auto-tag auto-count">'+a.fired+' sent</span>'
-        +'</div>'
-      +'</div>'
-      +'<div class="auto-actions">'
-        +'<button class="btn" style="font-size:11px;padding:4px 9px;" onclick="editAuto('+a.id+')">Edit</button>'
-      +'</div>';
-    list.appendChild(card);
-  });
-  document.getElementById('auto-active-count').textContent=automations.filter(function(a){return a.active;}).length;
+/* -------- storage -------- */
+function autoLoadLocal(){
+  try { automations = JSON.parse(localStorage.getItem(AUTO_LS_KEY)||'[]'); } catch(e){ automations = []; }
+  try { automationRuns = JSON.parse(localStorage.getItem(AUTO_RUNS_LS_KEY)||'[]'); } catch(e){ automationRuns = []; }
+}
+function autoSaveLocal(){
+  localStorage.setItem(AUTO_LS_KEY, JSON.stringify(automations));
+  localStorage.setItem(AUTO_RUNS_LS_KEY, JSON.stringify(automationRuns.slice(-200)));
+}
+async function autoLoadRemote(){
+  if(typeof supabase==='undefined' || !supabase) return;
+  try{
+    var r = await supabase.from('automations').select('*').order('id');
+    if(r && r.data && Array.isArray(r.data)){
+      automations = r.data.map(function(row){
+        return {
+          id:row.id, name:row.name, enabled:!!row.enabled,
+          trigger:row.trigger, trigger_value:row.trigger_value,
+          logic:row.logic||'AND',
+          conditions: (typeof row.conditions==='string'?JSON.parse(row.conditions||'[]'):(row.conditions||[])),
+          actions:    (typeof row.actions==='string'?JSON.parse(row.actions||'[]'):(row.actions||[])),
+          created_at: row.created_at
+        };
+      });
+      autoSaveLocal();
+    }
+  }catch(e){ console.warn('automations remote load skipped:', e && e.message); }
+}
+async function autoPersistRemote(rule){
+  if(typeof supabase==='undefined' || !supabase) return;
+  try{
+    var payload = {
+      id:rule.id, name:rule.name, enabled:rule.enabled,
+      trigger:rule.trigger, trigger_value:rule.trigger_value||null,
+      logic:rule.logic||'AND',
+      conditions: JSON.stringify(rule.conditions||[]),
+      actions:    JSON.stringify(rule.actions||[])
+    };
+    await supabase.from('automations').upsert(payload, {onConflict:'id'});
+  }catch(e){ console.warn('automations remote upsert failed:', e && e.message); }
+}
+async function autoDeleteRemote(id){
+  if(typeof supabase==='undefined' || !supabase) return;
+  try{ await supabase.from('automations').delete().eq('id',id); }catch(e){}
 }
 
-function toggleAuto(id,active){
-  var auto=automations.find(function(a){return a.id===id;});
-  if(auto){auto.active=active;document.getElementById('auto-active-count').textContent=automations.filter(function(a){return a.active;}).length;}
+/* -------- render list -------- */
+function renderAutoList(){
+  var host = document.getElementById('auto-list');
+  if(!host) return;
+  if(!automations.length){
+    host.innerHTML = '<div class="empty-state" style="padding:28px;text-align:center;color:var(--muted);background:var(--panel);border:1px dashed var(--border);border-radius:var(--radius);">No automations yet. Click <b>+ New automation</b> to build your first rule.</div>';
+    var ac = document.getElementById('auto-active-count'); if(ac) ac.textContent='0';
+    var atot = document.getElementById('auto-total-count'); if(atot) atot.textContent='0';
+    var tc = document.getElementById('auto-today-count'); if(tc) tc.textContent='0';
+    return;
+  }
+  var html = '';
+  for(var i=0;i<automations.length;i++){
+    var a = automations[i];
+    var condSummary = (a.conditions&&a.conditions.length) ? (a.conditions.length+' condition'+(a.conditions.length>1?'s':'')+' ('+(a.logic||'AND')+')') : 'runs every time';
+    var actSummary = (a.actions||[]).map(function(x){ return x.type; }).join(', ') || 'no actions';
+    html += '<div class="card" style="padding:14px 16px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:12px;">'
+      + '<div style="flex:1;min-width:0;">'
+      +   '<div style="display:flex;align-items:center;gap:8px;"><b style="font-size:14px;">'+escAuto(a.name||'Untitled')+'</b>'
+      +     (a.enabled?'<span class="pill pill-ok" style="font-size:10px;">ACTIVE</span>':'<span class="pill" style="font-size:10px;background:#eee;color:#666;">PAUSED</span>')
+      +   '</div>'
+      +   '<div style="font-size:12px;color:var(--muted);margin-top:4px;">When <b>'+escAuto(a.trigger||'?')+'</b> &middot; '+escAuto(condSummary)+' &middot; do '+escAuto(actSummary)+'</div>'
+      + '</div>'
+      + '<div style="display:flex;gap:6px;">'
+      +   '<button class="btn" style="font-size:12px;padding:4px 10px;" onclick="autoToggle('+a.id+')">'+(a.enabled?'Pause':'Enable')+'</button>'
+      +   '<button class="btn" style="font-size:12px;padding:4px 10px;" onclick="autoEdit('+a.id+')">Edit</button>'
+      +   '<button class="btn" style="font-size:12px;padding:4px 10px;color:#c0392b;" onclick="autoDelete('+a.id+')">Delete</button>'
+      + '</div>'
+      + '</div>';
+  }
+  host.innerHTML = html;
+  var active = automations.filter(function(a){return a.enabled;}).length;
+  var ac = document.getElementById('auto-active-count'); if(ac) ac.textContent=String(active);
+  var atot = document.getElementById('auto-total-count'); if(atot) atot.textContent=String(automations.length);
+  var today = (new Date()).toDateString();
+  var todayN = automationRuns.filter(function(r){ return new Date(r.ts).toDateString()===today; }).length;
+  var tc = document.getElementById('auto-today-count'); if(tc) tc.textContent=String(todayN);
 }
+function escAuto(s){ s=String(s==null?'':s); return s.replace(/[&<>"]/g, function(c){return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c];}); }
 
-function editAuto(id){
-  var auto=automations.find(function(a){return a.id===id;});
-  if(!auto)return;
-  document.getElementById('na2-name').value=auto.name;
-  document.getElementById('na2-msg').value=auto.msg;
-  document.getElementById('na2-active').value=auto.active?'true':'false';
-  document.getElementById('new-auto-overlay').classList.remove('hidden');
-}
-
+/* -------- builder UI -------- */
 function openNewAuto(){
-  document.getElementById('na2-name').value='';
-  document.getElementById('na2-msg').value='';
-  document.getElementById('na2-active').value='true';
+  _autoEditingId = null;
+  document.getElementById('na-name').value = '';
+  document.getElementById('na-enabled').checked = true;
+  document.getElementById('na-trigger').value = 'appointment.created';
+  document.getElementById('na-trigger-value').value = '';
+  document.getElementById('na-trigger-extra').style.display = 'none';
+  document.getElementById('na-logic').value = 'AND';
+  document.getElementById('na-conditions').innerHTML = '';
+  document.getElementById('na-actions').innerHTML = '';
+  autoAddAction();
   document.getElementById('new-auto-overlay').classList.remove('hidden');
+  document.getElementById('na-trigger').onchange = autoOnTriggerChange;
+  autoOnTriggerChange();
+}
+function autoOnTriggerChange(){
+  var t = document.getElementById('na-trigger').value;
+  var needs = ['appointment.before_custom','appointment.after_complete','lead.stale','client.inactive','schedule.daily'];
+  document.getElementById('na-trigger-extra').style.display = (needs.indexOf(t)>=0)?'':'none';
+}
+function autoEdit(id){
+  var a = automations.filter(function(x){return x.id===id;})[0]; if(!a) return;
+  _autoEditingId = id;
+  document.getElementById('na-name').value = a.name||'';
+  document.getElementById('na-enabled').checked = !!a.enabled;
+  document.getElementById('na-trigger').value = a.trigger||'appointment.created';
+  document.getElementById('na-trigger-value').value = a.trigger_value||'';
+  document.getElementById('na-logic').value = a.logic||'AND';
+  document.getElementById('na-conditions').innerHTML = '';
+  document.getElementById('na-actions').innerHTML = '';
+  (a.conditions||[]).forEach(function(c){ autoAddCondition(c); });
+  (a.actions||[]).forEach(function(ac){ autoAddAction(ac); });
+  document.getElementById('new-auto-overlay').classList.remove('hidden');
+  document.getElementById('na-trigger').onchange = autoOnTriggerChange;
+  autoOnTriggerChange();
 }
 
-function saveNewAuto(){
-  var name=document.getElementById('na2-name').value;
-  if(!name){document.getElementById('na2-name').focus();return;}
-  var triggerSel=document.getElementById('na2-trigger');
-  var actionSel=document.getElementById('na2-action');
-  var triggerLabel=triggerSel.options[triggerSel.selectedIndex].text;
-  var actionLabel=actionSel.options[actionSel.selectedIndex].text;
-  var newId=automations.length>0?Math.max.apply(null,automations.map(function(a){return a.id;}))+1:1;
-  automations.push({
-    id:newId,name:name,
-    trigger:triggerSel.value,triggerLabel:triggerLabel,
-    action:actionSel.value,actionLabel:actionLabel,
-    msg:document.getElementById('na2-msg').value,
-    active:document.getElementById('na2-active').value==='true',
-    fired:0
+function autoAddCondition(preset){
+  var host = document.getElementById('na-conditions');
+  var row = document.createElement('div');
+  row.className = 'auto-cond';
+  row.style.cssText = 'display:flex;gap:6px;margin-bottom:6px;align-items:center;';
+  var fSel = '<select class="ac-field" style="flex:1;">';
+  AUTO_FIELDS.forEach(function(f){ fSel += '<option value="'+f.k+'">'+f.label+'</option>'; });
+  fSel += '</select>';
+  var oSel = '<select class="ac-op" style="flex:0 0 150px;">';
+  AUTO_OPS.forEach(function(o){ oSel += '<option value="'+o.k+'">'+o.label+'</option>'; });
+  oSel += '</select>';
+  row.innerHTML = fSel + oSel +
+    '<input class="ac-value" type="text" placeholder="value" style="flex:1;">' +
+    '<button type="button" class="btn" style="padding:4px 8px;font-size:12px;" onclick="this.parentNode.remove()">&#x2715;</button>';
+  host.appendChild(row);
+  if(preset){
+    row.querySelector('.ac-field').value = preset.field||AUTO_FIELDS[0].k;
+    row.querySelector('.ac-op').value = preset.op||'eq';
+    row.querySelector('.ac-value').value = preset.value==null?'':preset.value;
+  }
+}
+function autoAddAction(preset){
+  var host = document.getElementById('na-actions');
+  var row = document.createElement('div');
+  row.className = 'auto-act card';
+  row.style.cssText = 'padding:10px;margin-bottom:8px;background:var(--panel);border:1px solid var(--border);border-radius:var(--radius-sm);';
+  var typeSel = '<select class="aa-type" style="flex:0 0 180px;">';
+  AUTO_ACTIONS.forEach(function(a){ typeSel += '<option value="'+a.k+'">'+a.label+'</option>'; });
+  typeSel += '</select>';
+  row.innerHTML = '<div style="display:flex;gap:6px;align-items:center;margin-bottom:8px;">'+typeSel+
+    '<button type="button" class="btn" style="padding:4px 8px;font-size:12px;margin-left:auto;" onclick="this.parentNode.parentNode.remove()">Remove</button></div>'+
+    '<div class="aa-fields" style="display:flex;flex-direction:column;gap:6px;"></div>';
+  host.appendChild(row);
+  var sel = row.querySelector('.aa-type');
+  sel.onchange = function(){ autoRenderActionFields(row, sel.value, {}); };
+  if(preset){
+    sel.value = preset.type||'sms';
+    autoRenderActionFields(row, sel.value, preset);
+  } else {
+    autoRenderActionFields(row, sel.value, {});
+  }
+}
+function autoRenderActionFields(row, type, preset){
+  var def = AUTO_ACTIONS.filter(function(a){return a.k===type;})[0]; if(!def) return;
+  var host = row.querySelector('.aa-fields');
+  host.innerHTML = '';
+  def.fields.forEach(function(fn){
+    var wrap = document.createElement('div');
+    var isBody = (fn==='body');
+    wrap.innerHTML = '<label style="font-size:11px;color:var(--muted);display:block;margin-bottom:2px;">'+fn+'</label>'+
+      (isBody
+        ? '<textarea class="aa-f" data-k="'+fn+'" rows="3" style="width:100%;"></textarea>'
+        : '<input class="aa-f" data-k="'+fn+'" type="text" style="width:100%;">');
+    host.appendChild(wrap);
+    if(preset && preset[fn]!=null) wrap.querySelector('.aa-f').value = preset[fn];
   });
-  renderAutomations();
-  var s=document.getElementById('na2-success');s.classList.add('show');
-  setTimeout(function(){s.classList.remove('show');closeOverlay('new-auto-overlay');},1800);
 }
 
-function insertVar(btn,v){
-  var ta=document.getElementById('na2-msg');
-  var pos=ta.selectionStart;
-  ta.value=ta.value.slice(0,pos)+v+ta.value.slice(ta.selectionEnd);
-  ta.focus();
-  ta.selectionStart=ta.selectionEnd=pos+v.length;
+function autoCopyVar(v){
+  // copy to clipboard, also try to append into the currently focused textarea
+  try { navigator.clipboard.writeText(v); } catch(e){}
+  var active = document.activeElement;
+  if(active && (active.tagName==='TEXTAREA' || (active.tagName==='INPUT' && active.type==='text'))){
+    var s=active.selectionStart, e=active.selectionEnd;
+    active.value = active.value.slice(0,s)+v+active.value.slice(e);
+    active.selectionStart = active.selectionEnd = s+v.length;
+  }
 }
+
+function autoSave(){
+  var name = document.getElementById('na-name').value.trim();
+  if(!name){ alert('Please name this automation'); return; }
+  var rule = {
+    id: _autoEditingId || (automations.length ? Math.max.apply(null, automations.map(function(x){return x.id;}))+1 : 1),
+    name: name,
+    enabled: document.getElementById('na-enabled').checked,
+    trigger: document.getElementById('na-trigger').value,
+    trigger_value: document.getElementById('na-trigger-value').value || null,
+    logic: document.getElementById('na-logic').value,
+    conditions: [],
+    actions: [],
+    created_at: new Date().toISOString()
+  };
+  document.querySelectorAll('#na-conditions .auto-cond').forEach(function(r){
+    rule.conditions.push({
+      field: r.querySelector('.ac-field').value,
+      op:    r.querySelector('.ac-op').value,
+      value: r.querySelector('.ac-value').value
+    });
+  });
+  document.querySelectorAll('#na-actions .auto-act').forEach(function(r){
+    var act = { type: r.querySelector('.aa-type').value };
+    r.querySelectorAll('.aa-f').forEach(function(f){ act[f.dataset.k] = f.value; });
+    rule.actions.push(act);
+  });
+  if(!rule.actions.length){ alert('Add at least one action'); return; }
+  var idx = automations.findIndex(function(x){return x.id===rule.id;});
+  if(idx>=0) automations[idx] = rule; else automations.push(rule);
+  autoSaveLocal();
+  autoPersistRemote(rule);
+  renderAutoList();
+  var s = document.getElementById('na-success'); s.classList.add('show');
+  setTimeout(function(){ s.classList.remove('show'); closeOverlay('new-auto-overlay'); }, 1000);
+}
+function autoToggle(id){
+  var a = automations.filter(function(x){return x.id===id;})[0]; if(!a) return;
+  a.enabled = !a.enabled;
+  autoSaveLocal(); autoPersistRemote(a); renderAutoList();
+}
+function autoDelete(id){
+  if(!confirm('Delete this automation? This cannot be undone.')) return;
+  automations = automations.filter(function(x){return x.id!==id;});
+  autoSaveLocal(); autoDeleteRemote(id); renderAutoList();
+}
+
+/* -------- evaluator & actions -------- */
+function autoMatchCondition(c, ctx){
+  var v = ctx[c.field];
+  var cmp = c.value;
+  var num = function(x){ return typeof x==='number'?x:parseFloat(x); };
+  switch(c.op){
+    case 'eq':  return String(v)===String(cmp);
+    case 'neq': return String(v)!==String(cmp);
+    case 'gt':  return num(v) >  num(cmp);
+    case 'gte': return num(v) >= num(cmp);
+    case 'lt':  return num(v) <  num(cmp);
+    case 'lte': return num(v) <= num(cmp);
+    case 'contains': return String(v||'').toLowerCase().indexOf(String(cmp||'').toLowerCase())>=0;
+    case 'in':  return String(cmp||'').split(',').map(function(x){return x.trim();}).indexOf(String(v))>=0;
+  }
+  return false;
+}
+function autoTemplate(str, ctx){
+  if(!str) return '';
+  return String(str).replace(/\{(\w+)\}/g, function(_,k){ return ctx[k]==null?'':String(ctx[k]); });
+}
+function autoLogRun(rule, ctx, outcome){
+  automationRuns.push({ts:Date.now(), rule_id:rule.id, name:rule.name, trigger:rule.trigger, outcome:outcome});
+  autoSaveLocal();
+}
+async function autoRunAction(act, ctx, rule){
+  try{
+    if(act.type==='sms'){
+      var to = autoTemplate(act.to, ctx);
+      var body = autoTemplate(act.body, ctx);
+      if(typeof sendSMS === 'function'){ await sendSMS(to, body); }
+      else { console.log('[automation stub SMS]', {to:to, body:body}); }
+      autoLogRun(rule, ctx, 'sms:'+to);
+    } else if(act.type==='email'){
+      var eto = autoTemplate(act.to, ctx);
+      var sub = autoTemplate(act.subject, ctx);
+      var eb = autoTemplate(act.body, ctx);
+      if(typeof sendEmail === 'function'){ await sendEmail(eto, sub, eb); }
+      else { console.log('[automation stub EMAIL]', {to:eto, subject:sub, body:eb}); }
+      autoLogRun(rule, ctx, 'email:'+eto);
+    } else if(act.type==='tag'){
+      var tag = autoTemplate(act.tag, ctx);
+      if(ctx.client_id && typeof supabase !== 'undefined' && supabase){
+        try{ await supabase.from('client_tags').insert({client_id:ctx.client_id, tag:tag}); }catch(e){}
+      }
+      autoLogRun(rule, ctx, 'tag:'+tag);
+    } else if(act.type==='assign'){
+      var cid = autoTemplate(act.cleaner_id, ctx);
+      if(ctx.appointment_id && typeof supabase !== 'undefined' && supabase){
+        try{ await supabase.from('appointments').update({cleaner_id:cid}).eq('id',ctx.appointment_id); }catch(e){}
+      }
+      autoLogRun(rule, ctx, 'assign:'+cid);
+    } else if(act.type==='task'){
+      var title = autoTemplate(act.title, ctx);
+      var dueHours = parseFloat(act.due_hours||'24');
+      console.log('[automation task]', {title:title, due_in_hours:dueHours, ctx:ctx});
+      autoLogRun(rule, ctx, 'task:'+title);
+    } else if(act.type==='webhook'){
+      var url = autoTemplate(act.url, ctx);
+      var wb = autoTemplate(act.body, ctx);
+      try{ await fetch(url, {method:'POST', headers:{'Content-Type':'application/json'}, body: wb || JSON.stringify(ctx)}); }catch(e){}
+      autoLogRun(rule, ctx, 'webhook:'+url);
+    }
+  }catch(e){ console.warn('automation action failed', e); autoLogRun(rule, ctx, 'error:'+(e&&e.message)); }
+}
+
+function hncFireEvent(eventName, ctx){
+  ctx = ctx || {};
+  ctx.event = eventName;
+  if(ctx.date && !ctx.day_of_week){ try{ ctx.day_of_week = new Date(ctx.date).getDay(); }catch(e){} }
+  if(ctx.time && ctx.hour_of_day==null){ try{ ctx.hour_of_day = parseInt(String(ctx.time).slice(0,2),10); }catch(e){} }
+  for(var i=0;i<automations.length;i++){
+    var a = automations[i];
+    if(!a.enabled) continue;
+    if(a.trigger !== eventName) continue;
+    var conds = a.conditions||[];
+    if(conds.length){
+      var results = conds.map(function(c){ return autoMatchCondition(c, ctx); });
+      var pass = (a.logic==='OR') ? results.some(Boolean) : results.every(Boolean);
+      if(!pass) continue;
+    }
+    (a.actions||[]).forEach(function(act){ autoRunAction(act, ctx, a); });
+  }
+}
+window.hncFireEvent = hncFireEvent;
+
+/* -------- time-based scheduler (polls once a minute) -------- */
+var _autoTicked = {};
+function autoTick(){
+  try{
+    var now = Date.now();
+    var upcoming = (typeof apptData !== 'undefined' && Array.isArray(apptData)) ? apptData : [];
+    upcoming.forEach(function(ap){
+      if(!ap || !ap.date || !ap.time) return;
+      if(ap.status==='cancelled' || ap.status==='deleted') return;
+      var when;
+      try{ when = new Date(ap.date + 'T' + (ap.time.length===5?ap.time+':00':ap.time)).getTime(); }catch(e){ return; }
+      var ctx = {
+        appointment_id: ap.id, client_id: ap.client_id, client_name: ap.client_name || ap.client || '',
+        date: ap.date, time: ap.time, cleaner: ap.cleaner_name || '',
+        cleaner_id: ap.cleaner_id || '', address: ap.address||'', service: ap.service||ap.service_type||'',
+        service_type: ap.service_type||ap.service||'', price: ap.price||ap.total_amount||0,
+        total_amount: ap.total_amount||ap.price||0, recurrence: ap.recurrence||'none',
+        status: ap.status||'', is_first_time: !!ap.is_first_time
+      };
+      [['appointment.before_24h', 24*3600*1000],
+       ['appointment.before_2h',   2*3600*1000]].forEach(function(pair){
+        var ev=pair[0], off=pair[1];
+        var target = when - off;
+        if(now >= target && now < target + 60*1000){
+          var key = ev+':'+ap.id;
+          if(_autoTicked[key]) return;
+          _autoTicked[key] = 1;
+          hncFireEvent(ev, ctx);
+        }
+      });
+      // custom hours before
+      automations.forEach(function(a){
+        if(!a.enabled) return;
+        if(a.trigger==='appointment.before_custom'){
+          var hrs = parseFloat(a.trigger_value||'0'); if(!hrs) return;
+          var t2 = when - hrs*3600*1000;
+          if(now >= t2 && now < t2+60*1000){
+            var key = 'custom:'+a.id+':'+ap.id;
+            if(_autoTicked[key]) return;
+            _autoTicked[key] = 1;
+            hncFireEvent('appointment.before_custom', ctx);
+          }
+        }
+      });
+    });
+    // daily schedule trigger
+    var nowD = new Date();
+    automations.forEach(function(a){
+      if(!a.enabled || a.trigger!=='schedule.daily') return;
+      var v = (a.trigger_value||'09:00').split(':');
+      if(nowD.getHours()===parseInt(v[0],10) && nowD.getMinutes()===parseInt(v[1]||'0',10)){
+        var key='daily:'+a.id+':'+nowD.toDateString();
+        if(_autoTicked[key]) return;
+        _autoTicked[key]=1;
+        hncFireEvent('schedule.daily', {event:'schedule.daily'});
+      }
+    });
+  }catch(e){ console.warn('autoTick err', e); }
+}
+
+/* -------- boot -------- */
+autoLoadLocal();
+renderAutoList();
+autoLoadRemote().then(function(){ renderAutoList(); });
+setInterval(autoTick, 60*1000);
 
 /* PAYMENTS */
 var stripeConnected=false;
@@ -8574,51 +8937,92 @@ loadSettings();
 
 <!-- NEW AUTOMATION OVERLAY -->
 <div class="overlay hidden" id="new-auto-overlay" onclick="closeOverlay('new-auto-overlay')">
-  <div class="panel" onclick="event.stopPropagation()">
-    <div class="panel-header"><div class="panel-title">New automation</div><button class="close-btn" onclick="closeOverlay('new-auto-overlay')">&#x2715;</button></div>
+  <div class="panel" style="max-width:820px;" onclick="event.stopPropagation()">
+    <div class="panel-header">
+      <div class="panel-title">New automation</div>
+      <button class="close-btn" onclick="closeOverlay('new-auto-overlay')">&#x2715;</button>
+    </div>
     <div class="panel-body">
-      <div class="form-row"><label>Automation name</label><input type="text" id="na2-name" placeholder="e.g. 24hr appointment reminder"></div>
-      <div class="form-row"><label>Trigger</label>
-        <select id="na2-trigger">
-          <option value="daily-6pm-before">Day before at 6:00 PM (cleaner summary)</option>
-          <option value="24h-before">24 hours before appointment</option>
-          <option value="2h-before">2 hours before appointment</option>
-          <option value="on-complete">When job marked complete</option>
-          <option value="2h-after">2 hours after job complete</option>
-          <option value="60-dormant">Client inactive for 60 days</option>
-          <option value="invoice-unpaid">Invoice unpaid for 3 days</option>
-          <option value="new-booking">New booking created</option>
+
+      <div class="form-row">
+        <label>Name</label>
+        <input type="text" id="na-name" placeholder="e.g. Remind VIP clients 24h before">
+      </div>
+
+      <div class="form-row" style="display:flex;align-items:center;gap:10px;">
+        <label style="margin:0;">Enabled</label>
+        <label class="switch"><input type="checkbox" id="na-enabled" checked><span class="slider"></span></label>
+        <span style="font-size:12px;color:var(--muted);">Rule will run as soon as it is saved</span>
+      </div>
+
+      <div style="height:1px;background:var(--border);margin:14px 0;"></div>
+
+      <div class="section-title" style="margin:0 0 8px 0;font-size:13px;">When &mdash; Trigger</div>
+      <div class="form-row">
+        <select id="na-trigger">
+          <option value="appointment.created">Appointment is created</option>
+          <option value="appointment.updated">Appointment is updated</option>
+          <option value="appointment.cancelled">Appointment is cancelled</option>
+          <option value="appointment.completed">Appointment is completed (marked done)</option>
+          <option value="appointment.paid">Appointment is marked paid</option>
+          <option value="appointment.before_24h">24 hours before appointment start</option>
+          <option value="appointment.before_2h">2 hours before appointment start</option>
+          <option value="appointment.before_custom">Custom hours before appointment</option>
+          <option value="appointment.after_complete">Hours after job completed</option>
+          <option value="lead.created">New lead is created</option>
+          <option value="lead.stale">Lead inactive for N days</option>
+          <option value="client.inactive">Client inactive for N days</option>
+          <option value="schedule.daily">Every day at specific time</option>
         </select>
       </div>
-      <div class="form-row"><label>Action</label>
-        <select id="na2-action">
-          <option value="sms-client">Send SMS to client</option>
-          <option value="email-client">Send email to client</option>
-          <option value="sms-cleaner">Send SMS to assigned cleaner</option>
-          <option value="sms-cleaner-all">Send SMS to each cleaner (daily summary)</option>
-          <option value="send-invoice">Send invoice to client</option>
-          <option value="charge-card">Charge card on file</option>
-        </select>
+
+      <div class="form-row" id="na-trigger-extra" style="display:none;">
+        <label>Trigger value (hours / days / time)</label>
+        <input type="text" id="na-trigger-value" placeholder="e.g. 48 or 18:00">
       </div>
-      <div class="form-row"><label>Message template</label>
-        <textarea id="na2-msg" style="min-height:80px;" placeholder="Use {{client_name}}, {{date}}, {{time}}, {{cleaner}}, {{amount}} as variables"></textarea>
+
+      <div style="height:1px;background:var(--border);margin:14px 0;"></div>
+
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+        <div class="section-title" style="margin:0;font-size:13px;">If &mdash; Conditions</div>
+        <div style="display:flex;gap:6px;align-items:center;">
+          <span style="font-size:12px;color:var(--muted);">Match</span>
+          <select id="na-logic" style="padding:4px 8px;font-size:12px;">
+            <option value="AND">ALL conditions</option>
+            <option value="OR">ANY condition</option>
+          </select>
+          <button type="button" class="btn" style="font-size:12px;padding:4px 10px;" onclick="autoAddCondition()">+ Condition</button>
+        </div>
       </div>
-      <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
-        <button class="tone-btn active" onclick="insertVar(this,'{{client_name}}')">+ Client name</button>
-        <button class="tone-btn" onclick="insertVar(this,'{{date}}')">+ Date</button>
-        <button class="tone-btn" onclick="insertVar(this,'{{time}}')">+ Time</button>
-        <button class="tone-btn" onclick="insertVar(this,'{{cleaner}}')">+ Cleaner</button>
-        <button class="tone-btn" onclick="insertVar(this,'{{amount}}')">+ Amount</button>
-        <button class="tone-btn" onclick="insertVar(this,'{{jobs_list}}')">+ Jobs list</button>
+      <div id="na-conditions"></div>
+      <div style="font-size:11px;color:var(--muted);margin-top:4px;">Leave empty to run on every trigger.</div>
+
+      <div style="height:1px;background:var(--border);margin:14px 0;"></div>
+
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+        <div class="section-title" style="margin:0;font-size:13px;">Then &mdash; Actions</div>
+        <button type="button" class="btn" style="font-size:12px;padding:4px 10px;" onclick="autoAddAction()">+ Action</button>
       </div>
-      <div class="form-row"><label>Active</label>
-        <select id="na2-active"><option value="true">Yes — run this automation</option><option value="false">No — save as draft</option></select>
+      <div id="na-actions"></div>
+
+      <div style="height:1px;background:var(--border);margin:14px 0;"></div>
+
+      <div style="font-size:12px;color:var(--muted);margin-bottom:6px;">Template variables (click to copy &mdash; paste into any message body):</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;">
+        <button type="button" class="chan-btn" onclick="autoCopyVar('{client_name}')">{client_name}</button>
+        <button type="button" class="chan-btn" onclick="autoCopyVar('{date}')">{date}</button>
+        <button type="button" class="chan-btn" onclick="autoCopyVar('{time}')">{time}</button>
+        <button type="button" class="chan-btn" onclick="autoCopyVar('{cleaner}')">{cleaner}</button>
+        <button type="button" class="chan-btn" onclick="autoCopyVar('{address}')">{address}</button>
+        <button type="button" class="chan-btn" onclick="autoCopyVar('{service}')">{service}</button>
+        <button type="button" class="chan-btn" onclick="autoCopyVar('{price}')">{price}</button>
       </div>
-      <div class="save-bar">
-        <button class="btn btn-primary" onclick="saveNewAuto()">Save automation</button>
+
+      <div class="form-actions" style="margin-top:18px;">
+        <button class="btn btn-primary" onclick="autoSave()">Save automation</button>
         <button class="btn" onclick="closeOverlay('new-auto-overlay')">Cancel</button>
       </div>
-      <div class="success-bar" id="na2-success">Automation saved!</div>
+      <div class="success-bar" id="na-success">Automation saved!</div>
     </div>
   </div>
 </div>

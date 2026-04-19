@@ -342,7 +342,7 @@ async function loadData(client){
   const [apptRes, invRes, requestsRes] = await Promise.all([
     supa.from('appointments')
       .select('id,client_id,client_name,service,date,time,duration_hours,base_price,tax,total_price,status,invoice_sent,address,notes,cleaner_name,recurring')
-      .eq('client_id', client.id).order('date',{ascending:true}).order('time',{ascending:true}),
+      .eq('client_id', client.id).neq('status','deleted').order('date',{ascending:true}).order('time',{ascending:true}),
     supa.from('invoices')
       .select('id,stripe_invoice_id,status,notes,appointment_id,amount,created_at')
       .order('created_at', { ascending: false }).limit(100),

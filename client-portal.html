@@ -93,6 +93,7 @@
   dialog.modal .m-foot{padding:14px 24px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:10px;background:var(--bg-soft);border-radius:0 0 14px 14px}
   .empty{color:var(--muted);padding:16px;text-align:center;font-size:14px}
 </style>
+  <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCkn8UeVuv5iek_Rm3jqdozF1HGMhSuGNk&libraries=places&v=weekly" defer></script>
 </head>
 <body>
 <div id="app"></div>
@@ -155,7 +156,30 @@ async function findClient(user){
   }
 }
 
-// -------- AUTH SCREEN ---------
+
+    // Google Places Autocomplete — attaches to any <input data-address>
+    function initPortalAutocomplete() {
+      if (!window.google || !window.google.maps || !window.google.maps.places) {
+        setTimeout(initPortalAutocomplete, 300); return;
+      }
+      document.querySelectorAll("input[data-address]:not([data-ac-wired])").forEach(inp => {
+        inp.setAttribute("data-ac-wired", "1");
+        try {
+          const ac = new google.maps.places.Autocomplete(inp, {
+            types: ["address"],
+            componentRestrictions: { country: ["us"] },
+            fields: ["formatted_address", "geometry"]
+          });
+          ac.addListener("place_changed", () => {
+            const p = ac.getPlace();
+            if (p && p.formatted_address) { inp.value = p.formatted_address; inp.dispatchEvent(new Event("change", { bubbles: true })); }
+          });
+        } catch(e) { console.warn("Autocomplete init failed", e); }
+      });
+    }
+    setInterval(initPortalAutocomplete, 500);
+    
+    // -------- AUTH SCREEN ---------
 function renderLogin(message){
   app.innerHTML='';
   const card = $(`
@@ -317,8 +341,11 @@ async function loadData(client){
 }
 
 function renderShell(client, user){
+  const showLeadBanner = client && client.is_lead;
+  window.__LEAD_BANNER_HTML = showLeadBanner ? `<div style="margin:16px 0;padding:14px 18px;border-radius:10px;background:#FEF3C7;color:#92400E;border:1px solid #FCD34D;font-size:14px;line-height:1.5"><strong>Thanks for signing up!</strong> We received your info and will reach out shortly to confirm your first cleaning. Meanwhile, feel free to request a cleaning below.</div>` : "";
   app.innerHTML='';
   const wrap = $(`<div class="wrap">
+    ${window.__LEAD_BANNER_HTML||""}
     <header class="topbar">
       <div class="brand">
         <img src="/hnc-logo.png" alt="HNC" />
@@ -332,7 +359,7 @@ function renderShell(client, user){
     <div class="tabs" id="tabs">
       <button class="tab active" data-t="upcoming">Upcoming</button>
       <button class="tab" data-t="history">History</button>
-      <button class="tab" data-t="book">Book a cleaning</button>
+      <button class="tab" data-t="book">Request a cleaning</button>
       <button class="tab" data-t="invoices">Invoices</button>
       <button class="tab" data-t="profile">Profile</button>
     </div>
@@ -382,7 +409,7 @@ function renderUpcoming(c){
   const card = $(`<div class="card"><h3>Upcoming cleanings</h3><div id="upList"></div></div>`);
   c.appendChild(card);
   const list = card.querySelector('#upList');
-  if (!up.length) { list.innerHTML='<div class="empty">You have no upcoming cleanings. Use the “Book a cleaning” tab to request one.</div>'; return; }
+  if (!up.length) { list.innerHTML='<div class="empty">You have no upcoming cleanings. Use the “Request a cleaning” tab to request one.</div>'; return; }
   const table = $(`<table><thead><tr><th>Date</th><th>Time</th><th>Service</th><th>Status</th><th></th></tr></thead><tbody></tbody></table>`);
   const tb = table.querySelector('tbody');
   up.forEach(a => {
@@ -477,7 +504,7 @@ function renderBook(c){
       <div class="field"><label>Bathrooms</label><input type="number" id="bk-baths" min="0" step="0.5" value="2"/></div>
       <div class="field"><label>Square feet (optional)</label><input type="number" id="bk-sqft" min="0"/></div>
     </div>
-    <div class="field"><label>Address</label><input type="text" id="bk-address" placeholder="Service address"/></div>
+    <div class="field"><label>Address</label><input type="text" id="bk-address" placeholder="Service address"/ data-address></div>
     <div class="field"><label>Notes for your cleaner</label><textarea id="bk-notes" rows="3" placeholder="Gate codes, pets, entry instructions…"></textarea></div>
     <div class="row between">
       <div class="muted">We'll confirm the final price before scheduling.</div>
@@ -652,7 +679,7 @@ function renderProfile(c){
       <div class="field"><label>Email</label><input id="pf-email" type="email" value="${escapeHtml(cl.email||'')}"/></div>
       <div class="field"><label>Phone</label><input id="pf-phone" value="${escapeHtml(cl.phone||'')}"/></div>
     </div>
-    <div class="field"><label>Service address</label><input id="pf-address" value="${escapeHtml(cl.address||'')}"/></div>
+    <div class="field"><label>Service address</label><input id="pf-address" value="${escapeHtml(cl.address||'')}"/ data-address></div>
     <div class="field"><label>Notes for your cleaner (gate codes, pets, preferences)</label>
       <textarea id="pf-notes" rows="3">${escapeHtml(cl.notes||'')}</textarea></div>
     <div class="row between">

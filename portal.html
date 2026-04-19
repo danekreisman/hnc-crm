@@ -71,7 +71,19 @@ const app = document.getElementById('app');
 const $ = (html) => { const t = document.createElement('template'); t.innerHTML = html.trim(); return t.content.firstChild; };
 const fmtMoney = (n) => '$' + (Number(n||0)).toFixed(2);
 const fmtDate = (d) => { if(!d) return ''; const dt = new Date(d+'T00:00:00'); return dt.toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric'}); };
-const fmtTime = (t) => { if(!t) return ''; const [h,m]=t.split(':'); const H=parseInt(h,10); const ap=H>=12?'PM':'AM'; const h12=((H+11)%12)+1; return `${h12}:${m} ${ap}`; };
+const fmtTime = (t) => {
+  if (!t) return '';
+  var s = String(t).trim();
+  var mAmPm = s.match(/^(\d{1,2})\s*(am|pm)$/i);
+  if (mAmPm) { return parseInt(mAmPm[1],10) + ':00 ' + mAmPm[2].toUpperCase(); }
+  var mHMAmPm = s.match(/^(\d{1,2}):(\d{2})\s*(am|pm)$/i);
+  if (mHMAmPm) { return parseInt(mHMAmPm[1],10) + ':' + mHMAmPm[2] + ' ' + mHMAmPm[3].toUpperCase(); }
+  var m24 = s.match(/^(\d{1,2}):(\d{2})/);
+  if (m24) { var H = parseInt(m24[1],10); var mm = m24[2]; var ap = H>=12?'PM':'AM'; var h12=((H+11)%12)+1; return h12+':'+mm+' '+ap; }
+  var mH = s.match(/^(\d{1,2})$/);
+  if (mH) { var H2=parseInt(mH[1],10); var ap2=H2>=12?'PM':'AM'; var h122=((H2+11)%12)+1; return h122+':00 '+ap2; }
+  return s;
+};
 
 function renderLogin(message){
   app.innerHTML = '';
@@ -191,7 +203,7 @@ function currentPeriod(cfg){
 
 async function loadAppointments(cleaner){
   const { data, error } = await supa.from('appointments')
-    .select('id,client_name,service,date,time,duration_hours,status,total_price,cleaner_pay,cleaner_pay_override,address,notes')
+    .select('id,client_name,service,date,time,duration_hours,status,total_price,cleaner_pay,cleaner_pay_override,address,notes,cleaner_name')
     .eq('cleaner_id', cleaner.id)
     .order('date', { ascending: true })
     .order('time', { ascending: true });
@@ -223,7 +235,7 @@ function renderDashboard(ctx){
   const hoursThisPeriod = periodCompleted.reduce((s,a)=>s + Number(a.duration_hours||0), 0);
   const payThisPeriod = periodCompleted.reduce((s,a)=>s + payForApt(a, cleaner), 0);
 
-  const upcoming = appts.filter(a => a.date >= today && a.status !== 'cancelled' && a.status !== 'completed').slice(0, 25);
+  const upcoming = appts.filter(a => a.date >= today && a.status !== 'cancelled' && a.status !== 'completed' && a.status !== 'unassigned' && (!a.cleaner_name || String(a.cleaner_name).toLowerCase() !== 'unassigned')).slice(0, 25);
   const recent = appts.filter(a => a.status === 'completed').slice(-10).reverse();
 
   app.innerHTML = '';

@@ -7,33 +7,47 @@
 <link rel="icon" href="/hnc-logo.png" />
 <style>
   :root{
-    --bg:#ffffff;
-    --bg-soft:#f4fafc;
-    --panel:#ffffff;
-    --panel2:#f7fbfc;
-    --border:#d7e7ec;
-    --text:#173641;
-    --muted:#6a8793;
-    --accent:#2fb8d4;
-    --accent-dark:#1f99b2;
-    --accent-soft:#e5f6fa;
-    --success:#3aa57a;
-    --warn:#d89a2a;
-    --danger:#d9534f;
-    --shadow:0 2px 6px rgba(20,70,90,.06);
+    /* HNC Design Tokens — unified brand palette */
+    --brand-500:#3BB8E3; --brand-400:#59C7E2; --brand-300:#79D3E1;
+    --brand-200:#A5E6E9; --brand-50:#EAF7FB;
+    --brand-600:#1F9EC6; --brand-700:#16758F;
+    --accent-gold:#F2E19B; --accent-gold-ink:#7A5A00;
+    --bg:#FFFFFF; --bg-soft:#F7FBFC;
+    --bg-wash: radial-gradient(1100px 520px at 8% -10%, #EAF7FB 0%, transparent 55%),
+               radial-gradient(900px 480px at 110% 0%, #F4FBFD 0%, transparent 60%), #FFFFFF;
+    --panel:#FFFFFF; --panel-muted:#F7FBFC; --panel-glass:rgba(255,255,255,.72);
+    --border:#E3EEF2; --border-strong:#CFE3EA; --border-focus:#79D3E1;
+    --text:#0F1C24; --text-muted:#5B7683; --text-subtle:#8AA3AE; --text-on-brand:#FFFFFF;
+    --ok:#2FB88A; --ok-bg:#E7F7F1;
+    --warn:#D9A520; --warn-bg:#FBF2D8;
+    --danger:#E16B6B; --danger-bg:#FCE9E9;
+    --info:#3BB8E3; --info-bg:#EAF7FB;
+    --radius-sm:8px; --radius:12px; --radius-lg:16px;
+    --shadow-sm:0 1px 2px rgba(15,42,53,.04), 0 1px 1px rgba(15,42,53,.03);
+    --shadow:0 8px 24px -10px rgba(31,158,198,.18), 0 2px 6px rgba(15,42,53,.05);
+    --glow:0 0 0 1px rgba(59,184,227,.35), 0 0 22px rgba(59,184,227,.25);
+    --ring:0 0 0 3px rgba(121,211,225,.45);
+    --blur:saturate(140%) blur(14px);
+    /* ---- Legacy-name compat so existing rules (var(--accent), --panel2, --muted, --success) keep working ---- */
+    --panel2:var(--panel-muted);
+    --accent:var(--brand-500);
+    --accent-dark:var(--brand-600);
+    --accent-soft:var(--brand-50);
+    --success:var(--ok);
+    --muted:var(--text-muted);
   }
   *{box-sizing:border-box}
-  html,body{margin:0;padding:0;background:var(--bg-soft);color:var(--text);
+  html,body{margin:0;padding:0;background:var(--bg-wash);color:var(--text);
     font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;}
   a{color:var(--accent-dark);text-decoration:none}
   a:hover{text-decoration:underline}
   .wrap{max-width:1080px;margin:0 auto;padding:24px 20px 80px}
   header.topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;gap:16px;flex-wrap:wrap}
   header.topbar .brand{display:flex;align-items:center;gap:12px}
-  header.topbar .brand img{height:54px;width:auto;display:block}
+  header.topbar .brand img{height:54px;width:auto;display:block;filter:drop-shadow(0 2px 6px rgba(59,184,227,.22));}
   header.topbar .brand .sub{color:var(--muted);font-size:13px;margin-top:2px}
   header.topbar .who{font-size:13px;color:var(--muted)}
-  .btn{background:var(--accent);color:#fff;border:none;border-radius:8px;padding:10px 16px;font-weight:600;cursor:pointer;font-size:14px;transition:background .15s}
+  .btn{background:linear-gradient(135deg,var(--brand-500),var(--brand-400));color:#fff;border:1px solid transparent;border-radius:10px;padding:10px 16px;font-weight:600;cursor:pointer;font-size:14px;transition:background .15s}
   .btn:hover{background:var(--accent-dark)}
   .btn:disabled{opacity:.55;cursor:not-allowed}
   .btn.secondary{background:#fff;color:var(--accent-dark);border:1px solid var(--accent)}

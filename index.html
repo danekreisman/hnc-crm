@@ -1498,9 +1498,17 @@ async function dbSaveClient(data){
 }
 
 async function dbLoadClients(){
-  const {data,error}=await db.from('clients').select('*').neq('status','Deleted').order('created_at',{ascending:false});
-  if(error){console.error('Load clients error:',error);return[];}
-  return data||[];
+  var PAGE = 1000; var all = []; var from = 0;
+  while(true){
+    var res = await db.from('clients').select('*').neq('status','Deleted').order('created_at',{ascending:false}).range(from, from+PAGE-1);
+    if(res.error){ console.error('Load clients error:', res.error); return all.length ? all : []; }
+    var chunk = res.data||[];
+    all = all.concat(chunk);
+    if(chunk.length < PAGE) break;
+    from += PAGE;
+    if(from > 50000) break;
+  }
+  return all;
 }
 
 async function dbSaveCleaner(data){
@@ -1518,9 +1526,17 @@ async function dbSaveCleaner(data){
 }
 
 async function dbLoadCleaners(){
-  const {data,error}=await db.from('cleaners').select('*').order('created_at',{ascending:false});
-  if(error){console.error('Load cleaners error:',error);return[];}
-  return data||[];
+  var PAGE = 1000; var all = []; var from = 0;
+  while(true){
+    var res = await db.from('cleaners').select('*').order('created_at',{ascending:false}).range(from, from+PAGE-1);
+    if(res.error){ console.error('Load cleaners error:', res.error); return all.length ? all : []; }
+    var chunk = res.data||[];
+    all = all.concat(chunk);
+    if(chunk.length < PAGE) break;
+    from += PAGE;
+    if(from > 10000) break;
+  }
+  return all;
 }
 
       async function dbLoadSettings(key){
@@ -1668,9 +1684,20 @@ async function dbUpdateAppointment(dbId,data){
 }
 
 async function dbLoadAppointments(){
-  const {data,error}=await db.from('appointments').select('*').neq('status','deleted').order('date',{ascending:true});
-  if(error){console.error('Load appointments error:',error);return[];}
-  return data||[];
+  // Supabase caps SELECT at 1000 rows by default; paginate to fetch all.
+  var PAGE = 1000;
+  var all = []; var from = 0;
+  while(true){
+    var res = await db.from('appointments').select('*').neq('status','deleted').order('date',{ascending:true}).range(from, from+PAGE-1);
+    if(res.error){ console.error('Load appointments error:', res.error); return all.length ? all : []; }
+    var chunk = res.data||[];
+    all = all.concat(chunk);
+    if(chunk.length < PAGE) break;
+    from += PAGE;
+    if(from > 50000) break; // safety cap
+  }
+  console.log('[dbLoadAppointments] loaded '+all.length+' rows');
+  return all;
 }
 
 async function dbSaveLead(data){

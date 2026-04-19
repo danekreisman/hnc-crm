@@ -223,6 +223,8 @@ async function loadAppointments(cleaner){
   const { data, error } = await supa.from('appointments')
     .select('id,client_name,service,date,time,duration_hours,status,total_price,cleaner_pay,cleaner_pay_override,address,notes,cleaner_name')
     .eq('cleaner_id', cleaner.id)
+    .neq('status', 'cancelled')
+    .neq('status', 'deleted')
     .order('date', { ascending: true })
     .order('time', { ascending: true });
   if (error) throw error;

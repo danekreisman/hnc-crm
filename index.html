@@ -2956,10 +2956,10 @@ async function saveApptEdit(mode){
             if(_dt < _todayDate) { _skipped++; return; }
             var _oKey = _dt.getFullYear()+'-'+(_dt.getMonth()+1)+'-'+_dt.getDate();
             if(!apptData[_oKey]) apptData[_oKey] = [];
-            var _dupe = apptData[_oKey].some(function(x){ return x && x.n===name; });
+            var _dupe = apptData[_oKey].some(function(x){ return x && x.n===editClient; });
             if(_dupe){ _skipped++; return; }
             var _newAppt = {
-              n: name,
+              n: editClient,
               s: 'unassigned',
               t: newTimeStr,
               cleaner: cleanerVal,
@@ -2981,7 +2981,7 @@ async function saveApptEdit(mode){
             try{
               if(typeof dbSaveAppointment==='function'){
                 dbSaveAppointment({
-                  clientName: name, service: svcText, freq: freq,
+                  clientName: editClient, service: svcText, freq: freq,
                   date: _oKey, time: newTimeStr, address: editAddr,
                   beds: editBeds, baths: editBaths, sqft: editSqft, condition: editCond,
                   cleaner: cleanerVal, status: 'unassigned',

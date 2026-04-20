@@ -1430,10 +1430,14 @@ Mahalo 🌺</textarea>
         <div class="form-row"><label>Phone</label><input type="tel" id="ced2-phone"></div>
         <div class="form-row"><label>Email</label><input type="email" id="ced2-email"></div>
         <div class="form-row"><label>Location</label><input type="text" id="ced2-loc"></div>
+        <div class="form-row"><label>Island</label><select id="ced2-island"><option>Oahu</option><option>Maui</option><option>Both</option></select></div>
+        <div style="margin-top:8px;font-weight:600;font-size:13px;color:#2a3a4a">Pay rates</div>
+        <div style="font-size:11px;color:#6b7a88;margin-bottom:4px">Commercial jobs use a flat rate set on each booking.</div>
         <div class="form-two">
-          <div class="form-row"><label>Hourly rate ($)</label><input type="number" id="ced2-rate"></div>
-          <div class="form-row"><label>Island</label><select id="ced2-island"><option>Oahu</option><option>Maui</option><option>Both</option></select></div>
+          <div class="form-row"><label>Regular ($/hr)</label><input type="number" id="ced2-rate" step="0.5"></div>
+          <div class="form-row"><label>Deep ($/hr)</label><input type="number" id="ced2-rate-deep" step="0.5"></div>
         </div>
+        <div class="form-row" style="max-width:48%"><label>Move-out ($/hr)</label><input type="number" id="ced2-rate-moveout" step="0.5"></div>
         <div class="form-row"><label>Role</label><select id="ced2-role"><option>Cleaner</option><option>Lead cleaner</option></select></div>
         <div class="form-row"><label>Background check</label><select id="ced2-bg"><option>Cleared</option><option>Pending</option><option>Not started</option></select></div>
         <div class="form-row"><label>Status</label><select id="ced2-status"><option>Active</option><option>Inactive</option></select></div>
@@ -1547,17 +1551,33 @@ async function dbLoadClients(){
 }
 
 async function dbSaveCleaner(data){
-  const {error}=await db.from('cleaners').insert([{
+  var base = {
     name:data.name, role:data.role||'Cleaner',
     island:data.island||'Oahu', phone:data.phone||null,
     email:data.email||null, location:data.loc||null,
-    hourly_rate:parseFloat(data.rate)||16,
+    hourly_rate:parseFloat(data.rate)||30,
     start_date:data.startDate||null,
     background_check:data.bgcheck||'Not started',
     status:'Active', notes:data.notes||null
-  }]);
-  if(error)console.error('Save cleaner error:',error);
-  return !error;
+  };
+  var withRates = Object.assign({}, base, {
+    rate_regular_cents: (data.rate?Math.round(parseFloat(data.rate)*100):null),
+    rate_deep_cents: (data.rateDeep?Math.round(parseFloat(data.rateDeep)*100):null),
+    rate_moveout_cents: (data.rateMoveout?Math.round(parseFloat(data.rateMoveout)*100):null)
+  });
+  var r = await db.from('cleaners').insert([withRates]);
+  if(r.error){
+    var em = (r.error.message||'')+' '+(r.error.details||'');
+    if(/rate_(regular|deep|moveout)_cents/i.test(em)){
+      console.warn('[dbSaveCleaner] retrying without per-service rate columns');
+      var r2 = await db.from('cleaners').insert([base]);
+      if(r2.error) console.error('Save cleaner error:', r2.error);
+      return !r2.error;
+    }
+    console.error('Save cleaner error:', r.error);
+    return false;
+  }
+  return true;
 }
 
 async function dbLoadCleaners(){
@@ -1870,6 +1890,9 @@ async function loadAllData(){
         loc:c.location||'—',
         start:c.start_date?new Date(c.start_date+'T12:00:00').toLocaleDateString('en-US',{month:'short',year:'numeric'}):'—',
         rate:'$'+(c.hourly_rate||16)+'/hr',
+        rateRegular: (c.rate_regular_cents!=null?c.rate_regular_cents/100:(c.hourly_rate||null)),
+        rateDeep: (c.rate_deep_cents!=null?c.rate_deep_cents/100:null),
+        rateMoveout: (c.rate_moveout_cents!=null?c.rate_moveout_cents/100:null),
         week:'0 hrs', month:'0 hrs', paid:'$0',
         jobs:'0', alltime:'0', islands:c.island||'Oahu',
         bgcheck:c.background_check||'Not started',
@@ -2813,7 +2836,7 @@ async function saveApptEdit(mode){
   var cpOvrChk=document.getElementById('edit-cleaner-pay-override-chk');
   var cpOvrVal=document.getElementById('edit-cleaner-pay-override-val');
   var hasCpOverride=cpOvrChk&&cpOvrChk.checked&&cpOvrVal&&cpOvrVal.value;
-  var editCleanerPayCalc=calcCleanerPay(editDuration,cleanerVal);
+  var editCleanerPayCalc=calcCleanerPay(editDuration,cleanerVal,a&&a.service);
   var editCleanerPayOverride=hasCpOverride?parseFloat(cpOvrVal.value)||0:null;
   var editCleanerPay=hasCpOverride?editCleanerPayOverride:editCleanerPayCalc;
   console.log('[saveApptEdit] cleaner='+cleanerVal+' duration='+editDuration+' calcPay=$'+editCleanerPayCalc+(hasCpOverride?' OVERRIDE=$'+editCleanerPayOverride:''));
@@ -3509,8 +3532,13 @@ function showCleanerEdit(){
     document.getElementById('ced2-email').value=c.email||'';
     document.getElementById('ced2-loc').value=c.loc||'';
     document.getElementById('ced2-notes').value=c.notes||'';
-    var rate=c.rate?c.rate.replace(/[^0-9]/g,''):'16';
-    document.getElementById('ced2-rate').value=rate;
+    var rate=c.rate?c.rate.replace(/[^0-9.]/g,''):'30';
+    var rateNum = parseFloat(rate)||30;
+    document.getElementById('ced2-rate').value = (c.rateRegular!=null?c.rateRegular:rateNum);
+    var _rdE = document.getElementById('ced2-rate-deep');
+    if(_rdE) _rdE.value = (c.rateDeep!=null?c.rateDeep:(rateNum+5));
+    var _rmE = document.getElementById('ced2-rate-moveout');
+    if(_rmE) _rmE.value = (c.rateMoveout!=null?c.rateMoveout:(rateNum+5));
   }
   document.getElementById('cleaner-view').style.display='none';
   document.getElementById('cleaner-edit').style.display='block';
@@ -3522,6 +3550,8 @@ function saveCleanerEdit(){
   var email=document.getElementById('ced2-email').value;
   var loc=document.getElementById('ced2-loc').value;
   var rate=document.getElementById('ced2-rate').value;
+  var rateDeep=(document.getElementById('ced2-rate-deep')||{}).value;
+  var rateMoveout=(document.getElementById('ced2-rate-moveout')||{}).value;
   var island=document.getElementById('ced2-island').value;
   var role=document.getElementById('ced2-role').value;
   var bg=document.getElementById('ced2-bg').value;
@@ -3536,6 +3566,9 @@ function saveCleanerEdit(){
     c.email=email||c.email;
     c.loc=loc||c.loc;
     c.rate='$'+rate+'/hr';
+    c.rateRegular = parseFloat(rate)||null;
+    c.rateDeep = parseFloat(rateDeep)||null;
+    c.rateMoveout = parseFloat(rateMoveout)||null;
     c.role=role+' · '+island;
     c.islands=island;
     c.bgcheck=bg;
@@ -3550,13 +3583,31 @@ function saveCleanerEdit(){
       email:email||undefined,
       location:loc||undefined,
       hourly_rate:parseFloat(rate)||undefined,
+      rate_regular_cents: (rate?Math.round(parseFloat(rate)*100):undefined),
+      rate_deep_cents: (rateDeep?Math.round(parseFloat(rateDeep)*100):undefined),
+      rate_moveout_cents: (rateMoveout?Math.round(parseFloat(rateMoveout)*100):undefined),
       island:island||undefined,
       role:role||undefined,
       background_check:bg||undefined,
       status:status||undefined,
       notes:notes||undefined
     }).eq('id',currentCleanerId).then(function(res){
-      if(res.error)console.error('Update cleaner error:',res.error);
+      if(res.error){
+        console.error('Update cleaner error:',res.error);
+        var em=(res.error.message||'')+' '+(res.error.details||'');
+        if(/rate_(regular|deep|moveout)_cents/i.test(em)){
+          // Columns don't exist yet — retry without them
+          console.warn('[cleaner update] retrying without per-service rate columns');
+          db.from('cleaners').update({
+            name:name||undefined, phone:phone||undefined, email:email||undefined, location:loc||undefined,
+            hourly_rate:parseFloat(rate)||undefined, island:island||undefined, role:role||undefined,
+            background_check:bg||undefined, status:status||undefined, notes:notes||undefined
+          }).eq('id',currentCleanerId).then(function(r2){
+            if(r2.error)console.error('Retry update cleaner error:',r2.error);
+            else alert('Saved. To save the new Deep and Move-out rates, run this SQL in Supabase:\n\nALTER TABLE cleaners ADD COLUMN IF NOT EXISTS rate_regular_cents INTEGER;\nALTER TABLE cleaners ADD COLUMN IF NOT EXISTS rate_deep_cents INTEGER;\nALTER TABLE cleaners ADD COLUMN IF NOT EXISTS rate_moveout_cents INTEGER;');
+          });
+        }
+      }
     });
   }
 
@@ -3818,26 +3869,55 @@ function _deriveHours(beds, baths, svcType, cond, commercialHrs){
   return Math.round(baseHrs*condMod*10)/10;
 }
 
-function getCleanerRate(cleanerName){
-  // Look up cleaner in cleanerDB by name (primary source — real hourly_rate from Supabase)
-  if(!cleanerName||cleanerName==='Unassigned')return 0;
-  var found=Object.values(cleanerDB).find(function(c){return c.name===cleanerName;});
-  if(found&&found.rate){
-    var n=parseFloat(found.rate.replace(/[^0-9.]/g,''));
-    if(!isNaN(n)&&n>0)return n;
-  }
-  // Fallback: parse from option text like "Kaimana M. — Oahu ($18/hr)"
-  var m=cleanerName.match(/\$(\d+)\/hr/i);
-  if(m)return parseFloat(m[1]);
-  return 16;
+function serviceRateKey(service){
+  // Maps an appointment service name (or code) to one of: 'regular','deep','moveout','airbnb','commercial'
+  if(!service) return 'regular';
+  var s = String(service).toLowerCase();
+  if(s.indexOf('deep')>=0) return 'deep';
+  if(s.indexOf('move')>=0) return 'moveout';
+  if(s.indexOf('airbnb')>=0 || s.indexOf('turnover')>=0) return 'regular';
+  if(s.indexOf('commercial')>=0) return 'commercial';
+  return 'regular';
 }
 
-function calcCleanerPay(duration,cleanerName){
-  if(!duration||!cleanerName||cleanerName==='Unassigned')return 0;
-  var rate=getCleanerRate(cleanerName);
-  if(!rate)return 0;
-  var pay=Math.round(parseFloat(duration)*rate*100)/100;
-  console.log('[calcCleanerPay] '+cleanerName+' $'+rate+'/hr × '+duration+'h = $'+pay);
+function getCleanerRate(cleanerName, service){
+  // Look up cleaner in cleanerDB by name (primary source — real hourly_rate from Supabase)
+  if(!cleanerName||cleanerName==='Unassigned') return 0;
+  var key = serviceRateKey(service);
+  var found = Object.values(cleanerDB).find(function(c){return c.name===cleanerName;});
+  if(found){
+    // Prefer service-type specific rate
+    if(key==='regular' && found.rateRegular) { var r=parseFloat(found.rateRegular); if(!isNaN(r)&&r>0) return r; }
+    if(key==='deep' && found.rateDeep) { var r=parseFloat(found.rateDeep); if(!isNaN(r)&&r>0) return r; }
+    if(key==='moveout' && found.rateMoveout) { var r=parseFloat(found.rateMoveout); if(!isNaN(r)&&r>0) return r; }
+    // Service-type defaults if cleaner has no per-type rate configured
+    if(found.rate){
+      var legacy = parseFloat(String(found.rate).replace(/[^0-9.]/g,''));
+      if(!isNaN(legacy) && legacy>0){
+        // If the cleaner only has a legacy single rate, use service-type defaults
+        // to approximate the new tiered system: deep/moveout +$5.
+        if(key==='deep' || key==='moveout') return legacy + 5;
+        return legacy;
+      }
+    }
+  }
+  // Fallback: parse from option text like "Kaimana M. — Oahu ($18/hr)"
+  var m = cleanerName.match(/\$(\d+)\/hr/i);
+  if(m){
+    var base = parseFloat(m[1]);
+    if(key==='deep' || key==='moveout') return base + 5;
+    return base;
+  }
+  // Final default: $30 regular, $35 deep/moveout
+  return (key==='deep'||key==='moveout') ? 35 : 30;
+}
+
+function calcCleanerPay(duration, cleanerName, service){
+  if(!duration||!cleanerName||cleanerName==='Unassigned') return 0;
+  var rate = getCleanerRate(cleanerName, service);
+  if(!rate) return 0;
+  var pay = Math.round(parseFloat(duration)*rate*100)/100;
+  console.log('[calcCleanerPay] '+cleanerName+' ['+serviceRateKey(service)+'] $'+rate+'/hr × '+duration+'h = $'+pay);
   return pay;
 }
 
@@ -3943,7 +4023,8 @@ function calcPrice(){
   if(isOverride&&overrideValEl&&overrideValEl.value){
     var _ovrBase=parseFloat(overrideValEl.value)||0;
     var _ovrTax=Math.round(_ovrBase*0.04*100)/100;
-    total=Math.round((_ovrBase+_ovrTax)*100)/100;
+ var cp=calcCleanerPay(hrs,cleanerName,svcType);
+    var cpRate=getCleanerRate(cleanerName,svcType);
     document.getElementById('price-val').textContent='$'+total.toFixed(2);
     document.getElementById('price-breakdown').textContent=hrs+' est hrs — custom price override';
     console.log('[calcPrice] override='+total+' hrs='+hrs+' svc='+svcType);
@@ -4069,8 +4150,8 @@ function calcEditPrice(){
   var total;
   if(isOverride&&overrideValEl&&overrideValEl.value){
     var _ovrBase2=parseFloat(overrideValEl.value)||0;
-    var _ovrTax2=Math.round(_ovrBase2*0.04*100)/100;
-    total=Math.round((_ovrBase2+_ovrTax2)*100)/100;
+    var _ovrTax2=Math.round(_ovrBase2*0.var ecp=calcCleanerPay(hrs,editCleanerName,svcType);
+    var ecpRate=getCleanerRate(editCleanerName,svcType);
     document.getElementById('edit-price-val').textContent='$'+total.toFixed(2);
     document.getElementById('edit-price-breakdown').textContent=hrs+' est hrs — custom price override';
     console.log('[calcEditPrice] override='+total+' hrs='+hrs+' svc='+svcType);
@@ -4162,8 +4243,7 @@ async function saveNewAppt(){
     var _cRes=await dbSaveClient({
       name:name, type:'Residential',
       phone:_apptPhone, email:_apptEmail, address:apptAddress,
-      service:naServiceText, freq:freq, beds:apptBeds, baths:apptBaths,
-      cleaner:cleanerName
+      service:naServiceText, freq:freq, b:calcCleanerPay(apptDuration,cleanerName,naService&&naService.value)ner:cleanerName
     });
     console.log('[saveNewAppt] auto-created client:', _cRes);
     if(!_cRes.error && _cRes.data && _cRes.data[0]){
@@ -4669,7 +4749,7 @@ function setPeriod(btn){
           var dateKey = entry[0];
           var parts = dateKey.split('-');
           if(parts.length!==3) return;
-          var iso = parts[0]+'-'+String(parts[1]).padStart(2,'0')+'-'+String(parts[2]).padStart(2,'0');
+? calcCleanerPay(hrs, cname, a&&a.service) : hrs * (_rateForName(cname)||0))0')+'-'+String(parts[2]).padStart(2,'0');
           if(iso < s || iso > e) return;
           (entry[1]||[]).forEach(function(a){ out.push(Object.assign({_date: iso}, a)); });
         });
@@ -4756,8 +4836,7 @@ function setPeriod(btn){
         var m = document.querySelectorAll('#view-payroll .metric-value');
         if(m[0]) m[0].textContent = '\$'+(totalGross+totalBonus).toFixed(2) + (totalBonus>0?' (+\$'+totalBonus.toFixed(2)+' bonus)':'');
         if(m[1]) m[1].textContent = totalHrs.toFixed(1) + ' h';
-        if(m[2]) m[2].textContent = '\$'+totalPaid.toFixed(2);
-        if(m[3]) m[3].textContent = totalHrs>0 ? ('\$'+(totalGross/totalHrs).toFixed(2)+'/hr') : '—';
+        if(m[2]) m[2].textContent = '\$'+totalPaid.to? calcCleanerPay(hrs, cname, a&&a.service) : hrs*_rateForName(cname))0 ? ('\$'+(totalGross/totalHrs).toFixed(2)+'/hr') : '—';
         var det = document.getElementById('payroll-appts-detail');
         if(det) det.innerHTML = '';
       }
@@ -4830,8 +4909,7 @@ function setPeriod(btn){
           period_end: _fmtISODate(period.end),
           payday: _fmtISODate(period.payday),
           cleaner_id: cleanerId || null,
-          cleaner_name: cleanerName,
-          bonus_cents: bonusCents,
+          cleanecalcCleanerPay(parseFloat(x.duration)||0, cname, x&&x.service)sCents,
           status: (existing && existing.status) || 'unpaid'
         };
         // Preserve existing fields
@@ -4875,9 +4953,7 @@ function setPeriod(btn){
           period_key: period.key,
           period_start: _fmtISODate(period.start),
           period_end: _fmtISODate(period.end),
-          payday: _fmtISODate(period.payday),
-          cleaner_id: cid || null,
-          cleaner_name: cname,
+          payday: _fmtISODate(period.paydcalcCleanerPay(hrs,cname,a&&a.service):hrs*_rateForName(cname))cleaner_name: cname,
           hours: hrs,
           gross_cents: Math.round(pay*100),
           rate_cents: Math.round(rate*100),
@@ -5123,7 +5199,9 @@ try{var _sv=sessionStorage.getItem('hnc_currentView'); if(_sv && _sv!=='calendar
         </div>
       </div>
       <div class="form-two">
-        <div class="form-row"><label>Hourly rate ($)</label><input type="number" id="ncl-rate" value="16" min="0"></div>
+        <div class="form-row"><label>Regular cleaning rate ($/hr)</label><input type="number" id="ncl-rate" value="30" min="0" step="0.5"></div>
+        <div class="form-row"><label>Deep cleaning rate ($/hr)</label><input type="number" id="ncl-rate-deep" value="35" min="0" step="0.5"></div>
+        <div class="form-row" style="grid-column:span 2;max-width:50%"><label>Move-out cleaning rate ($/hr)</label><input type="number" id="ncl-rate-moveout" value="35" min="0" step="0.5"></div>
         <div class="form-row"><label>Start date</label><input type="date" id="ncl-start"></div>
       </div>
       <div class="panel-section">Compliance</div>
@@ -5275,6 +5353,8 @@ function saveNewCleaner(){
   var role=document.getElementById('ncl-role').value;
   var island=document.getElementById('ncl-island').value;
   var rate=document.getElementById('ncl-rate').value;
+  var rateDeep=(document.getElementById('ncl-rate-deep')||{}).value;
+  var rateMoveout=(document.getElementById('ncl-rate-moveout')||{}).value;
   var bgcheck=document.getElementById('ncl-bg').value;
   var startDate=document.getElementById('ncl-start').value;
   var startLabel=startDate?new Date(startDate+'T12:00:00').toLocaleDateString('en-US',{month:'short',year:'numeric'}):new Date().toLocaleDateString('en-US',{month:'short',year:'numeric'});
@@ -5283,7 +5363,7 @@ function saveNewCleaner(){
     phone:document.getElementById('ncl-phone').value||'—',
     email:document.getElementById('ncl-email').value||'—',
     loc:document.getElementById('ncl-loc').value||'—',
-    start:startLabel,rate:'$'+rate+'/hr',week:'0 hrs',month:'0 hrs',
+    start:startLabel,rate:'$'+rate+'/hr',rateRegular:parseFloat(rate)||null,rateDeep:parseFloat(rateDeep)||null,rateMoveout:parseFloat(rateMoveout)||null,week:'0 hrs',month:'0 hrs',
     paid:'$0',jobs:'0',alltime:'0',islands:island,bgcheck:bgcheck,
     notes:document.getElementById('ncl-notes').value||'—'
   };
@@ -5307,7 +5387,7 @@ function saveNewCleaner(){
   }
   // Save to Supabase
   dbSaveCleaner({
-    name:name, role:role, island:island, rate:rate,
+    name:name, role:role, island:island, rate:rate, rateDeep:rateDeep, rateMoveout:rateMoveout,
     phone:document.getElementById('ncl-phone').value,
     email:document.getElementById('ncl-email').value,
     loc:document.getElementById('ncl-loc').value,
@@ -7877,7 +7957,7 @@ function openInviteCleaner(){
     var id=entry[0];var c=entry[1];
     if(c.notes&&c.notes.indexOf('leave')>=0)return;
     var label=document.createElement('label');
-    label.style.cssText='display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--bg-soft);border:1px solid var(--border);border-radius:8px;cursor:pointer;font-size:12px;';
+    lavar previewPay=calcCleanerPay(hrs,previewCleanerName,currentAppt&&currentAppt.service);:10px;padding:8px 10px;background:var(--bg-soft);border:1px solid var(--border);border-radius:8px;cursor:pointer;font-size:12px;';
     label.innerHTML='<input type="checkbox" value="'+id+'" style="accent-color:var(--brand-500);width:15px;height:15px;" onchange="updateInvitePreview()">'
       +'<div style="flex:1;">'
         +'<div style="font-weight:600;color:var(--text);">'+c.name+'</div>'
@@ -7907,8 +7987,7 @@ function updateInvitePreview(){
     if(firstC)previewCleanerName=firstC.name;
   }
   if(!previewCleanerName)previewCleanerName=currentAppt.cleaner||'';
-  var previewPay=calcCleanerPay(hrs,previewCleanerName);
-  var payStr=previewPay?'$'+previewPay.toFixed(0):'—';
+  var previewPay=calcCleanerPay(hvar cleanerPay=calcCleanerPay(hrs,c.name,currentAppt&&currentAppt.service);ewPay?'$'+previewPay.toFixed(0):'—';
   if(checkedBoxes.length>1)payStr+=' (varies by cleaner)';
   var msg='Aloha! Would you be able to take this job?\n\n'
     +'Client: '+currentAppt.n+'\n'
@@ -7921,7 +8000,7 @@ function updateInvitePreview(){
     +'Your pay: '+payStr+'\n\n'
     +'Reply YES to accept or NO to pass. First YES gets the job!\n— Hawaii Natural Clean';
   var note=document.getElementById('invite-note');
-  if(note&&note.value)msg+='\n\nNote: '+note.value;
+  if(no'+hrs+'h × $'+getCleanerRate(c.name,currentAppt&&currentAppt.service)+'/hr)';
   document.getElementById('invite-msg-preview').textContent=msg;
 }
 

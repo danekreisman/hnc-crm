@@ -2813,7 +2813,7 @@ async function saveApptEdit(mode){
   var cpOvrChk=document.getElementById('edit-cleaner-pay-override-chk');
   var cpOvrVal=document.getElementById('edit-cleaner-pay-override-val');
   var hasCpOverride=cpOvrChk&&cpOvrChk.checked&&cpOvrVal&&cpOvrVal.value;
-  var editCleanerPayCalc=calcCleanerPay(editDuration,cleanerVal);
+  var editCleanerPayCalc=calcCleanerPay(editDuration,cleanerVal,svcText);
   var editCleanerPayOverride=hasCpOverride?parseFloat(cpOvrVal.value)||0:null;
   var editCleanerPay=hasCpOverride?editCleanerPayOverride:editCleanerPayCalc;
   console.log('[saveApptEdit] cleaner='+cleanerVal+' duration='+editDuration+' calcPay=$'+editCleanerPayCalc+(hasCpOverride?' OVERRIDE=$'+editCleanerPayOverride:''));
@@ -3986,7 +3986,7 @@ function calcPrice(){
   // Show/hide cleaner pay override input
   if(cpOvrChk&&cpOvrVal) cpOvrVal.style.display=cpOvrChk.checked?'':'none';
   if(cpLine&&cpVal){
-    var cp=calcCleanerPay(hrs,cleanerName);
+    var cp=calcCleanerPay(hrs,cleanerName,svcType);
     var cpRate=getCleanerRate(cleanerName);
     var cpOverride=cpOvrChk&&cpOvrChk.checked&&cpOvrVal&&cpOvrVal.value?parseFloat(cpOvrVal.value):null;
     var cpDisplay=cpOverride!=null?cpOverride:cp;
@@ -4112,7 +4112,7 @@ function calcEditPrice(){
   var ecpOvrVal=document.getElementById('edit-cleaner-pay-override-val');
   if(ecpOvrChk&&ecpOvrVal) ecpOvrVal.style.display=ecpOvrChk.checked?'':'none';
   if(ecpLine&&ecpVal){
-    var ecp=calcCleanerPay(hrs,editCleanerName);
+    var ecp=calcCleanerPay(hrs,editCleanerName,svcText);
     var ecpRate=getCleanerRate(editCleanerName);
     var ecpOverride=ecpOvrChk&&ecpOvrChk.checked&&ecpOvrVal&&ecpOvrVal.value?parseFloat(ecpOvrVal.value):null;
     console.log('[calcEditPrice] cleaner='+editCleanerName+' rate=$'+ecpRate+'/hr hrs='+hrs+' calcPay=$'+ecp+(ecpOverride!=null?' OVERRIDE=$'+ecpOverride:''));
@@ -4213,7 +4213,7 @@ async function saveNewAppt(){
   var apptDuration=_lastCalcHrs; // from calcPrice()
   var cpOvrChk=document.getElementById('na-cleaner-pay-override-chk');
   var cpOvrValEl=document.getElementById('na-cleaner-pay-override-val');
-  var apptCleanerPay=(cpOvrChk&&cpOvrChk.checked&&cpOvrValEl&&cpOvrValEl.value)?parseFloat(cpOvrValEl.value):calcCleanerPay(apptDuration,cleanerName);
+  var apptCleanerPay=(cpOvrChk&&cpOvrChk.checked&&cpOvrValEl&&cpOvrValEl.value)?parseFloat(cpOvrValEl.value):calcCleanerPay(apptDuration,cleanerName,naServiceText);
   // Build full appointment object
   var apptObj={
     n:name, s:apptStatus, t:timeStr, cleaner:cleanerName,
@@ -4721,7 +4721,7 @@ function setPeriod(btn){
           var cname = a.cleaner || 'Unassigned';
           if(cname==='Unassigned') return;
           var hrs = parseFloat(a.duration)||0;
-          var pay = parseFloat(a.cleanerPay) || (typeof calcCleanerPay==='function' ? calcCleanerPay(hrs, cname) : hrs * (_rateForName(cname)||0));
+          var pay = parseFloat(a.cleanerPay) || (typeof calcCleanerPay==='function' ? calcCleanerPay(hrs, cname, a.service) : hrs * (_rateForName(cname)||0));
           if(!totals[cname]) totals[cname] = { hrs:0, pay:0, jobs:[] };
           totals[cname].hrs += hrs;
           totals[cname].pay += pay;
@@ -4805,7 +4805,7 @@ function setPeriod(btn){
           '<div class="tw"><table><thead><tr><th>Date</th><th>Client</th><th>Hours</th><th>Pay</th></tr></thead><tbody>' +
           appts.map(function(a){
             var hrs = parseFloat(a.duration)||0;
-            var pay = parseFloat(a.cleanerPay) || (typeof calcCleanerPay==='function' ? calcCleanerPay(hrs, cname) : hrs*_rateForName(cname));
+            var pay = parseFloat(a.cleanerPay) || (typeof calcCleanerPay==='function' ? calcCleanerPay(hrs, cname, a.service) : hrs*_rateForName(cname));
             return '<tr><td>'+a._date+'</td><td>'+(a.n||'')+'</td><td>'+hrs.toFixed(2)+'</td><td>\$'+pay.toFixed(2)+'</td></tr>';
           }).join('') +
           '</tbody></table></div>';
@@ -4880,7 +4880,7 @@ function setPeriod(btn){
         var period = _currentPeriod(); if(!period) return;
         var appts = _apptsInPeriod(period).filter(function(a){return a.cleaner===cname;});
         var hrs = appts.reduce(function(a,x){return a+(parseFloat(x.duration)||0);},0);
-        var pay = appts.reduce(function(a,x){return a+(parseFloat(x.cleanerPay) || (typeof calcCleanerPay==='function'?calcCleanerPay(parseFloat(x.duration)||0, cname):0));},0);
+        var pay = appts.reduce(function(a,x){return a+(parseFloat(x.cleanerPay) || (typeof calcCleanerPay==='function'?calcCleanerPay(parseFloat(x.duration)||0, cname, x.service):0));},0);
         var rate = _rateForName(cname)||0;
         var existingRow = (function(){
           var pr = _payrollPeriodRows[period.key] || {};
@@ -4933,7 +4933,7 @@ function setPeriod(btn){
         appts.forEach(function(a){
           var cname = a.cleaner||'Unassigned'; if(cname==='Unassigned') return;
           var hrs = parseFloat(a.duration)||0;
-          var pay = parseFloat(a.cleanerPay) || (typeof calcCleanerPay==='function'?calcCleanerPay(hrs,cname):hrs*_rateForName(cname));
+          var pay = parseFloat(a.cleanerPay) || (typeof calcCleanerPay==='function'?calcCleanerPay(hrs,cname,a.service):hrs*_rateForName(cname));
           if(!totals[cname]) totals[cname] = { hrs:0, pay:0 };
           totals[cname].hrs += hrs; totals[cname].pay += pay;
         });
@@ -7932,7 +7932,7 @@ function updateInvitePreview(){
     if(firstC)previewCleanerName=firstC.name;
   }
   if(!previewCleanerName)previewCleanerName=currentAppt.cleaner||'';
-  var previewPay=calcCleanerPay(hrs,previewCleanerName);
+  var previewPay=calcCleanerPay(hrs,previewCleanerName,(cd&&cd.service)||(currentAppt&&currentAppt.service));
   var payStr=previewPay?'$'+previewPay.toFixed(0):'—';
   if(checkedBoxes.length>1)payStr+=' (varies by cleaner)';
   var msg='Aloha! Would you be able to take this job?\n\n'
@@ -7971,7 +7971,7 @@ function sendCleanerInvites(){
     names.push(c.name);
 
     // Build per-cleaner message with their individual pay rate
-    var cleanerPay=calcCleanerPay(hrs,c.name);
+    var cleanerPay=calcCleanerPay(hrs,c.name,(cd&&cd.service)||(currentAppt&&currentAppt.service));
     var payStr=cleanerPay?'$'+cleanerPay.toFixed(0):'—';
     var msgText='Aloha! Would you be able to take this job?\n\n'
       +'Client: '+currentAppt.n+'\n'

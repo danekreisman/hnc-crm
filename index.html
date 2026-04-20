@@ -2869,7 +2869,7 @@ async function saveApptEdit(mode){
         var inSeries=curSeriesId
           ?(appt.seriesId===curSeriesId)
           :(appt.n===a.n&&appt.recurring);
-        if(inSeries){
+        if(inSeries && (appt.s||'').toLowerCase()!=='paid'){
           apptData[k][i]=Object.assign({},appt,seriesFields);
           seriesCount++;
         }
@@ -2955,7 +2955,7 @@ async function saveApptEdit(mode){
         sbAllQuery=sbAllQuery.eq('client_name',a.n).eq('recurring',true);
         console.log('[saveApptEdit] Supabase all-series update by client_name (no series_id)');
       }
-      sbAllQuery.then(function(res){
+      sbAllQuery=sbAllQuery.neq('status','paid');sbAllQuery.then(function(res){
         console.log('[saveApptEdit] Supabase all-series sync complete, error:',res.error||'none');
       });
     } else {

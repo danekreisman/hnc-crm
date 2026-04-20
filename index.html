@@ -3534,6 +3534,8 @@ function saveCleanerEdit(){
   var phone=document.getElementById('ced2-phone').value;
   var email=document.getElementById('ced2-email').value;
   var loc=document.getElementById('ced2-loc').value;
+  function __blank(v){v=String(v||'').trim();return (v===''||v==='—'||v==='-')?null:v;}
+  phone=__blank(phone);email=__blank(email);loc=__blank(loc);
   var rateReg = document.getElementById('ced2-rate-regular').value;
   var rateDeep = document.getElementById('ced2-rate-deep').value;
   var rateMove = document.getElementById('ced2-rate-moveout').value;

@@ -1029,6 +1029,7 @@ Mahalo 🌺</textarea>
             <option>Every Day</option>
             <option>Weekly</option>
             <option selected>Biweekly</option>
+            <option>Every 3 weeks</option>
             <option>Monthly</option>
             <option>One-time</option>
           </select>
@@ -1167,15 +1168,17 @@ Mahalo 🌺</textarea>
           <div class="form-row"><label>Service type</label>
             <select id="edit-service" onchange="calcEditPrice()">
               <option value="Regular Cleaning">Regular Cleaning</option>
-              <option value="Deep Clean">Deep Clean</option>
-              <option value="Move-out Clean">Move-out Clean</option>
+              <option value="Deep Cleaning">Deep Cleaning</option>
+              <option value="Move Out Cleaning">Move Out Cleaning</option>
+              <option value="Commercial Cleaning">Commercial Cleaning</option>
             </select>
           </div>
           <div class="form-row"><label>Frequency</label>
             <select id="edit-freq">
               <option value="One-time">One-time</option>
               <option value="Weekly">Weekly</option>
-              <option value="Bi-weekly">Bi-weekly</option>
+              <option value="Biweekly">Biweekly</option>
+              <option value="Every 3 weeks">Every 3 weeks</option>
               <option value="Monthly">Monthly</option>
             </select>
           </div>
@@ -1662,11 +1665,13 @@ function _generateUUID(){
 function _generateRecurringDates(yr,mo,dy,freq){
   var dates=[];
   var start=new Date(yr,mo-1,dy);
-  var limits={'Every Day':30,'Weekly':26,'Biweekly':13,'Monthly':12};
+  // Normalize common aliases
+  if(freq==='Bi-weekly') freq='Biweekly';
+  var limits={'Every Day':60,'Weekly':52,'Biweekly':26,'Every 3 weeks':18,'Monthly':12};
   var max=limits[freq]||12;
   var d=new Date(start);
-  if(freq==='Every Day'||freq==='Weekly'||freq==='Biweekly'){
-    var step=freq==='Every Day'?1:freq==='Weekly'?7:14;
+  if(freq==='Every Day'||freq==='Weekly'||freq==='Biweekly'||freq==='Every 3 weeks'){
+    var step=freq==='Every Day'?1:freq==='Weekly'?7:freq==='Biweekly'?14:21;
     for(var i=0;i<max;i++){dates.push(new Date(d));d.setDate(d.getDate()+step);}
   } else if(freq==='Monthly'){
     for(var i=0;i<max;i++){dates.push(new Date(yr,mo-1+i,dy));}
@@ -2747,13 +2752,13 @@ function showApptEdit(){
     if(_svcSel){
       var _svc = _a.service || 'Regular Cleaning';
       // If current appointment has a service value not in the list, add it as an option so it doesn't silently change
-      var _known = ['Regular Cleaning','Deep Clean','Move-out Clean'];
+      var _known = ['Regular Cleaning','Deep Cleaning','Move Out Cleaning','Commercial Cleaning'];
       if(_svc && _known.indexOf(_svc)<0){ var _o=document.createElement('option'); _o.value=_svc; _o.textContent=_svc; _svcSel.insertBefore(_o, _svcSel.firstChild); }
       _svcSel.value = _svc;
     }
     if(_freqSel){
       var _fq = _a.freq || _a.frequency || 'One-time';
-      var _kf = ['One-time','Weekly','Bi-weekly','Monthly'];
+      var _kf = ['One-time','Weekly','Biweekly','Every 3 weeks','Monthly'];
       if(_fq && _kf.indexOf(_fq)<0){ var _of=document.createElement('option'); _of.value=_fq; _of.textContent=_fq; _freqSel.insertBefore(_of, _freqSel.firstChild); }
       _freqSel.value = _fq;
     }

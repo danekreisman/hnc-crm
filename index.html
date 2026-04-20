@@ -3803,7 +3803,7 @@ function populateCleanerDropdown(selectId, currentValue){
     unassOpt.textContent='Unassigned';
     sel.appendChild(unassOpt);
   }
-  var entries=Object.entries(cleanerDB).filter(function(e){ if(e[0].length<30) return false; var st=(e[1]&&e[1].status)||'Active'; return isEditDropdown||st!=='Inactive'; });
+  var entries=Object.entries(cleanerDB).filter(function(e){ if(e[0].length<30) return false; var st=(e[1]&&e[1].status)||'Active'; return st==='Active'||e[1].name===currentValue; });
   console.log('[populateCleanerDropdown] source: cleanerDB, cleaners found:', entries.length, '| select:', selectId);
   entries.forEach(function(entry){
     var c=entry[1];

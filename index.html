@@ -584,7 +584,7 @@ textarea{font-family:inherit;}
         </div>
         <div class="section-title" style="margin-top:16px">Payroll — <span id="payroll-period-label">—</span></div>
         <div class="tw" style="margin-bottom:16px"><table>
-        <thead><tr><th style="width:22%">Cleaner</th><th style="width:10%">Island</th><th style="width:10%">Hours</th><th style="width:10%">Rate</th><th style="width:12%">Gross</th><th style="width:12%">Paid</th><th style="width:12%">Status</th><th style="width:12%">Action</th></tr></thead>
+        <thead><tr><th style="width:20%">Cleaner</th><th style="width:9%">Island</th><th style="width:8%">Hours</th><th style="width:8%">Rate</th><th style="width:11%">Gross</th><th style="width:12%">Bonus</th><th style="width:11%">Total</th><th style="width:9%">Paid</th><th style="width:6%">Status</th><th style="width:6%">Action</th></tr></thead>
         <tbody id="payroll-tbody"></tbody></table></div>
         <div id="payroll-appts-detail" style="margin-top:12px"></div>
       </div>
@@ -2229,7 +2229,7 @@ function renderMonth(){
     // Show all appointments - no limit
     da.forEach(function(a){
       var btn=document.createElement('button');
-      btn.className='appt '+(a.s==='cancelled'?'ax':'a'+a.s.charAt(0));
+      btn.className='appt '+(function(st){if(!st)return 'au';if(st==='cancelled')return 'ax';if(st==='scheduled')return 'aa';if(st==='unassigned')return 'au';if(st==='completed')return 'ac';if(st==='paid')return 'ap';return 'aa';})(a.s);
       btn.textContent=(a.recurring?'\u21bb ':'')+a.t+' '+a.n;
       btn.dataset.appt=JSON.stringify(a);
       btn.dataset.key=k;
@@ -2252,11 +2252,11 @@ var CAL_PX_HR=60;       // pixels per hour
 var CAL_DURATION=90;    // default appointment duration in minutes
 var CAL_TOTAL_H=(CAL_END_HOUR-CAL_START_HOUR)*CAL_PX_HR; // 19*60=1140px
 var CAL_COLORS={
-  u:{bg:'#fce7f3',text:'#9d174d',border:'#f9a8d4'},
-  a:{bg:'#dbeafe',text:'#1e40af',border:'#93c5fd'},
-  c:{bg:'#fef9c3',text:'#713f12',border:'#fde68a'},
-  p:{bg:'#dcfce7',text:'#166534',border:'#86efac'},
-  x:{bg:'#e2e8f0',text:'#64748b',border:'#cbd5e1'}
+  u:{bg:'#FDE2E4',text:'#8A2C3A',border:'#F9B8BE'}, /* Unassigned — soft coral */
+  a:{bg:'#EAF7FB',text:'#16758F',border:'#79D3E1'}, /* Assigned/Scheduled — brand cyan */
+  c:{bg:'#FBEDC9',text:'#7A5A00',border:'#F2E19B'}, /* Completed — accent gold */
+  p:{bg:'#E7F7F1',text:'#1F7A5A',border:'#8FE4C6'}, /* Paid — soft emerald */
+  x:{bg:'#EEF2F4',text:'#8AA3AE',border:'#CFE3EA'}  /* Cancelled — greyed */
 };
 
 function parseApptHour(t){
@@ -2351,7 +2351,7 @@ function calLayoutAppts(appts,dateKey,col,compact){
 
     cluster.forEach(function(appt){
       var a=appt.a;
-      var sc=a.s==='cancelled'?'x':(a.s?a.s.charAt(0):'u');
+      var sc=(function(st){if(!st)return 'u';if(st==='cancelled')return 'x';if(st==='scheduled')return 'a';if(st==='unassigned')return 'u';if(st==='completed')return 'c';if(st==='paid')return 'p';return 'a';})(a.s);
       var clr=colorMap[sc]||colorMap.u;
       var pct=100/numSlots;
       var leftPct=appt.slot*pct;
@@ -4445,6 +4445,7 @@ function setPeriod(btn){
           var payday = _addDays(mon, 7);
           out.push({
             key: _fmtISODate(mon),
+            endKey: _fmtISODate(sun),
             start: mon,
             end: sun,
             payday: payday,
@@ -4488,39 +4489,108 @@ function setPeriod(btn){
         }
         var bc = document.getElementById('payroll-period-buttons');
         if(bc){
-          // Group periods by month of their start date (descending: newest first)
-          var byMonth = {}; var monthOrder = [];
+          // Group periods by month (descending: newest first)
+          var byMonth = {};
+          var monthOrder = [];
           var monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-          // sort descending so newest periods render first
           var sorted = _payrollPeriods.slice().sort(function(a,b){ return b.start - a.start; });
           sorted.forEach(function(p){
             var mKey = p.start.getFullYear()+'-'+String(p.start.getMonth()+1).padStart(2,'0');
-            if(!byMonth[mKey]){ byMonth[mKey] = { label: monthNames[p.start.getMonth()]+' '+p.start.getFullYear(), periods:[] }; monthOrder.push(mKey); }
+            if(!byMonth[mKey]){
+              byMonth[mKey] = { label: monthNames[p.start.getMonth()]+' '+p.start.getFullYear(), periods:[] };
+              monthOrder.push(mKey);
+            }
             byMonth[mKey].periods.push(p);
           });
+          // Determine currently-selected month from active period
+          var activePeriod = _payrollPeriods.find(function(p){return p.key===_currentPayrollPeriodKey;});
+          var activeMonthKey = activePeriod ? (activePeriod.start.getFullYear()+'-'+String(activePeriod.start.getMonth()+1).padStart(2,'0')) : (monthOrder[0]||'');
+          // Find "current" (covers today) and "previous" period keys
+          var now = new Date();
+          var todayStr = now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0');
+          var currentPeriod = _payrollPeriods.find(function(p){ return p.key <= todayStr && p.endKey >= todayStr; });
+          var currentKey = currentPeriod ? currentPeriod.key : '';
+          var prevKey = '';
+          if(currentPeriod){
+            var pSorted = _payrollPeriods.slice().sort(function(a,b){ return a.start - b.start; });
+            var ci = pSorted.findIndex(function(p){return p.key===currentKey;});
+            if(ci > 0) prevKey = pSorted[ci-1].key;
+          }
           var html = '';
-          monthOrder.forEach(function(mKey){
-            var grp = byMonth[mKey];
-            var hasActive = grp.periods.some(function(p){return p.key===_currentPayrollPeriodKey;});
-            var collapsed = !hasActive; // auto-expand the month containing the active period
-            var monthId = 'pp-month-'+mKey;
-            html += '<div class="pp-month-group" style="flex:1 1 100%;margin-bottom:8px;">';
-            html += '<div class="pp-month-header" onclick="togglePayrollMonth(\''+monthId+'\', this)" style="cursor:pointer;font-size:13px;font-weight:600;color:var(--text);padding:6px 0;display:flex;align-items:center;gap:6px;user-select:none;">';
-            html += '<span class="pp-caret" style="display:inline-block;transition:transform .2s;transform:'+(collapsed?'rotate(-90deg)':'rotate(0)')+';">▼</span>';
-            html += grp.label+' <span style="color:var(--text-muted);font-weight:400;font-size:12px;">('+grp.periods.length+' periods)</span>';
-            html += '</div>';
-            html += '<div id="'+monthId+'" class="pp-month-body" style="display:'+(collapsed?'none':'flex')+';gap:6px;flex-wrap:wrap;padding:4px 0 4px 18px;">';
-            grp.periods.forEach(function(p){
-              var active = (p.key===_currentPayrollPeriodKey)? ' active':'';
-              html += '<button class="pbtn'+active+'" data-period="'+p.key+'" onclick="setPayrollPeriod(\''+p.key+'\', this)">'+p.label+'</button>';
-            });
-            html += '</div></div>';
+          html += '<div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;flex:1;">';
+          // Month select
+          html += '<label style="font-size:12px;color:var(--text-muted);font-weight:500;">Month</label>';
+          html += '<select id="pp-month-select" class="input" style="min-width:150px;padding:6px 10px;font-size:13px;" onchange="onPayrollMonthChange(this.value)">';
+          monthOrder.forEach(function(mk){
+            var sel = (mk===activeMonthKey)?' selected':'';
+            html += '<option value="'+mk+'"'+sel+'>'+byMonth[mk].label+' ('+byMonth[mk].periods.length+')</option>';
           });
+          html += '</select>';
+          // Period select
+          html += '<label style="font-size:12px;color:var(--text-muted);font-weight:500;margin-left:4px;">Pay period</label>';
+          html += '<select id="pp-period-select" class="input" style="min-width:180px;padding:6px 10px;font-size:13px;" onchange="setPayrollPeriod(this.value, null)">';
+          (byMonth[activeMonthKey]?byMonth[activeMonthKey].periods:[]).forEach(function(p){
+            var sel = (p.key===_currentPayrollPeriodKey)?' selected':'';
+            var lbl = p.label;
+            if(p.key===currentKey) lbl += ' (current)';
+            html += '<option value="'+p.key+'"'+sel+'>'+lbl+'</option>';
+          });
+          html += '</select>';
+          // Quick buttons
+          html += '<span style="display:inline-flex;gap:4px;margin-left:4px;">';
+          if(currentKey){
+            var curActive = (currentKey===_currentPayrollPeriodKey)?' active':'';
+            html += '<button class="pbtn'+curActive+'" onclick="jumpPayrollToKey(\''+currentKey+'\')" title="Jump to current pay period" style="font-size:12px;">Current</button>';
+          }
+          if(prevKey){
+            var prvActive = (prevKey===_currentPayrollPeriodKey)?' active':'';
+            html += '<button class="pbtn'+prvActive+'" onclick="jumpPayrollToKey(\''+prevKey+'\')" title="Jump to previous pay period" style="font-size:12px;">Previous</button>';
+          }
+          html += '</span>';
+          html += '</div>';
           bc.innerHTML = html;
-          bc.style.flexDirection = 'column';
-          bc.style.alignItems = 'stretch';
+          bc.style.flexDirection = 'row';
+          bc.style.alignItems = 'center';
         }
         renderPayroll();
+      }
+
+      function onPayrollMonthChange(mKey){
+        var monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+        var periodsInMonth = _payrollPeriods.filter(function(p){
+          var pk = p.start.getFullYear()+'-'+String(p.start.getMonth()+1).padStart(2,'0');
+          return pk === mKey;
+        }).sort(function(a,b){ return b.start - a.start; });
+        var sel = document.getElementById('pp-period-select');
+        if(!sel) return;
+        sel.innerHTML = '';
+        var now = new Date();
+        var todayStr = now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0');
+        periodsInMonth.forEach(function(p){
+          var opt = document.createElement('option');
+          opt.value = p.key;
+          var lbl = p.label;
+          if(p.key <= todayStr && p.endKey >= todayStr) lbl += ' (current)';
+          opt.textContent = lbl;
+          sel.appendChild(opt);
+        });
+        if(periodsInMonth.length){
+          setPayrollPeriod(periodsInMonth[0].key, null);
+        }
+      }
+
+      function jumpPayrollToKey(key){
+        var period = _payrollPeriods.find(function(p){return p.key===key;});
+        if(!period) return;
+        var mKey = period.start.getFullYear()+'-'+String(period.start.getMonth()+1).padStart(2,'0');
+        var monthSel = document.getElementById('pp-month-select');
+        if(monthSel && monthSel.value !== mKey){
+          monthSel.value = mKey;
+          onPayrollMonthChange(mKey);
+        }
+        var periodSel = document.getElementById('pp-period-select');
+        if(periodSel) periodSel.value = key;
+        setPayrollPeriod(key, null);
       }
 
       function setPayrollPeriod(key, btn){
@@ -4605,12 +4675,23 @@ function setPeriod(btn){
               ? '<button class="btn" style="font-size:11px;padding:4px 10px" onclick="undoCleanerPaid(\''+cidSafe+'\',\''+cnameSafe+'\')">Undo</button>'
               : '<button class="btn btn-primary" style="font-size:11px;padding:4px 10px" onclick="markCleanerPaid(\''+cidSafe+'\',\''+cnameSafe+'\')">Mark as paid</button>';
             var paidDisplay = paid && row.paid_amount_cents ? ('\$'+(row.paid_amount_cents/100).toFixed(2)) : (paid ? '\$'+t.pay.toFixed(2) : '—');
+            var bonusCents = (row && row.bonus_cents) ? +row.bonus_cents : 0;
+            var bonusDollars = (bonusCents/100);
+            var totalPay = t.pay + bonusDollars;
+            var bonusCellKey = (row && row.id) ? row.id : ('new:'+cnameSafe);
+            var bonusInput = '<div style="display:flex;gap:4px;align-items:center;">' +
+              '<span style="color:var(--text-muted);font-size:12px;">$</span>' +
+              '<input type="number" step="0.01" min="0" value="'+(bonusDollars>0?bonusDollars.toFixed(2):'')+'" placeholder="0.00" id="bonus-in-'+cnameSafe+'" style="width:70px;padding:3px 6px;font-size:12px;border:1px solid var(--border);border-radius:4px;" '+(paid?'disabled':'')+' />' +
+              (paid ? '' : '<button onclick="savePayrollBonus(\''+cnameSafe+'\')" title="Save bonus" style="font-size:11px;padding:3px 8px;background:var(--brand-50);color:var(--brand-700);border:1px solid var(--brand-300);border-radius:4px;cursor:pointer;">Save</button>') +
+              '</div>';
             return '<tr>' +
               '<td><a href="javascript:void(0)" onclick="showCleanerApptDetail(\''+cnameSafe+'\')">'+cname+'</a></td>' +
               '<td>'+island+'</td>' +
               '<td>'+t.hrs.toFixed(2)+'</td>' +
               '<td>\$'+rate.toFixed(2)+'/hr</td>' +
               '<td>\$'+t.pay.toFixed(2)+'</td>' +
+              '<td>'+bonusInput+'</td>' +
+              '<td style="font-weight:600;">\$'+totalPay.toFixed(2)+'</td>' +
               '<td>'+paidDisplay+'</td>' +
               '<td>'+statusPill+'</td>' +
               '<td>'+action+'</td>' +
@@ -4619,9 +4700,10 @@ function setPeriod(btn){
         }
         var totalGross = rows.reduce(function(a,e){return a+e[1].pay;},0);
         var totalHrs = rows.reduce(function(a,e){return a+e[1].hrs;},0);
+        var totalBonus = Object.values(periodRows).reduce(function(a,r){return a+((r.bonus_cents||0)/100);},0);
         var totalPaid = Object.values(periodRows).filter(function(r){return r.status==='paid';}).reduce(function(a,r){return a+((r.paid_amount_cents||0)/100);},0);
         var m = document.querySelectorAll('#view-payroll .metric-value');
-        if(m[0]) m[0].textContent = '\$'+totalGross.toFixed(2);
+        if(m[0]) m[0].textContent = '\$'+(totalGross+totalBonus).toFixed(2) + (totalBonus>0?' (+\$'+totalBonus.toFixed(2)+' bonus)':'');
         if(m[1]) m[1].textContent = totalHrs.toFixed(1) + ' h';
         if(m[2]) m[2].textContent = '\$'+totalPaid.toFixed(2);
         if(m[3]) m[3].textContent = totalHrs>0 ? ('\$'+(totalGross/totalHrs).toFixed(2)+'/hr') : '—';
@@ -4656,13 +4738,88 @@ function setPeriod(btn){
           '</tbody></table></div>';
       }
 
+      async function savePayrollBonus(cnameSafe){
+        var input = document.getElementById('bonus-in-'+cnameSafe);
+        if(!input) return;
+        var raw = (input.value||'').trim();
+        var bonusDollars = parseFloat(raw) || 0;
+        if(bonusDollars < 0){ alert('Bonus cannot be negative'); return; }
+        var bonusCents = Math.round(bonusDollars*100);
+        // Locate period & cleaner
+        var period = _payrollPeriods.find(function(p){return p.key===_currentPayrollPeriodKey;});
+        if(!period){ alert('No pay period selected'); return; }
+        // Resolve actual cleaner name from the row lookup - we only have cnameSafe
+        // Use the totals from last render: find via periodRows
+        var periodRows = _payrollPeriodRows[_currentPayrollPeriodKey] || {};
+        var existing = null, cleanerId = null, cleanerName = null;
+        Object.keys(periodRows).forEach(function(k){
+          var r = periodRows[k];
+          var cn = r.cleaner_name || '';
+          if(cn.replace(/[^a-zA-Z0-9]/g,'_') === cnameSafe){ existing = r; cleanerId = r.cleaner_id || null; cleanerName = cn; }
+        });
+        if(!cleanerName){
+          // Fallback: scan appts in period for a cleaner with matching safe name
+          var appts = _apptsInPeriod(period);
+          for(var i=0;i<appts.length;i++){
+            var cn = appts[i].cleaner || '';
+            if(cn.replace(/[^a-zA-Z0-9]/g,'_') === cnameSafe){
+              cleanerName = cn;
+              // Look up cleaner_id by name
+              Object.keys(cleanerDB||{}).forEach(function(k){
+                if((cleanerDB[k].name||'') === cn) cleanerId = cleanerDB[k].id || k;
+              });
+              break;
+            }
+          }
+        }
+        if(!cleanerName){ alert('Could not resolve cleaner'); return; }
+        var row = {
+          period_key: period.key,
+          period_start: _fmtISODate(period.start),
+          period_end: _fmtISODate(period.end),
+          payday: _fmtISODate(period.payday),
+          cleaner_id: cleanerId || null,
+          cleaner_name: cleanerName,
+          bonus_cents: bonusCents,
+          status: (existing && existing.status) || 'unpaid'
+        };
+        // Preserve existing fields
+        if(existing){
+          if(existing.hours != null) row.hours = existing.hours;
+          if(existing.gross_cents != null) row.gross_cents = existing.gross_cents;
+          if(existing.rate_cents != null) row.rate_cents = existing.rate_cents;
+          if(existing.appt_ids != null) row.appt_ids = existing.appt_ids;
+          if(existing.paid_at != null) row.paid_at = existing.paid_at;
+          if(existing.paid_amount_cents != null) row.paid_amount_cents = existing.paid_amount_cents;
+        }
+        try{
+          await dbUpsertPayPeriod(row);
+          await loadPayPeriodRows();
+          renderPayroll();
+        } catch(e){
+          // If DB rejects (e.g., column not present), show a helpful message
+          console.error('savePayrollBonus failed', e);
+          alert('Save failed: '+(e.message||e)+'\n\nIf this says "bonus_cents" column does not exist, you need to run:\nALTER TABLE pay_periods ADD COLUMN IF NOT EXISTS bonus_cents INTEGER DEFAULT 0;');
+        }
+      }
+
       async function markCleanerPaid(cid, cname){
         var period = _currentPeriod(); if(!period) return;
         var appts = _apptsInPeriod(period).filter(function(a){return a.cleaner===cname;});
         var hrs = appts.reduce(function(a,x){return a+(parseFloat(x.duration)||0);},0);
         var pay = appts.reduce(function(a,x){return a+(parseFloat(x.cleanerPay) || (typeof calcCleanerPay==='function'?calcCleanerPay(parseFloat(x.duration)||0, cname):0));},0);
         var rate = _rateForName(cname)||0;
-        if(!confirm('Mark '+cname+' as paid for '+period.label+'?\nHours: '+hrs.toFixed(2)+'  Gross: \$'+pay.toFixed(2)+'\n\nRemember to actually send payment via QuickBooks.')) return;
+        var existingRow = (function(){
+          var pr = _payrollPeriodRows[period.key] || {};
+          var key = cid || ('name:'+cname);
+          return pr[key] || null;
+        })();
+        var bonusExtra = (existingRow && existingRow.bonus_cents) ? +existingRow.bonus_cents/100 : 0;
+        var totalPayout = pay + bonusExtra;
+        var confirmMsg = 'Mark '+cname+' as paid for '+period.label+'?\nHours: '+hrs.toFixed(2)+'  Gross: \$'+pay.toFixed(2);
+        if(bonusExtra>0) confirmMsg += '\nBonus: \$'+bonusExtra.toFixed(2)+'\nTotal payout: \$'+totalPayout.toFixed(2);
+        confirmMsg += '\n\nRemember to actually send payment via QuickBooks.';
+        if(!confirm(confirmMsg)) return;
         var row = {
           period_key: period.key,
           period_start: _fmtISODate(period.start),
@@ -4676,7 +4833,8 @@ function setPeriod(btn){
           appt_ids: appts.map(function(a){return a.id;}).filter(Boolean),
           status: 'paid',
           paid_at: new Date().toISOString(),
-          paid_amount_cents: Math.round(pay*100)
+          bonus_cents: (existingRow && existingRow.bonus_cents) ? existingRow.bonus_cents : 0,
+          paid_amount_cents: Math.round(pay*100) + ((existingRow && existingRow.bonus_cents) ? +existingRow.bonus_cents : 0)
         };
         try {
           await dbUpsertPayPeriod(row);

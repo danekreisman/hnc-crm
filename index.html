@@ -1431,7 +1431,7 @@ Mahalo 🌺</textarea>
         <div class="form-row"><label>Email</label><input type="email" id="ced2-email"></div>
         <div class="form-row"><label>Location</label><input type="text" id="ced2-loc"></div>
         <div class="form-two">
-          <div class="form-row"><label>Hourly rate ($)</label><input type="number" id="ced2-rate"></div>
+          <div class="form-row"><label>Regular rate ($/hr)</label><input type="number" id="ced2-rate-regular" min="0" step="0.5"></div><div class="form-row"><label>Deep cleaning rate ($/hr)</label><input type="number" id="ced2-rate-deep" min="0" step="0.5"></div><div class="form-row"><label>Move-out rate ($/hr)</label><input type="number" id="ced2-rate-moveout" min="0" step="0.5"></div><input type="hidden" id="ced2-rate">
           <div class="form-row"><label>Island</label><select id="ced2-island"><option>Oahu</option><option>Maui</option><option>Both</option></select></div>
         </div>
         <div class="form-row"><label>Role</label><select id="ced2-role"><option>Cleaner</option><option>Lead cleaner</option></select></div>
@@ -3509,8 +3509,15 @@ function showCleanerEdit(){
     document.getElementById('ced2-email').value=c.email||'';
     document.getElementById('ced2-loc').value=c.loc||'';
     document.getElementById('ced2-notes').value=c.notes||'';
-    var rate=c.rate?c.rate.replace(/[^0-9]/g,''):'16';
-    document.getElementById('ced2-rate').value=rate;
+    function __parseRate(v, def){ if(!v) return def; var n = parseFloat(String(v).replace(/[^0-9.]/g,'')); return (!isNaN(n)&&n>0) ? n : def; }
+    var legacyRate = __parseRate(c.rate, 30);
+    var rReg  = __parseRate(c.rate_regular, legacyRate);
+    var rDeep = __parseRate(c.rate_deep, Math.max(35, legacyRate));
+    var rMove = __parseRate(c.rate_moveout, Math.max(35, legacyRate));
+    document.getElementById('ced2-rate-regular').value = rReg;
+    document.getElementById('ced2-rate-deep').value    = rDeep;
+    document.getElementById('ced2-rate-moveout').value = rMove;
+    document.getElementById('ced2-rate').value = rReg;
   }
   document.getElementById('cleaner-view').style.display='none';
   document.getElementById('cleaner-edit').style.display='block';
@@ -3521,7 +3528,10 @@ function saveCleanerEdit(){
   var phone=document.getElementById('ced2-phone').value;
   var email=document.getElementById('ced2-email').value;
   var loc=document.getElementById('ced2-loc').value;
-  var rate=document.getElementById('ced2-rate').value;
+  var rateReg = document.getElementById('ced2-rate-regular').value;
+  var rateDeep = document.getElementById('ced2-rate-deep').value;
+  var rateMove = document.getElementById('ced2-rate-moveout').value;
+  var rate = rateReg;
   var island=document.getElementById('ced2-island').value;
   var role=document.getElementById('ced2-role').value;
   var bg=document.getElementById('ced2-bg').value;
@@ -3536,6 +3546,9 @@ function saveCleanerEdit(){
     c.email=email||c.email;
     c.loc=loc||c.loc;
     c.rate='$'+rate+'/hr';
+    if(rateReg)  c.rate_regular  = '$'+rateReg+'/hr';
+    if(rateDeep) c.rate_deep     = '$'+rateDeep+'/hr';
+    if(rateMove) c.rate_moveout  = '$'+rateMove+'/hr';
     c.role=role+' · '+island;
     c.islands=island;
     c.bgcheck=bg;
@@ -5132,7 +5145,7 @@ try{var _sv=sessionStorage.getItem('hnc_currentView'); if(_sv && _sv!=='calendar
         </div>
       </div>
       <div class="form-two">
-        <div class="form-row"><label>Hourly rate ($)</label><input type="number" id="ncl-rate" value="16" min="0"></div>
+        <div class="form-row"><label>Regular rate ($/hr)</label><input type="number" id="ncl-rate-regular" value="30" min="0" step="0.5"></div><div class="form-row"><label>Deep cleaning rate ($/hr)</label><input type="number" id="ncl-rate-deep" value="35" min="0" step="0.5"></div><div class="form-row"><label>Move-out rate ($/hr)</label><input type="number" id="ncl-rate-moveout" value="35" min="0" step="0.5"></div><input type="hidden" id="ncl-rate" value="30">
         <div class="form-row"><label>Start date</label><input type="date" id="ncl-start"></div>
       </div>
       <div class="panel-section">Compliance</div>
@@ -5283,7 +5296,10 @@ function saveNewCleaner(){
   var id=name.toLowerCase().replace(/[^a-z0-9]/g,'-')+'-'+Date.now();
   var role=document.getElementById('ncl-role').value;
   var island=document.getElementById('ncl-island').value;
-  var rate=document.getElementById('ncl-rate').value;
+  var rateReg = document.getElementById('ncl-rate-regular').value || '30';
+  var rateDeep = document.getElementById('ncl-rate-deep').value || '35';
+  var rateMove = document.getElementById('ncl-rate-moveout').value || '35';
+  var rate = rateReg;
   var bgcheck=document.getElementById('ncl-bg').value;
   var startDate=document.getElementById('ncl-start').value;
   var startLabel=startDate?new Date(startDate+'T12:00:00').toLocaleDateString('en-US',{month:'short',year:'numeric'}):new Date().toLocaleDateString('en-US',{month:'short',year:'numeric'});
@@ -5292,7 +5308,7 @@ function saveNewCleaner(){
     phone:document.getElementById('ncl-phone').value||'—',
     email:document.getElementById('ncl-email').value||'—',
     loc:document.getElementById('ncl-loc').value||'—',
-    start:startLabel,rate:'$'+rate+'/hr',week:'0 hrs',month:'0 hrs',
+    start:startLabel,rate:'$'+rate+'/hr',rate_regular:'$'+rateReg+'/hr',rate_deep:'$'+rateDeep+'/hr',rate_moveout:'$'+rateMove+'/hr',week:'0 hrs',month:'0 hrs',
     paid:'$0',jobs:'0',alltime:'0',islands:island,bgcheck:bgcheck,
     notes:document.getElementById('ncl-notes').value||'—'
   };

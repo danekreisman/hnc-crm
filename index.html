@@ -3818,23 +3818,32 @@ function _deriveHours(beds, baths, svcType, cond, commercialHrs){
   return Math.round(baseHrs*condMod*10)/10;
 }
 
-function getCleanerRate(cleanerName){
-  // Look up cleaner in cleanerDB by name (primary source — real hourly_rate from Supabase)
+function serviceRateKey(service){
+  if(!service) return null;
+  var s=String(service).toLowerCase();
+  if(s.indexOf("deep")>=0) return "rate_deep";
+  if(s.indexOf("move")>=0) return "rate_moveout";
+  return "rate_regular";
+}
+function getCleanerRate(cleanerName, service){
   if(!cleanerName||cleanerName==='Unassigned')return 0;
   var found=Object.values(cleanerDB).find(function(c){return c.name===cleanerName;});
-  if(found&&found.rate){
-    var n=parseFloat(found.rate.replace(/[^0-9.]/g,''));
-    if(!isNaN(n)&&n>0)return n;
+  if(found){
+    var key = serviceRateKey(service);
+    var rateStr = (key && found[key]) ? found[key] : found.rate;
+    if(rateStr){
+      var n=parseFloat(String(rateStr).replace(/[^0-9.]/g,''));
+      if(!isNaN(n)&&n>0)return n;
+    }
   }
-  // Fallback: parse from option text like "Kaimana M. — Oahu ($18/hr)"
   var m=cleanerName.match(/\$(\d+)\/hr/i);
   if(m)return parseFloat(m[1]);
   return 16;
 }
 
-function calcCleanerPay(duration,cleanerName){
+function calcCleanerPay(duration,cleanerName,service){
   if(!duration||!cleanerName||cleanerName==='Unassigned')return 0;
-  var rate=getCleanerRate(cleanerName);
+  var rate=getCleanerRate(cleanerName, service);
   if(!rate)return 0;
   var pay=Math.round(parseFloat(duration)*rate*100)/100;
   console.log('[calcCleanerPay] '+cleanerName+' $'+rate+'/hr × '+duration+'h = $'+pay);

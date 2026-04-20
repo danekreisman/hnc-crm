@@ -1028,9 +1028,9 @@ Mahalo 🌺</textarea>
           <select id="na-freq" onchange="calcPrice();showClientPricingRules(_findClientByName&&_findClientByName((document.getElementById('na-name')||{}).value||'')?clientDB[_findClientByName((document.getElementById('na-name')||{}).value||'').id]:null)">
             <option>Every Day</option>
             <option>Weekly</option>
-            <option selected>Biweekly</option>
+            <option value="Biweekly" selected>Biweekly (every 2 weeks)</option>
             <option>Every 3 weeks</option>
-            <option>Monthly</option>
+            <option value="Monthly">Monthly (every 4 weeks)</option>
             <option>One-time</option>
           </select>
         </div>
@@ -1177,9 +1177,9 @@ Mahalo 🌺</textarea>
             <select id="edit-freq">
               <option value="One-time">One-time</option>
               <option value="Weekly">Weekly</option>
-              <option value="Biweekly">Biweekly</option>
+              <option value="Biweekly">Biweekly (every 2 weeks)</option>
               <option value="Every 3 weeks">Every 3 weeks</option>
-              <option value="Monthly">Monthly</option>
+              <option value="Monthly">Monthly (every 4 weeks)</option>
             </select>
           </div>
         </div>
@@ -1670,11 +1670,9 @@ function _generateRecurringDates(yr,mo,dy,freq){
   var limits={'Every Day':60,'Weekly':52,'Biweekly':26,'Every 3 weeks':18,'Monthly':12};
   var max=limits[freq]||12;
   var d=new Date(start);
-  if(freq==='Every Day'||freq==='Weekly'||freq==='Biweekly'||freq==='Every 3 weeks'){
-    var step=freq==='Every Day'?1:freq==='Weekly'?7:freq==='Biweekly'?14:21;
-    for(var i=0;i<max;i++){dates.push(new Date(d));d.setDate(d.getDate()+step);}
-  } else if(freq==='Monthly'){
-    for(var i=0;i<max;i++){dates.push(new Date(yr,mo-1+i,dy));}
+  if(freq==='Every Day'||freq==='Weekly'||freq==='Biweekly'||freq==='Every 3 weeks'||freq==='Monthly'){
+    var step=freq==='Every Day'?1:freq==='Weekly'?7:freq==='Biweekly'?14:freq==='Every 3 weeks'?21:28;
+    var d=new Date(start);for(var i=0;i<lim;i++){dates.push(new Date(d));d.setDate(d.getDate()+step);}
   }
   return dates;
 }

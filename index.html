@@ -2055,7 +2055,7 @@ function renderCleanersGrid(){
     var badgeClass=isInactive?'bin':'bac';
     var badgeText=isInactive?'Inactive':'Active';
     var topHtml='<div class="cleaner-top"><div class="avatar" style="background:'+c.bg+';color:'+c.fg+';">'+c.initials+'</div><div style="flex:1;"><div class="cleaner-name">'+c.name+'</div><div class="cleaner-role">'+c.role+'</div></div></div>';
-    var statsHtml='<div class="cleaner-stats"><div class="cs"><div class="cs-label">This week</div><div class="cs-val">'+c.week+'</div></div><div class="cs"><div class="cs-label">Rate</div><div class="cs-val">'+c.rate+'</div></div><div class="cs"><div class="cs-label">Jobs this mo</div><div class="cs-val">'+c.jobs+'</div></div><div class="cs"><div class="cs-label">Status</div><div class="cs-val"><span class="badge '+badgeClass+'">'+badgeText+'</span></div></div></div>';
+    var statsHtml='<div class="cleaner-stats"><div class="cs"><div class="cs-label">This week</div><div class="cs-val">'+c.week+'</div></div><div class="cs"><div class="cs-label">Rate</div><div class="cs-val">'+(c.rate_regular||c.rate)+'</div></div><div class="cs"><div class="cs-label">Jobs this mo</div><div class="cs-val">'+c.jobs+'</div></div><div class="cs"><div class="cs-label">Status</div><div class="cs-val"><span class="badge '+badgeClass+'">'+badgeText+'</span></div></div></div>';
     var btnHtml = isInactive ? '<button class="btn btn-primary" style="margin-top:8px;width:100%;background:linear-gradient(135deg,#22c55e,#16a34a);" onclick="event.stopPropagation();quickReactivate(\''+id+'\')">Reactivate</button>' : '<div class="pb"><div class="pf" style="width:0%"></div></div>';
     card.innerHTML=topHtml+statsHtml+btnHtml;
     (function(cid){card.addEventListener('click',function(){openCleaner(cid);});})(id);
@@ -5553,7 +5553,7 @@ function generateAgentResponse(text){
     lines=['**Active cleaners — '+cleaners.length+' total**',''];
     cleaners.forEach(function(c){
       var hrs=c.week;var busy=hrs!=='0 hrs';
-      lines.push('- **'+c.name+'** | '+c.role+' | '+c.rate+' | This week: '+hrs+(busy?'':' (inactive)'));
+      lines.push('- **'+c.name+'** | '+c.role+' | '+(c.rate_regular||c.rate)+' | This week: '+hrs+(busy?'':' (inactive)'));
     });
     lines.push('','Total hours logged this week: **'+Object.values(cleanerDB).reduce(function(sum,c){return sum+parseFloat(c.week)||0;},0)+'**');
     return lines.join('\n');
@@ -7915,7 +7915,7 @@ function openInviteCleaner(){
     label.innerHTML='<input type="checkbox" value="'+id+'" style="accent-color:var(--brand-500);width:15px;height:15px;" onchange="updateInvitePreview()">'
       +'<div style="flex:1;">'
         +'<div style="font-weight:600;color:var(--text);">'+c.name+'</div>'
-        +'<div style="color:var(--text-muted);font-size:11px;">'+c.role+' · '+c.rate+'</div>'
+        +'<div style="color:var(--text-muted);font-size:11px;">'+c.role+' · '+(c.rate_regular||c.rate)+'</div>'
       +'</div>'
       +'<div style="font-size:11px;color:var(--brand-500);font-weight:500;">'+(id===currentAppt.cleaner.toLowerCase().replace(/[^a-z]/g,'')?'Currently assigned':'Available')+'</div>';
     list.appendChild(label);

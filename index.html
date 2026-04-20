@@ -1552,6 +1552,9 @@ async function dbSaveCleaner(data){
     island:data.island||'Oahu', phone:data.phone||null,
     email:data.email||null, location:data.loc||null,
     hourly_rate:parseFloat(data.rate)||16,
+    rate_regular_cents: (function(v){var n=parseFloat(String(v||'').replace(/[^0-9.]/g,'')); return (!isNaN(n)&&n>0)?Math.round(n*100):null;})(data.rate_regular || data.rate),
+    rate_deep_cents: (function(v){var n=parseFloat(String(v||'').replace(/[^0-9.]/g,'')); return (!isNaN(n)&&n>0)?Math.round(n*100):null;})(data.rate_deep),
+    rate_moveout_cents: (function(v){var n=parseFloat(String(v||'').replace(/[^0-9.]/g,'')); return (!isNaN(n)&&n>0)?Math.round(n*100):null;})(data.rate_moveout),
     start_date:data.startDate||null,
     background_check:data.bgcheck||'Not started',
     status:'Active', notes:data.notes||null
@@ -1870,6 +1873,9 @@ async function loadAllData(){
         loc:c.location||'—',
         start:c.start_date?new Date(c.start_date+'T12:00:00').toLocaleDateString('en-US',{month:'short',year:'numeric'}):'—',
         rate:'$'+(c.hourly_rate||16)+'/hr',
+        rate_regular: c.rate_regular_cents ? '$'+(c.rate_regular_cents/100)+'/hr' : undefined,
+        rate_deep: c.rate_deep_cents ? '$'+(c.rate_deep_cents/100)+'/hr' : undefined,
+        rate_moveout: c.rate_moveout_cents ? '$'+(c.rate_moveout_cents/100)+'/hr' : undefined,
         week:'0 hrs', month:'0 hrs', paid:'$0',
         jobs:'0', alltime:'0', islands:c.island||'Oahu',
         bgcheck:c.background_check||'Not started',
@@ -3563,6 +3569,9 @@ function saveCleanerEdit(){
       email:email||undefined,
       location:loc||undefined,
       hourly_rate:parseFloat(rate)||undefined,
+      rate_regular_cents: (function(v){var n=parseFloat(String(v||'').replace(/[^0-9.]/g,'')); return (!isNaN(n)&&n>0)?Math.round(n*100):undefined;})(typeof rateReg!=='undefined'?rateReg:rate),
+      rate_deep_cents: (function(v){var n=parseFloat(String(v||'').replace(/[^0-9.]/g,'')); return (!isNaN(n)&&n>0)?Math.round(n*100):undefined;})(typeof rateDeep!=='undefined'?rateDeep:undefined),
+      rate_moveout_cents: (function(v){var n=parseFloat(String(v||'').replace(/[^0-9.]/g,'')); return (!isNaN(n)&&n>0)?Math.round(n*100):undefined;})(typeof rateMove!=='undefined'?rateMove:undefined),
       island:island||undefined,
       role:role||undefined,
       background_check:bg||undefined,
@@ -4532,7 +4541,7 @@ function setPeriod(btn){
           if(typeof dbLoadCleaners === 'function'){
             try { var cs = await dbLoadCleaners(); (cs||[]).forEach(function(c){
               if(typeof cleanerDB==='undefined') window.cleanerDB = {};
-              cleanerDB[c.id] = { id:c.id, name:c.name, role:c.role||'Cleaner · '+(c.island||''), rate:'$'+(c.hourly_rate||0)+'/hr', islands:c.island||'', email:c.email, phone:c.phone };
+              cleanerDB[c.id] = { id:c.id, name:c.name, role:c.role||'Cleaner · '+(c.island||''), rate:'$'+(c.hourly_rate||0)+'/hr', rate_regular: c.rate_regular_cents ? '$'+(c.rate_regular_cents/100)+'/hr' : undefined, rate_deep: c.rate_deep_cents ? '$'+(c.rate_deep_cents/100)+'/hr' : undefined, rate_moveout: c.rate_moveout_cents ? '$'+(c.rate_moveout_cents/100)+'/hr' : undefined, islands:c.island||'', email:c.email, phone:c.phone };
             }); } catch(e){ console.warn('bootstrap cleaners', e); }
           }
         }

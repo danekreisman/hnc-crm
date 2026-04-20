@@ -2933,6 +2933,74 @@ async function saveApptEdit(mode){
       }
     });
     console.log('[saveApptEdit] recurringAppts updated: '+rUpdated+' entries');
+    // === Tail regeneration: generate future recurring occurrences on the new cadence ===
+    // Only fires in 'all' mode and only when freq is a recurring type.
+    try{
+      var _isRecurFreq = (freq && freq!=='One-time');
+      if(_isRecurFreq){
+        // Parse current appointment's date key as the anchor date for generation
+        var _kp = (currentApptKey||'').split('-');
+        if(_kp.length===3){
+          var _yr = parseInt(_kp[0],10), _mo = parseInt(_kp[1],10), _dy = parseInt(_kp[2],10);
+          if(_yr && _mo && _dy){
+            // Ensure this appointment is marked as recurring with a seriesId so future edits cascade
+            var _ensureSid = curSeriesId || (a && a.seriesId) || (typeof _generateUUID==='function' ? _generateUUID() : ('sid-'+Date.now()+'-'+Math.random().toString(36).slice(2,8)));
+            var _todayDate = new Date();
+            var _occ = _generateRecurringDates(_yr, _mo, _dy, freq) || [];
+            var _inserted = 0, _skipped = 0;
+            _occ.forEach(function(_dt, _idx){
+              if(!_dt) return;
+              // Only forward-generate: skip the anchor itself (already updated in place) and anything in the past
+              if(_idx===0) return;
+              if(_dt < _todayDate) { _skipped++; return; }
+              var _oKey = _dt.getFullYear()+'-'+(_dt.getMonth()+1)+'-'+_dt.getDate();
+              if(!apptData[_oKey]) apptData[_oKey] = [];
+              // Skip if this client already has a (non-paid) booking on this date — avoids duplicates and preserves paid rows
+              var _dupe = apptData[_oKey].some(function(x){ return x && x.n===name; });
+              if(_dupe){ _skipped++; return; }
+              var _newAppt = {
+                n: name,
+                s: 'unassigned',
+                t: newTimeStr,
+                cleaner: cleanerVal,
+                recurring: true,
+                seriesId: _ensureSid,
+                service: svcText,
+                freq: freq,
+                address: editAddr,
+                beds: editBeds, baths: editBaths, sqft: editSqft, condition: editCond,
+                duration: editDuration,
+                basePrice: editBase, tax: editTax, totalPrice: editTotal,
+                base: '$'+(typeof editBase==='number'?editBase.toFixed(2):editBase),
+                cleanerPay: editCleanerPay,
+                cleanerPayOverride: editCleanerPayOverride,
+                notes: editNotes
+              };
+              apptData[_oKey].push(_newAppt);
+              _inserted++;
+              // Persist to Supabase (fire-and-forget)
+              try{
+                if(typeof dbSaveAppointment==='function'){
+                  dbSaveAppointment({
+                    clientName: name, service: svcText, freq: freq,
+                    date: _oKey, time: newTimeStr, address: editAddr,
+                    beds: editBeds, baths: editBaths, sqft: editSqft, condition: editCond,
+                    cleaner: cleanerVal, status: 'unassigned',
+                    basePrice: editBase, tax: editTax, totalPrice: editTotal,
+                    cleanerPay: editCleanerPay, cleanerPayOverride: editCleanerPayOverride,
+                    duration: editDuration, notes: editNotes,
+                    recurring: true, seriesId: _ensureSid
+                  });
+                }
+              }catch(_dberr){ console.warn('[saveApptEdit] dbSaveAppointment failed for '+_oKey, _dberr); }
+            });
+            // Also backfill seriesId + recurring:true on the anchor row if missing, so next edit cascades
+            if(a && !a.seriesId){ a.seriesId = _ensureSid; a.recurring = true; }
+            console.log('[saveApptEdit] tail-regen: inserted '+_inserted+' future occurrences, skipped '+_skipped+' (freq='+freq+', from '+currentApptKey+')');
+          }
+        }
+      }
+    }catch(_tailErr){ console.warn('[saveApptEdit] tail-regen error', _tailErr); }
   }
 
   // Render immediately

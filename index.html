@@ -1163,6 +1163,23 @@ Mahalo 🌺</textarea>
           <div class="form-row"><label>Date</label><input type="date" id="edit-date"></div>
           <div class="form-row"><label>Time</label><input type="time" id="edit-time"></div>
         </div>
+        <div class="form-two">
+          <div class="form-row"><label>Service type</label>
+            <select id="edit-service" onchange="calcEditPrice()">
+              <option value="Regular Cleaning">Regular Cleaning</option>
+              <option value="Deep Clean">Deep Clean</option>
+              <option value="Move-out Clean">Move-out Clean</option>
+            </select>
+          </div>
+          <div class="form-row"><label>Frequency</label>
+            <select id="edit-freq">
+              <option value="One-time">One-time</option>
+              <option value="Weekly">Weekly</option>
+              <option value="Bi-weekly">Bi-weekly</option>
+              <option value="Monthly">Monthly</option>
+            </select>
+          </div>
+        </div>
         <div class="form-row"><label>Assigned cleaner</label>
           <select id="edit-cleaner" onchange="calcEditPrice()">
             <option value="Unassigned">Unassigned</option>
@@ -2722,6 +2739,25 @@ function showApptEdit(){
   // Rebuild cleaner dropdown fresh from cleanerDB, restore current cleaner
   var currentCleaner=currentAppt?currentAppt.cleaner:'Unassigned';
   populateCleanerDropdown('edit-cleaner', currentCleaner);
+  // Initialize Service type + Frequency from currentAppt
+  try{
+    var _a = window.currentAppt||{};
+    var _svcSel = document.getElementById('edit-service');
+    var _freqSel = document.getElementById('edit-freq');
+    if(_svcSel){
+      var _svc = _a.service || 'Regular Cleaning';
+      // If current appointment has a service value not in the list, add it as an option so it doesn't silently change
+      var _known = ['Regular Cleaning','Deep Clean','Move-out Clean'];
+      if(_svc && _known.indexOf(_svc)<0){ var _o=document.createElement('option'); _o.value=_svc; _o.textContent=_svc; _svcSel.insertBefore(_o, _svcSel.firstChild); }
+      _svcSel.value = _svc;
+    }
+    if(_freqSel){
+      var _fq = _a.freq || _a.frequency || 'One-time';
+      var _kf = ['One-time','Weekly','Bi-weekly','Monthly'];
+      if(_fq && _kf.indexOf(_fq)<0){ var _of=document.createElement('option'); _of.value=_fq; _of.textContent=_fq; _freqSel.insertBefore(_of, _freqSel.firstChild); }
+      _freqSel.value = _fq;
+    }
+  }catch(_e){ console.warn('init edit-service/edit-freq failed', _e); }
   // Restore cleaner pay override state
   var cpOvrChk=document.getElementById('edit-cleaner-pay-override-chk');
   var cpOvrVal=document.getElementById('edit-cleaner-pay-override-val');
@@ -2773,8 +2809,10 @@ async function saveApptEdit(mode){
   console.log('[saveApptEdit] mode='+mode+' recurring='+!!a.recurring+' client='+a.n);
   var editClient=document.getElementById('edit-client').value||a.n;
   // Service, freq, beds, baths, sqft, condition are property-level — read from current appointment
-  var svcText=a.service||'Regular Cleaning';
-  var freq=a.freq||a.frequency||'One-time';
+  var _editSvcEl=document.getElementById('edit-service');
+  var _editFreqEl=document.getElementById('edit-freq');
+  var svcText=(_editSvcEl&&_editSvcEl.value)||a.service||'Regular Cleaning';
+  var freq=(_editFreqEl&&_editFreqEl.value)||a.freq||a.frequency||'One-time';
   var editBeds=a.beds||'';
   var editBaths=a.baths||'';
   var editSqft=a.sqft||'';
@@ -4067,7 +4105,8 @@ function calcEditPrice(){
     'Standard clean':'standard','Deep clean':'deep','Move-out clean':'moveout',
     'Commercial weekly':'commercial','Commercial daily':'commercial','Airbnb turnover':'airbnb',
     'Standard':'standard','Deep Clean':'deep','Move In/Out':'moveout','Post-Construction':'standard'};
-  var svcText=appt.service||'Regular Cleaning';
+  var _calcSvcEl=document.getElementById('edit-service');
+  var svcText=(_calcSvcEl&&_calcSvcEl.value)||appt.service||'Regular Cleaning';
   var svcType=svcTextMap[svcText]||'standard';
   var isCommercial=(svcType==='commercial');
   var hrs;

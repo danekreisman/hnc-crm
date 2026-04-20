@@ -3475,7 +3475,7 @@ function openCleaner(id){
   var toggleBtn=document.getElementById('cp-toggle-active');
   if(toggleBtn){ toggleBtn.textContent=isInactive?'Reactivate cleaner':'Deactivate cleaner'; toggleBtn.style.background=isInactive?'#dcfce7':'#fef3c7'; toggleBtn.style.color=isInactive?'#166534':'#92400e'; }
   ['phone','email','loc','start','rate','week','month','paid','jobs','alltime','islands','notes'].forEach(function(f){
-    document.getElementById('cp-'+f).textContent=d[f]||'—';
+    document.getElementById('cp-'+f).textContent=(f==='rate'?(d.rate_regular||d.rate):d[f])||'—';
   });
   var bg=document.getElementById('cp-bg');bg.textContent=d.bgcheck;bg.className='badge '+(d.bgcheck==='Cleared'?'bac':'bpn');
   hideCleanerEdit();

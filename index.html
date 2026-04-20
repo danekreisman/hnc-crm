@@ -3586,6 +3586,7 @@ function saveCleanerEdit(){
 
   hideCleanerEdit();
   if(currentCleanerId)openCleaner(currentCleanerId);
+  try{ if(typeof renderCleanersGrid==='function') renderCleanersGrid(); }catch(e){ console.warn('renderCleanersGrid failed',e); }
   showToast('cleaner-overlay','Cleaner updated successfully.');
 }
 

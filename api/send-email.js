@@ -103,9 +103,10 @@ export default async function handler(req, res) {
         </div>
       `;
     } else if (type === 'quote') {
-      const { quoteData, frequency, bookingUrl } = req.body;
+      const { quoteData, frequency, bookingUrl, customIntro } = req.body;
       const q = quoteData || {};
       const bk = q.breakdown || {};
+      const introText = customIntro || `Hi ${clientName}, thanks for reaching out! Here's your personalized quote from Hawaii Natural Clean.`;
 
       // Build breakdown rows
       const breakdownRows = [];
@@ -129,7 +130,7 @@ export default async function handler(req, res) {
           </div>
 
           <h2 style="font-size:24px;font-weight:700;margin:0 0 8px;color:#0f172a;">Your cleaning quote is ready 🌺</h2>
-          <p style="color:#64748b;font-size:15px;margin:0 0 24px;">Hi ${clientName}, thanks for reaching out! Here's your personalized quote from Hawaii Natural Clean.</p>
+          <p style="color:#64748b;font-size:15px;margin:0 0 24px;">${introText}</p>
 
           <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:14px;padding:22px;margin-bottom:22px;">
             <div style="font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#94a3b8;margin-bottom:14px;">Quote details</div>

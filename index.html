@@ -1457,6 +1457,11 @@ Mahalo 🌺</textarea>
         <input type="text" id="qat-subject" placeholder="Your Hawaii Natural Clean quote: ${total}">
       </div>
       <div style="font-size:11px;color:var(--text-muted);margin-top:-8px;margin-bottom:14px;">Leave blank to use the default subject.</div>
+      <div class="panel-section">Email intro message</div>
+      <div class="form-row">
+        <textarea id="qat-email-intro" style="min-height:80px;font-size:13px;" placeholder="Hi {firstName}, thanks for reaching out! Here's your personalized quote from Hawaii Natural Clean."></textarea>
+      </div>
+      <div style="font-size:11px;color:var(--text-muted);margin-top:-8px;margin-bottom:14px;">Appears above the quote breakdown. Leave blank to use the default.</div>
       <div class="save-bar" style="margin-top:16px;">
         <button class="btn btn-primary" onclick="saveQuoteTemplates()">Save templates</button>
         <button class="btn" onclick="closeOverlay('quote-auto-overlay')">Cancel</button>
@@ -2230,7 +2235,9 @@ function renderLeadsPipeline(){
       card.dataset.leadId=id;
       var svc=l.service||'Service';
       var badgeCls=svc.toLowerCase().indexOf('commercial')>=0?'bc':'br';
-      card.innerHTML='<div class="deal-name">'+l.name+'</div><div class="deal-type"><span class="badge '+badgeCls+'">'+svc+'</span></div><div class="deal-val">'+(l.value||'TBD')+'</div>';
+      var priceDisplay = l.quoteTotal ? '<span style="color:var(--brand-500);font-weight:600;">$'+Number(l.quoteTotal).toFixed(2)+'</span>' : (l.value && l.value!=='TBD' ? l.value : '<span style="color:var(--text-muted);">No quote yet</span>');
+      var freqDisplay = l.frequency ? '<div style="font-size:11px;color:var(--text-muted);margin-top:2px;">'+l.frequency+'</div>' : '';
+      card.innerHTML='<div class="deal-name">'+l.name+'</div><div class="deal-type"><span class="badge '+badgeCls+'">'+svc+'</span>'+freqDisplay+'</div><div class="deal-val">'+priceDisplay+'</div>';
       (function(lid){card.addEventListener('click',function(){openLead(lid);});})(id);
       cols[colIdx].appendChild(card);
     });
@@ -6081,6 +6088,8 @@ async function openQuoteAutoEdit(){
     document.getElementById('qat-sms').value = (r.data && r.data.value) ? r.data.value : '';
     var r2 = await db.from('settings').select('value').eq('key','quote_email_subject').maybeSingle();
     document.getElementById('qat-subject').value = (r2.data && r2.data.value) ? r2.data.value : '';
+    var r3 = await db.from('settings').select('value').eq('key','quote_email_intro').maybeSingle();
+    document.getElementById('qat-email-intro').value = (r3.data && r3.data.value) ? r3.data.value : '';
   } catch(e) { console.warn('loadQuoteTemplates err:', e); }
   openOverlay('quote-auto-overlay');
 }
@@ -6088,18 +6097,15 @@ async function openQuoteAutoEdit(){
 async function saveQuoteTemplates(){
   var sms = document.getElementById('qat-sms').value.trim();
   var subject = document.getElementById('qat-subject').value.trim();
+  var emailIntro = document.getElementById('qat-email-intro').value.trim();
   var savedEl = document.getElementById('qat-saved');
   try {
-    if(sms){
-      await db.from('settings').upsert({ key:'quote_sms_template', value: sms, updated_at: new Date().toISOString() }, { onConflict:'key' });
-    } else {
-      await db.from('settings').delete().eq('key','quote_sms_template');
-    }
-    if(subject){
-      await db.from('settings').upsert({ key:'quote_email_subject', value: subject, updated_at: new Date().toISOString() }, { onConflict:'key' });
-    } else {
-      await db.from('settings').delete().eq('key','quote_email_subject');
-    }
+    if(sms){ await db.from('settings').upsert({ key:'quote_sms_template', value: sms, updated_at: new Date().toISOString() }, { onConflict:'key' }); }
+    else { await db.from('settings').delete().eq('key','quote_sms_template'); }
+    if(subject){ await db.from('settings').upsert({ key:'quote_email_subject', value: subject, updated_at: new Date().toISOString() }, { onConflict:'key' }); }
+    else { await db.from('settings').delete().eq('key','quote_email_subject'); }
+    if(emailIntro){ await db.from('settings').upsert({ key:'quote_email_intro', value: emailIntro, updated_at: new Date().toISOString() }, { onConflict:'key' }); }
+    else { await db.from('settings').delete().eq('key','quote_email_intro'); }
     if(savedEl){ savedEl.textContent='Templates saved!'; savedEl.classList.add('show'); setTimeout(function(){ savedEl.classList.remove('show'); },3000); }
   } catch(e) {
     console.error('saveQuoteTemplates err:', e);

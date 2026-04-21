@@ -60,13 +60,16 @@ export default async function handler(req, res) {
   // ── 3. Load custom templates from settings ──────────────────────────────
   let customSmsTemplate = null;
   let customEmailSubject = null;
+  let customEmailIntro = null;
   try {
-    const [smsRow, subjectRow] = await Promise.all([
+    const [smsRow, subjectRow, introRow] = await Promise.all([
       db.from('settings').select('value').eq('key', 'quote_sms_template').maybeSingle(),
       db.from('settings').select('value').eq('key', 'quote_email_subject').maybeSingle(),
+      db.from('settings').select('value').eq('key', 'quote_email_intro').maybeSingle(),
     ]);
     if (smsRow.data?.value)     customSmsTemplate  = smsRow.data.value;
     if (subjectRow.data?.value) customEmailSubject = subjectRow.data.value;
+    if (introRow.data?.value)   customEmailIntro   = introRow.data.value;
   } catch(err) {
     console.warn('[lead-capture] failed to load templates:', err.message);
   }
@@ -131,6 +134,7 @@ export default async function handler(req, res) {
           service:    d.serviceType || 'Cleaning',
           frequency:  d.frequency   || null,
           quoteData:  isCustom ? null : quoteResult,
+          customIntro: customEmailIntro ? applyVars(customEmailIntro) : null,
           notes: isCustom
             ? `Thanks for reaching out! Your request (${d.serviceType}) requires a custom quote. We'll follow up within 24 hours — or call/text us at (808) 468-5356.`
             : null,

@@ -31,7 +31,8 @@ export default async function handler(req, res) {
     if (age > 30) return res.status(410).json({ error: 'This booking link has expired. Please contact us for a new quote.' });
 
     // Parse frequency from notes
-    const freqMatch = lead.notes && /Frequency:\s*([^\n]+)/.exec(lead.notes);
+    const freqMatch   = lead.notes && /Frequency:\s*([^\n]+)/.exec(lead.notes);
+    const islandMatch = lead.notes && /Island:\s*([^\n]+)/.exec(lead.notes);
     const bedsMatch = lead.notes && /Beds:\s*(\S+)/.exec(lead.notes);
     const bathsMatch = lead.notes && /Baths:\s*(\S+)/.exec(lead.notes);
 
@@ -41,6 +42,7 @@ export default async function handler(req, res) {
       email:     lead.email,
       service:   lead.service,
       frequency: freqMatch ? freqMatch[1].trim() : null,
+      island:    islandMatch ? islandMatch[1].trim() : 'Oahu',
       beds:      bedsMatch ? bedsMatch[1] : null,
       baths:     bathsMatch ? bathsMatch[1] : null,
       quoteTotal: lead.quote_total,

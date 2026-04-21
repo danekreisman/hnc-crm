@@ -88,6 +88,37 @@ body{background:linear-gradient(160deg,#eaf7fb 0%,#f7fbfc 40%,#f0faf6 100%)}
 
 /* Hidden */
 .hidden{display:none!important}
+
+/* Calendar */
+.cal-wrap{user-select:none}
+.cal-nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.cal-nav button{background:none;border:1px solid var(--border);border-radius:8px;width:32px;height:32px;cursor:pointer;font-size:16px;color:var(--muted);display:flex;align-items:center;justify-content:center;transition:all .15s}
+.cal-nav button:hover{border-color:var(--blue);color:var(--blue)}
+.cal-nav .cal-title{font-weight:700;font-size:15px;color:var(--text)}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+.cal-day-hdr{text-align:center;font-size:11px;font-weight:700;color:var(--muted);letter-spacing:.05em;padding:4px 0;text-transform:uppercase}
+.cal-day{aspect-ratio:1;display:flex;align-items:center;justify-content:center;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;transition:all .15s;border:1.5px solid transparent;position:relative}
+.cal-day:hover:not(.blocked):not(.past):not(.empty){background:var(--blue-light);border-color:var(--blue-border);color:var(--blue)}
+.cal-day.today{border-color:var(--blue-border);color:var(--blue)}
+.cal-day.selected{background:var(--blue);color:#fff;border-color:var(--blue);font-weight:700}
+.cal-day.selected:hover{background:var(--blue)}
+.cal-day.blocked{background:#fef2f2;color:#fca5a5;cursor:not-allowed;text-decoration:line-through}
+.cal-day.past{color:var(--border);cursor:not-allowed}
+.cal-day.empty{cursor:default}
+.cal-day.sunday{color:#fca5a5;cursor:not-allowed;}
+.cal-day.loading{opacity:.5;pointer-events:none}
+.cal-legend{display:flex;gap:16px;margin-top:10px;flex-wrap:wrap}
+.cal-legend span{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted)}
+.cal-legend i{width:12px;height:12px;border-radius:3px;display:inline-block}
+.avail-badge{font-size:10px;position:absolute;bottom:2px;right:3px;color:var(--blue);font-weight:700;opacity:.7}
+
+/* Time slots */
+.slot-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}
+.slot-btn{padding:9px 6px;border:1.5px solid var(--border);border-radius:8px;background:#fff;font-size:13px;font-family:inherit;cursor:pointer;transition:all .15s;text-align:center;color:var(--text)}
+.slot-btn:hover:not(:disabled){border-color:var(--blue);color:var(--blue);background:var(--blue-light)}
+.slot-btn.selected{background:var(--blue);color:#fff;border-color:var(--blue);font-weight:600}
+.slot-btn:disabled{opacity:.35;cursor:not-allowed;text-decoration:line-through}
+.slots-label{font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.05em;text-transform:uppercase;margin-top:16px;margin-bottom:4px}
 </style>
 </head>
 <body>
@@ -284,13 +315,13 @@ function renderBook(){
 }
 
 async function submitBooking(){
-  var date  = document.getElementById('bk-date').value;
-  var time  = document.getElementById('bk-time').value;
-  var notes = document.getElementById('bk-notes').value;
+  var date  = SEL_DATE;
+  var time  = SEL_TIME;
+  var notes = document.getElementById('bk-notes') ? document.getElementById('bk-notes').value : '';
   var btn   = document.getElementById('bk-submit');
   var errEl = document.getElementById('bk-error');
 
-  if(!date){ errEl.innerHTML='<div class="error-banner" style="margin-bottom:12px;">Please select a date.</div>'; return; }
+  if(!date || !time){ errEl.innerHTML='<div class="error-banner" style="margin-bottom:12px;">Please select a date and time.</div>'; return; }
 
   btn.disabled = true; btn.textContent = 'Sending…';
 

@@ -5,239 +5,443 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Hawaii Natural Clean — Get a Free Quote</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Josefin+Sans:wght@300;400;600;700&family=Cormorant+Garamond:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
 *{margin:0;padding:0;box-sizing:border-box;}
 :root{
-  --green:#1a3d2b;--green-mid:#2d5a3d;--green-light:#e8f0eb;
-  --gold:#c9a96e;--gold-light:#f5ead8;
-  --cream:#faf8f3;--cream-dark:#f0ece2;
-  --text:#1c1c1c;--text-muted:#6b6b6b;--border:#ddd8ce;
-  --white:#ffffff;--error:#c0392b;
+  --blue:#3BB8E3;
+  --blue2:#59C7E2;
+  --blue3:#79D3E1;
+  --blue4:#A5E6E9;
+  --gold:#F2E19B;
+  --gold-dark:#d4c277;
+  --white:#ffffff;
+  --offwhite:#f8fbfd;
+  --text:#1a2e38;
+  --text-muted:#5a7a8a;
+  --border:#d0eaf4;
+  --error:#e05c5c;
 }
-html,body{min-height:100vh;background:var(--cream);}
-body{font-family:'DM Sans',sans-serif;color:var(--text);overflow-x:hidden;}
-body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellipse 80% 60% at 0% 0%,rgba(26,61,43,.07) 0%,transparent 60%),radial-gradient(ellipse 60% 80% at 100% 100%,rgba(201,169,110,.08) 0%,transparent 60%);pointer-events:none;z-index:0;}
-.page{min-height:100vh;display:grid;grid-template-columns:1fr 440px;position:relative;z-index:1;}
-.left-panel{background:var(--green);padding:60px 56px;display:flex;flex-direction:column;position:relative;overflow:hidden;}
-.left-panel::before{content:'';position:absolute;top:-120px;right:-80px;width:400px;height:400px;border-radius:50%;background:rgba(255,255,255,.04);}
-.left-panel::after{content:'';position:absolute;bottom:-100px;left:-60px;width:320px;height:320px;border-radius:50%;background:rgba(201,169,110,.1);}
-.logo{display:flex;align-items:center;gap:12px;margin-bottom:60px;}
-.logo-mark{width:42px;height:42px;border-radius:10px;background:var(--gold);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
-.logo-mark svg{width:22px;height:22px;}
-.logo-name{font-family:'Playfair Display',serif;font-size:18px;color:white;line-height:1.2;}
-.logo-sub{font-size:11px;color:rgba(255,255,255,.5);font-weight:300;letter-spacing:.05em;}
-.tagline{font-family:'Playfair Display',serif;font-size:38px;line-height:1.25;color:white;margin-bottom:16px;font-weight:400;}
-.tagline em{color:var(--gold);font-style:normal;}
-.tagline-sub{font-size:15px;color:rgba(255,255,255,.65);font-weight:300;line-height:1.7;margin-bottom:48px;max-width:340px;}
-.features{display:flex;flex-direction:column;gap:20px;margin-bottom:auto;}
+html,body{min-height:100vh;background:var(--white);}
+body{font-family:'Josefin Sans',sans-serif;color:var(--text);overflow-x:hidden;}
+
+/* === PAGE LAYOUT === */
+.page{min-height:100vh;display:grid;grid-template-columns:420px 1fr;position:relative;}
+
+/* === LEFT BRAND PANEL === */
+.left{
+  background:linear-gradient(160deg, #2ea8d4 0%, #3BB8E3 40%, #59C7E2 100%);
+  padding:52px 44px;
+  display:flex;flex-direction:column;
+  position:relative;overflow:hidden;
+}
+/* Decorative wave circles */
+.left::before{
+  content:'';position:absolute;
+  top:-180px;right:-140px;
+  width:500px;height:500px;
+  border-radius:50%;
+  background:rgba(255,255,255,.1);
+  pointer-events:none;
+}
+.left::after{
+  content:'';position:absolute;
+  bottom:-200px;left:-120px;
+  width:440px;height:440px;
+  border-radius:50%;
+  background:rgba(255,255,255,.07);
+  pointer-events:none;
+}
+
+/* Logo */
+.logo-wrap{margin-bottom:56px;position:relative;z-index:1;}
+.logo-svg{width:52px;height:52px;margin-bottom:16px;}
+.logo-wordmark{display:flex;flex-direction:column;gap:2px;}
+.logo-line1{
+  font-family:'Josefin Sans',sans-serif;
+  font-size:22px;font-weight:700;letter-spacing:.18em;
+  color:white;text-transform:uppercase;line-height:1;
+}
+.logo-divider{height:1.5px;background:rgba(255,255,255,.5);margin:6px 0;}
+.logo-line2{
+  font-family:'Josefin Sans',sans-serif;
+  font-size:18px;font-weight:300;letter-spacing:.35em;
+  color:rgba(255,255,255,.9);text-transform:uppercase;line-height:1;
+  text-align:center;
+}
+
+/* Headline */
+.headline{
+  font-family:'Cormorant Garamond',serif;
+  font-size:42px;line-height:1.18;
+  color:white;font-weight:300;
+  margin-bottom:18px;
+  position:relative;z-index:1;
+}
+.headline em{
+  font-style:italic;
+  color:var(--gold);
+}
+.subhead{
+  font-size:13px;color:rgba(255,255,255,.75);
+  font-weight:300;letter-spacing:.04em;line-height:1.8;
+  margin-bottom:52px;max-width:300px;
+  position:relative;z-index:1;
+}
+
+/* Features */
+.features{display:flex;flex-direction:column;gap:22px;margin-bottom:auto;position:relative;z-index:1;}
 .feature{display:flex;align-items:flex-start;gap:14px;}
-.feature-icon{width:36px;height:36px;border-radius:8px;background:rgba(255,255,255,.08);display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;}
-.feature-icon svg{width:16px;height:16px;color:var(--gold);}
-.feature-text strong{display:block;font-size:14px;color:white;font-weight:500;margin-bottom:2px;}
-.feature-text span{font-size:13px;color:rgba(255,255,255,.55);font-weight:300;}
-.trust{margin-top:48px;padding-top:32px;border-top:1px solid rgba(255,255,255,.1);}
-.stars{display:flex;gap:3px;margin-bottom:8px;}
-.star{color:var(--gold);font-size:16px;}
-.trust-text{font-size:13px;color:rgba(255,255,255,.6);font-weight:300;}
-.trust-text strong{color:white;font-weight:500;}
-.right-panel{background:var(--white);display:flex;flex-direction:column;min-height:100vh;box-shadow:-20px 0 60px rgba(0,0,0,.06);}
-.form-top{padding:40px 44px 0;}
-.progress-steps{display:flex;align-items:center;margin-bottom:12px;}
-.ps{display:flex;align-items:center;flex:1;}
-.ps-dot{width:28px;height:28px;border-radius:50%;border:2px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:500;color:var(--text-muted);transition:all .3s;flex-shrink:0;background:white;}
-.ps-dot.active{border-color:var(--green);background:var(--green);color:white;}
-.ps-dot.done{border-color:var(--green);background:var(--green);color:white;}
-.ps-line{flex:1;height:2px;background:var(--border);margin:0 6px;transition:background .3s;}
-.ps-line.done{background:var(--green);}
-.progress-bar{height:3px;background:var(--cream-dark);border-radius:2px;overflow:hidden;}
-.progress-fill{height:100%;background:var(--green);border-radius:2px;transition:width .4s cubic-bezier(.4,0,.2,1);}
-.step-label{font-size:12px;color:var(--text-muted);margin-top:8px;}
-.step-label strong{color:var(--text);font-weight:500;}
-.steps-wrap{flex:1;position:relative;overflow:hidden;}
-.step{position:absolute;inset:0;padding:8px 44px 44px;overflow-y:auto;opacity:0;pointer-events:none;transform:translateX(40px);transition:opacity .3s ease,transform .3s cubic-bezier(.4,0,.2,1);}
+.feat-icon{
+  width:34px;height:34px;border-radius:8px;
+  background:rgba(255,255,255,.15);
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px;
+}
+.feat-icon svg{width:16px;height:16px;}
+.feat-text strong{display:block;font-size:13px;color:white;font-weight:600;letter-spacing:.03em;margin-bottom:2px;}
+.feat-text span{font-size:12px;color:rgba(255,255,255,.65);font-weight:300;letter-spacing:.02em;}
+
+/* Rating */
+.rating{
+  margin-top:44px;padding-top:28px;
+  border-top:1px solid rgba(255,255,255,.2);
+  position:relative;z-index:1;
+}
+.stars{display:flex;gap:2px;margin-bottom:6px;}
+.star{color:var(--gold);font-size:15px;}
+.rating-text{font-size:12px;color:rgba(255,255,255,.65);letter-spacing:.03em;font-weight:300;}
+.rating-text strong{color:white;font-weight:600;}
+
+/* === RIGHT FORM PANEL === */
+.right{
+  background:var(--white);
+  display:flex;flex-direction:column;
+  min-height:100vh;
+}
+.form-header{padding:44px 52px 0;}
+.progress-row{display:flex;align-items:center;gap:0;margin-bottom:10px;}
+.pdot{
+  width:26px;height:26px;border-radius:50%;
+  border:2px solid var(--border);
+  display:flex;align-items:center;justify-content:center;
+  font-size:11px;font-weight:600;color:var(--text-muted);
+  transition:all .3s;flex-shrink:0;background:var(--white);
+  letter-spacing:0;
+}
+.pdot.active{border-color:var(--blue);background:var(--blue);color:white;}
+.pdot.done{border-color:var(--blue);background:var(--blue);color:white;}
+.pline{flex:1;height:2px;background:var(--border);margin:0 8px;transition:background .3s;}
+.pline.done{background:var(--blue);}
+.prog-bar{height:3px;background:var(--border);border-radius:2px;overflow:hidden;margin-bottom:6px;}
+.prog-fill{height:100%;background:linear-gradient(90deg,var(--blue),var(--blue2));border-radius:2px;transition:width .4s cubic-bezier(.4,0,.2,1);}
+.prog-label{font-size:11px;color:var(--text-muted);letter-spacing:.06em;text-transform:uppercase;font-weight:400;}
+.prog-label strong{color:var(--text);font-weight:600;}
+
+/* Steps */
+.steps-container{flex:1;overflow:hidden;position:relative;}
+.step{
+  position:absolute;inset:0;padding:4px 52px 48px;
+  overflow-y:auto;opacity:0;pointer-events:none;
+  transform:translateX(40px);
+  transition:opacity .28s ease,transform .28s cubic-bezier(.4,0,.2,1);
+}
 .step.active{opacity:1;pointer-events:all;transform:translateX(0);position:relative;}
-.step h2{font-family:'Playfair Display',serif;font-size:24px;font-weight:400;margin-bottom:6px;margin-top:8px;}
-.step p.sub{font-size:14px;color:var(--text-muted);margin-bottom:28px;font-weight:300;}
+.step-title{
+  font-family:'Cormorant Garamond',serif;
+  font-size:28px;font-weight:400;color:var(--text);
+  margin-top:12px;margin-bottom:5px;line-height:1.2;
+}
+.step-sub{font-size:13px;color:var(--text-muted);margin-bottom:30px;letter-spacing:.02em;font-weight:300;}
+
+/* Fields */
 .field{margin-bottom:20px;}
-.field label{display:block;font-size:12px;font-weight:500;letter-spacing:.04em;text-transform:uppercase;color:var(--text-muted);margin-bottom:7px;}
-.field input,.field select,.field textarea{width:100%;padding:13px 15px;border:1.5px solid var(--border);border-radius:10px;font-size:15px;font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--text);transition:border-color .2s,background .2s,box-shadow .2s;-webkit-appearance:none;appearance:none;}
-.field select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%236b6b6b' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 14px center;}
-.field input:focus,.field select:focus,.field textarea:focus{outline:none;border-color:var(--green);background:white;box-shadow:0 0 0 3px rgba(26,61,43,.08);}
+.field label{
+  display:block;font-size:11px;font-weight:600;
+  letter-spacing:.1em;text-transform:uppercase;
+  color:var(--text-muted);margin-bottom:8px;
+}
+.field input,.field select,.field textarea{
+  width:100%;padding:13px 16px;
+  border:1.5px solid var(--border);
+  border-radius:10px;
+  font-size:14px;font-family:'Josefin Sans',sans-serif;
+  font-weight:300;letter-spacing:.02em;
+  background:var(--offwhite);color:var(--text);
+  transition:border-color .2s,background .2s,box-shadow .2s;
+  -webkit-appearance:none;appearance:none;
+}
+.field select{
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%235a7a8a' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 14px center;
+}
+.field input:focus,.field select:focus,.field textarea:focus{
+  outline:none;border-color:var(--blue);
+  background:var(--white);box-shadow:0 0 0 3px rgba(59,184,227,.12);
+}
 .field input.err,.field select.err{border-color:var(--error);}
-.field-err{font-size:12px;color:var(--error);margin-top:4px;display:none;}
-.field-err.show{display:block;}
-.field textarea{resize:vertical;min-height:90px;line-height:1.5;}
-.field-row{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+.ferr{font-size:11px;color:var(--error);margin-top:4px;display:none;letter-spacing:.02em;}
+.ferr.show{display:block;}
+.field textarea{resize:vertical;min-height:88px;line-height:1.6;}
+.frow{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+
+/* Island toggle */
 .island-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px;}
-.island-card{border:1.5px solid var(--border);border-radius:10px;padding:14px 16px;cursor:pointer;transition:all .2s;display:flex;align-items:center;gap:10px;background:var(--cream);}
-.island-card:hover{border-color:var(--green-mid);background:white;}
-.island-card.selected{border-color:var(--green);background:var(--green-light);}
+.island-card{
+  border:1.5px solid var(--border);border-radius:10px;
+  padding:14px 18px;cursor:pointer;transition:all .2s;
+  display:flex;align-items:center;gap:10px;
+  background:var(--offwhite);font-family:'Josefin Sans',sans-serif;
+}
+.island-card:hover{border-color:var(--blue2);background:var(--white);}
+.island-card.selected{border-color:var(--blue);background:#eef9fd;}
 .island-card input{display:none;}
-.island-icon{font-size:20px;}
-.island-name{font-size:14px;font-weight:500;}
-.service-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px;}
-.service-card{border:1.5px solid var(--border);border-radius:12px;padding:16px 14px;cursor:pointer;transition:all .2s;background:var(--cream);text-align:center;}
-.service-card:hover{border-color:var(--green-mid);background:white;transform:translateY(-1px);}
-.service-card.selected{border-color:var(--green);background:var(--green-light);}
-.service-card input{display:none;}
-.service-icon{font-size:24px;margin-bottom:6px;}
-.service-name{font-size:13px;font-weight:500;color:var(--text);margin-bottom:3px;}
-.service-desc{font-size:11px;color:var(--text-muted);font-weight:300;}
-.freq-row{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:20px;}
-.freq-pill{border:1.5px solid var(--border);border-radius:40px;padding:9px 18px;cursor:pointer;font-size:13px;font-weight:400;transition:all .2s;background:var(--cream);color:var(--text);}
-.freq-pill:hover{border-color:var(--green-mid);background:white;}
-.freq-pill.selected{border-color:var(--green);background:var(--green);color:white;}
-.freq-pill input{display:none;}
+.island-card .ic-em{font-size:18px;}
+.island-card .ic-name{font-size:13px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--text);}
+
+/* Service cards */
+.svc-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px;}
+.svc-card{
+  border:1.5px solid var(--border);border-radius:12px;
+  padding:18px 14px;cursor:pointer;transition:all .2s;
+  background:var(--offwhite);text-align:center;
+}
+.svc-card:hover{border-color:var(--blue2);background:var(--white);transform:translateY(-1px);}
+.svc-card.selected{border-color:var(--blue);background:#eef9fd;}
+.svc-card input{display:none;}
+.svc-icon{font-size:26px;margin-bottom:7px;}
+.svc-name{font-size:12px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--text);margin-bottom:3px;}
+.svc-desc{font-size:11px;color:var(--text-muted);font-weight:300;letter-spacing:.02em;}
+
+/* Frequency pills */
+.freq-wrap{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:20px;}
+.fpill{
+  border:1.5px solid var(--border);border-radius:50px;
+  padding:9px 20px;cursor:pointer;font-size:12px;font-weight:600;
+  letter-spacing:.06em;text-transform:uppercase;
+  transition:all .2s;background:var(--offwhite);color:var(--text);
+  font-family:'Josefin Sans',sans-serif;
+}
+.fpill:hover{border-color:var(--blue2);background:var(--white);}
+.fpill.selected{border-color:var(--blue);background:var(--blue);color:white;}
+.fpill input{display:none;}
+
+/* Source pills */
+.src-wrap{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:20px;}
+.spill{
+  border:1.5px solid var(--border);border-radius:50px;
+  padding:8px 16px;cursor:pointer;font-size:12px;font-weight:400;
+  letter-spacing:.03em;transition:all .2s;background:var(--offwhite);color:var(--text);
+  font-family:'Josefin Sans',sans-serif;white-space:nowrap;
+}
+.spill:hover{border-color:var(--blue2);background:var(--white);}
+.spill.selected{border-color:var(--blue);background:var(--blue);color:white;}
+.spill input{display:none;}
+
+/* Buttons */
 .btn-row{display:flex;gap:10px;margin-top:8px;}
-.btn-back{padding:14px 22px;border:1.5px solid var(--border);border-radius:10px;background:transparent;color:var(--text-muted);font-size:14px;font-family:'DM Sans',sans-serif;cursor:pointer;transition:all .2s;font-weight:400;}
-.btn-back:hover{border-color:var(--text-muted);color:var(--text);}
-.btn-next{flex:1;padding:14px 24px;border:none;border-radius:10px;background:var(--green);color:white;font-size:15px;font-family:'DM Sans',sans-serif;cursor:pointer;transition:all .2s;font-weight:500;display:flex;align-items:center;justify-content:center;gap:8px;}
-.btn-next:hover{background:var(--green-mid);}
+.btn-back{
+  padding:14px 22px;border:1.5px solid var(--border);border-radius:10px;
+  background:transparent;color:var(--text-muted);font-size:12px;
+  font-family:'Josefin Sans',sans-serif;cursor:pointer;transition:all .2s;
+  font-weight:600;letter-spacing:.06em;text-transform:uppercase;
+}
+.btn-back:hover{border-color:var(--blue);color:var(--blue);}
+.btn-next{
+  flex:1;padding:14px 24px;border:none;border-radius:10px;
+  background:linear-gradient(135deg,var(--blue),var(--blue2));
+  color:white;font-size:12px;
+  font-family:'Josefin Sans',sans-serif;cursor:pointer;transition:all .2s;
+  font-weight:600;letter-spacing:.1em;text-transform:uppercase;
+  display:flex;align-items:center;justify-content:center;gap:8px;
+  box-shadow:0 4px 16px rgba(59,184,227,.3);
+}
+.btn-next:hover{box-shadow:0 6px 22px rgba(59,184,227,.45);transform:translateY(-1px);}
 .btn-next:active{transform:scale(.98);}
-.btn-next:disabled{opacity:.6;cursor:not-allowed;transform:none;}
+.btn-next:disabled{opacity:.6;cursor:not-allowed;transform:none;box-shadow:none;}
 .btn-next svg{width:16px;height:16px;transition:transform .2s;}
 .btn-next:hover:not(:disabled) svg{transform:translateX(3px);}
-.success-view{display:none;flex-direction:column;align-items:center;justify-content:center;padding:60px 44px;text-align:center;min-height:100vh;}
-.success-view.show{display:flex;}
-.success-ring{width:80px;height:80px;border-radius:50%;background:var(--green-light);display:flex;align-items:center;justify-content:center;margin-bottom:24px;animation:popIn .5s cubic-bezier(.34,1.56,.64,1);}
-.success-ring svg{width:36px;height:36px;color:var(--green);}
-@keyframes popIn{from{transform:scale(0);opacity:0}to{transform:scale(1);opacity:1}}
-.success-view h2{font-family:'Playfair Display',serif;font-size:28px;margin-bottom:10px;font-weight:400;}
-.success-view p{font-size:15px;color:var(--text-muted);max-width:280px;line-height:1.7;font-weight:300;}
-.success-meta{margin-top:28px;padding:20px 24px;background:var(--cream);border-radius:12px;text-align:left;width:100%;max-width:300px;}
-.success-meta-row{display:flex;justify-content:space-between;align-items:center;padding:6px 0;}
-.success-meta-row:not(:last-child){border-bottom:1px solid var(--border);}
-.sm-label{font-size:12px;color:var(--text-muted);}
-.sm-val{font-size:13px;font-weight:500;}
-.another-link{margin-top:20px;font-size:13px;color:var(--green);cursor:pointer;font-weight:500;}
-.another-link:hover{text-decoration:underline;}
-.spinner{width:18px;height:18px;border:2px solid rgba(255,255,255,.3);border-top-color:white;border-radius:50%;animation:spin .7s linear infinite;}
-@keyframes spin{to{transform:rotate(360deg)}}
-.err-banner{background:#fff5f5;border:1px solid #f5c6c6;border-radius:10px;padding:12px 16px;font-size:13px;color:var(--error);margin-bottom:16px;display:none;}
+
+/* Optional label */
+.opt{font-size:11px;color:var(--text-muted);font-weight:300;text-transform:none;letter-spacing:0;margin-left:4px;}
+
+/* Error banner */
+.err-banner{background:#fff5f5;border:1px solid #fcc;border-radius:10px;padding:12px 16px;font-size:12px;color:var(--error);margin-bottom:16px;display:none;letter-spacing:.02em;}
 .err-banner.show{display:block;}
-.source-grid{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:4px;}
-.source-pill{border:1.5px solid var(--border);border-radius:40px;padding:8px 14px;cursor:pointer;font-size:13px;font-weight:400;transition:all .2s;background:var(--cream);color:var(--text);white-space:nowrap;}
-.source-pill:hover{border-color:var(--green-mid);background:white;}
-.source-pill.selected{border-color:var(--green);background:var(--green);color:white;}
-.source-pill input{display:none;}
-.opt-note{font-size:12px;color:var(--text-muted);font-weight:300;text-transform:none;letter-spacing:0;margin-left:4px;}
+
+/* Success */
+.success{display:none;flex-direction:column;align-items:center;justify-content:center;padding:60px 52px;text-align:center;min-height:100vh;}
+.success.show{display:flex;}
+.success-icon{
+  width:76px;height:76px;border-radius:50%;
+  background:linear-gradient(135deg,#eef9fd,#d0f0f8);
+  border:2px solid var(--blue3);
+  display:flex;align-items:center;justify-content:center;
+  margin-bottom:24px;
+  animation:popIn .5s cubic-bezier(.34,1.56,.64,1);
+}
+.success-icon svg{width:32px;height:32px;color:var(--blue);}
+@keyframes popIn{from{transform:scale(0);opacity:0}to{transform:scale(1);opacity:1}}
+.success h2{
+  font-family:'Cormorant Garamond',serif;
+  font-size:32px;font-weight:400;margin-bottom:10px;color:var(--text);
+}
+.success p{font-size:13px;color:var(--text-muted);max-width:280px;line-height:1.8;font-weight:300;letter-spacing:.02em;}
+.success-card{
+  margin-top:28px;padding:20px 24px;
+  background:var(--offwhite);border:1.5px solid var(--border);
+  border-radius:12px;text-align:left;width:100%;max-width:320px;
+}
+.sc-row{display:flex;justify-content:space-between;align-items:center;padding:7px 0;}
+.sc-row:not(:last-child){border-bottom:1px solid var(--border);}
+.sc-label{font-size:11px;color:var(--text-muted);letter-spacing:.06em;text-transform:uppercase;font-weight:400;}
+.sc-val{font-size:13px;font-weight:600;color:var(--text);letter-spacing:.02em;}
+.again{margin-top:22px;font-size:12px;color:var(--blue);cursor:pointer;font-weight:600;letter-spacing:.06em;text-transform:uppercase;}
+.again:hover{text-decoration:underline;}
+
+/* Spinner */
+.spinner{width:16px;height:16px;border:2px solid rgba(255,255,255,.3);border-top-color:white;border-radius:50%;animation:spin .7s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* Responsive */
 @media(max-width:900px){
   .page{grid-template-columns:1fr;grid-template-rows:auto 1fr;}
-  .left-panel{padding:32px 24px 24px;min-height:auto;}
-  .tagline{font-size:26px;}
-  .features,.trust{display:none;}
-  .right-panel{min-height:auto;box-shadow:none;}
-  .form-top,.step{padding-left:24px;padding-right:24px;}
-  .step{padding-bottom:32px;}
+  .left{padding:32px 28px 24px;min-height:auto;}
+  .headline{font-size:30px;}
+  .features,.rating{display:none;}
+  .right{min-height:auto;}
+  .form-header,.step{padding-left:24px;padding-right:24px;}
+  .step{padding-bottom:36px;}
 }
 @media(max-width:480px){
-  .field-row,.island-row{grid-template-columns:1fr;}
+  .frow,.island-row{grid-template-columns:1fr;}
+  .svc-grid{grid-template-columns:1fr 1fr;}
 }
 </style>
 </head>
 <body>
 <div class="page">
 
-<div class="left-panel">
-  <div class="logo">
-    <div class="logo-mark">
-      <svg viewBox="0 0 22 22" fill="none"><path d="M11 2C11 2 4 6 4 12a7 7 0 0014 0c0-6-7-10-7-10z" fill="white" opacity=".9"/><path d="M11 8v8M8 13l3 3 3-3" stroke="rgba(26,61,43,.6)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-    </div>
-    <div>
-      <div class="logo-name">Hawaii Natural Clean</div>
-      <div class="logo-sub">Oahu &amp; Maui</div>
+<!-- LEFT: Brand panel -->
+<div class="left">
+  <!-- Logo (SVG recreation of HNC brand) -->
+  <div class="logo-wrap">
+    <svg class="logo-svg" viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <!-- Left leaf -->
+      <path d="M22 38 C22 38 14 28 16 18 C18 10 24 8 24 8 C24 8 26 18 24 28 C23 33 22 38 22 38Z" fill="url(#lg1)" opacity=".9"/>
+      <!-- Right leaf -->
+      <path d="M30 38 C30 38 38 28 36 18 C34 10 28 8 28 8 C28 8 26 18 28 28 C29 33 30 38 30 38Z" fill="url(#lg1)" opacity=".9"/>
+      <!-- Center leaf -->
+      <path d="M26 40 C26 40 22 30 24 20 C25 14 26 10 26 10 C26 10 27 14 28 20 C30 30 26 40 26 40Z" fill="url(#lg2)" opacity=".95"/>
+      <defs>
+        <linearGradient id="lg1" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#F2E19B"/>
+          <stop offset="100%" stop-color="#A5E6E9"/>
+        </linearGradient>
+        <linearGradient id="lg2" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#F2E19B"/>
+          <stop offset="60%" stop-color="#79D3E1"/>
+        </linearGradient>
+      </defs>
+    </svg>
+    <div class="logo-wordmark">
+      <div class="logo-line1">Hawaii Natural</div>
+      <div class="logo-divider"></div>
+      <div class="logo-line2">Clean</div>
     </div>
   </div>
-  <div class="tagline">A cleaner home,<br><em>guaranteed.</em></div>
-  <div class="tagline-sub">Get your free quote in under 2 minutes. No commitment, no pressure — just honest local cleaning.</div>
+
+  <div class="headline">A cleaner home,<br><em>beautifully done.</em></div>
+  <div class="subhead">Get your free quote in under 2 minutes. No commitment — just honest, local cleaning from a team you can trust.</div>
+
   <div class="features">
     <div class="feature">
-      <div class="feature-icon"><svg viewBox="0 0 16 16" fill="none"><path d="M2 8l4 4 8-8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-      <div class="feature-text"><strong>Response within 24 hours</strong><span>We'll reach out fast with your quote</span></div>
+      <div class="feat-icon"><svg viewBox="0 0 16 16" fill="none"><path d="M2 8l4 4 8-8" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+      <div class="feat-text"><strong>Response within 24 hours</strong><span>We'll reach out fast with your personalized quote</span></div>
     </div>
     <div class="feature">
-      <div class="feature-icon"><svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.5"/><path d="M8 5v3l2 2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></div>
-      <div class="feature-text"><strong>Flexible scheduling</strong><span>Weekly, biweekly, monthly, or one-time</span></div>
+      <div class="feat-icon"><svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="white" stroke-width="1.5"/><path d="M8 5v3l2 2" stroke="white" stroke-width="1.5" stroke-linecap="round"/></svg></div>
+      <div class="feat-text"><strong>Flexible scheduling</strong><span>Weekly, biweekly, monthly or one-time</span></div>
     </div>
     <div class="feature">
-      <div class="feature-icon"><svg viewBox="0 0 16 16" fill="none"><path d="M8 1l1.8 3.6 4 .6-2.9 2.8.7 4-3.6-1.9-3.6 1.9.7-4L2.2 5.2l4-.6z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></div>
-      <div class="feature-text"><strong>Satisfaction guaranteed</strong><span>If it's not right, we'll come back and fix it</span></div>
+      <div class="feat-icon"><svg viewBox="0 0 16 16" fill="none"><path d="M8 1l1.8 3.6 4 .6-2.9 2.8.7 4-3.6-1.9-3.6 1.9.7-4L2.2 5.2l4-.6z" stroke="white" stroke-width="1.4" stroke-linejoin="round"/></svg></div>
+      <div class="feat-text"><strong>Satisfaction guaranteed</strong><span>If it's not right, we'll come back and fix it</span></div>
     </div>
     <div class="feature">
-      <div class="feature-icon"><svg viewBox="0 0 16 16" fill="none"><rect x="2" y="6" width="12" height="8" rx="1.5" stroke="currentColor" stroke-width="1.5"/><path d="M5 6V4.5a3 3 0 016 0V6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></div>
-      <div class="feature-text"><strong>Insured &amp; background-checked</strong><span>Every cleaner is vetted and protected</span></div>
+      <div class="feat-icon"><svg viewBox="0 0 16 16" fill="none"><rect x="2" y="6" width="12" height="8" rx="1.5" stroke="white" stroke-width="1.5"/><path d="M5 6V4.5a3 3 0 016 0V6" stroke="white" stroke-width="1.5" stroke-linecap="round"/></svg></div>
+      <div class="feat-text"><strong>Insured &amp; background-checked</strong><span>Every cleaner vetted for your peace of mind</span></div>
     </div>
   </div>
-  <div class="trust">
+
+  <div class="rating">
     <div class="stars"><span class="star">★</span><span class="star">★</span><span class="star">★</span><span class="star">★</span><span class="star">★</span></div>
-    <div class="trust-text"><strong>4.9 out of 5</strong> from 100+ Hawaii homeowners</div>
+    <div class="rating-text"><strong>4.9 / 5</strong> from 100+ Hawaii homeowners</div>
   </div>
 </div>
 
-<div class="right-panel" id="formPanel">
-  <div class="form-top" id="formTop">
-    <div style="padding-bottom:0">
-      <div class="progress-steps">
-        <div class="ps"><div class="ps-dot active" id="dot1">1</div></div>
-        <div class="ps-line" id="line1"></div>
-        <div class="ps"><div class="ps-dot" id="dot2">2</div></div>
-        <div class="ps-line" id="line2"></div>
-        <div class="ps"><div class="ps-dot" id="dot3">3</div></div>
-      </div>
-      <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:33%"></div></div>
-      <div class="step-label" id="stepLabel"><strong>Step 1 of 3</strong> — Contact info</div>
+<!-- RIGHT: Form panel -->
+<div class="right" id="rightPanel">
+  <div class="form-header" id="formHeader">
+    <div class="progress-row">
+      <div class="pdot active" id="pd1">1</div>
+      <div class="pline" id="pl1"></div>
+      <div class="pdot" id="pd2">2</div>
+      <div class="pline" id="pl2"></div>
+      <div class="pdot" id="pd3">3</div>
     </div>
+    <div class="prog-bar"><div class="prog-fill" id="progFill" style="width:33%"></div></div>
+    <div class="prog-label" id="progLabel"><strong>Step 1 of 3</strong> — Contact info</div>
   </div>
 
-  <div class="steps-wrap" id="stepsWrap">
+  <div class="steps-container" id="stepsContainer">
 
+    <!-- Step 1 -->
     <div class="step active" id="step1">
-      <h2>Let's get started</h2>
-      <p class="sub">How should we reach you?</p>
-      <div class="err-banner" id="err1"></div>
+      <div class="step-title">Let's get started</div>
+      <div class="step-sub">How should we reach you?</div>
+      <div class="err-banner" id="e1"></div>
       <div class="field">
         <label>Full name <span style="color:var(--error)">*</span></label>
         <input type="text" id="fullName" placeholder="Jane Smith" autocomplete="name">
-        <div class="field-err" id="fe-fullName"></div>
+        <div class="ferr" id="fe-fullName"></div>
       </div>
-      <div class="field-row">
+      <div class="frow">
         <div class="field">
           <label>Email <span style="color:var(--error)">*</span></label>
           <input type="email" id="email" placeholder="jane@email.com" autocomplete="email">
-          <div class="field-err" id="fe-email"></div>
+          <div class="ferr" id="fe-email"></div>
         </div>
         <div class="field">
           <label>Phone <span style="color:var(--error)">*</span></label>
           <input type="tel" id="phone" placeholder="(808) 555-0000" autocomplete="tel">
-          <div class="field-err" id="fe-phone"></div>
+          <div class="ferr" id="fe-phone"></div>
         </div>
       </div>
       <div class="btn-row">
-        <button class="btn-next" onclick="nextStep(1)">Continue <svg viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+        <button class="btn-next" onclick="next(1)">Continue <svg viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
       </div>
     </div>
 
+    <!-- Step 2 -->
     <div class="step" id="step2">
-      <h2>Your property</h2>
-      <p class="sub">Where would you like us to clean?</p>
-      <div class="err-banner" id="err2"></div>
+      <div class="step-title">Your property</div>
+      <div class="step-sub">Tell us about the home you'd like cleaned.</div>
+      <div class="err-banner" id="e2"></div>
       <div class="field">
         <label>Property address <span style="color:var(--error)">*</span></label>
         <input type="text" id="address" placeholder="123 Kailua Rd, Kailua, HI 96734" autocomplete="street-address">
-        <div class="field-err" id="fe-address"></div>
+        <div class="ferr" id="fe-address"></div>
       </div>
       <div class="field">
         <label>Island</label>
         <div class="island-row">
-          <label class="island-card selected" id="island-oahu"><input type="radio" name="island" value="Oahu" checked><span class="island-icon">🌺</span><span class="island-name">Oahu</span></label>
-          <label class="island-card" id="island-maui"><input type="radio" name="island" value="Maui"><span class="island-icon">🏄</span><span class="island-name">Maui</span></label>
+          <label class="island-card selected" id="ic-oahu"><input type="radio" name="island" value="Oahu" checked><span class="ic-em">🌺</span><span class="ic-name">Oahu</span></label>
+          <label class="island-card" id="ic-maui"><input type="radio" name="island" value="Maui"><span class="ic-em">🏄</span><span class="ic-name">Maui</span></label>
         </div>
       </div>
-      <div class="field-row">
+      <div class="frow">
         <div class="field">
           <label>Bedrooms</label>
-          <select id="beds"><option value="">Select...</option><option value="1">1 bedroom</option><option value="2">2 bedrooms</option><option value="3">3 bedrooms</option><option value="4">4 bedrooms</option><option value="5">5+ bedrooms</option></select>
+          <select id="beds"><option value="">Select...</option><option>1 bedroom</option><option value="2">2 bedrooms</option><option value="3">3 bedrooms</option><option value="4">4 bedrooms</option><option value="5">5+ bedrooms</option></select>
         </div>
         <div class="field">
           <label>Bathrooms</label>
@@ -245,157 +449,164 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
         </div>
       </div>
       <div class="field">
-        <label>Square footage <span class="opt-note">(optional)</span></label>
+        <label>Square footage <span class="opt">(optional)</span></label>
         <input type="number" id="sqft" placeholder="e.g. 1200">
       </div>
       <div class="btn-row">
-        <button class="btn-back" onclick="prevStep(2)">Back</button>
-        <button class="btn-next" onclick="nextStep(2)">Continue <svg viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+        <button class="btn-back" onclick="prev(2)">Back</button>
+        <button class="btn-next" onclick="next(2)">Continue <svg viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
       </div>
     </div>
 
+    <!-- Step 3 -->
     <div class="step" id="step3">
-      <h2>What do you need?</h2>
-      <p class="sub">Pick a service and how often.</p>
-      <div class="err-banner" id="err3"></div>
+      <div class="step-title">What do you need?</div>
+      <div class="step-sub">Choose a service and how often you'd like us.</div>
+      <div class="err-banner" id="e3"></div>
       <div class="field">
         <label>Service type <span style="color:var(--error)">*</span></label>
-        <div class="service-grid">
-          <label class="service-card selected" id="sc-regular"><input type="radio" name="serviceType" value="Regular Cleaning" checked><div class="service-icon">🧹</div><div class="service-name">Regular Clean</div><div class="service-desc">Recurring maintenance</div></label>
-          <label class="service-card" id="sc-deep"><input type="radio" name="serviceType" value="Deep Cleaning"><div class="service-icon">✨</div><div class="service-name">Deep Clean</div><div class="service-desc">Thorough top-to-bottom</div></label>
-          <label class="service-card" id="sc-moveout"><input type="radio" name="serviceType" value="Move-out Cleaning"><div class="service-icon">📦</div><div class="service-name">Move-out</div><div class="service-desc">Ready for next tenant</div></label>
-          <label class="service-card" id="sc-airbnb"><input type="radio" name="serviceType" value="Airbnb Turnover"><div class="service-icon">🏡</div><div class="service-name">Airbnb Turnover</div><div class="service-desc">Between guest stays</div></label>
+        <div class="svc-grid">
+          <label class="svc-card selected" id="sc-reg"><input type="radio" name="svc" value="Regular Cleaning" checked><div class="svc-icon">🧹</div><div class="svc-name">Regular Clean</div><div class="svc-desc">Recurring maintenance</div></label>
+          <label class="svc-card" id="sc-deep"><input type="radio" name="svc" value="Deep Cleaning"><div class="svc-icon">✨</div><div class="svc-name">Deep Clean</div><div class="svc-desc">Top-to-bottom detail</div></label>
+          <label class="svc-card" id="sc-move"><input type="radio" name="svc" value="Move-out Cleaning"><div class="svc-icon">📦</div><div class="svc-name">Move-out</div><div class="svc-desc">Ready for next tenant</div></label>
+          <label class="svc-card" id="sc-bnb"><input type="radio" name="svc" value="Airbnb Turnover"><div class="svc-icon">🏡</div><div class="svc-name">Airbnb Turnover</div><div class="svc-desc">Between guest stays</div></label>
         </div>
-        <div class="field-err" id="fe-serviceType"></div>
+        <div class="ferr" id="fe-svc"></div>
       </div>
       <div class="field">
         <label>Frequency <span style="color:var(--error)">*</span></label>
-        <div class="freq-row">
-          <label class="freq-pill selected"><input type="radio" name="frequency" value="Biweekly" checked>Every 2 weeks</label>
-          <label class="freq-pill"><input type="radio" name="frequency" value="Weekly">Weekly</label>
-          <label class="freq-pill"><input type="radio" name="frequency" value="Monthly">Monthly</label>
-          <label class="freq-pill"><input type="radio" name="frequency" value="One-time">One-time</label>
+        <div class="freq-wrap">
+          <label class="fpill selected"><input type="radio" name="freq" value="Biweekly" checked>Every 2 weeks</label>
+          <label class="fpill"><input type="radio" name="freq" value="Weekly">Weekly</label>
+          <label class="fpill"><input type="radio" name="freq" value="Monthly">Monthly</label>
+          <label class="fpill"><input type="radio" name="freq" value="One-time">One-time</label>
         </div>
-        <div class="field-err" id="fe-frequency"></div>
+        <div class="ferr" id="fe-freq"></div>
       </div>
       <div class="field">
-        <label>How did you hear about us? <span class="opt-note">(optional)</span></label>
-        <div class="source-grid" id="sourceGrid">
-          <label class="source-pill"><input type="radio" name="referralSource" value="Google Search">🔍 Google</label>
-          <label class="source-pill"><input type="radio" name="referralSource" value="Instagram">📸 Instagram</label>
-          <label class="source-pill"><input type="radio" name="referralSource" value="Facebook">👥 Facebook</label>
-          <label class="source-pill"><input type="radio" name="referralSource" value="Nextdoor">🏘️ Nextdoor</label>
-          <label class="source-pill"><input type="radio" name="referralSource" value="Referral / Word of mouth">🗣️ Referral</label>
-          <label class="source-pill"><input type="radio" name="referralSource" value="Yelp">⭐ Yelp</label>
-          <label class="source-pill"><input type="radio" name="referralSource" value="Other">💬 Other</label>
+        <label>How did you hear about us? <span class="opt">(optional)</span></label>
+        <div class="src-wrap">
+          <label class="spill"><input type="radio" name="src" value="Google Search">🔍 Google</label>
+          <label class="spill"><input type="radio" name="src" value="Instagram">📸 Instagram</label>
+          <label class="spill"><input type="radio" name="src" value="Facebook">👥 Facebook</label>
+          <label class="spill"><input type="radio" name="src" value="Nextdoor">🏘️ Nextdoor</label>
+          <label class="spill"><input type="radio" name="src" value="Referral / Word of mouth">🗣️ Referral</label>
+          <label class="spill"><input type="radio" name="src" value="Yelp">⭐ Yelp</label>
+          <label class="spill"><input type="radio" name="src" value="Other">💬 Other</label>
         </div>
       </div>
       <div class="field">
-        <label>Anything to know? <span class="opt-note">(optional)</span></label>
+        <label>Anything to know? <span class="opt">(optional)</span></label>
         <textarea id="notes" placeholder="Pets, entry instructions, areas to focus on…"></textarea>
       </div>
       <div class="btn-row">
-        <button class="btn-back" onclick="prevStep(3)">Back</button>
-        <button class="btn-next" id="submitBtn" onclick="submitForm()">Get my free quote <svg viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+        <button class="btn-back" onclick="prev(3)">Back</button>
+        <button class="btn-next" id="submitBtn" onclick="doSubmit()">Get my free quote <svg viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
       </div>
     </div>
 
-  </div>
+  </div><!-- /steps -->
 
-  <div class="success-view" id="successView">
-    <div class="success-ring"><svg viewBox="0 0 36 36" fill="none"><path d="M8 18l7 7 13-13" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+  <!-- Success -->
+  <div class="success" id="successView">
+    <div class="success-icon"><svg viewBox="0 0 36 36" fill="none"><path d="M8 18l7 7 13-13" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
     <h2>You're all set!</h2>
     <p>We'll reach out within 24 hours to confirm your quote and availability.</p>
-    <div class="success-meta" id="successMeta"></div>
-    <a class="another-link" onclick="resetForm()">Submit another request</a>
+    <div class="success-card" id="successCard"></div>
+    <div class="again" onclick="resetForm()">Submit another request</div>
   </div>
 </div>
 
-</div>
+</div><!-- /page -->
 
 <script>
-var currentStep=1;
+var cur=1;
 
-function showStep(from,to){
-  var fromEl=document.getElementById('step'+from);
-  var toEl=document.getElementById('step'+to);
+function goTo(from,to){
+  var fEl=document.getElementById('step'+from);
+  var tEl=document.getElementById('step'+to);
   var dir=to>from?1:-1;
-  fromEl.style.transition='opacity .25s ease,transform .25s cubic-bezier(.4,0,.2,1)';
-  fromEl.style.transform='translateX('+(dir>0?-40:40)+'px)';
-  fromEl.style.opacity='0';
-  fromEl.style.pointerEvents='none';
+  fEl.style.transition='opacity .22s ease,transform .22s cubic-bezier(.4,0,.2,1)';
+  fEl.style.transform='translateX('+(dir>0?-40:40)+'px)';
+  fEl.style.opacity='0';
+  fEl.style.pointerEvents='none';
   setTimeout(function(){
-    fromEl.classList.remove('active');
-    fromEl.style.transform='';fromEl.style.opacity='';fromEl.style.pointerEvents='';fromEl.style.transition='';fromEl.style.position='';
-    toEl.style.transform='translateX('+(dir>0?40:-40)+'px)';
-    toEl.style.opacity='0';
-    toEl.style.transition='none';
-    toEl.classList.add('active');
+    fEl.classList.remove('active');
+    fEl.style.cssText='';
+    tEl.style.transform='translateX('+(dir>0?40:-40)+'px)';
+    tEl.style.opacity='0';
+    tEl.style.transition='none';
+    tEl.classList.add('active');
     requestAnimationFrame(function(){requestAnimationFrame(function(){
-      toEl.style.transition='opacity .3s ease,transform .3s cubic-bezier(.4,0,.2,1)';
-      toEl.style.transform='translateX(0)';
-      toEl.style.opacity='1';
+      tEl.style.transition='opacity .28s ease,transform .28s cubic-bezier(.4,0,.2,1)';
+      tEl.style.transform='translateX(0)';
+      tEl.style.opacity='1';
     });});
-  },220);
-  currentStep=to;
-  updateProgress(to);
+  },210);
+  cur=to;
+  updateProg(to);
 }
 
-function updateProgress(step){
-  var labels=['','Contact info','Your property','Service details'];
-  var fills=['','33%','66%','100%'];
-  document.getElementById('progressFill').style.width=fills[step];
-  document.getElementById('stepLabel').innerHTML='<strong>Step '+step+' of 3</strong> — '+labels[step];
+function updateProg(s){
+  var labs=['','Contact info','Your property','Service details'];
+  var pcts=['','33%','66%','100%'];
+  document.getElementById('progFill').style.width=pcts[s];
+  document.getElementById('progLabel').innerHTML='<strong>Step '+s+' of 3</strong> — '+labs[s];
   for(var i=1;i<=3;i++){
-    var dot=document.getElementById('dot'+i);
-    dot.classList.remove('active','done');
-    if(i<step)dot.classList.add('done');
-    else if(i===step)dot.classList.add('active');
+    var d=document.getElementById('pd'+i);
+    d.classList.remove('active','done');
+    if(i<s)d.classList.add('done');
+    else if(i===s)d.classList.add('active');
   }
-  for(var j=1;j<=2;j++){document.getElementById('line'+j).classList.toggle('done',j<step);}
+  for(var j=1;j<=2;j++) document.getElementById('pl'+j).classList.toggle('done',j<s);
 }
 
-function setErr(id,msg){var el=document.getElementById(id);var fe=document.getElementById('fe-'+id);if(el)el.classList.add('err');if(fe){fe.textContent=msg;fe.classList.add('show');}}
-function clrErr(id){var el=document.getElementById(id);var fe=document.getElementById('fe-'+id);if(el)el.classList.remove('err');if(fe)fe.classList.remove('show');}
+function se(id,msg){
+  var el=document.getElementById(id);
+  var fe=document.getElementById('fe-'+id);
+  if(el)el.classList.add('err');
+  if(fe){fe.textContent=msg;fe.classList.add('show');}
+}
+function ce(id){
+  var el=document.getElementById(id);
+  var fe=document.getElementById('fe-'+id);
+  if(el)el.classList.remove('err');
+  if(fe)fe.classList.remove('show');
+}
 
-function validateStep(step){
-  if(step===1){
+function validate(s){
+  if(s===1){
     var ok=true;
-    var name=document.getElementById('fullName').value.trim();
-    var email=document.getElementById('email').value.trim();
-    var phone=document.getElementById('phone').value.trim();
-    if(name.length<2){setErr('fullName','Please enter your full name');ok=false;}else clrErr('fullName');
-    if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){setErr('email','Enter a valid email address');ok=false;}else clrErr('email');
-    if(phone.replace(/\D/g,'').length<10){setErr('phone','Enter a valid 10-digit phone number');ok=false;}else clrErr('phone');
+    if(document.getElementById('fullName').value.trim().length<2){se('fullName','Please enter your full name');ok=false;}else ce('fullName');
+    if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(document.getElementById('email').value.trim())){se('email','Enter a valid email address');ok=false;}else ce('email');
+    if(document.getElementById('phone').value.replace(/\D/g,'').length<10){se('phone','Enter a valid 10-digit number');ok=false;}else ce('phone');
     return ok;
   }
-  if(step===2){
-    var addr=document.getElementById('address').value.trim();
-    if(addr.length<5){setErr('address','Please enter your property address');return false;}
-    clrErr('address');return true;
+  if(s===2){
+    if(document.getElementById('address').value.trim().length<5){se('address','Please enter your property address');return false;}
+    ce('address');return true;
   }
-  if(step===3){
-    var svc=document.querySelector('input[name="serviceType"]:checked');
-    if(!svc){setErr('serviceType','Please select a service type');return false;}
-    clrErr('serviceType');
-    var frq=document.querySelector('input[name="frequency"]:checked');
-    if(!frq){setErr('frequency','Please select a cleaning frequency');return false;}
-    clrErr('frequency');
+  if(s===3){
+    if(!document.querySelector('input[name="svc"]:checked')){se('svc','Please select a service type');return false;}
+    ce('svc');
+    if(!document.querySelector('input[name="freq"]:checked')){se('freq','Please select a frequency');return false;}
+    ce('freq');
     return true;
   }
   return true;
 }
 
-function nextStep(from){if(!validateStep(from))return;showStep(from,from+1);}
-function prevStep(from){showStep(from,from-1);}
+function next(s){if(validate(s))goTo(s,s+1);}
+function prev(s){goTo(s,s-1);}
 
+// Interactive cards
 document.querySelectorAll('input[name="island"]').forEach(function(r){r.addEventListener('change',function(){document.querySelectorAll('.island-card').forEach(function(c){c.classList.remove('selected');});this.closest('.island-card').classList.add('selected');});});
-document.querySelectorAll('input[name="serviceType"]').forEach(function(r){r.addEventListener('change',function(){document.querySelectorAll('.service-card').forEach(function(c){c.classList.remove('selected');});this.closest('.service-card').classList.add('selected');clrErr('serviceType');});});
-document.querySelectorAll('input[name="frequency"]').forEach(function(r){r.addEventListener('change',function(){document.querySelectorAll('.freq-pill').forEach(function(c){c.classList.remove('selected');});this.closest('.freq-pill').classList.add('selected');clrErr('frequency');});});
-document.querySelectorAll('input[name="referralSource"]').forEach(function(r){r.addEventListener('change',function(){document.querySelectorAll('.source-pill').forEach(function(c){c.classList.remove('selected');});this.closest('.source-pill').classList.add('selected');});});
+document.querySelectorAll('input[name="svc"]').forEach(function(r){r.addEventListener('change',function(){document.querySelectorAll('.svc-card').forEach(function(c){c.classList.remove('selected');});this.closest('.svc-card').classList.add('selected');ce('svc');});});
+document.querySelectorAll('input[name="freq"]').forEach(function(r){r.addEventListener('change',function(){document.querySelectorAll('.fpill').forEach(function(c){c.classList.remove('selected');});this.closest('.fpill').classList.add('selected');ce('freq');});});
+document.querySelectorAll('input[name="src"]').forEach(function(r){r.addEventListener('change',function(){document.querySelectorAll('.spill').forEach(function(c){c.classList.remove('selected');});this.closest('.spill').classList.add('selected');});});
 
-async function submitForm(){
-  if(!validateStep(3))return;
+async function doSubmit(){
+  if(!validate(3))return;
   var btn=document.getElementById('submitBtn');
   btn.disabled=true;
   btn.innerHTML='<div class="spinner"></div>';
@@ -407,9 +618,9 @@ async function submitForm(){
     beds:document.getElementById('beds').value||null,
     baths:document.getElementById('baths').value||null,
     sqft:document.getElementById('sqft').value||null,
-    serviceType:(document.querySelector('input[name="serviceType"]:checked')||{}).value||'',
-    frequency:(document.querySelector('input[name="frequency"]:checked')||{}).value||'',
-    referralSource:(document.querySelector('input[name="referralSource"]:checked')||{}).value||null,
+    serviceType:(document.querySelector('input[name="svc"]:checked')||{}).value||'',
+    frequency:(document.querySelector('input[name="freq"]:checked')||{}).value||'',
+    referralSource:(document.querySelector('input[name="src"]:checked')||{}).value||null,
     notes:document.getElementById('notes').value.trim()||null,
     island:(document.querySelector('input[name="island"]:checked')||{}).value||'Oahu',
     source:'website_form',
@@ -419,34 +630,31 @@ async function submitForm(){
     var res=await fetch('/api/lead-capture',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
     var result=await res.json();
     if(!res.ok)throw new Error(result.message||'Server error');
-    document.getElementById('formTop').style.display='none';
-    document.getElementById('stepsWrap').style.display='none';
+    document.getElementById('formHeader').style.display='none';
+    document.getElementById('stepsContainer').style.display='none';
     var sv=document.getElementById('successView');
     sv.classList.add('show');
-    document.getElementById('successMeta').innerHTML=
-      '<div class="success-meta-row"><span class="sm-label">Name</span><span class="sm-val">'+data.name+'</span></div>'+
-      '<div class="success-meta-row"><span class="sm-label">Service</span><span class="sm-val">'+data.serviceType+'</span></div>'+
-      '<div class="success-meta-row"><span class="sm-label">Frequency</span><span class="sm-val">'+data.frequency+'</span></div>'+
-      '<div class="success-meta-row"><span class="sm-label">Island</span><span class="sm-val">'+data.island+'</span></div>'+
-      (data.referralSource?'<div class="success-meta-row"><span class="sm-label">Heard via</span><span class="sm-val">'+data.referralSource+'</span></div>':'');
+    document.getElementById('successCard').innerHTML=
+      row('Service',data.serviceType)+row('Frequency',data.frequency)+row('Island',data.island)+(data.referralSource?row('Heard via',data.referralSource):'');
   }catch(err){
-    var eb=document.getElementById('err3');
-    eb.textContent=err.message||'Something went wrong. Please try again or call us.';
+    var eb=document.getElementById('e3');
+    eb.textContent=err.message||'Something went wrong. Please try again.';
     eb.classList.add('show');
     btn.disabled=false;
     btn.innerHTML='Get my free quote <svg viewBox="0 0 16 16" fill="none" style="width:16px;height:16px"><path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
   }
 }
 
+function row(l,v){return '<div class="sc-row"><span class="sc-label">'+l+'</span><span class="sc-val">'+v+'</span></div>';}
+
 function resetForm(){
-  document.getElementById('formTop').style.display='';
-  document.getElementById('stepsWrap').style.display='';
+  document.getElementById('formHeader').style.display='';
+  document.getElementById('stepsContainer').style.display='';
   document.getElementById('successView').classList.remove('show');
   document.querySelectorAll('input[type=text],input[type=email],input[type=tel],input[type=number],textarea,select').forEach(function(el){el.value='';});
-  var s1=document.getElementById('step'+currentStep);
-  s1.classList.remove('active');
+  document.getElementById('step'+cur).classList.remove('active');
   document.getElementById('step1').classList.add('active');
-  currentStep=1;updateProgress(1);
+  cur=1;updateProg(1);
 }
 </script>
 </body>

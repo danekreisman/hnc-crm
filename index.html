@@ -3728,12 +3728,35 @@ function saveCleanerEdit(){
 function closeOverlay(id){document.getElementById(id).classList.add('hidden');}
 
 function showToast(overlayId,msg){
-  var panel=document.getElementById(overlayId).querySelector('.panel-body');
+  // Create a sleek, professional notification toast
   var t=document.createElement('div');
-  t.style.cssText='background:var(--brand-50);border:1px solid #9ae6b4;border-radius:8px;padding:8px 12px;font-size:12px;color:#276749;margin-bottom:12px;';
-  t.textContent=msg;
-  panel.insertBefore(t,panel.firstChild);
-  setTimeout(function(){t.remove();},3000);
+  t.style.cssText='position:fixed;top:24px;right:24px;background:linear-gradient(135deg, #10b981 0%, #059669 100%);color:white;padding:16px 24px;border-radius:12px;box-shadow:0 20px 25px -5px rgba(0,0,0,0.15), 0 10px 10px -5px rgba(0,0,0,0.1);font-size:14px;font-weight:500;display:flex;align-items:center;gap:12px;z-index:10000;animation:slideIn 0.3s cubic-bezier(0.34,1.56,0.64,1);';
+  
+  // Success checkmark SVG
+  var checkmark=document.createElement('div');
+  checkmark.innerHTML='<svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 111.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" fill="currentColor"/></svg>';
+  checkmark.style.cssText='flex-shrink:0;';
+  
+  var msgSpan=document.createElement('span');
+  msgSpan.textContent=msg;
+  
+  t.appendChild(checkmark);
+  t.appendChild(msgSpan);
+  document.body.appendChild(t);
+  
+  // Add animation style if not already present
+  if(!document.getElementById('toast-animations')){
+    var style=document.createElement('style');
+    style.id='toast-animations';
+    style.textContent='@keyframes slideIn{from{opacity:0;transform:translateX(400px)}to{opacity:1;transform:translateX(0)}}.toast-exit{animation:slideOut 0.3s cubic-bezier(0.4,0,1,1)!important;}@keyframes slideOut{from{opacity:1;transform:translateX(0)}to{opacity:0;transform:translateX(400px)}}';
+    document.head.appendChild(style);
+  }
+  
+  // Auto-remove after 4 seconds with smooth exit
+  setTimeout(function(){
+    t.classList.add('toast-exit');
+    setTimeout(function(){t.remove();},300);
+  },4000);
 }
 
 /* MESSAGING */

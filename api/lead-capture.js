@@ -59,23 +59,23 @@ module.exports = async (req, res) => {
       return res.status(500).json({ success:false, message:'Error saving your request. Please try again.' });
     }
 
-    // Send welcome email (non-blocking — don't fail submission if this errors)
-    if (RESEND_API_KEY) {
-      fetch('https://api.resend.com/emails', {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${RESEND_API_KEY}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+    // Send welcome email (non-blocking — silently skip if anything fails)
+    try {
+      if (RESEND_API_KEY) {
+        const https = require('https');
+        const emailBody = JSON.stringify({
           from: 'Hawaii Natural Clean <hello@hawaiinatural.clean>',
           to: d.email.trim(),
           subject: 'We received your quote request — Mahalo!',
-          html: `<div style="font-family:sans-serif;max-width:560px;margin:0 auto;color:#1a2e38">
-            <h2 style="color:#3BB8E3">Mahalo, ${d.name.split(' ')[0]}! 🌺</h2>
-            <p>We received your request for a <strong>${d.serviceType || 'cleaning'}</strong> at ${d.address}.</p>
-            <p>We'll reach out within the hour to go over your quote and get you scheduled.</p>
-            <p style="margin-top:28px;color:#888;font-size:13px">— The Hawaii Natural Clean team<br>Oahu &amp; Maui</p>
-          </div>`
-        })
-      }).catch(e => console.error('[lead-capture] email error:', e));
+          html: '<div style="font-family:sans-serif;max-width:560px;margin:0 auto;color:#1a2e38"><h2 style="color:#3BB8E3">Mahalo, ' + d.name.split(' ')[0] + '! \uD83C\uDF3A</h2><p>We received your request for a <strong>' + (d.serviceType || 'cleaning') + '</strong> at ' + d.address + '.</p><p>We\'ll reach out within the hour to go over your quote and get you scheduled.</p><p style="margin-top:28px;color:#888;font-size:13px">— The Hawaii Natural Clean team<br>Oahu &amp; Maui</p></div>'
+        });
+        const req = https.request({ hostname:'api.resend.com', path:'/emails', method:'POST', headers:{'Authorization':'Bearer '+RESEND_API_KEY,'Content-Type':'application/json','Content-Length':Buffer.byteLength(emailBody)} });
+        req.on('error', e => console.error('[email] error:', e.message));
+        req.write(emailBody);
+        req.end();
+      }
+    } catch(emailErr) {
+      console.error('[lead-capture] email skipped:', emailErr.message);
     }
 
     return res.status(200).json({ success:true, message:'Lead captured successfully', leadId: lead[0].id });

@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Policy Agreement — Hawaii Natural Clean</title>
+<link rel="icon" href="/hnc-logo.png"/>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
+<style>
+:root{--blue:#3BB8E3;--blue-light:#eaf7fb;--blue-border:#9adcf0;--blue-dark:#1F9EC6;--text:#0f1c24;--muted:#5b7683;--border:#e3eef2;--panel:#fff;--radius:14px;--shadow:0 4px 24px rgba(15,42,53,.08)}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{min-height:100vh;font-family:'DM Sans',sans-serif;font-size:15px;color:var(--text)}
+body{background:linear-gradient(160deg,#eaf7fb 0%,#f7fbfc 40%,#eaf7fb 100%)}
+.wrap{max-width:560px;margin:0 auto;padding:32px 16px 64px}
+.logo-row{display:flex;align-items:center;justify-content:center;gap:12px;margin-bottom:36px}
+.logo-row img{height:44px}
+.brand{font-family:'Playfair Display',serif;font-size:18px;color:var(--text);line-height:1.2}
+.brand span{display:block;font-family:'DM Sans',sans-serif;font-size:11px;color:var(--muted);font-weight:600;letter-spacing:.08em;text-transform:uppercase;margin-top:1px}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow)}
+.card-head{padding:22px 24px 18px;border-bottom:1px solid var(--border)}
+.card-head h2{font-family:'Playfair Display',serif;font-size:22px;font-weight:700;margin-bottom:5px}
+.card-head p{font-size:13px;color:var(--muted);line-height:1.55}
+.card-body{padding:24px}
+.policy-item{display:flex;gap:12px;align-items:flex-start;padding:12px 14px;border:1.5px solid var(--border);border-radius:10px;margin-bottom:8px;cursor:pointer;background:#fff;transition:border-color .2s,background .2s}
+.policy-item:hover{border-color:var(--blue-border);background:var(--blue-light)}
+.policy-item.checked{border-color:var(--blue);background:var(--blue-light)}
+.policy-item input[type=checkbox]{width:18px;height:18px;accent-color:var(--blue);flex-shrink:0;margin-top:2px;cursor:pointer}
+.pi-title{font-size:13px;font-weight:600;color:var(--text);margin-bottom:2px}
+.pi-detail{font-size:12px;color:var(--muted);line-height:1.5}
+.btn-primary{display:block;width:100%;padding:14px;border:none;border-radius:10px;font-size:15px;font-weight:700;font-family:inherit;cursor:pointer;background:var(--blue);color:#fff;box-shadow:0 4px 16px rgba(59,184,227,.3);transition:all .2s;margin-top:16px}
+.btn-primary:disabled{opacity:.4;cursor:not-allowed;box-shadow:none}
+.error-banner{background:#fef2f2;border:1px solid #fca5a5;border-radius:10px;padding:14px;font-size:13px;color:#b91c1c;margin-top:12px;text-align:center}
+.success-screen{text-align:center;padding:40px 24px}
+.success-icon{font-size:52px;margin-bottom:16px}
+.success-screen h2{font-family:'Playfair Display',serif;font-size:24px;margin-bottom:10px}
+.success-screen p{color:var(--muted);font-size:14px;line-height:1.65;max-width:360px;margin:0 auto}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="logo-row">
+    <img src="/hnc-logo.png" alt="HNC" onerror="this.style.display='none'">
+    <div class="brand">Hawaii Natural Clean<span>Service Agreement</span></div>
+  </div>
+  <div id="app"><div class="card"><div style="padding:40px;text-align:center;color:var(--muted);font-size:13px;">Loading&hellip;</div></div></div>
+</div>
+<script>
+var CLIENT_ID = new URLSearchParams(location.search).get('c');
+
+var POLICIES = [
+  { id:'p1', title:'Cancellation policy',
+    detail:'Please provide at least 24 hours notice to cancel or reschedule. Late cancellations may incur a fee.' },
+  { id:'p2', title:'Home preparation',
+    detail:'Please tidy clutter from surfaces, do dishes or put them away, and secure any pets before our team arrives. This helps us focus on deep cleaning.' },
+  { id:'p3', title:'Property access',
+    detail:'Please ensure we have access to your property at the scheduled time. You will be asked to provide entry instructions when booking.' },
+  { id:'p4', title:'Payment terms',
+    detail:'Payment is due on the day of service. We accept ACH bank transfer (free) and credit/debit card (3% processing fee).' },
+  { id:'p5', title:'I agree to the terms of service',
+    detail:'By proceeding I authorise Hawaii Natural Clean to perform cleaning services and agree to all policies above.' }
+];
+
+function $(id){ return document.getElementById(id); }
+function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c];}); }
+
+if(!CLIENT_ID){
+  $('app').innerHTML='<div class="card"><div class="card-body"><div class="error-banner">Invalid link. Please use the link sent to you by Hawaii Natural Clean.</div></div></div>';
+} else {
+  renderPolicies();
+}
+
+function renderPolicies(){
+  var items = POLICIES.map(function(p){
+    return '<div class="policy-item" id="pi-'+p.id+'" onclick="toggle(\''+p.id+'\')">'
+      +'<input type="checkbox" id="cb-'+p.id+'" onclick="event.stopPropagation();toggle(\''+p.id+'\')">'
+      +'<div><div class="pi-title">'+esc(p.title)+'</div><div class="pi-detail">'+esc(p.detail)+'</div></div>'
+      +'</div>';
+  }).join('');
+
+  $('app').innerHTML = '<div class="card">'
+    +'<div class="card-head"><h2>Our service policies 🌺</h2>'
+    +'<p>Before we get started, please take a moment to read and agree to our service policies. This only takes about a minute.</p></div>'
+    +'<div class="card-body">'
+    +items
+    +'<button class="btn-primary" id="agree-btn" onclick="submit()" disabled>I agree to all policies</button>'
+    +'<div id="err"></div>'
+    +'</div></div>';
+}
+
+function toggle(id){
+  var cb = $('cb-'+id);
+  var item = $('pi-'+id);
+  if(!cb) return;
+  cb.checked = !cb.checked;
+  item.className = 'policy-item'+(cb.checked?' checked':'');
+  var allOk = POLICIES.every(function(p){ var c=$('cb-'+p.id); return c&&c.checked; });
+  var btn = $('agree-btn');
+  if(btn) btn.disabled = !allOk;
+}
+
+async function submit(){
+  var allOk = POLICIES.every(function(p){ var c=$('cb-'+p.id); return c&&c.checked; });
+  if(!allOk){ alert('Please agree to all policies to continue.'); return; }
+  var btn = $('agree-btn');
+  btn.disabled = true; btn.textContent = 'Saving\u2026';
+
+  try {
+    var r = await fetch('/api/policy-agree', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ clientId: CLIENT_ID })
+    });
+    var j = await r.json();
+    if(!r.ok) throw new Error(j.error||'Something went wrong');
+    $('app').innerHTML = '<div class="card"><div class="success-screen">'
+      +'<div class="success-icon">&#10003;</div>'
+      +'<h2>All set!</h2>'
+      +'<p>Thank you for reviewing our policies. Your agreement has been recorded. We look forward to serving you! If you have any questions, call or text us at <strong>(808) 468-5356</strong>. &#127946;</p>'
+      +'</div></div>';
+  } catch(e){
+    btn.disabled = false; btn.textContent = 'I agree to all policies';
+    $('err').innerHTML = '<div class="error-banner">'+esc(e.message)+'</div>';
+  }
+}
+</script>
+</body>
+</html>

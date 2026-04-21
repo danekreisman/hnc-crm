@@ -103,7 +103,7 @@ export default async function handler(req, res) {
         </div>
       `;
     } else if (type === 'quote') {
-      const { quoteData, frequency, bookingUrl, customIntro } = req.body;
+      const { quoteData, frequency, bookingUrl, bookingToken, customIntro } = req.body;
       const q = quoteData || {};
       const bk = q.breakdown || {};
       const introText = customIntro || `Hi ${clientName}, thanks for reaching out! Here's your personalized quote from Hawaii Natural Clean.`;
@@ -119,9 +119,10 @@ export default async function handler(req, res) {
         ? `<tr><td style="color:#059669;padding:6px 0;">${frequency || 'Frequency'} discount (${q.discount_pct}% off)</td><td style="text-align:right;color:#059669;font-weight:500;">−$${Number(q.discount).toFixed(2)}</td></tr>`
         : '';
 
-      const bookBtn = bookingUrl
-        ? `<a href="${bookingUrl}" style="display:block;background:#1D9E75;color:#fff;text-align:center;padding:14px 24px;border-radius:10px;text-decoration:none;font-weight:700;font-size:16px;margin-bottom:24px;">Book Now →</a>`
-        : `<a href="https://hawaiinaturalclean.com/contact" style="display:block;background:#1D9E75;color:#fff;text-align:center;padding:14px 24px;border-radius:10px;text-decoration:none;font-weight:700;font-size:16px;margin-bottom:24px;">Book Now →</a>`;
+      const finalBookUrl = bookingToken
+        ? `https://hnc-crm.vercel.app/book.html?bt=${bookingToken}`
+        : (bookingUrl || 'https://hnc-crm.vercel.app/book.html');
+      const bookBtn = `<a href="${finalBookUrl}" style="display:block;background:#1D9E75;color:#fff;text-align:center;padding:14px 24px;border-radius:10px;text-decoration:none;font-weight:700;font-size:16px;margin-bottom:24px;">Book Now →</a>`;
 
       html = `
         <div style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;max-width:600px;margin:0 auto;padding:32px 24px;color:#1a1a1a;background:#ffffff;">

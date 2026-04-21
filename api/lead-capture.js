@@ -19,6 +19,7 @@ export default async function handler(req, res) {
   );
 
   const BASE_URL = 'https://hnc-crm.vercel.app';
+  const bookingToken = crypto.randomUUID();
   const isJanitorial = (d.serviceType === 'Janitorial Cleaning');
 
   // ── 1. Build notes ──────────────────────────────────────────────────────
@@ -45,6 +46,7 @@ export default async function handler(req, res) {
     source:       d.referralSource || 'Website form',
     stage:        'New inquiry',
     assigned_to:  'VA',
+    booking_token: bookingToken,
     notes:        noteParts.join('\n') || null,
   }]).select();
 
@@ -177,6 +179,7 @@ export default async function handler(req, res) {
           frequency: d.frequency || null,
           quoteData: isCustom ? null : quoteResult,
           customIntro: emailIntro,
+          bookingToken: bookingToken,
           notes: isCustom ? `Thanks for reaching out! Your request (${d.serviceType}) requires a custom quote. We'll follow up within 24 hours — or call/text us at (808) 468-5356.` : null,
         })
       });

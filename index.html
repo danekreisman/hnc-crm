@@ -1636,13 +1636,14 @@ async function dbLoadCleaners(){
     clientId=Object.keys(clientDB).find(function(_id){return clientDB[_id]&&clientDB[_id].name===data.clientName;})||null;
   }
   var row={
-    client_id:clientId, service:data.service||'Regular Cleaning',
+    client_id:clientId, client_name:data.clientName, service:data.service||'Regular Cleaning',
     frequency:data.freq||'One-time', date:data.date,
     time:data.time||'8am', address:data.address||null,
     beds:parseInt(data.beds)||null, baths:parseFloat(data.baths)||null,
     sqft:parseInt(data.sqft)||null,
     condition:parseInt(data.condition)||7,
     cleaner_id:(typeof cleanerDB!=='undefined'&&data.cleanerName&&data.cleanerName!=='Unassigned'?(Object.keys(cleanerDB).find(function(_id){return cleanerDB[_id]&&cleanerDB[_id].name===data.cleanerName;})||null):null),
+    cleaner_name:data.cleanerName||'Unassigned',
     status:data.cleanerName&&data.cleanerName!=='Unassigned'?'assigned':'unassigned',
     base_price:parseFloat(data.basePrice)||0,
     tax:parseFloat(data.tax)||0,
@@ -1656,7 +1657,7 @@ async function dbLoadCleaners(){
   if(data.seriesIndex!=null) row.series_index=data.seriesIndex;
   var res=await db.from('appointments').insert([row]).select();
   if(res.error)console.error('Save appointment error:',res.error);
-  else console.log('[dbSaveAppointment] saved client_id='+clientId+' duration_hours='+data.duration+(data.seriesId?' series_id='+data.seriesId:''));
+  else console.log('[dbSaveAppointment] saved client_id='+clientId+' client_name='+data.clientName+' duration_hours='+data.duration+(data.seriesId?' series_id='+data.seriesId:''));
   return res;
 }
 
@@ -1727,13 +1728,14 @@ async function dbUpdateAppointment(dbId,data){
     clientId=Object.keys(clientDB).find(function(_id){return clientDB[_id]&&clientDB[_id].name===data.clientName;})||null;
   }
   var payload={
-    client_id:clientId, service:data.service,
+    client_id:clientId, client_name:data.clientName, service:data.service,
     frequency:data.freq, date:data.date,
     time:data.time, address:data.address||null,
     beds:parseInt(data.beds)||null, baths:parseFloat(data.baths)||null,
     sqft:parseInt(data.sqft)||null,
     condition:parseInt(data.condition)||7,
     cleaner_id:(typeof cleanerDB!=='undefined'&&data.cleanerName&&data.cleanerName!=='Unassigned'?(Object.keys(cleanerDB).find(function(_id){return cleanerDB[_id]&&cleanerDB[_id].name===data.cleanerName;})||null):null),
+    cleaner_name:data.cleanerName||'Unassigned',
     status:(data.cleanerName==='Unassigned'?'unassigned':(data.status||'assigned')),
     base_price:parseFloat(data.basePrice)||0,
     tax:parseFloat(data.tax)||0,

@@ -345,6 +345,13 @@ textarea{font-family:inherit;}
 @keyframes toastSlideOut{from{opacity:1;transform:translateX(0)}to{opacity:0;transform:translateX(420px)}}
 .hnc-toast{animation:toastSlideIn 0.35s cubic-bezier(0.34,1.56,0.64,1) forwards;}
 .hnc-toast.toast-exit{animation:toastSlideOut 0.3s cubic-bezier(0.4,0,1,1) forwards;}
+/* === BUTTON PULSE GLOW === */
+@keyframes hncPulseGlow{0%{box-shadow:0 0 0 0 rgba(59,184,227,.5)}70%{box-shadow:0 0 0 11px rgba(59,184,227,0)}100%{box-shadow:0 0 0 0 rgba(59,184,227,0)}}
+@keyframes hncPulseGlowGreen{0%{box-shadow:0 0 0 0 rgba(16,185,129,.5)}70%{box-shadow:0 0 0 11px rgba(16,185,129,0)}100%{box-shadow:0 0 0 0 rgba(16,185,129,0)}}
+@keyframes hncPulseGlowRed{0%{box-shadow:0 0 0 0 rgba(239,68,68,.45)}70%{box-shadow:0 0 0 11px rgba(239,68,68,0)}100%{box-shadow:0 0 0 0 rgba(239,68,68,0)}}
+.hnc-btn-pulse{animation:hncPulseGlow .55s cubic-bezier(.4,0,.2,1)!important;}
+.hnc-btn-pulse-green{animation:hncPulseGlowGreen .55s cubic-bezier(.4,0,.2,1)!important;}
+.hnc-btn-pulse-red{animation:hncPulseGlowRed .55s cubic-bezier(.4,0,.2,1)!important;}
 </style>
 </head>
 <body>
@@ -3148,14 +3155,9 @@ async function cancelAppointment(){
     console.log('[cancelAppointment] SUCCESS — persisted to Supabase, appointment will not reload on refresh');
   }
 
-  // Show success, re-render, then close
-  var bar=document.getElementById('appt-action-success');
-  if(bar){bar.textContent='Appointment cancelled.';bar.classList.add('show');}
   renderCal();
-  setTimeout(function(){
-    if(bar)bar.classList.remove('show');
-    closeOverlay('appt-overlay');
-  },1800);
+  closeOverlay('appt-overlay');
+  showToast('', 'Appointment cancelled.');
   // AUTOMATION HOOK: appointment.cancelled
   try { if (typeof hncFireEvent === 'function' && currentAppt) hncFireEvent('appointment.cancelled', {
     appointment_id: currentAppt.dbId||null, client_name: currentAppt.n||'', date: (currentApptKey||'').replace(/-/g,'-'),
@@ -3216,12 +3218,10 @@ async function cancelAllRecurring(){
   }
 
   var bar=document.getElementById('appt-action-success');
-  if(bar){bar.textContent='Recurring series for '+targetName+' cancelled.';bar.classList.add('show');}
+  if(bar){bar.textContent='';}
   renderCal();
-  setTimeout(function(){
-    if(bar)bar.classList.remove('show');
-    closeOverlay('appt-overlay');
-  },2000);
+  closeOverlay('appt-overlay');
+  showToast('', 'Recurring series for '+targetName+' cancelled.');
 }
 
 function deleteAppointment(){
@@ -3259,12 +3259,10 @@ function deleteAppointment(){
   }
 
   var bar = document.getElementById('appt-action-success');
-  if(bar){ bar.textContent='Appointment deleted.'; bar.classList.add('show'); }
+  if(bar){ bar.textContent=''; }
   renderCal();
-  setTimeout(function(){
-    if(bar) bar.classList.remove('show');
-    closeOverlay('appt-overlay');
-  }, 1500);
+  closeOverlay('appt-overlay');
+  showToast('', 'Appointment deleted.');
 }
 
 function deleteEntireSeries(){
@@ -3333,12 +3331,10 @@ function deleteEntireSeries(){
   });
 
   var bar = document.getElementById('appt-action-success');
-  if(bar){ bar.textContent='Series halted. '+futureDbIds.length+' future appointments deleted.'; bar.classList.add('show'); }
+  if(bar){ bar.textContent=''; }
   renderCal();
-  setTimeout(function(){
-    if(bar) bar.classList.remove('show');
-    closeOverlay('appt-overlay');
-  }, 2200);
+  closeOverlay('appt-overlay');
+  showToast('', 'Series halted — '+futureDbIds.length+' future appointments deleted.');
 }
 
 function openClient(id){
@@ -3716,7 +3712,24 @@ function saveCleanerEdit(){
   showToast('cleaner-overlay','Cleaner updated successfully.');
 }
 
-function closeOverlay(id){document.getElementById(id).classList.add('hidden');}
+function closeOverlay(id){
+  var overlay=document.getElementById(id);
+  if(!overlay)return;
+  var panel=overlay.querySelector('.panel');
+  if(panel){
+    panel.style.transition='transform .22s cubic-bezier(.4,0,.2,1),opacity .18s ease';
+    panel.style.transform='scale(.93)';
+    panel.style.opacity='0';
+    setTimeout(function(){
+      overlay.classList.add('hidden');
+      panel.style.transition='';
+      panel.style.transform='';
+      panel.style.opacity='';
+    },210);
+  } else {
+    overlay.classList.add('hidden');
+  }
+}
 
 function showToast(overlayId,msg){
   var t=document.createElement('div');
@@ -10017,6 +10030,19 @@ function applyEditProperty(){
 
 document.addEventListener('DOMContentLoaded', function(){
   initNewApptClientAutocomplete();
+
+  // Global button pulse glow — fires on every btn click
+  document.addEventListener('click', function(e){
+    var btn = e.target.closest('.btn-primary, .action-btn.green, .action-btn.red, .trigger-btn, .btn:not(.close-btn)');
+    if(!btn) return;
+    var cls = 'hnc-btn-pulse';
+    if(btn.classList.contains('action-btn') && btn.classList.contains('red')) cls = 'hnc-btn-pulse-red';
+    else if(btn.classList.contains('btn-primary') || (btn.classList.contains('action-btn') && btn.classList.contains('green'))) cls = 'hnc-btn-pulse-green';
+    btn.classList.remove('hnc-btn-pulse','hnc-btn-pulse-green','hnc-btn-pulse-red');
+    void btn.offsetWidth; // force reflow to restart animation
+    btn.classList.add(cls);
+    setTimeout(function(){ btn.classList.remove('hnc-btn-pulse','hnc-btn-pulse-green','hnc-btn-pulse-red'); }, 600);
+  }, true);
 });
 
 // Run immediately from localStorage — don't wait for Supabase

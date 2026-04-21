@@ -471,7 +471,7 @@ body{font-family:'Josefin Sans',sans-serif;color:var(--text);overflow-x:hidden;}
         <div class="condition-ends"><span>1 — Filthy 😬</span><span>10 — Pristine ✨</span></div>
       </div>
 
-      <div class="field">
+      <div class="field" id="freq-field">
         <label>Frequency <span style="color:var(--error)">*</span></label>
         <div class="freq-wrap">
           <label class="fpill selected"><input type="radio" name="freq" value="Biweekly" checked>Every 2 weeks</label>
@@ -588,8 +588,12 @@ function validate(s){
     return true;
   }
   if(s===3){
-    if(!document.querySelector('input[name="freq"]:checked')){se('freq','Please select a frequency');return false;}
-    ce('freq');return true;
+    // Janitorial doesn't need frequency
+    if(!isJanitorial){
+      if(!document.querySelector('input[name="freq"]:checked')){se('freq','Please select a frequency');return false;}
+      ce('freq');
+    }
+    return true;
   }
   return true;
 }
@@ -631,6 +635,10 @@ document.querySelectorAll('input[name="svc"]').forEach(function(r){
     // Show/hide res fields (beds/baths/sqft)
     var resFields = document.getElementById('res-fields');
     if(resFields) resFields.style.display = isJanitorial ? 'none' : '';
+
+    // Show/hide frequency field — janitorial doesn't need it
+    var freqField = document.getElementById('freq-field');
+    if(freqField) freqField.style.display = isJanitorial ? 'none' : '';
 
     // Show/hide condition slider on step 3
     document.getElementById('conditionWrap').classList.toggle('show', needsCondition);

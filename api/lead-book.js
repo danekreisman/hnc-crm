@@ -104,15 +104,24 @@ export default async function handler(req, res) {
         clientId = existing.id;
         console.log('[lead-book] found existing client', clientId);
       } else {
+        const parsedFreq  = parse(/Frequency:\s*([^\n]+)/);
+        const parsedBeds  = parse(/Beds:\s*(\S+)/);
+        const parsedBaths = parse(/Baths:\s*(\S+)/);
         const { data: newClient, error: clientErr } = await supabase
           .from('clients')
           .insert({
-            name:    lead.name.trim(),
-            email:   lead.email.trim(),
-            phone:   phone || null,
-            address: lead.address || null,
-            status:  'New',
-            source:  'Booking portal',
+            name:      lead.name.trim(),
+            email:     lead.email.trim(),
+            phone:     phone || null,
+            address:   lead.address || null,
+            type:      'Residential',
+            service:   lead.service   || null,
+            frequency: parsedFreq     || null,
+            beds:      parsedBeds     ? parseFloat(parsedBeds)  : null,
+            baths:     parsedBaths    ? parseFloat(parsedBaths) : null,
+            sqft:      lead.sqft      || null,
+            status:    'New',
+            notes:     'Created automatically from booking portal',
           })
           .select('id')
           .single();

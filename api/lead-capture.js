@@ -320,13 +320,16 @@ module.exports = async (req, res) => {
         address: leadData.address,
         beds: leadData.beds ? parseInt(leadData.beds) : null,
         baths: leadData.baths ? parseFloat(leadData.baths) : null,
-        stage: 'New',
+        stage: 'New inquiry',
+        source: leadData.referralSource || 'Website form',
         source_id: sourceId,
         property_details: leadData.serviceType,
         frequency: leadData.frequency,
         notes: leadData.notes || null,
         custom_fields: {
           serviceType: leadData.serviceType,
+          island: leadData.island || 'Oahu',
+          referralSource: leadData.referralSource || null,
           source_name: 'website_form',
           submittedAt: leadData.submittedAt
         }

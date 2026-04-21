@@ -116,6 +116,11 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
 @keyframes spin{to{transform:rotate(360deg)}}
 .err-banner{background:#fff5f5;border:1px solid #f5c6c6;border-radius:10px;padding:12px 16px;font-size:13px;color:var(--error);margin-bottom:16px;display:none;}
 .err-banner.show{display:block;}
+.source-grid{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:4px;}
+.source-pill{border:1.5px solid var(--border);border-radius:40px;padding:8px 14px;cursor:pointer;font-size:13px;font-weight:400;transition:all .2s;background:var(--cream);color:var(--text);white-space:nowrap;}
+.source-pill:hover{border-color:var(--green-mid);background:white;}
+.source-pill.selected{border-color:var(--green);background:var(--green);color:white;}
+.source-pill input{display:none;}
 .opt-note{font-size:12px;color:var(--text-muted);font-weight:300;text-transform:none;letter-spacing:0;margin-left:4px;}
 @media(max-width:900px){
   .page{grid-template-columns:1fr;grid-template-rows:auto 1fr;}
@@ -274,6 +279,18 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
         <div class="field-err" id="fe-frequency"></div>
       </div>
       <div class="field">
+        <label>How did you hear about us? <span class="opt-note">(optional)</span></label>
+        <div class="source-grid" id="sourceGrid">
+          <label class="source-pill"><input type="radio" name="referralSource" value="Google Search">🔍 Google</label>
+          <label class="source-pill"><input type="radio" name="referralSource" value="Instagram">📸 Instagram</label>
+          <label class="source-pill"><input type="radio" name="referralSource" value="Facebook">👥 Facebook</label>
+          <label class="source-pill"><input type="radio" name="referralSource" value="Nextdoor">🏘️ Nextdoor</label>
+          <label class="source-pill"><input type="radio" name="referralSource" value="Referral / Word of mouth">🗣️ Referral</label>
+          <label class="source-pill"><input type="radio" name="referralSource" value="Yelp">⭐ Yelp</label>
+          <label class="source-pill"><input type="radio" name="referralSource" value="Other">💬 Other</label>
+        </div>
+      </div>
+      <div class="field">
         <label>Anything to know? <span class="opt-note">(optional)</span></label>
         <textarea id="notes" placeholder="Pets, entry instructions, areas to focus on…"></textarea>
       </div>
@@ -375,6 +392,7 @@ function prevStep(from){showStep(from,from-1);}
 document.querySelectorAll('input[name="island"]').forEach(function(r){r.addEventListener('change',function(){document.querySelectorAll('.island-card').forEach(function(c){c.classList.remove('selected');});this.closest('.island-card').classList.add('selected');});});
 document.querySelectorAll('input[name="serviceType"]').forEach(function(r){r.addEventListener('change',function(){document.querySelectorAll('.service-card').forEach(function(c){c.classList.remove('selected');});this.closest('.service-card').classList.add('selected');clrErr('serviceType');});});
 document.querySelectorAll('input[name="frequency"]').forEach(function(r){r.addEventListener('change',function(){document.querySelectorAll('.freq-pill').forEach(function(c){c.classList.remove('selected');});this.closest('.freq-pill').classList.add('selected');clrErr('frequency');});});
+document.querySelectorAll('input[name="referralSource"]').forEach(function(r){r.addEventListener('change',function(){document.querySelectorAll('.source-pill').forEach(function(c){c.classList.remove('selected');});this.closest('.source-pill').classList.add('selected');});});
 
 async function submitForm(){
   if(!validateStep(3))return;
@@ -391,6 +409,7 @@ async function submitForm(){
     sqft:document.getElementById('sqft').value||null,
     serviceType:(document.querySelector('input[name="serviceType"]:checked')||{}).value||'',
     frequency:(document.querySelector('input[name="frequency"]:checked')||{}).value||'',
+    referralSource:(document.querySelector('input[name="referralSource"]:checked')||{}).value||null,
     notes:document.getElementById('notes').value.trim()||null,
     island:(document.querySelector('input[name="island"]:checked')||{}).value||'Oahu',
     source:'website_form',
@@ -408,7 +427,8 @@ async function submitForm(){
       '<div class="success-meta-row"><span class="sm-label">Name</span><span class="sm-val">'+data.name+'</span></div>'+
       '<div class="success-meta-row"><span class="sm-label">Service</span><span class="sm-val">'+data.serviceType+'</span></div>'+
       '<div class="success-meta-row"><span class="sm-label">Frequency</span><span class="sm-val">'+data.frequency+'</span></div>'+
-      '<div class="success-meta-row"><span class="sm-label">Island</span><span class="sm-val">'+data.island+'</span></div>';
+      '<div class="success-meta-row"><span class="sm-label">Island</span><span class="sm-val">'+data.island+'</span></div>'+
+      (data.referralSource?'<div class="success-meta-row"><span class="sm-label">Heard via</span><span class="sm-val">'+data.referralSource+'</span></div>':'');
   }catch(err){
     var eb=document.getElementById('err3');
     eb.textContent=err.message||'Something went wrong. Please try again or call us.';

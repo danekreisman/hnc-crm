@@ -1,6 +1,6 @@
-const { createClient } = require('@supabase/supabase-js');
+import { createClient } from '@supabase/supabase-js';
 
-module.exports = async (req, res) => {
+export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST,OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -40,9 +40,9 @@ module.exports = async (req, res) => {
   }]).select();
 
   if (error) {
-    console.error('[lead-capture] Supabase error:', JSON.stringify(error));
-    return res.status(500).json({ success: false, message: 'Error saving your request: ' + error.message });
+    console.error('[lead-capture] insert error:', JSON.stringify(error));
+    return res.status(500).json({ success: false, message: error.message });
   }
 
   return res.status(200).json({ success: true, leadId: data[0].id });
-};
+}

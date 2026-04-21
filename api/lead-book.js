@@ -128,42 +128,7 @@ export default async function handler(req, res) {
       console.error('[lead-book] client find/create error:', err.message);
     }
 
-    // 3. Find a free cleaner for this island on this date
-    let assignedCleanerId   = null;
-    let assignedCleanerName = null;
-    let assignedCleanerPhone = null;
-    try {
-      const { data: cleaners } = await supabase
-        .from('cleaners')
-        .select('id, name, phone, island')
-        .eq('status', 'Active');
-
-      const islandCleaners = (cleaners || []).filter(c =>
-        !c.island || c.island === island || c.island === 'Both'
-      );
-
-      const { data: bookedThatDay } = await supabase
-        .from('appointments')
-        .select('cleaner_id')
-        .eq('date', date)
-        .not('status', 'in', '("cancelled","deleted","unassigned")');
-
-      const bookedIds = new Set((bookedThatDay || []).map(a => a.cleaner_id));
-      const freeCleaners = islandCleaners.filter(c => !bookedIds.has(c.id));
-
-      if (freeCleaners.length > 0) {
-        assignedCleanerId    = freeCleaners[0].id;
-        assignedCleanerName  = freeCleaners[0].name;
-        assignedCleanerPhone = freeCleaners[0].phone;
-        console.log('[lead-book] assigned cleaner:', assignedCleanerName);
-      } else {
-        console.warn('[lead-book] no free cleaners found — creating unassigned appointment');
-      }
-    } catch (err) {
-      console.error('[lead-book] cleaner assignment error:', err.message);
-    }
-
-    // 4. Create appointment
+    // 3. Create appointment (cleaner assigned manually by team)
     let appointmentId = null;
     try {
       const apptPayload = {
@@ -176,7 +141,7 @@ export default async function handler(req, res) {
         beds:           beds ? parseFloat(beds) : null,
         baths:          baths ? parseFloat(baths) : null,
         sqft:           lead.sqft || null,
-        cleaner_id:     assignedCleanerId || undefined,
+
         status:         'scheduled',
         base_price:     quoteData.subtotal != null ? Number(quoteData.subtotal) : null,
         discount:       quoteData.discount != null ? Number(quoteData.discount) : 0,
@@ -242,30 +207,9 @@ export default async function handler(req, res) {
       console.error('[lead-book] confirmation email failed:', err.message);
     }
 
-    // 8. SMS the assigned cleaner
-    if (assignedCleanerPhone) {
-      try {
-        const cleanerPhone = assignedCleanerPhone.replace(/\D/g, '');
-        const cleanerE164  = cleanerPhone.startsWith('+') ? cleanerPhone : '+1' + cleanerPhone;
-        const cleanerSms   = `Hi ${assignedCleanerName.split(' ')[0]}! New job booked for you:\n`
-          + `📅 ${prettyDate} at ${time}\n`
-          + `👤 ${lead.name}\n`
-          + `🏠 ${lead.address || 'Address on file'}\n`
-          + `🧹 ${lead.service || 'Cleaning'}${frequency ? ' · ' + frequency : ''}`;
-        await fetch(`${BASE_URL}/api/send-sms`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ to: cleanerE164, message: cleanerSms })
-        });
-        console.log('[lead-book] cleaner SMS sent to', assignedCleanerName);
-      } catch (err) {
-        console.error('[lead-book] cleaner SMS failed:', err.message);
-      }
-    }
-
-    // 9. SMS admin notification
+    // 8. SMS admin notification
     try {
-      const adminSms = `✅ Auto-booked!\n${lead.name} · ${lead.service || 'Cleaning'}\n${prettyDate} at ${time}\nCleaner: ${assignedCleanerName || 'Unassigned'}${totalWithTax ? '\nTotal: $' + totalWithTax : ''}${rushFee > 0 ? ' (incl. $' + rushFee + ' rush fee)' : ''}`;
+      const adminSms = `✅ Auto-booked!\n${lead.name} · ${lead.service || 'Cleaning'}\n${prettyDate} at ${time}${totalWithTax ? '\nTotal: $' + totalWithTax : ''}${rushFee > 0 ? ' (incl. $' + rushFee + ' rush fee)' : ''}`;
       await fetch(`${BASE_URL}/api/send-sms`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -278,7 +222,6 @@ export default async function handler(req, res) {
     return res.status(200).json({
       success: true,
       appointmentId,
-      assignedCleaner: assignedCleanerName,
       date: prettyDate,
       time,
     });

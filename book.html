@@ -502,9 +502,8 @@ function renderSuccess(result){
     +'<div class="success-icon">&#127946;</div>'
     +'<h2>You\'re booked!</h2>'
     +'<p>Your cleaning is confirmed for <strong>'+esc(result.date || SEL_DATE)+'</strong> at <strong>'+esc(result.time || SEL_TIME)+'</strong>.'
-    +(result.assignedCleaner ? ' Your cleaner will be <strong>'+esc(result.assignedCleaner)+'</strong>.' : '')
     +(rush ? ' A '+rush.label.toLowerCase()+' fee of '+fmt(rush.fee)+' applies.' : '')
-    +'<br><br>A confirmation has been sent to your email. Questions? Call or text <strong>(808) 468-5356</strong>. We look forward to seeing you! &#127946;</p>'
+    +'<br><br>A confirmation has been sent to your email. Our team will be in touch with your cleaner assignment shortly. Questions? Call or text <strong>(808) 468-5356</strong>. We look forward to seeing you! &#127946;</p>'
     +'</div></div>';
 }
 </script>

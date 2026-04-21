@@ -1845,10 +1845,6 @@ async function loadAllData(){
     cleaners.forEach(function(c){
       const initials=c.name.split(' ').map(function(w){return w[0]||'';}).join('').slice(0,2).toUpperCase();
       const colors=[['var(--brand-200)','var(--brand-700)'],['#B5D4F4','#0C447C'],['#CECBF6','#3C3489'],['#FAC775','#633806'],['#F5C4B3','#712B13'],['#F4C0D1','#72243E']];
-      const cleaners=await dbLoadCleaners();
-    cleaners.forEach(function(c){
-      const initials=c.name.split(' ').map(function(w){return w[0]||'';}).join('').slice(0,2).toUpperCase();
-      const colors=[['var(--brand-200)','var(--brand-700)'],['#B5D4F4','#0C447C'],['#CECBF6','#3C3489'],['#FAC775','#633806'],['#F5C4B3','#712B13'],['#F4C0D1','#72243E']];
       const col=colors[Object.keys(cleanerDB).length%colors.length];
       cleanerDB[c.id]={
         name:c.name, role:(c.role||'Cleaner')+' · '+(c.island||'Oahu'),

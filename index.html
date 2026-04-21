@@ -2887,6 +2887,20 @@ async function saveApptEdit(mode){
   var newSeriesId = (mode==='single') ? null : (a.seriesId||null);
   var newSeriesIndex = (mode==='single') ? null : (a.seriesIndex!=null?a.seriesIndex:null);
 
+  // CRITICAL: If single mode, add this date to excludedDates BEFORE renderCal runs
+  // so the recurringAppts loop doesn't regenerate this slot
+  if(mode==='single' && a.recurring && a.seriesId){
+    recurringAppts.forEach(function(r){
+      if(r.seriesId===a.seriesId){
+        if(!r.excludedDates) r.excludedDates=[];
+        if(r.excludedDates.indexOf(currentApptKey)<0){
+          r.excludedDates.push(currentApptKey);
+          console.log('[saveApptEdit] pre-excluded date '+currentApptKey+' from series '+a.seriesId);
+        }
+      }
+    });
+  }
+
   // Update in-memory apptObj immediately
   var updatedAppt=Object.assign({},a,{
     n:editClient, s:statusVal, t:newTimeStr,
@@ -3080,14 +3094,6 @@ async function saveApptEdit(mode){
           // Break the series link for this specific occurrence in DB
           db.from('appointments').update({series_id:null,recurring:false}).eq('id',a.dbId).then(function(r){
             console.log('[saveApptEdit] series link broken for dbId='+a.dbId+', error:',r.error||'none');
-          });
-          // Add this date to excludedDates in the recurring template so it won't be regenerated
-          recurringAppts.forEach(function(r){
-            if(r.seriesId && r.seriesId===a.seriesId){
-              if(!r.excludedDates) r.excludedDates=[];
-              if(r.excludedDates.indexOf(currentApptKey)<0) r.excludedDates.push(currentApptKey);
-              console.log('[saveApptEdit] excluded date '+currentApptKey+' from series '+a.seriesId);
-            }
           });
         }
         console.log('[saveApptEdit] Supabase single sync complete, error:',sbUpdate.error||'none');

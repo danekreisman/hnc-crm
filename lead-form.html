@@ -423,13 +423,7 @@ body{font-family:'Josefin Sans',sans-serif;color:var(--text);overflow-x:hidden;}
         <div><strong>Save 25% on your first deep or move-out clean</strong> when you sign up for a recurring regular cleaning plan. Ask us about it when we reach out!</div>
       </div>
 
-      <!-- Address -->
-      <div class="field">
-        <label>Property address <span style="color:var(--error)">*</span></label>
-        <input type="text" id="address" placeholder="123 Kailua Rd, Kailua, HI 96734" autocomplete="street-address">
-        <div class="ferr" id="fe-address"></div>
-      </div>
-
+      <!-- Address collected at booking, not here -->
       <!-- Island -->
       <div class="field">
         <label>Island</label>
@@ -496,6 +490,7 @@ body{font-family:'Josefin Sans',sans-serif;color:var(--text);overflow-x:hidden;}
           <label class="spill"><input type="radio" name="src" value="Facebook">👥 Facebook</label>
           <label class="spill"><input type="radio" name="src" value="Nextdoor">🏘️ Nextdoor</label>
           <label class="spill"><input type="radio" name="src" value="Referral / Word of mouth">🗣️ Referral</label>
+          <label class="spill"><input type="radio" name="src" value="Property Manager">🏢 Property Manager</label>
           <label class="spill"><input type="radio" name="src" value="Yelp">⭐ Yelp</label>
           <label class="spill"><input type="radio" name="src" value="Other">💬 Other</label>
         </div>
@@ -590,8 +585,7 @@ function validate(s){
   if(s===2){
     if(!document.querySelector('input[name="svc"]:checked')){se('svc','Please select a service type');return false;}
     ce('svc');
-    if(document.getElementById('address').value.trim().length<5){se('address','Please enter your property address');return false;}
-    ce('address');return true;
+    return true;
   }
   if(s===3){
     if(!document.querySelector('input[name="freq"]:checked')){se('freq','Please select a frequency');return false;}
@@ -612,61 +606,6 @@ document.getElementById('phone').addEventListener('input', function(e){
   if(digits.length >= 7) fmt += '-' + digits.substring(6,10);
   this.value = fmt;
 });
-
-// === ADDRESS AUTOCOMPLETE (server-side proxy) ===
-(function(){
-  var addr = document.getElementById('address');
-  if(!addr) return;
-
-  // Append dropdown to body with fixed position — avoids step container clipping
-  var drop = document.createElement('ul');
-  drop.style.cssText = 'position:fixed;background:#fff;border:1.5px solid #A5E6E9;border-top:none;border-radius:0 0 12px 12px;box-shadow:0 8px 24px rgba(59,184,227,.18);z-index:99999;display:none;margin:0;padding:0;list-style:none;max-height:260px;overflow-y:auto;';
-  document.body.appendChild(drop);
-
-  function reposition(){
-    var r = addr.getBoundingClientRect();
-    drop.style.top = r.bottom + 'px';
-    drop.style.left = r.left + 'px';
-    drop.style.width = r.width + 'px';
-  }
-
-  var timer;
-  addr.addEventListener('input', function(){
-    var q = this.value.trim();
-    clearTimeout(timer);
-    if(q.length < 3){ drop.style.display='none'; return; }
-    timer = setTimeout(function(){
-      fetch('/api/places-autocomplete?input=' + encodeURIComponent(q))
-        .then(function(r){ return r.json(); })
-        .then(function(data){
-          drop.innerHTML = '';
-          if(!data.predictions || !data.predictions.length){ drop.style.display='none'; return; }
-          data.predictions.forEach(function(p){
-            var li = document.createElement('li');
-            li.style.cssText = 'padding:12px 16px;font-size:14px;color:#1a2e38;cursor:pointer;border-bottom:1px solid #eef4f8;list-style:none;font-family:\'Josefin Sans\',sans-serif;font-weight:300;display:flex;align-items:center;gap:10px;';
-            li.innerHTML = '<span style="color:#3BB8E3;font-size:15px;">📍</span><span>' + p.description + '</span>';
-            li.addEventListener('mousedown', function(e){
-              e.preventDefault();
-              addr.value = p.description;
-              drop.style.display = 'none';
-            });
-            li.addEventListener('mouseover', function(){ this.style.background='#eef9fd'; });
-            li.addEventListener('mouseout', function(){ this.style.background=''; });
-            drop.appendChild(li);
-          });
-          reposition();
-          drop.style.display = 'block';
-        })
-        .catch(function(){ drop.style.display='none'; });
-    }, 300);
-  });
-
-  addr.addEventListener('blur', function(){ setTimeout(function(){ drop.style.display='none'; }, 200); });
-  addr.addEventListener('focus', function(){ if(drop.children.length) reposition(); });
-  addr.addEventListener('keydown', function(e){ if(e.key==='Escape') drop.style.display='none'; });
-  window.addEventListener('scroll', reposition, true);
-  window.addEventListener('resize', reposition);
-})();
 
 // === CONDITION SLIDER ===
 var conditionSlider = document.getElementById('condition');
@@ -720,7 +659,7 @@ async function doSubmit(){
     name:document.getElementById('fullName').value.trim(),
     email:document.getElementById('email').value.trim(),
     phone:document.getElementById('phone').value.trim(),
-    address:document.getElementById('address').value.trim(),
+    address:'To be collected at booking',
     beds:document.getElementById('beds').value||null,
     baths:document.getElementById('baths').value||null,
     sqft:document.getElementById('sqft').value||null,

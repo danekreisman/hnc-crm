@@ -1667,7 +1667,7 @@ function _generateUUID(){
   });
 }
 
-function _generateRecurringDates(yr,mo,dy,freq){
+function _generateRecurringDates(yr,mo,dy,freq){ // FIXED: lim -> max
   var dates=[];
   var start=new Date(yr,mo-1,dy);
   // Normalize common aliases

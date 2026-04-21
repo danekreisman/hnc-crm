@@ -401,13 +401,36 @@ body{font-family:'Josefin Sans',sans-serif;color:var(--text);overflow-x:hidden;}
     <!-- Step 2 -->
     <div class="step" id="step2">
       <div class="step-title">Your property</div>
-      <div class="step-sub">Tell us about the home you'd like cleaned.</div>
+      <div class="step-sub">What service do you need, and where?</div>
       <div class="err-banner" id="e2"></div>
+
+      <!-- Service type FIRST -->
+      <div class="field">
+        <label>Service type <span style="color:var(--error)">*</span></label>
+        <div class="svc-grid">
+          <label class="svc-card selected" id="sc-reg"><input type="radio" name="svc" value="Regular Cleaning" checked><div class="svc-icon">🧹</div><div class="svc-name">Regular Clean</div><div class="svc-desc">Recurring maintenance</div></label>
+          <label class="svc-card" id="sc-deep"><input type="radio" name="svc" value="Deep Cleaning"><div class="svc-icon">✨</div><div class="svc-name">Deep Clean</div><div class="svc-desc">Top-to-bottom detail</div></label>
+          <label class="svc-card" id="sc-move"><input type="radio" name="svc" value="Move-out Cleaning"><div class="svc-icon">📦</div><div class="svc-name">Move-out</div><div class="svc-desc">Ready for next tenant</div></label>
+          <label class="svc-card" id="sc-bnb"><input type="radio" name="svc" value="Airbnb Turnover"><div class="svc-icon">🏡</div><div class="svc-name">Airbnb Turnover</div><div class="svc-desc">Between guest stays</div></label>
+          <label class="svc-card full-w" id="sc-jan"><input type="radio" name="svc" value="Janitorial Cleaning"><div class="svc-icon">🏢</div><div class="svc-name">Janitorial</div><div class="svc-desc">Commercial &amp; office spaces</div></label>
+        </div>
+        <div class="ferr" id="fe-svc"></div>
+      </div>
+
+      <!-- Promo banner for Deep / Move-out -->
+      <div class="promo-banner" id="promoBanner">
+        <span>🎉</span>
+        <div><strong>Save 25% on your first deep or move-out clean</strong> when you sign up for a recurring regular cleaning plan. Ask us about it when we reach out!</div>
+      </div>
+
+      <!-- Address -->
       <div class="field">
         <label>Property address <span style="color:var(--error)">*</span></label>
         <input type="text" id="address" placeholder="123 Kailua Rd, Kailua, HI 96734" autocomplete="street-address">
         <div class="ferr" id="fe-address"></div>
       </div>
+
+      <!-- Island -->
       <div class="field">
         <label>Island</label>
         <div class="island-row">
@@ -415,22 +438,25 @@ body{font-family:'Josefin Sans',sans-serif;color:var(--text);overflow-x:hidden;}
           <label class="island-card" id="ic-maui"><input type="radio" name="island" value="Maui"><span class="ic-em">🏄</span><span class="ic-name">Maui</span></label>
         </div>
       </div>
+
+      <!-- Beds / Baths / Sqft — hidden for Janitorial -->
       <div id="res-fields">
-      <div class="frow">
-        <div class="field">
-          <label>Bedrooms</label>
-          <select id="beds"><option value="">Select...</option><option>1 bedroom</option><option value="2">2 bedrooms</option><option value="3">3 bedrooms</option><option value="4">4 bedrooms</option><option value="5">5+ bedrooms</option></select>
+        <div class="frow">
+          <div class="field">
+            <label>Bedrooms</label>
+            <select id="beds"><option value="">Select...</option><option value="1">1 bedroom</option><option value="2">2 bedrooms</option><option value="3">3 bedrooms</option><option value="4">4 bedrooms</option><option value="5">5+ bedrooms</option></select>
+          </div>
+          <div class="field">
+            <label>Bathrooms</label>
+            <select id="baths"><option value="">Select...</option><option value="1">1</option><option value="1.5">1.5</option><option value="2">2</option><option value="2.5">2.5</option><option value="3">3+</option></select>
+          </div>
         </div>
         <div class="field">
-          <label>Bathrooms</label>
-          <select id="baths"><option value="">Select...</option><option value="1">1</option><option value="1.5">1.5</option><option value="2">2</option><option value="2.5">2.5</option><option value="3">3+</option></select>
+          <label>Square footage <span class="opt">(optional)</span></label>
+          <input type="number" id="sqft" placeholder="e.g. 1200">
         </div>
       </div>
-      <div class="field">
-        <label>Square footage <span class="opt">(optional)</span></label>
-        <input type="number" id="sqft" placeholder="e.g. 1200">
-      </div>
-      </div><!-- /res-fields -->
+
       <div class="btn-row">
         <button class="btn-back" onclick="prev(2)">Back</button>
         <button class="btn-next" onclick="next(2)">Continue <svg viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
@@ -439,26 +465,9 @@ body{font-family:'Josefin Sans',sans-serif;color:var(--text);overflow-x:hidden;}
 
     <!-- Step 3 -->
     <div class="step" id="step3">
-      <div class="step-title">What do you need?</div>
-      <div class="step-sub">Choose a service and how often you'd like us.</div>
+      <div class="step-title">Just a few more details</div>
+      <div class="step-sub">How often, and anything we should know?</div>
       <div class="err-banner" id="e3"></div>
-      <div class="field">
-        <label>Service type <span style="color:var(--error)">*</span></label>
-        <div class="svc-grid">
-          <label class="svc-card selected" id="sc-reg"><input type="radio" name="svc" value="Regular Cleaning" checked><div class="svc-icon">🧹</div><div class="svc-name">Regular Clean</div><div class="svc-desc">Recurring maintenance</div></label>
-          <label class="svc-card" id="sc-deep"><input type="radio" name="svc" value="Deep Cleaning"><div class="svc-icon">✨</div><div class="svc-name">Deep Clean</div><div class="svc-desc">Top-to-bottom detail</div></label>
-          <label class="svc-card" id="sc-move"><input type="radio" name="svc" value="Move-out Cleaning"><div class="svc-icon">📦</div><div class="svc-name">Move-out</div><div class="svc-desc">Ready for next tenant</div></label>
-          <label class="svc-card" id="sc-bnb"><input type="radio" name="svc" value="Airbnb Turnover"><div class="svc-icon">🏡</div><div class="svc-name">Airbnb Turnover</div><div class="svc-desc">Between guest stays</div></label>
-          <label class="svc-card full-w" id="sc-jan"><input type="radio" name="svc" value="Janitorial Cleaning"><div class="svc-icon">🏢</div><div class="svc-name">Janitorial</div><div class="svc-desc">Commercial & office spaces</div></label>
-        </div>
-        <div class="ferr" id="fe-svc"></div>
-      </div>
-
-      <!-- Promo banner — shown for Deep or Move-out -->
-      <div class="promo-banner" id="promoBanner">
-        <span>🎉</span>
-        <div><strong>Save 25% on your first deep or move-out clean</strong> when you sign up for a recurring regular cleaning plan. Ask us about it when we reach out!</div>
-      </div>
 
       <!-- Condition slider — shown for Deep or Move-out -->
       <div class="condition-wrap" id="conditionWrap">
@@ -467,6 +476,7 @@ body{font-family:'Josefin Sans',sans-serif;color:var(--text);overflow-x:hidden;}
         <input type="range" class="condition-slider" id="condition" min="1" max="10" value="5">
         <div class="condition-ends"><span>1 — Filthy 😬</span><span>10 — Pristine ✨</span></div>
       </div>
+
       <div class="field">
         <label>Frequency <span style="color:var(--error)">*</span></label>
         <div class="freq-wrap">
@@ -578,15 +588,14 @@ function validate(s){
     return ok;
   }
   if(s===2){
+    if(!document.querySelector('input[name="svc"]:checked')){se('svc','Please select a service type');return false;}
+    ce('svc');
     if(document.getElementById('address').value.trim().length<5){se('address','Please enter your property address');return false;}
     ce('address');return true;
   }
   if(s===3){
-    if(!document.querySelector('input[name="svc"]:checked')){se('svc','Please select a service type');return false;}
-    ce('svc');
     if(!document.querySelector('input[name="freq"]:checked')){se('freq','Please select a frequency');return false;}
-    ce('freq');
-    return true;
+    ce('freq');return true;
   }
   return true;
 }
@@ -666,7 +675,7 @@ conditionSlider.addEventListener('input', function(){
   conditionVal.textContent = this.value;
 });
 
-// === SERVICE CARD LOGIC ===
+// === SERVICE CARD LOGIC (now on step 2) ===
 var isJanitorial = false;
 document.querySelectorAll('input[name="svc"]').forEach(function(r){
   r.addEventListener('change', function(){
@@ -675,35 +684,24 @@ document.querySelectorAll('input[name="svc"]').forEach(function(r){
     ce('svc');
     var val = this.value;
     var needsCondition = (val === 'Deep Cleaning' || val === 'Move-out Cleaning');
-    var needsPromo = needsCondition;
     isJanitorial = (val === 'Janitorial Cleaning');
 
-    // Show/hide condition and promo
-    document.getElementById('conditionWrap').classList.toggle('show', needsCondition);
-    document.getElementById('promoBanner').classList.toggle('show', needsPromo);
+    // Show/hide promo (on step 2 now)
+    document.getElementById('promoBanner').classList.toggle('show', needsCondition);
 
-    // Show/hide res fields on step 2 (via sessionStorage flag)
-    sessionStorage.setItem('hnc_janitorial', isJanitorial ? '1' : '0');
+    // Show/hide res fields (beds/baths/sqft)
     var resFields = document.getElementById('res-fields');
     if(resFields) resFields.style.display = isJanitorial ? 'none' : '';
 
+    // Show/hide condition slider on step 3
+    document.getElementById('conditionWrap').classList.toggle('show', needsCondition);
+
     // Update notes placeholder for janitorial
     var notes = document.getElementById('notes');
-    if(notes){
-      notes.placeholder = isJanitorial
-        ? 'Describe the space and what needs to be done (e.g. office floors, restrooms, trash, frequency…)'
-        : 'Pets, entry instructions, areas to focus on…';
-    }
+    if(notes) notes.placeholder = isJanitorial
+      ? 'Describe the space: floors, restrooms, frequency, any specific areas…'
+      : 'Pets, entry instructions, areas to focus on…';
   });
-});
-
-// Check janitorial flag on step 2 display
-document.addEventListener('DOMContentLoaded', function(){
-  // Restore janitorial state if form was already partly filled
-  if(sessionStorage.getItem('hnc_janitorial') === '1'){
-    var resFields = document.getElementById('res-fields');
-    if(resFields) resFields.style.display = 'none';
-  }
 });
 
 // Interactive cards (island, freq, src)
@@ -767,9 +765,8 @@ function resetForm(){
   document.querySelectorAll('input[type=text],input[type=email],input[type=tel],input[type=number],textarea,select').forEach(function(el){el.value='';});
   document.getElementById('conditionWrap').classList.remove('show');
   document.getElementById('promoBanner').classList.remove('show');
-  var resFields = document.getElementById('res-fields');
-  if(resFields) resFields.style.display = '';
-  sessionStorage.removeItem('hnc_janitorial');
+  var resFields=document.getElementById('res-fields');
+  if(resFields)resFields.style.display='';
   document.getElementById('step'+cur).classList.remove('active');
   document.getElementById('step1').classList.add('active');
   cur=1;updateProg(1);

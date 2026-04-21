@@ -485,7 +485,7 @@ async function submitBooking(){
     });
     var j = await r.json();
     if(!r.ok) throw new Error(j.error||'Something went wrong');
-    renderSuccess();
+    renderSuccess(j);
   } catch(e){
     btn.disabled=false; btn.textContent='Confirm booking request \u2192';
     if(errEl) errEl.innerHTML='<div class="error-banner">'+esc(e.message)+'</div>';
@@ -495,16 +495,16 @@ async function submitBooking(){
 // ─────────────────────────────────────────────────────────────────────────
 // SUCCESS
 // ─────────────────────────────────────────────────────────────────────────
-function renderSuccess(){
+function renderSuccess(result){
   $('steps-bar').style.display='none';
-  var dt     = new Date(SEL_DATE+'T12:00:00');
-  var pretty = dt.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});
+  var rush = RUSH_FEE > 0 ? getRushInfo(SEL_DATE) : null;
   $('app').innerHTML = '<div class="card"><div class="success-screen">'
     +'<div class="success-icon">&#127946;</div>'
-    +'<h2>Request received!</h2>'
-    +'<p>We have got your booking request for <strong>'+pretty+'</strong> at <strong>'+esc(SEL_TIME)+'</strong>.'
-    +(RUSH_FEE?' A '+getRushInfo(SEL_DATE).label.toLowerCase()+' fee of '+fmt(RUSH_FEE)+' applies.':'')
-    +'<br><br>Our team will confirm availability and send you a final confirmation shortly. Questions? Call or text us at <strong>(808) 468-5356</strong>.</p>'
+    +'<h2>You\'re booked!</h2>'
+    +'<p>Your cleaning is confirmed for <strong>'+esc(result.date || SEL_DATE)+'</strong> at <strong>'+esc(result.time || SEL_TIME)+'</strong>.'
+    +(result.assignedCleaner ? ' Your cleaner will be <strong>'+esc(result.assignedCleaner)+'</strong>.' : '')
+    +(rush ? ' A '+rush.label.toLowerCase()+' fee of '+fmt(rush.fee)+' applies.' : '')
+    +'<br><br>A confirmation has been sent to your email. Questions? Call or text <strong>(808) 468-5356</strong>. We look forward to seeing you! &#127946;</p>'
     +'</div></div>';
 }
 </script>

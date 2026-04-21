@@ -6,13 +6,15 @@ const db = () => createClient(
   { auth: { persistSession: false } }
 );
 
+const BASE_URL = 'https://hnc-crm.vercel.app';
+
+// ── GET: validate token → return lead + quote data ────────────────────────
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') { res.status(200).end(); return; }
 
-  // ── GET: validate token, return lead + quote data ─────────────────────
   if (req.method === 'GET') {
     const token = req.query.token;
     if (!token) return res.status(400).json({ error: 'Missing token' });
@@ -20,88 +22,266 @@ export default async function handler(req, res) {
     const supabase = db();
     const { data: lead, error } = await supabase
       .from('leads')
-      .select('id,name,email,service,quote_total,quote_data,notes,booking_token,created_at')
+      .select('id,name,email,phone,address,service,sqft,quote_total,quote_data,notes,booking_token,created_at')
       .eq('booking_token', token)
       .maybeSingle();
 
     if (error || !lead) return res.status(404).json({ error: 'Invalid or expired link' });
 
-    // Tokens expire after 30 days
     const age = (Date.now() - new Date(lead.created_at).getTime()) / (1000 * 60 * 60 * 24);
     if (age > 30) return res.status(410).json({ error: 'This booking link has expired. Please contact us for a new quote.' });
 
-    // Parse frequency from notes
-    const freqMatch   = lead.notes && /Frequency:\s*([^\n]+)/.exec(lead.notes);
-    const islandMatch = lead.notes && /Island:\s*([^\n]+)/.exec(lead.notes);
-    const bedsMatch = lead.notes && /Beds:\s*(\S+)/.exec(lead.notes);
-    const bathsMatch = lead.notes && /Baths:\s*(\S+)/.exec(lead.notes);
+    const parse = (pattern) => {
+      const m = lead.notes && pattern.exec(lead.notes);
+      return m ? m[1].trim() : null;
+    };
 
     return res.status(200).json({
-      name:      lead.name,
-      firstName: lead.name.trim().split(' ')[0],
-      email:     lead.email,
-      service:   lead.service,
-      frequency: freqMatch ? freqMatch[1].trim() : null,
-      island:    islandMatch ? islandMatch[1].trim() : 'Oahu',
-      beds:      bedsMatch ? bedsMatch[1] : null,
-      baths:     bathsMatch ? bathsMatch[1] : null,
+      name:       lead.name,
+      firstName:  lead.name.trim().split(' ')[0],
+      email:      lead.email,
+      phone:      lead.phone,
+      address:    lead.address,
+      service:    lead.service,
+      sqft:       lead.sqft,
+      frequency:  parse(/Frequency:\s*([^\n]+)/),
+      island:     parse(/Island:\s*([^\n]+)/) || 'Oahu',
+      beds:       parse(/Beds:\s*(\S+)/),
+      baths:      parse(/Baths:\s*(\S+)/),
+      condition:  parse(/Condition:\s*(\d+)/),
       quoteTotal: lead.quote_total,
       quoteData:  lead.quote_data,
       leadId:     lead.id,
     });
   }
 
-  // ── POST: submit booking request ──────────────────────────────────────
+  // ── POST: auto-book ────────────────────────────────────────────────────
   if (req.method === 'POST') {
     const { token, date, time, notes, service, rushFee } = req.body;
-    if (!token || !date) return res.status(400).json({ error: 'Missing required fields' });
+    if (!token || !date || !time) return res.status(400).json({ error: 'Missing required fields' });
 
     const supabase = db();
+
+    // 1. Look up lead
     const { data: lead, error: leadErr } = await supabase
       .from('leads')
-      .select('id,name,email,service,quote_total')
+      .select('id,name,email,phone,address,service,sqft,quote_total,quote_data,notes,booking_token')
       .eq('booking_token', token)
       .maybeSingle();
 
     if (leadErr || !lead) return res.status(404).json({ error: 'Invalid token' });
 
-    // Update lead stage to Quoted
-    await supabase.from('leads').update({ stage: 'Quoted' }).eq('id', lead.id);
+    const firstName  = lead.name.trim().split(' ')[0];
+    const phone      = (lead.phone || '').replace(/\D/g, '');
+    const e164       = phone.startsWith('+') ? phone : '+1' + phone;
+    const quoteData  = lead.quote_data || {};
+    const TAX_RATE   = 0.04712;
 
-    // Log booking request as a note on the lead
-    const rushLabel = rushFee === 200 ? 'Same-day (+$200)'
-      : rushFee === 100 ? 'Next-day (+$100)'
-      : rushFee === 50  ? '2-day (+$50)'
-      : null;
-    const requestNote = [
-      `📅 BOOKING REQUEST via portal`,
-      `Date: ${date}`,
-      `Time: ${time || 'Flexible'}`,
-      rushLabel ? `Rush fee: ${rushLabel}` : null,
-      notes ? `Notes: ${notes}` : null,
-    ].filter(Boolean).join('\n');
+    const parse = (pattern) => {
+      const m = lead.notes && pattern.exec(lead.notes);
+      return m ? m[1].trim() : null;
+    };
+    const island    = parse(/Island:\s*([^\n]+)/) || 'Oahu';
+    const frequency = parse(/Frequency:\s*([^\n]+)/);
+    const beds      = parse(/Beds:\s*(\S+)/);
+    const baths     = parse(/Baths:\s*(\S+)/);
 
-    const { data: existing } = await supabase
-      .from('leads').select('notes').eq('id', lead.id).maybeSingle();
-    const updatedNotes = existing?.notes
-      ? existing.notes + '\n\n' + requestNote
-      : requestNote;
+    const preTotal   = quoteData.total != null ? Number(quoteData.total) : (lead.quote_total ? Number(lead.quote_total) : null);
+    const tax        = preTotal != null ? +(preTotal * TAX_RATE).toFixed(2) : null;
+    const totalWithTax = preTotal != null ? +(preTotal + tax + (rushFee || 0)).toFixed(2) : null;
+    const durationHrs  = quoteData.duration_minutes ? quoteData.duration_minutes / 60 : null;
 
-    await supabase.from('leads').update({ notes: updatedNotes }).eq('id', lead.id);
-
-    // Notify via SMS to HNC number
-    const BASE_URL = 'https://hnc-crm.vercel.app';
-    const rushStr = rushFee > 0 ? ` + $${rushFee} rush fee` : '';
-    const adminSms = `📅 New booking request from ${lead.name}!\nService: ${lead.service || service}\nDate: ${date} at ${time || 'flexible'}\nQuote: ${lead.quote_total ? '$'+Number(lead.quote_total).toFixed(2) : 'TBD'}${rushStr}`;
+    // 2. Find or create client
+    let clientId = null;
     try {
+      const { data: existing } = await supabase
+        .from('clients')
+        .select('id')
+        .ilike('email', lead.email.trim())
+        .maybeSingle();
+
+      if (existing) {
+        clientId = existing.id;
+        console.log('[lead-book] found existing client', clientId);
+      } else {
+        const { data: newClient, error: clientErr } = await supabase
+          .from('clients')
+          .insert({
+            name:    lead.name.trim(),
+            email:   lead.email.trim(),
+            phone:   phone || null,
+            address: lead.address || null,
+            status:  'New',
+            source:  'Booking portal',
+          })
+          .select('id')
+          .single();
+
+        if (clientErr) {
+          console.error('[lead-book] create client error:', JSON.stringify(clientErr));
+        } else {
+          clientId = newClient.id;
+          console.log('[lead-book] created new client', clientId);
+        }
+      }
+    } catch (err) {
+      console.error('[lead-book] client find/create error:', err.message);
+    }
+
+    // 3. Find a free cleaner for this island on this date
+    let assignedCleanerId   = null;
+    let assignedCleanerName = null;
+    let assignedCleanerPhone = null;
+    try {
+      const { data: cleaners } = await supabase
+        .from('cleaners')
+        .select('id, name, phone, island')
+        .eq('status', 'Active');
+
+      const islandCleaners = (cleaners || []).filter(c =>
+        !c.island || c.island === island || c.island === 'Both'
+      );
+
+      const { data: bookedThatDay } = await supabase
+        .from('appointments')
+        .select('cleaner_id')
+        .eq('date', date)
+        .not('status', 'in', '("cancelled","deleted","unassigned")');
+
+      const bookedIds = new Set((bookedThatDay || []).map(a => a.cleaner_id));
+      const freeCleaners = islandCleaners.filter(c => !bookedIds.has(c.id));
+
+      if (freeCleaners.length > 0) {
+        assignedCleanerId    = freeCleaners[0].id;
+        assignedCleanerName  = freeCleaners[0].name;
+        assignedCleanerPhone = freeCleaners[0].phone;
+        console.log('[lead-book] assigned cleaner:', assignedCleanerName);
+      } else {
+        console.warn('[lead-book] no free cleaners found — creating unassigned appointment');
+      }
+    } catch (err) {
+      console.error('[lead-book] cleaner assignment error:', err.message);
+    }
+
+    // 4. Create appointment
+    let appointmentId = null;
+    try {
+      const apptPayload = {
+        client_id:      clientId || undefined,
+        service:        lead.service || service || 'Regular Cleaning',
+        frequency:      frequency   || null,
+        date:           date,
+        time:           time,
+        address:        lead.address || null,
+        beds:           beds ? parseFloat(beds) : null,
+        baths:          baths ? parseFloat(baths) : null,
+        sqft:           lead.sqft || null,
+        cleaner_id:     assignedCleanerId || undefined,
+        status:         'scheduled',
+        base_price:     quoteData.subtotal != null ? Number(quoteData.subtotal) : null,
+        discount:       quoteData.discount != null ? Number(quoteData.discount) : 0,
+        tax:            tax,
+        total_price:    totalWithTax,
+        duration_hours: durationHrs,
+        notes:          [
+          'Booked via portal',
+          rushFee > 0 ? `Rush fee: $${rushFee} (${rushFee === 200 ? 'same-day' : rushFee === 100 ? 'next-day' : '2-day'})` : null,
+          notes || null,
+        ].filter(Boolean).join('\n'),
+      };
+
+      const { data: appt, error: apptErr } = await supabase
+        .from('appointments')
+        .insert(apptPayload)
+        .select('id')
+        .single();
+
+      if (apptErr) {
+        console.error('[lead-book] create appointment error:', JSON.stringify(apptErr));
+      } else {
+        appointmentId = appt.id;
+        console.log('[lead-book] appointment created:', appointmentId);
+      }
+    } catch (err) {
+      console.error('[lead-book] appointment insert error:', err.message);
+    }
+
+    // 5. Update lead: stage → Closed won, mark quote sent
+    await supabase
+      .from('leads')
+      .update({ stage: 'Closed won', quote_sent_at: new Date().toISOString() })
+      .eq('id', lead.id);
+
+    // 6. Format date nicely
+    const prettyDate = new Date(date + 'T12:00:00').toLocaleDateString('en-US', {
+      weekday: 'long', month: 'long', day: 'numeric', year: 'numeric'
+    });
+    const rushNote = rushFee > 0
+      ? ` A ${rushFee === 200 ? 'same-day' : rushFee === 100 ? 'next-day' : '2-day'} booking fee of $${rushFee} applies.`
+      : '';
+
+    // 7. Send confirmation email to lead
+    try {
+      await fetch(`${BASE_URL}/api/send-email`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          to:         lead.email.trim(),
+          subject:    `Booking confirmed — ${prettyDate}`,
+          type:       'generic',
+          clientName: firstName,
+          notes: `Your cleaning has been booked for <strong>${prettyDate} at ${time}</strong>. `
+            + `Service: ${lead.service || 'Cleaning'}.${frequency ? ` Frequency: ${frequency}.` : ''}`
+            + (totalWithTax ? ` Total: $${totalWithTax}.` : '')
+            + rushNote
+            + `<br><br>If you need to reschedule or have questions, call or text us at <strong>(808) 468-5356</strong>. We look forward to seeing you! 🌺`,
+        })
+      });
+      console.log('[lead-book] confirmation email sent to', lead.email);
+    } catch (err) {
+      console.error('[lead-book] confirmation email failed:', err.message);
+    }
+
+    // 8. SMS the assigned cleaner
+    if (assignedCleanerPhone) {
+      try {
+        const cleanerPhone = assignedCleanerPhone.replace(/\D/g, '');
+        const cleanerE164  = cleanerPhone.startsWith('+') ? cleanerPhone : '+1' + cleanerPhone;
+        const cleanerSms   = `Hi ${assignedCleanerName.split(' ')[0]}! New job booked for you:\n`
+          + `📅 ${prettyDate} at ${time}\n`
+          + `👤 ${lead.name}\n`
+          + `🏠 ${lead.address || 'Address on file'}\n`
+          + `🧹 ${lead.service || 'Cleaning'}${frequency ? ' · ' + frequency : ''}`;
+        await fetch(`${BASE_URL}/api/send-sms`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ to: cleanerE164, message: cleanerSms })
+        });
+        console.log('[lead-book] cleaner SMS sent to', assignedCleanerName);
+      } catch (err) {
+        console.error('[lead-book] cleaner SMS failed:', err.message);
+      }
+    }
+
+    // 9. SMS admin notification
+    try {
+      const adminSms = `✅ Auto-booked!\n${lead.name} · ${lead.service || 'Cleaning'}\n${prettyDate} at ${time}\nCleaner: ${assignedCleanerName || 'Unassigned'}${totalWithTax ? '\nTotal: $' + totalWithTax : ''}${rushFee > 0 ? ' (incl. $' + rushFee + ' rush fee)' : ''}`;
       await fetch(`${BASE_URL}/api/send-sms`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ to: '+18083484888', message: adminSms }) // Dane's number
+        body: JSON.stringify({ to: '+18083484888', message: adminSms })
       });
-    } catch(e) { console.warn('admin SMS failed', e.message); }
+    } catch (err) {
+      console.error('[lead-book] admin SMS failed:', err.message);
+    }
 
-    return res.status(200).json({ success: true });
+    return res.status(200).json({
+      success: true,
+      appointmentId,
+      assignedCleaner: assignedCleanerName,
+      date: prettyDate,
+      time,
+    });
   }
 
   return res.status(405).json({ error: 'Method not allowed' });

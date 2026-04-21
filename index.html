@@ -1677,7 +1677,7 @@ function _generateRecurringDates(yr,mo,dy,freq){
   var d=new Date(start);
   if(freq==='Every Day'||freq==='Weekly'||freq==='Biweekly'||freq==='Every 3 weeks'||freq==='Monthly'){
     var step=freq==='Every Day'?1:freq==='Weekly'?7:freq==='Biweekly'?14:freq==='Every 3 weeks'?21:28;
-    var d=new Date(start);for(var i=0;i<lim;i++){dates.push(new Date(d));d.setDate(d.getDate()+step);}
+    var d=new Date(start);for(var i=0;i<max;i++){dates.push(new Date(d));d.setDate(d.getDate()+step);}
   }
   return dates;
 }

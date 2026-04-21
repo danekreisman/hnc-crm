@@ -2945,13 +2945,14 @@ async function saveApptEdit(mode){
     console.log('[saveApptEdit] recurringAppts updated: '+rUpdated+' entries');
   }
 
-  // === Tail regeneration (works in both 'single' and 'all' modes) ===
+  // === Tail regeneration (only in 'all' mode) ===
   // If the user set a recurring frequency, forward-generate missing future occurrences
   // for this client starting from the edited appointment's date. Protects paid rows
   // and avoids duplicates by checking for existing bookings per client/date.
+  // NOTE: In 'single' mode, series is broken and no tail regeneration occurs.
   try{
     var _isRecurFreq = (freq && freq!=='One-time');
-    if(_isRecurFreq){
+    if(_isRecurFreq && mode==='all'){
       var _kp = (currentApptKey||'').split('-');
       if(_kp.length===3){
         var _yr = parseInt(_kp[0],10), _mo = parseInt(_kp[1],10), _dy = parseInt(_kp[2],10);

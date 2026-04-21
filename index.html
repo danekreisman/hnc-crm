@@ -1359,8 +1359,10 @@ Mahalo 🌺</textarea>
         </div>
         <div class="panel-section">Opportunity</div>
         <div class="info-block">
-          <div class="info-row"><span class="info-label">Est. value</span><span class="info-val" id="lead-value" style="color:var(--brand-500);font-size:14px;">—</span></div>
+          <div class="info-row"><span class="info-label">Quoted price</span><span class="info-val" id="lead-value" style="color:var(--brand-500);font-size:14px;font-weight:600;">—</span></div>
           <div class="info-row"><span class="info-label">Service type</span><span class="info-val" id="lead-service">—</span></div>
+          <div class="info-row"><span class="info-label">Frequency</span><span class="info-val" id="lead-frequency">—</span></div>
+          <div class="info-row"><span class="info-label">Beds / Baths</span><span class="info-val" id="lead-bedbath">—</span></div>
           <div class="info-row"><span class="info-label">Property size</span><span class="info-val" id="lead-sqft">—</span></div>
           <div class="info-row"><span class="info-label">Lead source</span><span class="info-val" id="lead-source">—</span></div>
           <div class="info-row"><span class="info-label">Inquiry date</span><span class="info-val" id="lead-date">—</span></div>
@@ -3594,9 +3596,18 @@ function openLead(id){
   var sb=document.getElementById('lead-stage-badge');sb.textContent=d.stage;
   var stageColors={'New inquiry':'background:#ebf5ff;color:#2b6cb0;','Quoted':'background:#fffbeb;color:#b7791f;','Follow-up':'background:#fff5f5;color:#c53030;','Closed won':'background:var(--brand-50);color:#276749;','Closed lost':'background:var(--bg-soft);color:var(--text-muted);'};
   sb.style.cssText=stageColors[d.stage]||'';
-  ['contact','phone','email','address','value','service','sqft','source','date','action','due','assigned','notes'].forEach(function(f){
+  ['contact','phone','email','address','service','sqft','source','date','action','due','assigned','notes'].forEach(function(f){
     var el=document.getElementById('lead-'+f);if(el)el.textContent=d[f]||'—';
   });
+  // Quoted price
+  var valEl=document.getElementById('lead-value');
+  if(valEl) valEl.textContent = d.quoteTotal ? '$'+Number(d.quoteTotal).toFixed(2) : (d.value&&d.value!=='TBD'?d.value:'No quote yet');
+  // Frequency
+  var freqEl=document.getElementById('lead-frequency');
+  if(freqEl) freqEl.textContent = d.frequency||'—';
+  // Beds / Baths
+  var bbEl=document.getElementById('lead-bedbath');
+  if(bbEl) bbEl.textContent = (d.beds||d.baths) ? (d.beds||'—')+' bed / '+(d.baths||'—')+' bath' : '—';
   document.getElementById('quote-price') && (document.getElementById('quote-price').value = d.value||'');
   document.getElementById('quote-success') && document.getElementById('quote-success').classList.remove('show');
   hideLeadEdit();

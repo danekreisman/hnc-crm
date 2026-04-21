@@ -310,29 +310,30 @@ module.exports = async (req, res) => {
 
     const sourceId = sourceData?.id || null;
 
-    // Create lead record
+    // Create lead record — columns match actual leads table schema
+    const noteParts = [
+      leadData.notes || null,
+      leadData.frequency ? `Frequency: ${leadData.frequency}` : null,
+      leadData.island ? `Island: ${leadData.island}` : null,
+      leadData.beds ? `Beds: ${leadData.beds}` : null,
+      leadData.baths ? `Baths: ${leadData.baths}` : null,
+      leadData.condition ? `Condition: ${leadData.condition}/10` : null,
+    ].filter(Boolean);
+
     const { data: newLead, error: leadError } = await db
       .from('leads')
       .insert([{
         name: leadData.name,
+        contact_name: leadData.name,
         email: leadData.email,
         phone: leadData.phone.replace(/\D/g, ''),
         address: leadData.address,
-        beds: leadData.beds ? parseInt(leadData.beds) : null,
-        baths: leadData.baths ? parseFloat(leadData.baths) : null,
-        stage: 'New inquiry',
+        service: leadData.serviceType || null,
+        sqft: leadData.sqft ? parseInt(leadData.sqft) : null,
         source: leadData.referralSource || 'Website form',
-        source_id: sourceId,
-        property_details: leadData.serviceType,
-        frequency: leadData.frequency,
-        notes: leadData.notes || null,
-        custom_fields: {
-          serviceType: leadData.serviceType,
-          island: leadData.island || 'Oahu',
-          referralSource: leadData.referralSource || null,
-          source_name: 'website_form',
-          submittedAt: leadData.submittedAt
-        }
+        stage: 'New inquiry',
+        assigned_to: 'VA',
+        notes: noteParts.length ? noteParts.join('\n') : null
       }])
       .select();
 

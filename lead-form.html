@@ -1,604 +1,433 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Hawaii Natural Clean — Get a Quote</title>
-  <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
-
-    :root {
-      --primary: #2d5a3d; /* Deep forest green */
-      --accent: #d4a574; /* Warm sand */
-      --accent-light: #f5e6d3; /* Light sand */
-      --text-dark: #1a1a1a;
-      --text-light: #666;
-      --border: #e0d5c7;
-      --success: #4a9d6f;
-      --error: #c84630;
-      --bg-light: #fefdfb;
-    }
-
-    body {
-      font-family: 'Segoe UI', 'Trebuchet MS', sans-serif;
-      color: var(--text-dark);
-      background: linear-gradient(135deg, var(--bg-light) 0%, #f9f5f0 100%);
-      padding: 20px;
-      min-height: 100vh;
-    }
-
-    .form-container {
-      max-width: 500px;
-      margin: 0 auto;
-      background: white;
-      border-radius: 12px;
-      box-shadow: 0 8px 24px rgba(45, 90, 61, 0.08);
-      overflow: hidden;
-    }
-
-    .form-header {
-      background: linear-gradient(135deg, var(--primary) 0%, #3d6e4d 100%);
-      color: white;
-      padding: 40px 30px;
-      text-align: center;
-    }
-
-    .form-header h1 {
-      font-size: 28px;
-      font-weight: 600;
-      margin-bottom: 8px;
-      letter-spacing: -0.5px;
-    }
-
-    .form-header p {
-      font-size: 14px;
-      opacity: 0.95;
-      font-weight: 300;
-    }
-
-    .form-body {
-      padding: 40px 30px;
-    }
-
-    .form-group {
-      margin-bottom: 24px;
-    }
-
-    .form-group:last-of-type {
-      margin-bottom: 0;
-    }
-
-    label {
-      display: block;
-      font-size: 13px;
-      font-weight: 600;
-      color: var(--text-dark);
-      margin-bottom: 8px;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-    }
-
-    .required {
-      color: var(--error);
-    }
-
-    input[type="text"],
-    input[type="email"],
-    input[type="tel"],
-    input[type="date"],
-    select,
-    textarea {
-      width: 100%;
-      padding: 12px 14px;
-      border: 1.5px solid var(--border);
-      border-radius: 8px;
-      font-size: 14px;
-      font-family: inherit;
-      background: white;
-      color: var(--text-dark);
-      transition: all 0.2s ease;
-    }
-
-    input[type="text"]:focus,
-    input[type="email"]:focus,
-    input[type="tel"]:focus,
-    input[type="date"]:focus,
-    select:focus,
-    textarea:focus {
-      outline: none;
-      border-color: var(--primary);
-      box-shadow: 0 0 0 3px rgba(45, 90, 61, 0.1);
-      background: #fafaf8;
-    }
-
-    textarea {
-      resize: vertical;
-      min-height: 100px;
-      font-family: inherit;
-    }
-
-    .checkbox-group {
-      display: flex;
-      gap: 16px;
-      margin-top: 10px;
-      flex-wrap: wrap;
-    }
-
-    .checkbox-item {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      flex: 1;
-      min-width: 140px;
-    }
-
-    .checkbox-item input[type="checkbox"] {
-      width: 18px;
-      height: 18px;
-      cursor: pointer;
-      accent-color: var(--primary);
-    }
-
-    .checkbox-item label {
-      margin: 0;
-      font-weight: 400;
-      text-transform: none;
-      letter-spacing: normal;
-      font-size: 13px;
-      cursor: pointer;
-      flex: 1;
-    }
-
-    .form-row {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 16px;
-    }
-
-    .form-row.full {
-      grid-template-columns: 1fr;
-    }
-
-    .submit-btn {
-      width: 100%;
-      padding: 14px 24px;
-      background: linear-gradient(135deg, var(--primary) 0%, #3d6e4d 100%);
-      color: white;
-      border: none;
-      border-radius: 8px;
-      font-size: 14px;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      cursor: pointer;
-      transition: all 0.3s ease;
-      margin-top: 10px;
-    }
-
-    .submit-btn:hover:not(:disabled) {
-      transform: translateY(-2px);
-      box-shadow: 0 8px 20px rgba(45, 90, 61, 0.25);
-    }
-
-    .submit-btn:active:not(:disabled) {
-      transform: translateY(0);
-    }
-
-    .submit-btn:disabled {
-      opacity: 0.6;
-      cursor: not-allowed;
-    }
-
-    .form-message {
-      padding: 14px;
-      border-radius: 8px;
-      font-size: 13px;
-      margin-bottom: 20px;
-      display: none;
-      animation: slideIn 0.3s ease;
-    }
-
-    .form-message.show {
-      display: block;
-    }
-
-    .form-message.success {
-      background: #e8f5e9;
-      color: #2e7d32;
-      border: 1.5px solid #c8e6c9;
-    }
-
-    .form-message.error {
-      background: #ffebee;
-      color: #c62828;
-      border: 1.5px solid #ffcdd2;
-    }
-
-    .field-error {
-      color: var(--error);
-      font-size: 12px;
-      margin-top: 4px;
-      display: none;
-    }
-
-    .field-error.show {
-      display: block;
-    }
-
-    input.error,
-    textarea.error,
-    select.error {
-      border-color: var(--error);
-      background: #fff5f5;
-    }
-
-    .info-banner {
-      background: linear-gradient(135deg, var(--accent-light) 0%, #f8ede3 100%);
-      padding: 12px 14px;
-      border-radius: 8px;
-      font-size: 12px;
-      color: #5d4a3a;
-      margin-bottom: 20px;
-      border-left: 3px solid var(--accent);
-    }
-
-    @keyframes slideIn {
-      from {
-        opacity: 0;
-        transform: translateY(-10px);
-      }
-      to {
-        opacity: 1;
-        transform: translateY(0);
-      }
-    }
-
-    .loading-spinner {
-      display: inline-block;
-      width: 16px;
-      height: 16px;
-      border: 2px solid rgba(255, 255, 255, 0.3);
-      border-top-color: white;
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-      margin-right: 8px;
-    }
-
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
-
-    .form-footer {
-      padding: 20px 30px;
-      background: #f9f7f4;
-      border-top: 1px solid var(--border);
-      font-size: 12px;
-      color: var(--text-light);
-      text-align: center;
-    }
-
-    @media (max-width: 600px) {
-      .form-container {
-        border-radius: 0;
-      }
-
-      .form-header {
-        padding: 30px 20px;
-      }
-
-      .form-header h1 {
-        font-size: 24px;
-      }
-
-      .form-body {
-        padding: 30px 20px;
-      }
-
-      .form-row {
-        grid-template-columns: 1fr;
-        gap: 12px;
-      }
-    }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hawaii Natural Clean — Get a Free Quote</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+:root{
+  --green:#1a3d2b;--green-mid:#2d5a3d;--green-light:#e8f0eb;
+  --gold:#c9a96e;--gold-light:#f5ead8;
+  --cream:#faf8f3;--cream-dark:#f0ece2;
+  --text:#1c1c1c;--text-muted:#6b6b6b;--border:#ddd8ce;
+  --white:#ffffff;--error:#c0392b;
+}
+html,body{min-height:100vh;background:var(--cream);}
+body{font-family:'DM Sans',sans-serif;color:var(--text);overflow-x:hidden;}
+body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellipse 80% 60% at 0% 0%,rgba(26,61,43,.07) 0%,transparent 60%),radial-gradient(ellipse 60% 80% at 100% 100%,rgba(201,169,110,.08) 0%,transparent 60%);pointer-events:none;z-index:0;}
+.page{min-height:100vh;display:grid;grid-template-columns:1fr 440px;position:relative;z-index:1;}
+.left-panel{background:var(--green);padding:60px 56px;display:flex;flex-direction:column;position:relative;overflow:hidden;}
+.left-panel::before{content:'';position:absolute;top:-120px;right:-80px;width:400px;height:400px;border-radius:50%;background:rgba(255,255,255,.04);}
+.left-panel::after{content:'';position:absolute;bottom:-100px;left:-60px;width:320px;height:320px;border-radius:50%;background:rgba(201,169,110,.1);}
+.logo{display:flex;align-items:center;gap:12px;margin-bottom:60px;}
+.logo-mark{width:42px;height:42px;border-radius:10px;background:var(--gold);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.logo-mark svg{width:22px;height:22px;}
+.logo-name{font-family:'Playfair Display',serif;font-size:18px;color:white;line-height:1.2;}
+.logo-sub{font-size:11px;color:rgba(255,255,255,.5);font-weight:300;letter-spacing:.05em;}
+.tagline{font-family:'Playfair Display',serif;font-size:38px;line-height:1.25;color:white;margin-bottom:16px;font-weight:400;}
+.tagline em{color:var(--gold);font-style:normal;}
+.tagline-sub{font-size:15px;color:rgba(255,255,255,.65);font-weight:300;line-height:1.7;margin-bottom:48px;max-width:340px;}
+.features{display:flex;flex-direction:column;gap:20px;margin-bottom:auto;}
+.feature{display:flex;align-items:flex-start;gap:14px;}
+.feature-icon{width:36px;height:36px;border-radius:8px;background:rgba(255,255,255,.08);display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;}
+.feature-icon svg{width:16px;height:16px;color:var(--gold);}
+.feature-text strong{display:block;font-size:14px;color:white;font-weight:500;margin-bottom:2px;}
+.feature-text span{font-size:13px;color:rgba(255,255,255,.55);font-weight:300;}
+.trust{margin-top:48px;padding-top:32px;border-top:1px solid rgba(255,255,255,.1);}
+.stars{display:flex;gap:3px;margin-bottom:8px;}
+.star{color:var(--gold);font-size:16px;}
+.trust-text{font-size:13px;color:rgba(255,255,255,.6);font-weight:300;}
+.trust-text strong{color:white;font-weight:500;}
+.right-panel{background:var(--white);display:flex;flex-direction:column;min-height:100vh;box-shadow:-20px 0 60px rgba(0,0,0,.06);}
+.form-top{padding:40px 44px 0;}
+.progress-steps{display:flex;align-items:center;margin-bottom:12px;}
+.ps{display:flex;align-items:center;flex:1;}
+.ps-dot{width:28px;height:28px;border-radius:50%;border:2px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:500;color:var(--text-muted);transition:all .3s;flex-shrink:0;background:white;}
+.ps-dot.active{border-color:var(--green);background:var(--green);color:white;}
+.ps-dot.done{border-color:var(--green);background:var(--green);color:white;}
+.ps-line{flex:1;height:2px;background:var(--border);margin:0 6px;transition:background .3s;}
+.ps-line.done{background:var(--green);}
+.progress-bar{height:3px;background:var(--cream-dark);border-radius:2px;overflow:hidden;}
+.progress-fill{height:100%;background:var(--green);border-radius:2px;transition:width .4s cubic-bezier(.4,0,.2,1);}
+.step-label{font-size:12px;color:var(--text-muted);margin-top:8px;}
+.step-label strong{color:var(--text);font-weight:500;}
+.steps-wrap{flex:1;position:relative;overflow:hidden;}
+.step{position:absolute;inset:0;padding:8px 44px 44px;overflow-y:auto;opacity:0;pointer-events:none;transform:translateX(40px);transition:opacity .3s ease,transform .3s cubic-bezier(.4,0,.2,1);}
+.step.active{opacity:1;pointer-events:all;transform:translateX(0);position:relative;}
+.step h2{font-family:'Playfair Display',serif;font-size:24px;font-weight:400;margin-bottom:6px;margin-top:8px;}
+.step p.sub{font-size:14px;color:var(--text-muted);margin-bottom:28px;font-weight:300;}
+.field{margin-bottom:20px;}
+.field label{display:block;font-size:12px;font-weight:500;letter-spacing:.04em;text-transform:uppercase;color:var(--text-muted);margin-bottom:7px;}
+.field input,.field select,.field textarea{width:100%;padding:13px 15px;border:1.5px solid var(--border);border-radius:10px;font-size:15px;font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--text);transition:border-color .2s,background .2s,box-shadow .2s;-webkit-appearance:none;appearance:none;}
+.field select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%236b6b6b' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 14px center;}
+.field input:focus,.field select:focus,.field textarea:focus{outline:none;border-color:var(--green);background:white;box-shadow:0 0 0 3px rgba(26,61,43,.08);}
+.field input.err,.field select.err{border-color:var(--error);}
+.field-err{font-size:12px;color:var(--error);margin-top:4px;display:none;}
+.field-err.show{display:block;}
+.field textarea{resize:vertical;min-height:90px;line-height:1.5;}
+.field-row{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+.island-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px;}
+.island-card{border:1.5px solid var(--border);border-radius:10px;padding:14px 16px;cursor:pointer;transition:all .2s;display:flex;align-items:center;gap:10px;background:var(--cream);}
+.island-card:hover{border-color:var(--green-mid);background:white;}
+.island-card.selected{border-color:var(--green);background:var(--green-light);}
+.island-card input{display:none;}
+.island-icon{font-size:20px;}
+.island-name{font-size:14px;font-weight:500;}
+.service-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px;}
+.service-card{border:1.5px solid var(--border);border-radius:12px;padding:16px 14px;cursor:pointer;transition:all .2s;background:var(--cream);text-align:center;}
+.service-card:hover{border-color:var(--green-mid);background:white;transform:translateY(-1px);}
+.service-card.selected{border-color:var(--green);background:var(--green-light);}
+.service-card input{display:none;}
+.service-icon{font-size:24px;margin-bottom:6px;}
+.service-name{font-size:13px;font-weight:500;color:var(--text);margin-bottom:3px;}
+.service-desc{font-size:11px;color:var(--text-muted);font-weight:300;}
+.freq-row{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:20px;}
+.freq-pill{border:1.5px solid var(--border);border-radius:40px;padding:9px 18px;cursor:pointer;font-size:13px;font-weight:400;transition:all .2s;background:var(--cream);color:var(--text);}
+.freq-pill:hover{border-color:var(--green-mid);background:white;}
+.freq-pill.selected{border-color:var(--green);background:var(--green);color:white;}
+.freq-pill input{display:none;}
+.btn-row{display:flex;gap:10px;margin-top:8px;}
+.btn-back{padding:14px 22px;border:1.5px solid var(--border);border-radius:10px;background:transparent;color:var(--text-muted);font-size:14px;font-family:'DM Sans',sans-serif;cursor:pointer;transition:all .2s;font-weight:400;}
+.btn-back:hover{border-color:var(--text-muted);color:var(--text);}
+.btn-next{flex:1;padding:14px 24px;border:none;border-radius:10px;background:var(--green);color:white;font-size:15px;font-family:'DM Sans',sans-serif;cursor:pointer;transition:all .2s;font-weight:500;display:flex;align-items:center;justify-content:center;gap:8px;}
+.btn-next:hover{background:var(--green-mid);}
+.btn-next:active{transform:scale(.98);}
+.btn-next:disabled{opacity:.6;cursor:not-allowed;transform:none;}
+.btn-next svg{width:16px;height:16px;transition:transform .2s;}
+.btn-next:hover:not(:disabled) svg{transform:translateX(3px);}
+.success-view{display:none;flex-direction:column;align-items:center;justify-content:center;padding:60px 44px;text-align:center;min-height:100vh;}
+.success-view.show{display:flex;}
+.success-ring{width:80px;height:80px;border-radius:50%;background:var(--green-light);display:flex;align-items:center;justify-content:center;margin-bottom:24px;animation:popIn .5s cubic-bezier(.34,1.56,.64,1);}
+.success-ring svg{width:36px;height:36px;color:var(--green);}
+@keyframes popIn{from{transform:scale(0);opacity:0}to{transform:scale(1);opacity:1}}
+.success-view h2{font-family:'Playfair Display',serif;font-size:28px;margin-bottom:10px;font-weight:400;}
+.success-view p{font-size:15px;color:var(--text-muted);max-width:280px;line-height:1.7;font-weight:300;}
+.success-meta{margin-top:28px;padding:20px 24px;background:var(--cream);border-radius:12px;text-align:left;width:100%;max-width:300px;}
+.success-meta-row{display:flex;justify-content:space-between;align-items:center;padding:6px 0;}
+.success-meta-row:not(:last-child){border-bottom:1px solid var(--border);}
+.sm-label{font-size:12px;color:var(--text-muted);}
+.sm-val{font-size:13px;font-weight:500;}
+.another-link{margin-top:20px;font-size:13px;color:var(--green);cursor:pointer;font-weight:500;}
+.another-link:hover{text-decoration:underline;}
+.spinner{width:18px;height:18px;border:2px solid rgba(255,255,255,.3);border-top-color:white;border-radius:50%;animation:spin .7s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg)}}
+.err-banner{background:#fff5f5;border:1px solid #f5c6c6;border-radius:10px;padding:12px 16px;font-size:13px;color:var(--error);margin-bottom:16px;display:none;}
+.err-banner.show{display:block;}
+.opt-note{font-size:12px;color:var(--text-muted);font-weight:300;text-transform:none;letter-spacing:0;margin-left:4px;}
+@media(max-width:900px){
+  .page{grid-template-columns:1fr;grid-template-rows:auto 1fr;}
+  .left-panel{padding:32px 24px 24px;min-height:auto;}
+  .tagline{font-size:26px;}
+  .features,.trust{display:none;}
+  .right-panel{min-height:auto;box-shadow:none;}
+  .form-top,.step{padding-left:24px;padding-right:24px;}
+  .step{padding-bottom:32px;}
+}
+@media(max-width:480px){
+  .field-row,.island-row{grid-template-columns:1fr;}
+}
+</style>
 </head>
 <body>
-  <div class="form-container">
-    <div class="form-header">
-      <h1>Get a Free Quote</h1>
-      <p>Professional cleaning for Oahu & Maui</p>
+<div class="page">
+
+<div class="left-panel">
+  <div class="logo">
+    <div class="logo-mark">
+      <svg viewBox="0 0 22 22" fill="none"><path d="M11 2C11 2 4 6 4 12a7 7 0 0014 0c0-6-7-10-7-10z" fill="white" opacity=".9"/><path d="M11 8v8M8 13l3 3 3-3" stroke="rgba(26,61,43,.6)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
     </div>
+    <div>
+      <div class="logo-name">Hawaii Natural Clean</div>
+      <div class="logo-sub">Oahu &amp; Maui</div>
+    </div>
+  </div>
+  <div class="tagline">A cleaner home,<br><em>guaranteed.</em></div>
+  <div class="tagline-sub">Get your free quote in under 2 minutes. No commitment, no pressure — just honest local cleaning.</div>
+  <div class="features">
+    <div class="feature">
+      <div class="feature-icon"><svg viewBox="0 0 16 16" fill="none"><path d="M2 8l4 4 8-8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+      <div class="feature-text"><strong>Response within 24 hours</strong><span>We'll reach out fast with your quote</span></div>
+    </div>
+    <div class="feature">
+      <div class="feature-icon"><svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.5"/><path d="M8 5v3l2 2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></div>
+      <div class="feature-text"><strong>Flexible scheduling</strong><span>Weekly, biweekly, monthly, or one-time</span></div>
+    </div>
+    <div class="feature">
+      <div class="feature-icon"><svg viewBox="0 0 16 16" fill="none"><path d="M8 1l1.8 3.6 4 .6-2.9 2.8.7 4-3.6-1.9-3.6 1.9.7-4L2.2 5.2l4-.6z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></div>
+      <div class="feature-text"><strong>Satisfaction guaranteed</strong><span>If it's not right, we'll come back and fix it</span></div>
+    </div>
+    <div class="feature">
+      <div class="feature-icon"><svg viewBox="0 0 16 16" fill="none"><rect x="2" y="6" width="12" height="8" rx="1.5" stroke="currentColor" stroke-width="1.5"/><path d="M5 6V4.5a3 3 0 016 0V6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></div>
+      <div class="feature-text"><strong>Insured &amp; background-checked</strong><span>Every cleaner is vetted and protected</span></div>
+    </div>
+  </div>
+  <div class="trust">
+    <div class="stars"><span class="star">★</span><span class="star">★</span><span class="star">★</span><span class="star">★</span><span class="star">★</span></div>
+    <div class="trust-text"><strong>4.9 out of 5</strong> from 100+ Hawaii homeowners</div>
+  </div>
+</div>
 
-    <form id="leadForm" class="form-body">
-      <div class="form-message" id="formMessage"></div>
-
-      <div class="info-banner">
-        💬 We'll respond within 24 hours. Your information is secure and never shared.
+<div class="right-panel" id="formPanel">
+  <div class="form-top" id="formTop">
+    <div style="padding-bottom:0">
+      <div class="progress-steps">
+        <div class="ps"><div class="ps-dot active" id="dot1">1</div></div>
+        <div class="ps-line" id="line1"></div>
+        <div class="ps"><div class="ps-dot" id="dot2">2</div></div>
+        <div class="ps-line" id="line2"></div>
+        <div class="ps"><div class="ps-dot" id="dot3">3</div></div>
       </div>
-
-      <!-- Name -->
-      <div class="form-group">
-        <label for="fullName">Your Name <span class="required">*</span></label>
-        <input
-          type="text"
-          id="fullName"
-          name="fullName"
-          placeholder="John Doe"
-          required
-        >
-        <div class="field-error" id="error-fullName"></div>
-      </div>
-
-      <!-- Contact Info -->
-      <div class="form-row">
-        <div class="form-group">
-          <label for="email">Email <span class="required">*</span></label>
-          <input
-            type="email"
-            id="email"
-            name="email"
-            placeholder="you@example.com"
-            required
-          >
-          <div class="field-error" id="error-email"></div>
-        </div>
-        <div class="form-group">
-          <label for="phone">Phone <span class="required">*</span></label>
-          <input
-            type="tel"
-            id="phone"
-            name="phone"
-            placeholder="(808) 555-0000"
-            required
-          >
-          <div class="field-error" id="error-phone"></div>
-        </div>
-      </div>
-
-      <!-- Property Address -->
-      <div class="form-group">
-        <label for="address">Property Address <span class="required">*</span></label>
-        <input
-          type="text"
-          id="address"
-          name="address"
-          placeholder="123 Main St, Honolulu, HI 96815"
-          required
-        >
-        <div class="field-error" id="error-address"></div>
-      </div>
-
-      <!-- Property Details -->
-      <div class="form-row">
-        <div class="form-group">
-          <label for="beds">Bedrooms</label>
-          <select id="beds" name="beds">
-            <option value="">Select...</option>
-            <option value="1">1</option>
-            <option value="2">2</option>
-            <option value="3">3</option>
-            <option value="4">4</option>
-            <option value="5">5+</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label for="baths">Bathrooms</label>
-          <select id="baths" name="baths">
-            <option value="">Select...</option>
-            <option value="1">1</option>
-            <option value="1.5">1.5</option>
-            <option value="2">2</option>
-            <option value="2.5">2.5</option>
-            <option value="3">3+</option>
-          </select>
-        </div>
-      </div>
-
-      <!-- Service Type -->
-      <div class="form-group">
-        <label>Service Type <span class="required">*</span></label>
-        <div class="checkbox-group">
-          <div class="checkbox-item">
-            <input
-              type="checkbox"
-              id="regular"
-              name="serviceType"
-              value="Regular Cleaning"
-            >
-            <label for="regular">Regular</label>
-          </div>
-          <div class="checkbox-item">
-            <input
-              type="checkbox"
-              id="deep"
-              name="serviceType"
-              value="Deep Cleaning"
-            >
-            <label for="deep">Deep</label>
-          </div>
-          <div class="checkbox-item">
-            <input
-              type="checkbox"
-              id="moveout"
-              name="serviceType"
-              value="Move-out Cleaning"
-            >
-            <label for="moveout">Move-out</label>
-          </div>
-        </div>
-        <div class="field-error" id="error-serviceType"></div>
-      </div>
-
-      <!-- Frequency -->
-      <div class="form-group">
-        <label for="frequency">How often would you like cleaning? <span class="required">*</span></label>
-        <select id="frequency" name="frequency" required>
-          <option value="">Select frequency...</option>
-          <option value="Weekly">Weekly</option>
-          <option value="Biweekly">Every 2 weeks</option>
-          <option value="Monthly">Monthly</option>
-          <option value="One-time">One-time</option>
-          <option value="Other">Other (explain below)</option>
-        </select>
-        <div class="field-error" id="error-frequency"></div>
-      </div>
-
-      <!-- Additional Notes -->
-      <div class="form-group">
-        <label for="notes">Anything else we should know?</label>
-        <textarea
-          id="notes"
-          name="notes"
-          placeholder="E.g., pet allergies, specific areas needing attention, etc."
-        ></textarea>
-      </div>
-
-      <!-- Submit -->
-      <button type="submit" class="submit-btn" id="submitBtn">
-        Get Your Free Quote
-      </button>
-    </form>
-
-    <div class="form-footer">
-      <p>© Hawaii Natural Clean • Honest, thorough, local.</p>
+      <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:33%"></div></div>
+      <div class="step-label" id="stepLabel"><strong>Step 1 of 3</strong> — Contact info</div>
     </div>
   </div>
 
-  <script>
-    const form = document.getElementById('leadForm');
-    const submitBtn = document.getElementById('submitBtn');
-    const formMessage = document.getElementById('formMessage');
+  <div class="steps-wrap" id="stepsWrap">
 
-    // Form validation
-    const validators = {
-      fullName: (value) => value.trim().length >= 2 ? null : 'Name must be at least 2 characters',
-      email: (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value) ? null : 'Invalid email address',
-      phone: (value) => /^\d{10,}|^\([0-9]{3}\)\s?[0-9]{3}-?[0-9]{4}/.test(value.replace(/\D/g, '')) ? null : 'Invalid phone number',
-      address: (value) => value.trim().length >= 5 ? null : 'Please enter a valid address',
-      serviceType: (value) => {
-        const checkedServices = Array.from(document.querySelectorAll('input[name="serviceType"]:checked'));
-        return checkedServices.length > 0 ? null : 'Please select at least one service type';
-      },
-      frequency: (value) => value ? null : 'Please select a frequency'
-    };
+    <div class="step active" id="step1">
+      <h2>Let's get started</h2>
+      <p class="sub">How should we reach you?</p>
+      <div class="err-banner" id="err1"></div>
+      <div class="field">
+        <label>Full name <span style="color:var(--error)">*</span></label>
+        <input type="text" id="fullName" placeholder="Jane Smith" autocomplete="name">
+        <div class="field-err" id="fe-fullName"></div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label>Email <span style="color:var(--error)">*</span></label>
+          <input type="email" id="email" placeholder="jane@email.com" autocomplete="email">
+          <div class="field-err" id="fe-email"></div>
+        </div>
+        <div class="field">
+          <label>Phone <span style="color:var(--error)">*</span></label>
+          <input type="tel" id="phone" placeholder="(808) 555-0000" autocomplete="tel">
+          <div class="field-err" id="fe-phone"></div>
+        </div>
+      </div>
+      <div class="btn-row">
+        <button class="btn-next" onclick="nextStep(1)">Continue <svg viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+      </div>
+    </div>
 
-    function validateField(fieldName) {
-      const field = document.getElementById(fieldName);
-      const errorEl = document.getElementById(`error-${fieldName}`);
-      const value = fieldName === 'serviceType' 
-        ? Array.from(document.querySelectorAll('input[name="serviceType"]:checked')).map(el => el.value).join(', ')
-        : field.value;
+    <div class="step" id="step2">
+      <h2>Your property</h2>
+      <p class="sub">Where would you like us to clean?</p>
+      <div class="err-banner" id="err2"></div>
+      <div class="field">
+        <label>Property address <span style="color:var(--error)">*</span></label>
+        <input type="text" id="address" placeholder="123 Kailua Rd, Kailua, HI 96734" autocomplete="street-address">
+        <div class="field-err" id="fe-address"></div>
+      </div>
+      <div class="field">
+        <label>Island</label>
+        <div class="island-row">
+          <label class="island-card selected" id="island-oahu"><input type="radio" name="island" value="Oahu" checked><span class="island-icon">🌺</span><span class="island-name">Oahu</span></label>
+          <label class="island-card" id="island-maui"><input type="radio" name="island" value="Maui"><span class="island-icon">🏄</span><span class="island-name">Maui</span></label>
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label>Bedrooms</label>
+          <select id="beds"><option value="">Select...</option><option value="1">1 bedroom</option><option value="2">2 bedrooms</option><option value="3">3 bedrooms</option><option value="4">4 bedrooms</option><option value="5">5+ bedrooms</option></select>
+        </div>
+        <div class="field">
+          <label>Bathrooms</label>
+          <select id="baths"><option value="">Select...</option><option value="1">1</option><option value="1.5">1.5</option><option value="2">2</option><option value="2.5">2.5</option><option value="3">3+</option></select>
+        </div>
+      </div>
+      <div class="field">
+        <label>Square footage <span class="opt-note">(optional)</span></label>
+        <input type="number" id="sqft" placeholder="e.g. 1200">
+      </div>
+      <div class="btn-row">
+        <button class="btn-back" onclick="prevStep(2)">Back</button>
+        <button class="btn-next" onclick="nextStep(2)">Continue <svg viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+      </div>
+    </div>
 
-      const error = validators[fieldName]?.(value);
+    <div class="step" id="step3">
+      <h2>What do you need?</h2>
+      <p class="sub">Pick a service and how often.</p>
+      <div class="err-banner" id="err3"></div>
+      <div class="field">
+        <label>Service type <span style="color:var(--error)">*</span></label>
+        <div class="service-grid">
+          <label class="service-card selected" id="sc-regular"><input type="radio" name="serviceType" value="Regular Cleaning" checked><div class="service-icon">🧹</div><div class="service-name">Regular Clean</div><div class="service-desc">Recurring maintenance</div></label>
+          <label class="service-card" id="sc-deep"><input type="radio" name="serviceType" value="Deep Cleaning"><div class="service-icon">✨</div><div class="service-name">Deep Clean</div><div class="service-desc">Thorough top-to-bottom</div></label>
+          <label class="service-card" id="sc-moveout"><input type="radio" name="serviceType" value="Move-out Cleaning"><div class="service-icon">📦</div><div class="service-name">Move-out</div><div class="service-desc">Ready for next tenant</div></label>
+          <label class="service-card" id="sc-airbnb"><input type="radio" name="serviceType" value="Airbnb Turnover"><div class="service-icon">🏡</div><div class="service-name">Airbnb Turnover</div><div class="service-desc">Between guest stays</div></label>
+        </div>
+        <div class="field-err" id="fe-serviceType"></div>
+      </div>
+      <div class="field">
+        <label>Frequency <span style="color:var(--error)">*</span></label>
+        <div class="freq-row">
+          <label class="freq-pill selected"><input type="radio" name="frequency" value="Biweekly" checked>Every 2 weeks</label>
+          <label class="freq-pill"><input type="radio" name="frequency" value="Weekly">Weekly</label>
+          <label class="freq-pill"><input type="radio" name="frequency" value="Monthly">Monthly</label>
+          <label class="freq-pill"><input type="radio" name="frequency" value="One-time">One-time</label>
+        </div>
+        <div class="field-err" id="fe-frequency"></div>
+      </div>
+      <div class="field">
+        <label>Anything to know? <span class="opt-note">(optional)</span></label>
+        <textarea id="notes" placeholder="Pets, entry instructions, areas to focus on…"></textarea>
+      </div>
+      <div class="btn-row">
+        <button class="btn-back" onclick="prevStep(3)">Back</button>
+        <button class="btn-next" id="submitBtn" onclick="submitForm()">Get my free quote <svg viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+      </div>
+    </div>
 
-      if (error) {
-        field?.classList.add('error');
-        errorEl.textContent = error;
-        errorEl.classList.add('show');
-        return false;
-      } else {
-        field?.classList.remove('error');
-        errorEl.classList.remove('show');
-        return true;
-      }
-    }
+  </div>
 
-    function validateForm() {
-      return Object.keys(validators).every(fieldName => {
-        return validateField(fieldName);
-      });
-    }
+  <div class="success-view" id="successView">
+    <div class="success-ring"><svg viewBox="0 0 36 36" fill="none"><path d="M8 18l7 7 13-13" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+    <h2>You're all set!</h2>
+    <p>We'll reach out within 24 hours to confirm your quote and availability.</p>
+    <div class="success-meta" id="successMeta"></div>
+    <a class="another-link" onclick="resetForm()">Submit another request</a>
+  </div>
+</div>
 
-    // Real-time validation
-    Object.keys(validators).forEach(fieldName => {
-      if (fieldName === 'serviceType') {
-        document.querySelectorAll('input[name="serviceType"]').forEach(el => {
-          el.addEventListener('change', () => validateField(fieldName));
-        });
-      } else {
-        const field = document.getElementById(fieldName);
-        if (field) {
-          field.addEventListener('blur', () => validateField(fieldName));
-          field.addEventListener('input', () => validateField(fieldName));
-        }
-      }
-    });
+</div>
 
-    // Form submission
-    form.addEventListener('submit', async (e) => {
-      e.preventDefault();
+<script>
+var currentStep=1;
 
-      if (!validateForm()) {
-        showMessage('Please fix the errors above', 'error');
-        return;
-      }
+function showStep(from,to){
+  var fromEl=document.getElementById('step'+from);
+  var toEl=document.getElementById('step'+to);
+  var dir=to>from?1:-1;
+  fromEl.style.transition='opacity .25s ease,transform .25s cubic-bezier(.4,0,.2,1)';
+  fromEl.style.transform='translateX('+(dir>0?-40:40)+'px)';
+  fromEl.style.opacity='0';
+  fromEl.style.pointerEvents='none';
+  setTimeout(function(){
+    fromEl.classList.remove('active');
+    fromEl.style.transform='';fromEl.style.opacity='';fromEl.style.pointerEvents='';fromEl.style.transition='';fromEl.style.position='';
+    toEl.style.transform='translateX('+(dir>0?40:-40)+'px)';
+    toEl.style.opacity='0';
+    toEl.style.transition='none';
+    toEl.classList.add('active');
+    requestAnimationFrame(function(){requestAnimationFrame(function(){
+      toEl.style.transition='opacity .3s ease,transform .3s cubic-bezier(.4,0,.2,1)';
+      toEl.style.transform='translateX(0)';
+      toEl.style.opacity='1';
+    });});
+  },220);
+  currentStep=to;
+  updateProgress(to);
+}
 
-      submitBtn.disabled = true;
-      submitBtn.innerHTML = '<span class="loading-spinner"></span>Submitting...';
+function updateProgress(step){
+  var labels=['','Contact info','Your property','Service details'];
+  var fills=['','33%','66%','100%'];
+  document.getElementById('progressFill').style.width=fills[step];
+  document.getElementById('stepLabel').innerHTML='<strong>Step '+step+' of 3</strong> — '+labels[step];
+  for(var i=1;i<=3;i++){
+    var dot=document.getElementById('dot'+i);
+    dot.classList.remove('active','done');
+    if(i<step)dot.classList.add('done');
+    else if(i===step)dot.classList.add('active');
+  }
+  for(var j=1;j<=2;j++){document.getElementById('line'+j).classList.toggle('done',j<step);}
+}
 
-      try {
-        const formData = new FormData(form);
-        const data = {
-          name: formData.get('fullName'),
-          email: formData.get('email'),
-          phone: formData.get('phone'),
-          address: formData.get('address'),
-          beds: formData.get('beds') || null,
-          baths: formData.get('baths') || null,
-          serviceType: Array.from(document.querySelectorAll('input[name="serviceType"]:checked'))
-            .map(el => el.value)
-            .join(', '),
-          frequency: formData.get('frequency'),
-          notes: formData.get('notes'),
-          source: 'website_form',
-          submittedAt: new Date().toISOString()
-        };
+function setErr(id,msg){var el=document.getElementById(id);var fe=document.getElementById('fe-'+id);if(el)el.classList.add('err');if(fe){fe.textContent=msg;fe.classList.add('show');}}
+function clrErr(id){var el=document.getElementById(id);var fe=document.getElementById('fe-'+id);if(el)el.classList.remove('err');if(fe)fe.classList.remove('show');}
 
-        // Submit to CRM backend
-        const response = await fetch('/api/lead-capture', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(data)
-        });
+function validateStep(step){
+  if(step===1){
+    var ok=true;
+    var name=document.getElementById('fullName').value.trim();
+    var email=document.getElementById('email').value.trim();
+    var phone=document.getElementById('phone').value.trim();
+    if(name.length<2){setErr('fullName','Please enter your full name');ok=false;}else clrErr('fullName');
+    if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){setErr('email','Enter a valid email address');ok=false;}else clrErr('email');
+    if(phone.replace(/\D/g,'').length<10){setErr('phone','Enter a valid 10-digit phone number');ok=false;}else clrErr('phone');
+    return ok;
+  }
+  if(step===2){
+    var addr=document.getElementById('address').value.trim();
+    if(addr.length<5){setErr('address','Please enter your property address');return false;}
+    clrErr('address');return true;
+  }
+  if(step===3){
+    var svc=document.querySelector('input[name="serviceType"]:checked');
+    if(!svc){setErr('serviceType','Please select a service type');return false;}
+    clrErr('serviceType');
+    var frq=document.querySelector('input[name="frequency"]:checked');
+    if(!frq){setErr('frequency','Please select a cleaning frequency');return false;}
+    clrErr('frequency');
+    return true;
+  }
+  return true;
+}
 
-        if (!response.ok) {
-          throw new Error(`Server error: ${response.statusText}`);
-        }
+function nextStep(from){if(!validateStep(from))return;showStep(from,from+1);}
+function prevStep(from){showStep(from,from-1);}
 
-        const result = await response.json();
+document.querySelectorAll('input[name="island"]').forEach(function(r){r.addEventListener('change',function(){document.querySelectorAll('.island-card').forEach(function(c){c.classList.remove('selected');});this.closest('.island-card').classList.add('selected');});});
+document.querySelectorAll('input[name="serviceType"]').forEach(function(r){r.addEventListener('change',function(){document.querySelectorAll('.service-card').forEach(function(c){c.classList.remove('selected');});this.closest('.service-card').classList.add('selected');clrErr('serviceType');});});
+document.querySelectorAll('input[name="frequency"]').forEach(function(r){r.addEventListener('change',function(){document.querySelectorAll('.freq-pill').forEach(function(c){c.classList.remove('selected');});this.closest('.freq-pill').classList.add('selected');clrErr('frequency');});});
 
-        // Clear form
-        form.reset();
-        document.querySelectorAll('input.error, textarea.error, select.error').forEach(el => {
-          el.classList.remove('error');
-        });
+async function submitForm(){
+  if(!validateStep(3))return;
+  var btn=document.getElementById('submitBtn');
+  btn.disabled=true;
+  btn.innerHTML='<div class="spinner"></div>';
+  var data={
+    name:document.getElementById('fullName').value.trim(),
+    email:document.getElementById('email').value.trim(),
+    phone:document.getElementById('phone').value.trim(),
+    address:document.getElementById('address').value.trim(),
+    beds:document.getElementById('beds').value||null,
+    baths:document.getElementById('baths').value||null,
+    sqft:document.getElementById('sqft').value||null,
+    serviceType:(document.querySelector('input[name="serviceType"]:checked')||{}).value||'',
+    frequency:(document.querySelector('input[name="frequency"]:checked')||{}).value||'',
+    notes:document.getElementById('notes').value.trim()||null,
+    island:(document.querySelector('input[name="island"]:checked')||{}).value||'Oahu',
+    source:'website_form',
+    submittedAt:new Date().toISOString()
+  };
+  try{
+    var res=await fetch('/api/lead-capture',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
+    var result=await res.json();
+    if(!res.ok)throw new Error(result.message||'Server error');
+    document.getElementById('formTop').style.display='none';
+    document.getElementById('stepsWrap').style.display='none';
+    var sv=document.getElementById('successView');
+    sv.classList.add('show');
+    document.getElementById('successMeta').innerHTML=
+      '<div class="success-meta-row"><span class="sm-label">Name</span><span class="sm-val">'+data.name+'</span></div>'+
+      '<div class="success-meta-row"><span class="sm-label">Service</span><span class="sm-val">'+data.serviceType+'</span></div>'+
+      '<div class="success-meta-row"><span class="sm-label">Frequency</span><span class="sm-val">'+data.frequency+'</span></div>'+
+      '<div class="success-meta-row"><span class="sm-label">Island</span><span class="sm-val">'+data.island+'</span></div>';
+  }catch(err){
+    var eb=document.getElementById('err3');
+    eb.textContent=err.message||'Something went wrong. Please try again or call us.';
+    eb.classList.add('show');
+    btn.disabled=false;
+    btn.innerHTML='Get my free quote <svg viewBox="0 0 16 16" fill="none" style="width:16px;height:16px"><path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  }
+}
 
-        showMessage(
-          '✓ Thanks! We\'ll reach out within 24 hours to confirm availability.',
-          'success'
-        );
-
-        // Scroll to message
-        setTimeout(() => {
-          formMessage.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }, 100);
-
-      } catch (error) {
-        console.error('Form submission error:', error);
-        showMessage('Something went wrong. Please try again or call us at (808) 555-0000.', 'error');
-      } finally {
-        submitBtn.disabled = false;
-        submitBtn.textContent = 'Get Your Free Quote';
-      }
-    });
-
-    function showMessage(text, type) {
-      formMessage.textContent = text;
-      formMessage.className = `form-message show ${type}`;
-    }
-  </script>
+function resetForm(){
+  document.getElementById('formTop').style.display='';
+  document.getElementById('stepsWrap').style.display='';
+  document.getElementById('successView').classList.remove('show');
+  document.querySelectorAll('input[type=text],input[type=email],input[type=tel],input[type=number],textarea,select').forEach(function(el){el.value='';});
+  var s1=document.getElementById('step'+currentStep);
+  s1.classList.remove('active');
+  document.getElementById('step1').classList.add('active');
+  currentStep=1;updateProgress(1);
+}
+</script>
 </body>
 </html>

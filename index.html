@@ -1631,14 +1631,18 @@ async function dbLoadCleaners(){
       }
 
       async function dbSaveAppointment(data){
+  var clientId=null;
+  if(typeof clientDB!=='undefined'&&data.clientName){
+    clientId=Object.keys(clientDB).find(function(_id){return clientDB[_id]&&clientDB[_id].name===data.clientName;})||null;
+  }
   var row={
-    client_name:data.clientName, service:data.service||'Regular Cleaning',
+    client_id:clientId, service:data.service||'Regular Cleaning',
     frequency:data.freq||'One-time', date:data.date,
     time:data.time||'8am', address:data.address||null,
     beds:parseInt(data.beds)||null, baths:parseFloat(data.baths)||null,
     sqft:parseInt(data.sqft)||null,
     condition:parseInt(data.condition)||7,
-    cleaner_name:data.cleanerName||'Unassigned', cleaner_id:(typeof cleanerDB!=='undefined'&&data.cleanerName&&data.cleanerName!=='Unassigned'?(Object.keys(cleanerDB).find(function(_id){return cleanerDB[_id]&&cleanerDB[_id].name===data.cleanerName;})||null):null),
+    cleaner_id:(typeof cleanerDB!=='undefined'&&data.cleanerName&&data.cleanerName!=='Unassigned'?(Object.keys(cleanerDB).find(function(_id){return cleanerDB[_id]&&cleanerDB[_id].name===data.cleanerName;})||null):null),
     status:data.cleanerName&&data.cleanerName!=='Unassigned'?'assigned':'unassigned',
     base_price:parseFloat(data.basePrice)||0,
     tax:parseFloat(data.tax)||0,
@@ -1652,7 +1656,7 @@ async function dbLoadCleaners(){
   if(data.seriesIndex!=null) row.series_index=data.seriesIndex;
   var res=await db.from('appointments').insert([row]).select();
   if(res.error)console.error('Save appointment error:',res.error);
-  else console.log('[dbSaveAppointment] saved with duration_hours='+data.duration+(data.seriesId?' series_id='+data.seriesId:''));
+  else console.log('[dbSaveAppointment] saved client_id='+clientId+' duration_hours='+data.duration+(data.seriesId?' series_id='+data.seriesId:''));
   return res;
 }
 
@@ -1718,14 +1722,18 @@ function _generateRecurringDates(yr,mo,dy,freq){
 }
 
 async function dbUpdateAppointment(dbId,data){
+  var clientId=null;
+  if(typeof clientDB!=='undefined'&&data.clientName){
+    clientId=Object.keys(clientDB).find(function(_id){return clientDB[_id]&&clientDB[_id].name===data.clientName;})||null;
+  }
   var payload={
-    client_name:data.clientName, service:data.service,
+    client_id:clientId, service:data.service,
     frequency:data.freq, date:data.date,
     time:data.time, address:data.address||null,
     beds:parseInt(data.beds)||null, baths:parseFloat(data.baths)||null,
     sqft:parseInt(data.sqft)||null,
     condition:parseInt(data.condition)||7,
-    cleaner_name:data.cleanerName||'Unassigned', cleaner_id:(typeof cleanerDB!=='undefined'&&data.cleanerName&&data.cleanerName!=='Unassigned'?(Object.keys(cleanerDB).find(function(_id){return cleanerDB[_id]&&cleanerDB[_id].name===data.cleanerName;})||null):null),
+    cleaner_id:(typeof cleanerDB!=='undefined'&&data.cleanerName&&data.cleanerName!=='Unassigned'?(Object.keys(cleanerDB).find(function(_id){return cleanerDB[_id]&&cleanerDB[_id].name===data.cleanerName;})||null):null),
     status:(data.cleanerName==='Unassigned'?'unassigned':(data.status||'assigned')),
     base_price:parseFloat(data.basePrice)||0,
     tax:parseFloat(data.tax)||0,
@@ -1737,7 +1745,7 @@ async function dbUpdateAppointment(dbId,data){
   };
   var res=await db.from('appointments').update(payload).eq('id',dbId).select();
   if(res.error)console.error('[dbUpdateAppointment] error:',res.error);
-  else console.log('[dbUpdateAppointment] synced id='+dbId+' cleaner='+data.cleanerName+' pay=$'+data.cleanerPay+(data.cleanerPayOverride!=null?' (override=$'+data.cleanerPayOverride+')':''));
+  else console.log('[dbUpdateAppointment] synced id='+dbId+' client_id='+clientId+' cleaner='+data.cleanerName+' pay=$'+data.cleanerPay+(data.cleanerPayOverride!=null?' (override=$'+data.cleanerPayOverride+')':''));
   return res;
 }
 
@@ -1815,6 +1823,7 @@ async function loadAllData(){
           n:a.client_name, s:a.status||'unassigned',
           t:a.time||'8am', cleaner:a.cleaner_name||'Unassigned',
           recurring:a.recurring||false, dbId:a.id,
+          client_id:a.client_id||null, cleaner_id:a.cleaner_id||null,
           service:a.service||'Regular Cleaning',
           freq:a.frequency||'One-time',
           address:a.address||'',
@@ -1829,7 +1838,7 @@ async function loadAllData(){
           seriesId:a.series_id||null,
           seriesIndex:a.series_index!=null?a.series_index:null
         });
-        console.log('[loadAllData] appt loaded: '+a.client_name+' key='+key+' duration='+a.duration_hours);
+        console.log('[loadAllData] appt loaded: '+a.client_name+' key='+key+' client_id='+a.client_id+' duration='+a.duration_hours);
       }
     });
 
@@ -3041,7 +3050,7 @@ async function saveApptEdit(mode){
   // Persist to Supabase in background
   if(a.dbId){
     var sbBasePayload={
-      time:newTimeStr, cleaner_name:cleanerVal, service:svcText,
+      time:newTimeStr, service:svcText,
       frequency:freq, address:editAddr||null,
       beds:parseInt(editBeds)||null, baths:parseFloat(editBaths)||null,
       sqft:parseInt(editSqft)||null, condition:parseInt(editCond)||7,
@@ -3051,6 +3060,10 @@ async function saveApptEdit(mode){
       cleaner_pay_override:editCleanerPayOverride!=null?editCleanerPayOverride:null,
       notes:editNotes||null, duration_hours:editDuration||null
     };
+    // Add cleaner_id lookup
+    if(typeof cleanerDB!=='undefined'&&cleanerVal&&cleanerVal!=='Unassigned'){
+      sbBasePayload.cleaner_id=Object.keys(cleanerDB).find(function(_id){return cleanerDB[_id]&&cleanerDB[_id].name===cleanerVal;})||null;
+    }
     if(mode==='all'&&a.recurring){
       // Update all appointments in the series
       var sbAllQuery=db.from('appointments').update(sbBasePayload);
@@ -3058,8 +3071,8 @@ async function saveApptEdit(mode){
         sbAllQuery=sbAllQuery.eq('series_id',a.seriesId);
         console.log('[saveApptEdit] Supabase all-series update by series_id='+a.seriesId);
       } else {
-        sbAllQuery=sbAllQuery.eq('client_name',a.n).eq('recurring',true);
-        console.log('[saveApptEdit] Supabase all-series update by client_name (no series_id)');
+        sbAllQuery=sbAllQuery.eq('client_id',a.client_id).eq('recurring',true);
+        console.log('[saveApptEdit] Supabase all-series update by client_id='+a.client_id);
       }
       sbAllQuery=sbAllQuery.neq('status','paid');sbAllQuery.then(function(res){
         console.log('[saveApptEdit] Supabase all-series sync complete, error:',res.error||'none');
@@ -3067,7 +3080,7 @@ async function saveApptEdit(mode){
     } else {
       // Single: also clear series_id to break series link
       var singlePayload=Object.assign({},sbBasePayload,{
-        client_name:editClient, date:dateVal,
+        date:dateVal,
         series_id: mode==='single'&&a.recurring ? null : undefined,
         recurring: mode==='single'&&a.recurring ? false : undefined
       });
@@ -3121,10 +3134,17 @@ async function cancelAppointment(){
   } else {
     var kp=currentApptKey.split('-');
     var dateStr=kp[0]+'-'+String(kp[1]).padStart(2,'0')+'-'+String(kp[2]).padStart(2,'0');
-    dbRes=await db.from('appointments').update({status:'cancelled'})
-      .eq('client_name',currentAppt.n)
-      .eq('date',dateStr);
-    console.log('[cancelAppointment] Supabase update by client_name+date ('+currentAppt.n+', '+dateStr+') | response:', dbRes);
+    if(currentAppt.client_id){
+      dbRes=await db.from('appointments').update({status:'cancelled'})
+        .eq('client_id',currentAppt.client_id)
+        .eq('date',dateStr);
+      console.log('[cancelAppointment] Supabase update by client_id+date ('+currentAppt.client_id+', '+dateStr+') | response:', dbRes);
+    } else {
+      dbRes=await db.from('appointments').update({status:'cancelled'})
+        .eq('client_name',currentAppt.n)
+        .eq('date',dateStr);
+      console.log('[cancelAppointment] Supabase update by client_name+date (fallback) ('+currentAppt.n+', '+dateStr+') | response:', dbRes);
+    }
   }
 
   if(dbRes&&dbRes.error){
@@ -3258,6 +3278,7 @@ function deleteEntireSeries(){
     return;
   }
   var targetName = currentAppt.n;
+  var targetClientId = currentAppt.client_id || null;
   var targetTime = currentAppt.t || '';
   var targetAddress = currentAppt.address || '';
   var targetSeriesId = currentAppt.seriesId || null;
@@ -3305,7 +3326,11 @@ function deleteEntireSeries(){
   if(targetSeriesId){
     q = db.from('appointments').delete().eq('series_id', targetSeriesId).gte('date', todayISO);
   } else {
-    q = db.from('appointments').delete().eq('client_name', targetName).eq('recurring', true).gte('date', todayISO);
+    if(targetClientId){
+      q = db.from('appointments').delete().eq('client_id', targetClientId).eq('recurring', true).gte('date', todayISO);
+    } else {
+      q = db.from('appointments').delete().eq('client_name', targetName).eq('recurring', true).gte('date', todayISO);
+    }
   }
   q.then(function(res){
     if(res.error) console.error('[deleteEntireSeries] Supabase delete error:', res.error);

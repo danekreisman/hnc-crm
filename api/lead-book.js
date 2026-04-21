@@ -121,6 +121,7 @@ export default async function handler(req, res) {
             baths:     parsedBaths    ? parseFloat(parsedBaths) : null,
             sqft:      lead.sqft      || null,
             status:    'New',
+            policies_agreed_at: new Date().toISOString(),
             notes:     'Created automatically from booking portal',
           })
           .select('id')

@@ -1257,6 +1257,7 @@ Mahalo 🌺</textarea>
           <div class="info-row"><span class="info-label">Address</span><span class="info-val" id="cl-address">—</span></div>
           <div class="info-row"><span class="info-label">Payment method</span><span class="info-val" id="cl-payment">—</span></div>
           <div class="info-row"><span class="info-label">Client since</span><span class="info-val" id="cl-since">—</span></div>
+          <div class="info-row"><span class="info-label">Policies</span><span class="info-val" id="cl-policies">—</span></div>
         </div>
         <div class="panel-section">Stats</div>
         <div class="stat-grid">
@@ -1952,7 +1953,8 @@ async function loadAllData(){
         properties:Array.isArray(c.properties)?c.properties:(c.properties?JSON.parse(JSON.stringify(c.properties)):[]),
         flatRate:c.flat_rate||'',
         permDiscount:c.perm_discount||'',
-        stripeCustomerId:c.stripe_customer_id||''
+        stripeCustomerId:c.stripe_customer_id||'',
+        policiesAgreedAt:c.policies_agreed_at||null
       };
     });
 
@@ -3482,6 +3484,17 @@ function openClient(id){
   ['phone','email','address','payment','since','ltv','mrr','jobs','avg','service','freq','sqft','bedbath','cleaner','lastjob','nextjob','notes'].forEach(function(f){
     var el=document.getElementById('cl-'+f);if(el)el.textContent=d[f]||'—';
   });
+  // Policies agreed
+  var polEl = document.getElementById('cl-policies');
+  if(polEl){
+    if(d.policiesAgreedAt){
+      var agreedDate = new Date(d.policiesAgreedAt).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+      polEl.innerHTML = '<span style="color:#276749;font-weight:600;">&#10003; Agreed</span> <span style="color:var(--text-muted);font-size:11px;">'+agreedDate+'</span>';
+    } else {
+      polEl.innerHTML = '<span style="color:#b7791f;">&#9888; Not agreed</span>'
+        +' <button onclick="sendPolicyAgreement()" style="margin-left:8px;font-size:11px;padding:2px 8px;border:1px solid #b7791f;border-radius:20px;background:#fffbeb;color:#b7791f;cursor:pointer;font-family:inherit;">Send link</button>';
+    }
+  }
   var hist=document.getElementById('cl-history');hist.innerHTML='';
   d.history.forEach(function(h){
     var row=document.createElement('div');row.className='job-history-item';
@@ -3522,6 +3535,24 @@ function openClient(id){
   if(thinkingEl){ thinkingEl.style.display='none'; }
   openOverlay('client-overlay');
   setTimeout(updateChargeBtn, 50);
+}
+
+function sendPolicyAgreement(){
+  var d = currentClientId ? clientDB[currentClientId] : null;
+  if(!d) return;
+  var link = 'https://hnc-crm.vercel.app/agree.html?c='+currentClientId;
+  var msg = 'Hi '+d.name.split(' ')[0]+'! Before we confirm your first cleaning with Hawaii Natural Clean, please take a moment to review and agree to our service policies: '+link;
+  // Send via SMS
+  var phone = (d.phone||'').replace(/[^0-9+]/g,'');
+  if(!phone){ alert('No phone number on file for this client.'); return; }
+  if(!phone.startsWith('+')) phone = '+1'+phone;
+  fetch('/api/send-sms',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({to:phone,message:msg})})
+    .then(function(r){return r.json();})
+    .then(function(j){
+      if(j.success){ showToast('client-overlay','Policy agreement link sent via SMS.'); }
+      else { showToast('client-overlay','SMS failed — copy link manually: '+link); }
+    })
+    .catch(function(){ showToast('client-overlay','Error sending SMS.'); });
 }
 
 function showClientEdit(){

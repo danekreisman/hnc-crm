@@ -102,6 +102,66 @@ export default async function handler(req, res) {
           <p style="color:#999;font-size:12px;margin-top:32px;padding-top:16px;border-top:1px solid #e8e8e5;">Hawaii Natural Clean · Oahu & Maui, Hawaii · hawaiinaturalclean.com</p>
         </div>
       `;
+    } else if (type === 'quote') {
+      const { quoteData, frequency, bookingUrl } = req.body;
+      const q = quoteData || {};
+      const bk = q.breakdown || {};
+
+      // Build breakdown rows
+      const breakdownRows = [];
+      if (bk.bedrooms)  breakdownRows.push(`<tr><td style="color:#666;padding:6px 0;">${bk.bedrooms.tier}</td><td style="text-align:right;font-weight:500;">$${Number(bk.bedrooms.price).toFixed(2)}</td></tr>`);
+      if (bk.bathrooms) breakdownRows.push(`<tr><td style="color:#666;padding:6px 0;">${bk.bathrooms.tier}</td><td style="text-align:right;font-weight:500;">$${Number(bk.bathrooms.price).toFixed(2)}</td></tr>`);
+      if (bk.sqft)      breakdownRows.push(`<tr><td style="color:#666;padding:6px 0;">${bk.sqft.tier}</td><td style="text-align:right;font-weight:500;">$${Number(bk.sqft.price).toFixed(2)}</td></tr>`);
+      if (bk.condition && bk.condition.surcharge > 0) breakdownRows.push(`<tr><td style="color:#666;padding:6px 0;">Condition surcharge (${bk.condition.tier})</td><td style="text-align:right;font-weight:500;">+$${Number(bk.condition.surcharge).toFixed(2)}</td></tr>`);
+
+      const discountRow = q.discount_pct > 0
+        ? `<tr><td style="color:#059669;padding:6px 0;">${frequency || 'Frequency'} discount (${q.discount_pct}% off)</td><td style="text-align:right;color:#059669;font-weight:500;">−$${Number(q.discount).toFixed(2)}</td></tr>`
+        : '';
+
+      const bookBtn = bookingUrl
+        ? `<a href="${bookingUrl}" style="display:block;background:#1D9E75;color:#fff;text-align:center;padding:14px 24px;border-radius:10px;text-decoration:none;font-weight:700;font-size:16px;margin-bottom:24px;">Book Now →</a>`
+        : `<a href="https://hawaiinaturalclean.com/contact" style="display:block;background:#1D9E75;color:#fff;text-align:center;padding:14px 24px;border-radius:10px;text-decoration:none;font-weight:700;font-size:16px;margin-bottom:24px;">Book Now →</a>`;
+
+      html = `
+        <div style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;max-width:600px;margin:0 auto;padding:32px 24px;color:#1a1a1a;background:#ffffff;">
+          <div style="text-align:center;margin-bottom:28px;">
+            <img src="https://hnc-crm.vercel.app/hnc-logo.png" alt="Hawaii Natural Clean" style="height:56px;" onerror="this.style.display='none'">
+          </div>
+
+          <h2 style="font-size:24px;font-weight:700;margin:0 0 8px;color:#0f172a;">Your cleaning quote is ready 🌺</h2>
+          <p style="color:#64748b;font-size:15px;margin:0 0 24px;">Hi ${clientName}, thanks for reaching out! Here's your personalized quote from Hawaii Natural Clean.</p>
+
+          <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:14px;padding:22px;margin-bottom:22px;">
+            <div style="font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#94a3b8;margin-bottom:14px;">Quote details</div>
+            <table style="width:100%;border-collapse:collapse;">
+              <tr><td style="color:#666;padding:6px 0;">Service</td><td style="text-align:right;font-weight:600;">${service || 'Cleaning'}</td></tr>
+              ${frequency ? `<tr><td style="color:#666;padding:6px 0;">Frequency</td><td style="text-align:right;font-weight:500;">${frequency}</td></tr>` : ''}
+              ${q.duration_minutes ? `<tr><td style="color:#666;padding:6px 0;">Est. duration</td><td style="text-align:right;font-weight:500;">${q.duration_minutes} min</td></tr>` : ''}
+            </table>
+          </div>
+
+          <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:14px;padding:22px;margin-bottom:22px;">
+            <div style="font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#94a3b8;margin-bottom:14px;">Price breakdown</div>
+            <table style="width:100%;border-collapse:collapse;">
+              ${breakdownRows.join('')}
+              ${q.subtotal !== q.total ? `<tr style="border-top:1px solid #e2e8f0;"><td style="padding:10px 0 6px;color:#666;">Subtotal</td><td style="text-align:right;padding:10px 0 6px;">$${Number(q.subtotal).toFixed(2)}</td></tr>` : ''}
+              ${discountRow}
+              <tr style="border-top:2px solid #e2e8f0;">
+                <td style="padding:12px 0 0;font-size:18px;font-weight:700;color:#0f172a;">Total</td>
+                <td style="text-align:right;padding:12px 0 0;font-size:22px;font-weight:800;color:#1D9E75;">$${Number(q.total).toFixed(2)}</td>
+              </tr>
+            </table>
+          </div>
+
+          ${bookBtn}
+
+          <div style="background:#fefce8;border:1px solid #fde68a;border-radius:10px;padding:16px;margin-bottom:24px;">
+            <p style="margin:0;font-size:13px;color:#92400e;">📞 Questions? Call or text us at <strong>(808) 468-5356</strong> or reply to this email. We're happy to customize your quote!</p>
+          </div>
+
+          <p style="color:#94a3b8;font-size:12px;margin-top:32px;padding-top:16px;border-top:1px solid #f1f5f9;text-align:center;">Hawaii Natural Clean · Oahu & Maui, Hawaii · hawaiinaturalclean.com</p>
+        </div>
+      `;
     } else if (type === 'reactivation') {
       html = `
         <div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:32px 24px;color:#1a1a1a;">

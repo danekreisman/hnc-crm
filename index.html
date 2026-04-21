@@ -1376,6 +1376,38 @@ Mahalo 🌺</textarea>
         <div id="lead-ai-summary" style="background:#f5f0ff;border:1px solid #e9d8fd;border-radius:10px;padding:12px 13px;margin-bottom:10px;font-size:12px;color:#44337a;line-height:1.7;display:none;"></div>
         <div class="panel-section">Notes</div>
         <div class="info-block"><div style="font-size:12px;color:var(--text);line-height:1.6;" id="lead-notes">—</div></div>
+        <div class="panel-section">Suggested quote</div>
+        <div id="suggested-quote-card" style="background:#f0f9ff;border:1px solid #bfdbfe;border-radius:10px;padding:12px 13px;margin-bottom:10px;display:none;">
+          <div id="suggested-quote-loading" style="text-align:center;color:var(--text-muted);font-size:12px;">⏳ Calculating quote...</div>
+          <div id="suggested-quote-content" style="display:none;">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+              <div style="border-right:1px solid #dbeafe;padding-right:10px;">
+                <div style="font-size:11px;color:var(--text-muted);">Service</div>
+                <div style="font-size:13px;font-weight:600;color:var(--text);margin-top:2px;" id="sug-service">—</div>
+              </div>
+              <div>
+                <div style="font-size:11px;color:var(--text-muted);">Duration</div>
+                <div style="font-size:13px;font-weight:600;color:var(--text);margin-top:2px;" id="sug-duration">—</div>
+              </div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px;">
+              <div style="background:#fff;border:1px solid #dbeafe;border-radius:6px;padding:8px;text-align:center;">
+                <div style="font-size:10px;color:var(--text-muted);">Subtotal</div>
+                <div style="font-size:14px;font-weight:600;color:var(--text);margin-top:2px;" id="sug-subtotal">$0</div>
+              </div>
+              <div style="background:#fff;border:1px solid #dbeafe;border-radius:6px;padding:8px;text-align:center;">
+                <div style="font-size:10px;color:var(--text-muted);">Discount</div>
+                <div style="font-size:14px;font-weight:600;color:var(--text);margin-top:2px;" id="sug-discount">—</div>
+              </div>
+              <div style="background:#dcfce7;border:1px solid #86efac;border-radius:6px;padding:8px;text-align:center;">
+                <div style="font-size:10px;color:#15803d;">Total</div>
+                <div style="font-size:14px;font-weight:600;color:#15803d;margin-top:2px;" id="sug-total">$0</div>
+              </div>
+            </div>
+            <div id="sug-breakdown" style="font-size:11px;color:var(--text-muted);line-height:1.5;background:#fff;border:1px solid #dbeafe;border-radius:6px;padding:8px;"></div>
+            <div id="sug-error" style="background:#fee;border:1px solid #fca;border-radius:6px;padding:8px 10px;margin-top:10px;font-size:11px;color:#c5192d;display:none;"></div>
+          </div>
+        </div>
         <div class="panel-section">Send quote</div>
         <div class="info-block" style="padding:12px 13px;">
           <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px;">Generate and send a quote to this lead</div>
@@ -1950,7 +1982,16 @@ async function loadAllData(){
         action:l.next_action||'Follow up',
         due:l.due_date||'TBD',
         assigned:l.assigned_to||'VA',
-        notes:l.notes||'—'
+        notes:l.notes||'—',
+        // Quote data from auto-quote flow
+        quoteData: l.quote_data||null,
+        quoteTotal: l.quote_total||null,
+        quoteSentAt: l.quote_sent_at||null,
+        // Parse beds/baths/frequency/condition from notes for manual leads
+        beds:      (l.notes&&/Beds:\s*(\S+)/.exec(l.notes))?/Beds:\s*(\S+)/.exec(l.notes)[1]:null,
+        baths:     (l.notes&&/Baths:\s*(\S+)/.exec(l.notes))?/Baths:\s*(\S+)/.exec(l.notes)[1]:null,
+        frequency: (l.notes&&/Frequency:\s*([^\n]+)/.exec(l.notes))?/Frequency:\s*([^\n]+)/.exec(l.notes)[1].trim():null,
+        condition: (l.notes&&/Condition:\s*(\d+)/.exec(l.notes))?/Condition:\s*(\d+)/.exec(l.notes)[1]:null,
       };
     });
 
@@ -3505,6 +3546,7 @@ function openLead(id){
   if(leadThinkEl){leadThinkEl.style.display='none';}
   openOverlay('lead-overlay');
   setTimeout(generateLeadSummary, 400);
+  setTimeout(loadSuggestedQuote, 400);
 }
 
 function showLeadEdit(){
@@ -9472,6 +9514,100 @@ async function generateClientSummary(){
     thinkingEl.style.display = 'none';
     summaryEl.textContent = 'Error generating summary. Check your connection.';
     summaryEl.style.display = 'block';
+  }
+}
+
+async function loadSuggestedQuote(){
+  var d = currentLeadId ? leadDB[currentLeadId] : null;
+  if(!d || !d.service || d.service === '—') {
+    document.getElementById('suggested-quote-card').style.display = 'none';
+    return;
+  }
+  
+  var card = document.getElementById('suggested-quote-card');
+  var loading = document.getElementById('suggested-quote-loading');
+  var content = document.getElementById('suggested-quote-content');
+  var errorEl = document.getElementById('sug-error');
+  
+  card.style.display = 'block';
+  loading.style.display = 'block';
+  content.style.display = 'none';
+  errorEl.style.display = 'none';
+  
+  try {
+    var result = null;
+
+    // Use cached quote data if available (avoids redundant API call)
+    if(d.quoteData && d.quoteData.total != null) {
+      result = d.quoteData;
+    } else {
+      // Call calculate-quote API
+      var quoteReq = {
+        serviceType: d.service !== '—' ? d.service : null,
+        beds:        d.beds      || null,
+        baths:       d.baths     || null,
+        sqft:        d.sqft !== '—' ? d.sqft : null,
+        condition:   d.condition  || null,
+        frequency:   d.frequency  || null
+      };
+      
+      var res = await fetch('/api/calculate-quote', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(quoteReq)
+      });
+      result = await res.json();
+    }
+    
+    if(result.custom_quote) {
+      errorEl.textContent = result.message || 'Custom quote required — contact for pricing';
+      errorEl.style.display = 'block';
+      loading.style.display = 'none';
+    } else if(result.error) {
+      errorEl.textContent = result.error;
+      errorEl.style.display = 'block';
+      loading.style.display = 'none';
+    } else {
+      document.getElementById('sug-service').textContent = result.service || '—';
+      document.getElementById('sug-duration').textContent = (result.duration_minutes || 0) + ' min';
+      document.getElementById('sug-subtotal').textContent = '$' + result.subtotal.toFixed(2);
+      
+      if(result.discount_pct > 0) {
+        document.getElementById('sug-discount').textContent = '-' + result.discount_pct + '% ($' + result.discount.toFixed(2) + ')';
+      } else {
+        document.getElementById('sug-discount').textContent = 'None';
+      }
+      
+      document.getElementById('sug-total').textContent = '$' + result.total.toFixed(2);
+      
+      var breakdown = '';
+      if(result.breakdown) {
+        if(result.breakdown.bedrooms) {
+          breakdown += '<strong>Bedrooms:</strong> ' + result.breakdown.bedrooms.tier + ' ($' + result.breakdown.bedrooms.price.toFixed(2) + ')<br>';
+        }
+        if(result.breakdown.bathrooms) {
+          breakdown += '<strong>Bathrooms:</strong> ' + result.breakdown.bathrooms.tier + ' ($' + result.breakdown.bathrooms.price.toFixed(2) + ')<br>';
+        }
+        if(result.breakdown.sqft) {
+          breakdown += '<strong>Sqft tier:</strong> ' + result.breakdown.sqft.tier + ' ($' + result.breakdown.sqft.price.toFixed(2) + ')<br>';
+        }
+        if(result.breakdown.condition && result.breakdown.condition.surcharge > 0) {
+          breakdown += '<strong>Condition:</strong> ' + result.breakdown.condition.tier + ' (Score: ' + result.breakdown.condition.score + '/10)<br>';
+        }
+        if(result.breakdown.frequency) {
+          breakdown += '<strong>Frequency:</strong> ' + result.breakdown.frequency;
+        }
+      }
+      
+      document.getElementById('sug-breakdown').innerHTML = breakdown || 'Standard quote';
+      loading.style.display = 'none';
+      content.style.display = 'block';
+    }
+  } catch(err) {
+    console.error('[loadSuggestedQuote]', err);
+    errorEl.textContent = 'Failed to load quote: ' + err.message;
+    errorEl.style.display = 'block';
+    loading.style.display = 'none';
   }
 }
 

@@ -54,21 +54,7 @@ body{font-family:'Josefin Sans',sans-serif;color:var(--text);overflow-x:hidden;}
 }
 
 /* Logo */
-.logo-wrap{margin-bottom:56px;position:relative;z-index:1;}
-.logo-svg{width:52px;height:52px;margin-bottom:16px;}
-.logo-wordmark{display:flex;flex-direction:column;gap:2px;}
-.logo-line1{
-  font-family:'Josefin Sans',sans-serif;
-  font-size:22px;font-weight:700;letter-spacing:.18em;
-  color:white;text-transform:uppercase;line-height:1;
-}
-.logo-divider{height:1.5px;background:rgba(255,255,255,.5);margin:6px 0;}
-.logo-line2{
-  font-family:'Josefin Sans',sans-serif;
-  font-size:18px;font-weight:300;letter-spacing:.35em;
-  color:rgba(255,255,255,.9);text-transform:uppercase;line-height:1;
-  text-align:center;
-}
+.logo-wrap{display:none;}
 
 /* Headline */
 .headline{
@@ -310,6 +296,7 @@ body{font-family:'Josefin Sans',sans-serif;color:var(--text);overflow-x:hidden;}
   .features,.rating{display:none;}
   .right{min-height:auto;}
   .form-header,.step{padding-left:24px;padding-right:24px;}
+  #rightPanel > div:first-child{padding-left:24px;padding-right:24px;}
   .step{padding-bottom:36px;}
 }
 @media(max-width:480px){
@@ -324,31 +311,6 @@ body{font-family:'Josefin Sans',sans-serif;color:var(--text);overflow-x:hidden;}
 <!-- LEFT: Brand panel -->
 <div class="left">
   <!-- Logo (SVG recreation of HNC brand) -->
-  <div class="logo-wrap">
-    <svg class="logo-svg" viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <!-- Left leaf -->
-      <path d="M22 38 C22 38 14 28 16 18 C18 10 24 8 24 8 C24 8 26 18 24 28 C23 33 22 38 22 38Z" fill="url(#lg1)" opacity=".9"/>
-      <!-- Right leaf -->
-      <path d="M30 38 C30 38 38 28 36 18 C34 10 28 8 28 8 C28 8 26 18 28 28 C29 33 30 38 30 38Z" fill="url(#lg1)" opacity=".9"/>
-      <!-- Center leaf -->
-      <path d="M26 40 C26 40 22 30 24 20 C25 14 26 10 26 10 C26 10 27 14 28 20 C30 30 26 40 26 40Z" fill="url(#lg2)" opacity=".95"/>
-      <defs>
-        <linearGradient id="lg1" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stop-color="#F2E19B"/>
-          <stop offset="100%" stop-color="#A5E6E9"/>
-        </linearGradient>
-        <linearGradient id="lg2" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stop-color="#F2E19B"/>
-          <stop offset="60%" stop-color="#79D3E1"/>
-        </linearGradient>
-      </defs>
-    </svg>
-    <div class="logo-wordmark">
-      <div class="logo-line1">Hawaii Natural</div>
-      <div class="logo-divider"></div>
-      <div class="logo-line2">Clean</div>
-    </div>
-  </div>
 
   <div class="headline">A cleaner home,<br><em>beautifully done.</em></div>
   <div class="subhead">Get your free quote in under 2 minutes. No commitment — just honest, local cleaning from a team you can trust.</div>
@@ -380,6 +342,10 @@ body{font-family:'Josefin Sans',sans-serif;color:var(--text);overflow-x:hidden;}
 
 <!-- RIGHT: Form panel -->
 <div class="right" id="rightPanel">
+  <!-- Logo on white background — clean, no transparency tricks needed -->
+  <div style="padding:32px 52px 0;border-bottom:1px solid #eef4f8;">
+    <img src="/hnc-logo.jpg" alt="Hawaii Natural Clean" style="height:60px;display:block;">
+  </div>
   <div class="form-header" id="formHeader">
     <div class="progress-row">
       <div class="pdot active" id="pd1">1</div>

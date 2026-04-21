@@ -1382,18 +1382,28 @@ Mahalo 🌺</textarea>
         <div id="suggested-quote-card" style="background:#f0f9ff;border:1px solid #bfdbfe;border-radius:10px;padding:12px 13px;margin-bottom:10px;display:none;">
           <div id="suggested-quote-loading" style="text-align:center;color:var(--text-muted);font-size:12px;">⏳ Calculating quote...</div>
           <div id="suggested-quote-content" style="display:none;">
-            <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
-              <div>
-                <div style="font-size:12px;color:var(--text-muted);">Service</div>
+            <div style="display:flex;gap:12px;margin-bottom:10px;">
+              <div style="flex:1;">
+                <div style="font-size:11px;color:var(--text-muted);">Service</div>
                 <div style="font-size:13px;font-weight:600;color:var(--text);margin-top:2px;" id="sug-service">—</div>
               </div>
-              <div>
-                <div style="font-size:12px;color:var(--text-muted);">Frequency</div>
+              <div style="flex:1;">
+                <div style="font-size:11px;color:var(--text-muted);">Frequency</div>
                 <div style="font-size:13px;font-weight:600;color:var(--text);margin-top:2px;" id="sug-frequency">—</div>
               </div>
-              <div style="background:#dcfce7;border:1px solid #86efac;border-radius:8px;padding:8px 16px;text-align:center;">
-                <div style="font-size:10px;color:#15803d;text-transform:uppercase;letter-spacing:.05em;">Total</div>
-                <div style="font-size:20px;font-weight:700;color:#15803d;margin-top:2px;" id="sug-total">$0</div>
+            </div>
+            <div style="background:#fff;border:1px solid #dbeafe;border-radius:8px;padding:10px 12px;">
+              <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text-muted);padding-bottom:6px;">
+                <span>Subtotal</span><span id="sug-subtotal">—</span>
+              </div>
+              <div id="sug-discount-row" style="display:flex;justify-content:space-between;font-size:12px;color:#059669;padding-bottom:6px;display:none;">
+                <span id="sug-discount-label">Discount</span><span id="sug-discount">—</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text-muted);padding-bottom:8px;border-bottom:1px solid #dbeafe;">
+                <span>Hawaii GET (4.712%)</span><span id="sug-tax">—</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;font-size:15px;font-weight:700;color:#15803d;padding-top:8px;">
+                <span>Total</span><span id="sug-total">—</span>
               </div>
             </div>
             <div id="sug-error" style="background:#fee;border:1px solid #fca;border-radius:6px;padding:8px 10px;margin-top:10px;font-size:11px;color:#c5192d;display:none;"></div>
@@ -2285,6 +2295,15 @@ function renderLeadsPipeline(){
       cols[colIdx].appendChild(card);
     });
   });
+  // Update column count badges
+  var counts = {0:0, 1:0, 2:0};
+  leadEntries.forEach(function(entry){
+    var idx = stageMap[entry[1].stage];
+    if(idx !== undefined) counts[idx]++;
+  });
+  var ci = document.getElementById('count-inquiry');  if(ci) ci.textContent = counts[0];
+  var cq = document.getElementById('count-quoted');   if(cq) cq.textContent = counts[1];
+  var cf = document.getElementById('count-followup'); if(cf) cf.textContent = counts[2];
 }
 
 function updateDashboardStats(){
@@ -9736,7 +9755,19 @@ async function loadSuggestedQuote(){
     } else {
       document.getElementById('sug-service').textContent = result.service || '—';
       document.getElementById('sug-frequency').textContent = d.frequency || '—';
-      document.getElementById('sug-total').textContent = '$' + result.total.toFixed(2);
+      document.getElementById('sug-subtotal').textContent = '$' + result.subtotal.toFixed(2);
+      var TAX_RATE = 0.04712;
+      var tax = +(result.total * TAX_RATE).toFixed(2);
+      document.getElementById('sug-tax').textContent = '$' + tax.toFixed(2);
+      document.getElementById('sug-total').textContent = '$' + (result.total + tax).toFixed(2);
+      var discRow = document.getElementById('sug-discount-row');
+      if(result.discount_pct > 0){
+        document.getElementById('sug-discount-label').textContent = result.discount_pct + '% frequency discount';
+        document.getElementById('sug-discount').textContent = '−$' + result.discount.toFixed(2);
+        discRow.style.display = 'flex';
+      } else {
+        discRow.style.display = 'none';
+      }
       loading.style.display = 'none';
       content.style.display = 'block';
     }

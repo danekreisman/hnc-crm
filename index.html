@@ -1914,9 +1914,11 @@ async function loadAllData(){
         startYear:d.getFullYear(), startMonth:d.getMonth()+1, startDay:d.getDate(),
         dayOfWeek:d.getDay(), timeStr:a.time||'8am',
         cleaner:cleanerName,
+        client_id:a.client_id||null, cleaner_id:a.cleaner_id||null,
         status:a.status||'assigned', active:true,
         service:a.service, duration:a.duration_hours||null,
-        address:a.address||'', beds:a.beds||'', baths:a.baths||'', sqft:a.sqft||''
+        address:a.address||'', beds:a.beds||'', baths:a.baths||'', sqft:a.sqft||'',
+        seriesId:a.series_id||null, excludedDates:[]
       });
     });
     console.log('[loadAllData] total recurringAppts rebuilt: '+recurringAppts.length);
@@ -3016,45 +3018,15 @@ async function saveApptEdit(mode){
     }
   }catch(_tailErr){ console.warn('[saveApptEdit] tail-regen error', _tailErr); }
 
-  // Render immediately
+  // Close overlay and show toast immediately — DB operations continue in background
   renderCal();
-  console.log('[saveApptEdit] renderCal() triggered immediately, mode='+mode);
-  hideApptEdit();
-
-  // Immediately refresh all display elements in appt-view without reopening
-  var _a = currentAppt;
-  var _dateParts = (dateVal||currentApptKey).split('-');
-  var _mons = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  var _moStr = _mons[parseInt(_dateParts[1])-1]||'';
-  var _sb = document.getElementById('appt-status');
-  if(_sb){ _sb.textContent=_a.s.charAt(0).toUpperCase()+_a.s.slice(1); _sb.className='status-badge s-'+_a.s; }
-  var _title=document.getElementById('appt-title');
-  if(_title) _title.textContent=_a.n;
-  document.getElementById('ai-client').textContent=_a.n;
-  document.getElementById('ai-date').textContent=_moStr+' '+_dateParts[2]+', '+_dateParts[0];
-  document.getElementById('ai-time').textContent=_a.t.replace('am',' AM').replace('pm',' PM');
-  document.getElementById('ai-service').textContent=_a.service||'Regular Cleaning';
-  document.getElementById('ai-freq').textContent=_a.freq||'—';
-  document.getElementById('ai-dur').textContent=_a.duration?(_a.duration+' hrs'):'—';
-  document.getElementById('ai-address').textContent=_a.address||'—';
-  document.getElementById('ai-sqft').textContent=_a.sqft?(_a.sqft+' sq ft'):'—';
-  document.getElementById('ai-bedbath').textContent=(_a.beds&&_a.baths)?(_a.beds+' bed / '+_a.baths+' bath'):'—';
-  document.getElementById('ai-cond').textContent=_a.condition?('Condition '+_a.condition+'/10'):'—';
-  document.getElementById('ai-cleaner').textContent=_a.cleaner;
-  document.getElementById('ai-cpay').textContent=fmtPrice(_a.cleanerPay);
-  document.getElementById('ai-base').textContent=fmtPrice(_a.base||_a.basePrice);
-  document.getElementById('ai-disc').textContent='$0';
-  document.getElementById('ai-tax').textContent=fmtPrice(_a.tax);
-  document.getElementById('ai-total').textContent=fmtPrice(_a.total||_a.totalPrice);
-  var _aiNotes=document.getElementById('ai-notes');
-  if(_aiNotes) _aiNotes.textContent=_a.notes||'—';
-
+  closeOverlay('appt-overlay');
   var toastMsg = mode==='all'
     ? 'All recurring appointments updated.'
     : mode==='single'&&a.recurring
-      ? 'This appointment updated (unlinked from series).'
-      : 'Changes saved successfully.';
-  showToast('appt-overlay', toastMsg);
+      ? 'This appointment updated.'
+      : 'Changes saved.';
+  showToast('', toastMsg);
 
   // Persist to Supabase in background
   if(a.dbId){
@@ -3105,9 +3077,17 @@ async function saveApptEdit(mode){
         notes:editNotes, duration:editDuration
       }).then(function(sbUpdate){
         if(!sbUpdate.error && mode==='single'&&a.recurring&&a.dbId){
-          // Break the series link for this specific occurrence
+          // Break the series link for this specific occurrence in DB
           db.from('appointments').update({series_id:null,recurring:false}).eq('id',a.dbId).then(function(r){
             console.log('[saveApptEdit] series link broken for dbId='+a.dbId+', error:',r.error||'none');
+          });
+          // Add this date to excludedDates in the recurring template so it won't be regenerated
+          recurringAppts.forEach(function(r){
+            if(r.seriesId && r.seriesId===a.seriesId){
+              if(!r.excludedDates) r.excludedDates=[];
+              if(r.excludedDates.indexOf(currentApptKey)<0) r.excludedDates.push(currentApptKey);
+              console.log('[saveApptEdit] excluded date '+currentApptKey+' from series '+a.seriesId);
+            }
           });
         }
         console.log('[saveApptEdit] Supabase single sync complete, error:',sbUpdate.error||'none');
@@ -4419,13 +4399,11 @@ async function saveNewAppt(){
     console.log('[saveNewAppt] immediate apptData insert: '+insertedCount+'/'+occDates.length+' recurring entries for freq='+freq+' series_id='+apptSeriesId);
   }
 
-  // ── STEP 2: Render calendar immediately — no waiting ──
+  // ── STEP 2: Close form and show toast immediately — no waiting ──
   renderCal();
-  console.log('[saveNewAppt] renderCal() triggered immediately');
-  var success=document.getElementById('na-success');
-  success.textContent='Booked! '+name+' — '+(freq==='One-time'?'appointment added':''+occDates.length+' '+freq.toLowerCase()+' appointments added')+'.';
-  success.classList.add('show');
-  setTimeout(function(){success.classList.remove('show');closeOverlay('new-appt-overlay');},2500);
+  closeOverlay('new-appt-overlay');
+  var apptLabel=freq==='One-time'?'Appointment booked!':occDates.length+' '+freq.toLowerCase()+' appointments booked!';
+  showToast('', apptLabel);
 
   // ── STEP 3: Persist to Supabase in background (UI already updated) ──
   if(freq==='One-time'){
@@ -4447,12 +4425,19 @@ async function saveNewAppt(){
   } else {
     var batchRows=occDates.map(function(od,sidx){
       var odStr=od.getFullYear()+'-'+String(od.getMonth()+1).padStart(2,'0')+'-'+String(od.getDate()).padStart(2,'0');
+      var _clientId=null;
+      var _found=_findClientByName(name);
+      if(_found&&_found.id&&_found.id.length>10) _clientId=_found.id;
+      var _cleanerId=null;
+      if(typeof cleanerDB!=='undefined'&&cleanerName&&cleanerName!=='Unassigned'){
+        _cleanerId=Object.keys(cleanerDB).find(function(_id){return cleanerDB[_id]&&cleanerDB[_id].name===cleanerName;})||null;
+      }
       return {
-        client_name:name, service:naServiceText, frequency:freq,
+        client_id:_clientId, service:naServiceText, frequency:freq,
         date:odStr, time:timeStr, address:apptAddress||null,
         beds:parseInt(apptBeds)||null, baths:parseFloat(apptBaths)||null,
         sqft:parseInt(apptSqft)||null, condition:parseInt(apptCond)||7,
-        cleaner_name:cleanerName,
+        cleaner_id:_cleanerId,
         status:cleanerName!=='Unassigned'?'assigned':'unassigned',
         base_price:apptBase, tax:apptTax, total_price:total,
         cleaner_pay:apptCleanerPay,
@@ -4541,22 +4526,30 @@ function populateRecurringMonth(yr,mo){
     }
     dates.forEach(function(d){
       var key=d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate();
+      // Skip dates explicitly excluded (e.g. broken from series via "edit this only")
+      if(r.excludedDates && r.excludedDates.indexOf(key)>=0) return;
       if(!apptData[key])apptData[key]=[];
-      var exists=apptData[key].some(function(a){return a.n===r.name&&a.t===r.timeStr;});
+      // Match by seriesId if available, fallback to name+time
+      var exists=apptData[key].some(function(a){
+        if(r.seriesId && a.seriesId===r.seriesId) return true;
+        return a.n===r.name && a.t===r.timeStr;
+      });
       if(!exists){
         var newApt = {
           n:r.name, s:r.status, t:r.timeStr, cleaner:r.cleaner, recurring:true,
           service:r.service||'Regular Cleaning', freq:r.freq,
           duration:r.duration||null,
           address:r.address||'', beds:r.beds||'', baths:r.baths||'', sqft:r.sqft||'',
-          seriesId:r.seriesId||null
+          seriesId:r.seriesId||null,
+          client_id:r.client_id||null, cleaner_id:r.cleaner_id||null
         };
         apptData[key].push(newApt);
-        // Persist new occurrence to Supabase (fire-and-forget) so cleaners + gcal see it
+        // Persist new occurrence to Supabase (fire-and-forget)
         if(typeof db !== 'undefined' && db && db.from){
           var isoDate = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
           var insertRow = {
-            client_name: r.name,
+            client_id: r.client_id||null,
+            cleaner_id: r.cleaner_id||null,
             service: r.service || 'Regular Cleaning',
             frequency: r.freq,
             date: isoDate,
@@ -4565,7 +4558,6 @@ function populateRecurringMonth(yr,mo){
             beds: r.beds ? (parseInt(r.beds)||null) : null,
             baths: r.baths ? (parseFloat(r.baths)||null) : null,
             sqft: r.sqft ? (parseInt(r.sqft)||null) : null,
-            cleaner_name: r.cleaner || 'Unassigned',
             status: (r.cleaner && r.cleaner !== 'Unassigned') ? 'assigned' : 'unassigned',
             recurring: true,
             duration_hours: r.duration || null,

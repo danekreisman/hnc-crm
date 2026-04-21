@@ -1430,6 +1430,43 @@ Mahalo 🌺</textarea>
 </div>
 
 <!-- CLEANER PROFILE PANEL -->
+<div class="overlay hidden" id="quote-auto-overlay" onclick="closeOverlay('quote-auto-overlay')">
+  <div class="panel" onclick="event.stopPropagation()">
+    <div class="panel-header"><div class="panel-title">Edit quote templates</div><button class="close-btn" onclick="closeOverlay('quote-auto-overlay')">&#x2715;</button></div>
+    <div class="panel-body">
+      <div class="panel-section">Automation info</div>
+      <div class="info-block">
+        <div class="info-row"><span class="info-label">Trigger</span><span class="info-val">New lead submitted</span></div>
+        <div class="info-row"><span class="info-label">Actions</span><span class="info-val">Send email + Send SMS</span></div>
+        <div class="info-row"><span class="info-label">Status</span><span class="info-val"><span class="badge" style="background:#dcfce7;color:#166534;">Always on</span></span></div>
+      </div>
+      <div class="panel-section">Available variables</div>
+      <div style="background:#f8fafc;border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:14px;font-size:11px;color:var(--text-muted);line-height:1.9;">
+        <code style="background:#e2e8f0;padding:1px 5px;border-radius:3px;">{firstName}</code> — lead's first name &nbsp;
+        <code style="background:#e2e8f0;padding:1px 5px;border-radius:3px;">{total}</code> — quoted price &nbsp;
+        <code style="background:#e2e8f0;padding:1px 5px;border-radius:3px;">{service}</code> — service type &nbsp;
+        <code style="background:#e2e8f0;padding:1px 5px;border-radius:3px;">{frequency}</code> — frequency
+      </div>
+      <div class="panel-section">SMS template</div>
+      <div class="form-row">
+        <textarea id="qat-sms" style="min-height:90px;font-size:13px;" placeholder="Hi {firstName}! Your Hawaii Natural Clean quote is ${total} for {service}. Ready to book? Reply or call (808) 468-5356 🌺"></textarea>
+      </div>
+      <div style="font-size:11px;color:var(--text-muted);margin-top:-8px;margin-bottom:14px;">Leave blank to use the default template.</div>
+      <div class="panel-section">Email subject</div>
+      <div class="form-row">
+        <input type="text" id="qat-subject" placeholder="Your Hawaii Natural Clean quote: ${total}">
+      </div>
+      <div style="font-size:11px;color:var(--text-muted);margin-top:-8px;margin-bottom:14px;">Leave blank to use the default subject.</div>
+      <div class="save-bar" style="margin-top:16px;">
+        <button class="btn btn-primary" onclick="saveQuoteTemplates()">Save templates</button>
+        <button class="btn" onclick="closeOverlay('quote-auto-overlay')">Cancel</button>
+      </div>
+      <div id="qat-saved" class="success-bar" style="margin-top:10px;"></div>
+    </div>
+  </div>
+</div>
+
+<!-- CLEANER PROFILE PANEL -->
 <div class="overlay hidden" id="cleaner-overlay" onclick="closeOverlay('cleaner-overlay')">
   <div class="panel" onclick="event.stopPropagation()">
     <div class="panel-header"><div class="panel-title">Cleaner profile</div><button class="close-btn" onclick="closeOverlay('cleaner-overlay')">&#x2715;</button></div>
@@ -5985,14 +6022,29 @@ async function autoDeleteRemote(id){
 function renderAutoList(){
   var host = document.getElementById('auto-list');
   if(!host) return;
+
+  // System card: always shown first, not deletable
+  var systemCard = '<div class="card" style="padding:14px 16px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:12px;border-left:3px solid var(--brand-500);">'
+    + '<div style="flex:1;min-width:0;">'
+    +   '<div style="display:flex;align-items:center;gap:8px;"><b style="font-size:14px;">New Lead — Auto Quote</b>'
+    +     '<span class="pill pill-ok" style="font-size:10px;">ACTIVE</span>'
+    +     '<span style="font-size:10px;background:#f0f9ff;color:#1d4ed8;padding:2px 7px;border-radius:99px;border:1px solid #bfdbfe;">System</span>'
+    +   '</div>'
+    +   '<div style="font-size:12px;color:var(--muted);margin-top:4px;">When <b>lead.created</b> &middot; runs every time &middot; do send_email, send_sms</div>'
+    + '</div>'
+    + '<div style="display:flex;gap:6px;">'
+    +   '<button class="btn" style="font-size:12px;padding:4px 10px;" onclick="openQuoteAutoEdit()">Edit templates</button>'
+    + '</div>'
+    + '</div>';
+
   if(!automations.length){
-    host.innerHTML = '<div class="empty-state" style="padding:28px;text-align:center;color:var(--muted);background:var(--panel);border:1px dashed var(--border);border-radius:var(--radius);">No automations yet. Click <b>+ New automation</b> to build your first rule.</div>';
-    var ac = document.getElementById('auto-active-count'); if(ac) ac.textContent='0';
-    var atot = document.getElementById('auto-total-count'); if(atot) atot.textContent='0';
+    host.innerHTML = systemCard + '<div class="empty-state" style="padding:28px;text-align:center;color:var(--muted);background:var(--panel);border:1px dashed var(--border);border-radius:var(--radius);">No custom automations yet. Click <b>+ New automation</b> to build your first rule.</div>';
+    var ac = document.getElementById('auto-active-count'); if(ac) ac.textContent='1';
+    var atot = document.getElementById('auto-total-count'); if(atot) atot.textContent='1';
     var tc = document.getElementById('auto-today-count'); if(tc) tc.textContent='0';
     return;
   }
-  var html = '';
+  var html = systemCard;
   for(var i=0;i<automations.length;i++){
     var a = automations[i];
     var condSummary = (a.conditions&&a.conditions.length) ? (a.conditions.length+' condition'+(a.conditions.length>1?'s':'')+' ('+(a.logic||'AND')+')') : 'runs every time';
@@ -6012,14 +6064,49 @@ function renderAutoList(){
       + '</div>';
   }
   host.innerHTML = html;
-  var active = automations.filter(function(a){return a.enabled;}).length;
+  var active = 1 + automations.filter(function(a){return a.enabled;}).length; // +1 for system
   var ac = document.getElementById('auto-active-count'); if(ac) ac.textContent=String(active);
-  var atot = document.getElementById('auto-total-count'); if(atot) atot.textContent=String(automations.length);
+  var atot = document.getElementById('auto-total-count'); if(atot) atot.textContent=String(1+automations.length);
   var today = (new Date()).toDateString();
   var todayN = automationRuns.filter(function(r){ return new Date(r.ts).toDateString()===today; }).length;
   var tc = document.getElementById('auto-today-count'); if(tc) tc.textContent=String(todayN);
 }
 function escAuto(s){ s=String(s==null?'':s); return s.replace(/[&<>"]/g, function(c){return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c];}); }
+
+async function openQuoteAutoEdit(){
+  var savedEl = document.getElementById('qat-saved');
+  if(savedEl){ savedEl.textContent=''; savedEl.classList.remove('show'); }
+  try {
+    var r = await db.from('settings').select('value').eq('key','quote_sms_template').maybeSingle();
+    document.getElementById('qat-sms').value = (r.data && r.data.value) ? r.data.value : '';
+    var r2 = await db.from('settings').select('value').eq('key','quote_email_subject').maybeSingle();
+    document.getElementById('qat-subject').value = (r2.data && r2.data.value) ? r2.data.value : '';
+  } catch(e) { console.warn('loadQuoteTemplates err:', e); }
+  openOverlay('quote-auto-overlay');
+}
+
+async function saveQuoteTemplates(){
+  var sms = document.getElementById('qat-sms').value.trim();
+  var subject = document.getElementById('qat-subject').value.trim();
+  var savedEl = document.getElementById('qat-saved');
+  try {
+    if(sms){
+      await db.from('settings').upsert({ key:'quote_sms_template', value: sms, updated_at: new Date().toISOString() }, { onConflict:'key' });
+    } else {
+      await db.from('settings').delete().eq('key','quote_sms_template');
+    }
+    if(subject){
+      await db.from('settings').upsert({ key:'quote_email_subject', value: subject, updated_at: new Date().toISOString() }, { onConflict:'key' });
+    } else {
+      await db.from('settings').delete().eq('key','quote_email_subject');
+    }
+    if(savedEl){ savedEl.textContent='Templates saved!'; savedEl.classList.add('show'); setTimeout(function(){ savedEl.classList.remove('show'); },3000); }
+  } catch(e) {
+    console.error('saveQuoteTemplates err:', e);
+    if(savedEl){ savedEl.textContent='Error saving: '+(e.message||e); savedEl.classList.add('show'); }
+  }
+}
+
 
 /* -------- builder UI -------- */
 function openNewAuto(){

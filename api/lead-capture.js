@@ -19,6 +19,7 @@ export default async function handler(req, res) {
   );
 
   const BASE_URL = 'https://hnc-crm.vercel.app';
+  const isJanitorial = (d.serviceType === 'Janitorial Cleaning');
 
   // ── 1. Build notes ──────────────────────────────────────────────────────
   const noteParts = [
@@ -52,74 +53,40 @@ export default async function handler(req, res) {
     return res.status(500).json({ success: false, message: insertError.message });
   }
 
-  const leadId   = insertData[0].id;
+  const leadId    = insertData[0].id;
   const firstName = d.name.trim().split(' ')[0];
-  const phone    = d.phone.replace(/\D/g, '');
-  const e164     = phone.startsWith('+') ? phone : '+1' + phone;
+  const phone     = d.phone.replace(/\D/g, '');
+  const e164      = phone.startsWith('+') ? phone : '+1' + phone;
 
-  // ── 3. Load custom templates from settings ──────────────────────────────
-  let customSmsTemplate = null;
-  let customEmailSubject = null;
-  let customEmailIntro = null;
-  try {
-    const [smsRow, subjectRow, introRow] = await Promise.all([
-      db.from('settings').select('value').eq('key', 'quote_sms_template').maybeSingle(),
-      db.from('settings').select('value').eq('key', 'quote_email_subject').maybeSingle(),
-      db.from('settings').select('value').eq('key', 'quote_email_intro').maybeSingle(),
-    ]);
-    if (smsRow.data?.value)     customSmsTemplate  = smsRow.data.value;
-    if (subjectRow.data?.value) customEmailSubject = subjectRow.data.value;
-    if (introRow.data?.value)   customEmailIntro   = introRow.data.value;
-  } catch(err) {
-    console.warn('[lead-capture] failed to load templates:', err.message);
+  function applyVars(template, extra = {}) {
+    return template
+      .replace(/\{firstName\}/g, firstName)
+      .replace(/\{service\}/g,   d.serviceType || 'cleaning')
+      .replace(/\{frequency\}/g, d.frequency   || '')
+      .replace(/\{total\}/g,     extra.total   || '');
   }
 
-  // ── 4. Calculate quote ──────────────────────────────────────────────────
-  let quoteResult = null;
-  try {
-    const quoteRes = await fetch(`${BASE_URL}/api/calculate-quote`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        serviceType: d.serviceType || null,
-        beds:        d.beds        || null,
-        baths:       d.baths       || null,
-        sqft:        d.sqft        || null,
-        condition:   d.condition   || null,
-        frequency:   d.frequency   || null,
-      })
-    });
-    quoteResult = await quoteRes.json();
-    console.log('[lead-capture] quote result:', JSON.stringify(quoteResult));
-  } catch (err) {
-    console.error('[lead-capture] calculate-quote failed:', err.message);
-  }
+  // ── 3. Janitorial branch ────────────────────────────────────────────────
+  if (isJanitorial) {
+    let janSms = null, janSubject = null, janIntro = null;
+    try {
+      const [sr, subr, intr] = await Promise.all([
+        db.from('settings').select('value').eq('key','janitorial_sms_template').maybeSingle(),
+        db.from('settings').select('value').eq('key','janitorial_email_subject').maybeSingle(),
+        db.from('settings').select('value').eq('key','janitorial_email_intro').maybeSingle(),
+      ]);
+      if (sr.data?.value)   janSms     = sr.data.value;
+      if (subr.data?.value) janSubject  = subr.data.value;
+      if (intr.data?.value) janIntro    = intr.data.value;
+    } catch(err) { console.warn('[lead-capture] janitorial settings load failed:', err.message); }
 
-  // ── 5. Send email + SMS + update lead ───────────────────────────────────
-  if (quoteResult && !quoteResult.error) {
-    const isCustom = quoteResult.custom_quote === true;
-    const totalStr = isCustom ? 'custom' : `$${Number(quoteResult.total).toFixed(2)}`;
+    const defaultSms     = `Aloha ${firstName}, we've received your request for Janitorial Cleaning. Would you be available for a walkthrough sometime this week?`;
+    const defaultSubject = `Your Janitorial Cleaning Request — Hawaii Natural Clean`;
+    const defaultIntro   = `Aloha ${firstName}, thanks for reaching out! We've received your Janitorial Cleaning request and would love to schedule a walkthrough to give you an accurate quote.`;
 
-    // Apply variable substitution helper
-    function applyVars(template) {
-      return template
-        .replace(/\{firstName\}/g, firstName)
-        .replace(/\{total\}/g,     isCustom ? 'custom' : Number(quoteResult.total).toFixed(2))
-        .replace(/\{service\}/g,   d.serviceType || 'cleaning')
-        .replace(/\{frequency\}/g, d.frequency   || '');
-    }
-
-    // Email subject
-    const defaultSubject = isCustom
-      ? `Hi ${firstName} — your Hawaii Natural Clean quote`
-      : `Your Hawaii Natural Clean quote: ${totalStr}`;
-    const subject = customEmailSubject ? applyVars(customEmailSubject) : defaultSubject;
-
-    // SMS body
-    const defaultSms = isCustom
-      ? `Hi ${firstName}! Thanks for reaching out to Hawaii Natural Clean. Your service requires a custom quote — we'll follow up within 24 hours. Questions? Call/text (808) 468-5356 🌺`
-      : `Hi ${firstName}! Your Hawaii Natural Clean quote is ${totalStr} for ${d.serviceType || 'cleaning'}. Ready to book? Reply or call (808) 468-5356 🌺`;
-    const smsBody = customSmsTemplate ? applyVars(customSmsTemplate) : defaultSms;
+    const smsBody      = janSms     ? applyVars(janSms)     : defaultSms;
+    const emailSubject = janSubject ? applyVars(janSubject)  : defaultSubject;
+    const emailIntro   = janIntro   ? applyVars(janIntro)    : defaultIntro;
 
     // Send email
     try {
@@ -127,24 +94,13 @@ export default async function handler(req, res) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          to:         d.email.trim(),
-          subject,
-          type:       isCustom ? 'generic' : 'quote',
-          clientName: firstName,
-          service:    d.serviceType || 'Cleaning',
-          frequency:  d.frequency   || null,
-          quoteData:  isCustom ? null : quoteResult,
-          customIntro: customEmailIntro ? applyVars(customEmailIntro) : null,
-          notes: isCustom
-            ? `Thanks for reaching out! Your request (${d.serviceType}) requires a custom quote. We'll follow up within 24 hours — or call/text us at (808) 468-5356.`
-            : null,
+          to: d.email.trim(), subject: emailSubject,
+          type: 'generic', clientName: firstName,
+          notes: emailIntro,
         })
       });
-      const emailData = await emailRes.json();
-      console.log('[lead-capture] email sent:', emailRes.status, JSON.stringify(emailData));
-    } catch (err) {
-      console.error('[lead-capture] send-email failed:', err.message);
-    }
+      console.log('[lead-capture] janitorial email sent:', emailRes.status);
+    } catch(err) { console.error('[lead-capture] janitorial email failed:', err.message); }
 
     // Send SMS
     try {
@@ -153,13 +109,89 @@ export default async function handler(req, res) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ to: e164, message: smsBody })
       });
-      const smsData = await smsRes.json();
-      console.log('[lead-capture] SMS sent:', smsRes.status, JSON.stringify(smsData));
-    } catch (err) {
-      console.error('[lead-capture] send-sms failed:', err.message);
-    }
+      console.log('[lead-capture] janitorial SMS sent:', smsRes.status);
+    } catch(err) { console.error('[lead-capture] janitorial SMS failed:', err.message); }
 
-    // Update lead with quote data
+    // Mark quote_sent_at so we know something was sent
+    await db.from('leads').update({ quote_sent_at: new Date().toISOString() }).eq('id', leadId);
+
+    return res.status(200).json({ success: true, leadId });
+  }
+
+  // ── 4. Load quote templates (non-Janitorial) ────────────────────────────
+  let customSmsTemplate = null, customEmailSubject = null, customEmailIntro = null;
+  try {
+    const [smsRow, subjectRow, introRow] = await Promise.all([
+      db.from('settings').select('value').eq('key','quote_sms_template').maybeSingle(),
+      db.from('settings').select('value').eq('key','quote_email_subject').maybeSingle(),
+      db.from('settings').select('value').eq('key','quote_email_intro').maybeSingle(),
+    ]);
+    if (smsRow.data?.value)     customSmsTemplate  = smsRow.data.value;
+    if (subjectRow.data?.value) customEmailSubject = subjectRow.data.value;
+    if (introRow.data?.value)   customEmailIntro   = introRow.data.value;
+  } catch(err) { console.warn('[lead-capture] failed to load templates:', err.message); }
+
+  // ── 5. Calculate quote ──────────────────────────────────────────────────
+  let quoteResult = null;
+  try {
+    const quoteRes = await fetch(`${BASE_URL}/api/calculate-quote`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        serviceType: d.serviceType || null,
+        beds: d.beds || null, baths: d.baths || null,
+        sqft: d.sqft || null, condition: d.condition || null,
+        frequency: d.frequency || null,
+      })
+    });
+    quoteResult = await quoteRes.json();
+    console.log('[lead-capture] quote result:', JSON.stringify(quoteResult));
+  } catch(err) { console.error('[lead-capture] calculate-quote failed:', err.message); }
+
+  // ── 6. Send quote email + SMS ───────────────────────────────────────────
+  if (quoteResult && !quoteResult.error) {
+    const isCustom  = quoteResult.custom_quote === true;
+    const totalStr  = isCustom ? 'custom' : `$${Number(quoteResult.total).toFixed(2)}`;
+    const extraVars = { total: isCustom ? 'custom' : Number(quoteResult.total).toFixed(2) };
+
+    const subject = customEmailSubject
+      ? applyVars(customEmailSubject, extraVars)
+      : (isCustom ? `Hi ${firstName} — your Hawaii Natural Clean quote` : `Your Hawaii Natural Clean quote: ${totalStr}`);
+
+    const smsBody = customSmsTemplate
+      ? applyVars(customSmsTemplate, extraVars)
+      : (isCustom
+          ? `Hi ${firstName}! Thanks for reaching out to Hawaii Natural Clean. Your service requires a custom quote — we'll follow up within 24 hours. Questions? Call/text (808) 468-5356 🌺`
+          : `Hi ${firstName}! Your Hawaii Natural Clean quote is ${totalStr} for ${d.serviceType || 'cleaning'}. Ready to book? Reply or call (808) 468-5356 🌺`);
+
+    const emailIntro = customEmailIntro ? applyVars(customEmailIntro, extraVars) : null;
+
+    try {
+      const emailRes = await fetch(`${BASE_URL}/api/send-email`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          to: d.email.trim(), subject,
+          type: isCustom ? 'generic' : 'quote',
+          clientName: firstName, service: d.serviceType || 'Cleaning',
+          frequency: d.frequency || null,
+          quoteData: isCustom ? null : quoteResult,
+          customIntro: emailIntro,
+          notes: isCustom ? `Thanks for reaching out! Your request (${d.serviceType}) requires a custom quote. We'll follow up within 24 hours — or call/text us at (808) 468-5356.` : null,
+        })
+      });
+      console.log('[lead-capture] email sent:', emailRes.status);
+    } catch(err) { console.error('[lead-capture] send-email failed:', err.message); }
+
+    try {
+      const smsRes = await fetch(`${BASE_URL}/api/send-sms`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ to: e164, message: smsBody })
+      });
+      console.log('[lead-capture] SMS sent:', smsRes.status);
+    } catch(err) { console.error('[lead-capture] send-sms failed:', err.message); }
+
     const quoteUpdate = { quote_sent_at: new Date().toISOString(), quote_data: quoteResult };
     if (!isCustom && quoteResult.total != null) quoteUpdate.quote_total = quoteResult.total;
     const { error: updateErr } = await db.from('leads').update(quoteUpdate).eq('id', leadId);

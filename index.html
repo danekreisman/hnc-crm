@@ -1471,6 +1471,47 @@ Mahalo 🌺</textarea>
   </div>
 </div>
 
+
+<!-- JANITORIAL AUTO OVERLAY -->
+<div class="overlay hidden" id="janitorial-auto-overlay" onclick="closeOverlay('janitorial-auto-overlay')">
+  <div class="panel" onclick="event.stopPropagation()">
+    <div class="panel-header"><div class="panel-title">Edit janitorial templates</div><button class="close-btn" onclick="closeOverlay('janitorial-auto-overlay')">&#x2715;</button></div>
+    <div class="panel-body">
+      <div class="panel-section">Automation info</div>
+      <div class="info-block">
+        <div class="info-row"><span class="info-label">Trigger</span><span class="info-val">Janitorial Cleaning lead submitted</span></div>
+        <div class="info-row"><span class="info-label">Actions</span><span class="info-val">Send email + Send SMS</span></div>
+        <div class="info-row"><span class="info-label">Status</span><span class="info-val"><span class="badge" style="background:#dcfce7;color:#166534;">Always on</span></span></div>
+      </div>
+      <div class="panel-section">Available variables</div>
+      <div style="background:#f8fafc;border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:14px;font-size:11px;color:var(--text-muted);line-height:1.9;">
+        <code style="background:#e2e8f0;padding:1px 5px;border-radius:3px;">{firstName}</code> &mdash; lead's first name &nbsp;
+        <code style="background:#e2e8f0;padding:1px 5px;border-radius:3px;">{service}</code> &mdash; service type
+      </div>
+      <div class="panel-section">SMS template</div>
+      <div class="form-row">
+        <textarea id="jan-sms" style="min-height:90px;font-size:13px;" placeholder="Aloha {firstName}, we've received your request for Janitorial Cleaning. Would you be available for a walkthrough sometime this week?"></textarea>
+      </div>
+      <div style="font-size:11px;color:var(--text-muted);margin-top:-8px;margin-bottom:14px;">Leave blank to use the default template.</div>
+      <div class="panel-section">Email subject</div>
+      <div class="form-row">
+        <input type="text" id="jan-subject" placeholder="Your Janitorial Cleaning Request &mdash; Hawaii Natural Clean">
+      </div>
+      <div style="font-size:11px;color:var(--text-muted);margin-top:-8px;margin-bottom:14px;">Leave blank to use the default.</div>
+      <div class="panel-section">Email intro message</div>
+      <div class="form-row">
+        <textarea id="jan-email-intro" style="min-height:80px;font-size:13px;" placeholder="Aloha {firstName}, thanks for reaching out! We've received your Janitorial Cleaning request and would love to schedule a walkthrough to give you an accurate quote."></textarea>
+      </div>
+      <div style="font-size:11px;color:var(--text-muted);margin-top:-8px;margin-bottom:14px;">Appears in the email body. Leave blank to use the default.</div>
+      <div class="save-bar" style="margin-top:16px;">
+        <button class="btn btn-primary" onclick="saveJanitorialTemplates()">Save templates</button>
+        <button class="btn" onclick="closeOverlay('janitorial-auto-overlay')">Cancel</button>
+      </div>
+      <div id="jan-saved" class="success-bar" style="margin-top:10px;"></div>
+    </div>
+  </div>
+</div>
+
 <!-- CLEANER PROFILE PANEL -->
 <div class="overlay hidden" id="cleaner-overlay" onclick="closeOverlay('cleaner-overlay')">
   <div class="panel" onclick="event.stopPropagation()">
@@ -6044,14 +6085,27 @@ function renderAutoList(){
     + '</div>'
     + '</div>';
 
+  var janitorialCard = '<div class="card" style="padding:14px 16px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:12px;border-left:3px solid #f59e0b;">'
+    + '<div style="flex:1;min-width:0;">'
+    +   '<div style="display:flex;align-items:center;gap:8px;"><b style="font-size:14px;">Janitorial Lead — Walkthrough Request</b>'
+    +     '<span class="pill pill-ok" style="font-size:10px;">ACTIVE</span>'
+    +     '<span style="font-size:10px;background:#f0f9ff;color:#1d4ed8;padding:2px 7px;border-radius:99px;border:1px solid #bfdbfe;">System</span>'
+    +   '</div>'
+    +   '<div style="font-size:12px;color:var(--muted);margin-top:4px;">When <b>lead.created</b> &middot; service is Janitorial Cleaning &middot; do send_email, send_sms</div>'
+    + '</div>'
+    + '<div style="display:flex;gap:6px;">'
+    +   '<button class="btn" style="font-size:12px;padding:4px 10px;" onclick="openJanitorialAutoEdit()">Edit templates</button>'
+    + '</div>'
+    + '</div>';
+
   if(!automations.length){
-    host.innerHTML = systemCard + '<div class="empty-state" style="padding:28px;text-align:center;color:var(--muted);background:var(--panel);border:1px dashed var(--border);border-radius:var(--radius);">No custom automations yet. Click <b>+ New automation</b> to build your first rule.</div>';
-    var ac = document.getElementById('auto-active-count'); if(ac) ac.textContent='1';
-    var atot = document.getElementById('auto-total-count'); if(atot) atot.textContent='1';
+    host.innerHTML = systemCard + janitorialCard + '<div class="empty-state" style="padding:28px;text-align:center;color:var(--muted);background:var(--panel);border:1px dashed var(--border);border-radius:var(--radius);">No custom automations yet. Click <b>+ New automation</b> to build your first rule.</div>';
+    var ac = document.getElementById('auto-active-count'); if(ac) ac.textContent='2';
+    var atot = document.getElementById('auto-total-count'); if(atot) atot.textContent='2';
     var tc = document.getElementById('auto-today-count'); if(tc) tc.textContent='0';
     return;
   }
-  var html = systemCard;
+  var html = systemCard + janitorialCard;
   for(var i=0;i<automations.length;i++){
     var a = automations[i];
     var condSummary = (a.conditions&&a.conditions.length) ? (a.conditions.length+' condition'+(a.conditions.length>1?'s':'')+' ('+(a.logic||'AND')+')') : 'runs every time';
@@ -6071,9 +6125,9 @@ function renderAutoList(){
       + '</div>';
   }
   host.innerHTML = html;
-  var active = 1 + automations.filter(function(a){return a.enabled;}).length; // +1 for system
+  var active = 2 + automations.filter(function(a){return a.enabled;}).length; // +2 for system cards
   var ac = document.getElementById('auto-active-count'); if(ac) ac.textContent=String(active);
-  var atot = document.getElementById('auto-total-count'); if(atot) atot.textContent=String(1+automations.length);
+  var atot = document.getElementById('auto-total-count'); if(atot) atot.textContent=String(2+automations.length);
   var today = (new Date()).toDateString();
   var todayN = automationRuns.filter(function(r){ return new Date(r.ts).toDateString()===today; }).length;
   var tc = document.getElementById('auto-today-count'); if(tc) tc.textContent=String(todayN);
@@ -6109,6 +6163,39 @@ async function saveQuoteTemplates(){
     if(savedEl){ savedEl.textContent='Templates saved!'; savedEl.classList.add('show'); setTimeout(function(){ savedEl.classList.remove('show'); },3000); }
   } catch(e) {
     console.error('saveQuoteTemplates err:', e);
+    if(savedEl){ savedEl.textContent='Error saving: '+(e.message||e); savedEl.classList.add('show'); }
+  }
+}
+
+async function openJanitorialAutoEdit(){
+  var savedEl = document.getElementById('jan-saved');
+  if(savedEl){ savedEl.textContent=''; savedEl.classList.remove('show'); }
+  try {
+    var r = await db.from('settings').select('value').eq('key','janitorial_sms_template').maybeSingle();
+    document.getElementById('jan-sms').value = (r.data && r.data.value) ? r.data.value : '';
+    var r2 = await db.from('settings').select('value').eq('key','janitorial_email_subject').maybeSingle();
+    document.getElementById('jan-subject').value = (r2.data && r2.data.value) ? r2.data.value : '';
+    var r3 = await db.from('settings').select('value').eq('key','janitorial_email_intro').maybeSingle();
+    document.getElementById('jan-email-intro').value = (r3.data && r3.data.value) ? r3.data.value : '';
+  } catch(e) { console.warn('loadJanitorialTemplates err:', e); }
+  openOverlay('janitorial-auto-overlay');
+}
+
+async function saveJanitorialTemplates(){
+  var sms = document.getElementById('jan-sms').value.trim();
+  var subject = document.getElementById('jan-subject').value.trim();
+  var emailIntro = document.getElementById('jan-email-intro').value.trim();
+  var savedEl = document.getElementById('jan-saved');
+  try {
+    if(sms){ await db.from('settings').upsert({ key:'janitorial_sms_template', value: sms, updated_at: new Date().toISOString() }, { onConflict:'key' }); }
+    else { await db.from('settings').delete().eq('key','janitorial_sms_template'); }
+    if(subject){ await db.from('settings').upsert({ key:'janitorial_email_subject', value: subject, updated_at: new Date().toISOString() }, { onConflict:'key' }); }
+    else { await db.from('settings').delete().eq('key','janitorial_email_subject'); }
+    if(emailIntro){ await db.from('settings').upsert({ key:'janitorial_email_intro', value: emailIntro, updated_at: new Date().toISOString() }, { onConflict:'key' }); }
+    else { await db.from('settings').delete().eq('key','janitorial_email_intro'); }
+    if(savedEl){ savedEl.textContent='Templates saved!'; savedEl.classList.add('show'); setTimeout(function(){ savedEl.classList.remove('show'); },3000); }
+  } catch(e) {
+    console.error('saveJanitorialTemplates err:', e);
     if(savedEl){ savedEl.textContent='Error saving: '+(e.message||e); savedEl.classList.add('show'); }
   }
 }

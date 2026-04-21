@@ -9,7 +9,7 @@
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
 <style>
 :root {
-  --brand:#1D9E75; --brand-light:#e8f8f2; --brand-border:#9ae6c4;
+  --brand:#3BB8E3; --brand-light:#eaf7fb; --brand-border:#9adcf0;
   --blue:#3BB8E3; --blue-light:#eaf7fb; --blue-border:#9adcf0;
   --text:#0f1c24; --muted:#5b7683; --border:#e3eef2;
   --bg:#f7fbfc; --panel:#fff;
@@ -30,11 +30,11 @@ body{background:linear-gradient(160deg,#eaf7fb 0%,#f7fbfc 40%,#f0faf6 100%)}
 .steps{display:flex;align-items:center;justify-content:center;gap:0;margin-bottom:32px}
 .step{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.04em;text-transform:uppercase}
 .step-dot{width:28px;height:28px;border-radius:50%;border:2px solid var(--border);background:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:var(--muted);transition:all .3s}
-.step.active .step-dot{border-color:var(--brand);background:var(--brand);color:#fff}
-.step.done .step-dot{border-color:var(--brand);background:var(--brand);color:#fff}
-.step.active{color:var(--brand)}
+.step.active .step-dot{border-color:var(--blue);background:var(--blue);color:#fff}
+.step.done .step-dot{border-color:var(--blue);background:var(--blue);color:#fff}
+.step.active{color:var(--blue)}
 .step-line{width:40px;height:2px;background:var(--border);margin:0 4px;transition:all .3s}
-.step-line.done{background:var(--brand)}
+.step-line.done{background:var(--blue)}
 
 /* Card */
 .card{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden}
@@ -44,12 +44,12 @@ body{background:linear-gradient(160deg,#eaf7fb 0%,#f7fbfc 40%,#f0faf6 100%)}
 .card-body{padding:24px}
 
 /* Quote summary */
-.quote-summary{background:var(--brand-light);border:1px solid var(--brand-border);border-radius:10px;padding:16px 18px;margin-bottom:20px}
+.quote-summary{background:var(--blue-light);border:1px solid var(--blue-border);border-radius:10px;padding:16px 18px;margin-bottom:20px}
 .quote-row{display:flex;justify-content:space-between;align-items:center;font-size:13px;padding:3px 0}
 .quote-row .label{color:var(--muted)}
 .quote-row .val{font-weight:600;color:var(--text)}
-.quote-divider{border:none;border-top:1px solid var(--brand-border);margin:10px 0}
-.quote-total-row{display:flex;justify-content:space-between;font-size:17px;font-weight:700;color:var(--brand)}
+.quote-divider{border:none;border-top:1px solid var(--blue-border);margin:10px 0}
+.quote-total-row{display:flex;justify-content:space-between;font-size:17px;font-weight:700;color:var(--blue)}
 .quote-name{font-size:16px;font-weight:600;margin-bottom:12px;color:var(--text)}
 
 /* Policy checklist */
@@ -57,8 +57,8 @@ body{background:linear-gradient(160deg,#eaf7fb 0%,#f7fbfc 40%,#f0faf6 100%)}
 .policy-title{font-size:12px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);margin-bottom:10px}
 .policy-item{display:flex;gap:12px;align-items:flex-start;padding:12px 14px;border:1px solid var(--border);border-radius:10px;margin-bottom:8px;cursor:pointer;transition:border-color .2s,background .2s;background:#fff}
 .policy-item:hover{border-color:var(--blue-border);background:var(--blue-light)}
-.policy-item.checked{border-color:var(--brand-border);background:var(--brand-light)}
-.policy-item input[type=checkbox]{width:18px;height:18px;accent-color:var(--brand);flex-shrink:0;margin-top:1px;cursor:pointer}
+.policy-item.checked{border-color:var(--blue-border);background:var(--blue-light)}
+.policy-item input[type=checkbox]{width:18px;height:18px;accent-color:var(--blue);flex-shrink:0;margin-top:1px;cursor:pointer}
 .policy-item .pi-text strong{display:block;font-size:13px;font-weight:600;color:var(--text);margin-bottom:2px}
 .policy-item .pi-text span{font-size:12px;color:var(--muted);line-height:1.5}
 
@@ -72,8 +72,8 @@ body{background:linear-gradient(160deg,#eaf7fb 0%,#f7fbfc 40%,#f0faf6 100%)}
 
 /* Buttons */
 .btn{display:block;width:100%;padding:14px;border:none;border-radius:10px;font-size:15px;font-weight:700;font-family:'DM Sans',sans-serif;cursor:pointer;transition:all .2s;text-align:center}
-.btn-primary{background:var(--brand);color:#fff;box-shadow:0 4px 16px rgba(29,158,117,.3)}
-.btn-primary:hover{filter:brightness(1.07);box-shadow:0 6px 20px rgba(29,158,117,.4)}
+.btn-primary{background:var(--blue);color:#fff;box-shadow:0 4px 16px rgba(59,184,227,.3)}
+.btn-primary:hover{filter:brightness(1.07);box-shadow:0 6px 20px rgba(59,184,227,.4)}
 .btn-primary:disabled{opacity:.6;cursor:not-allowed}
 .btn-ghost{background:transparent;color:var(--muted);font-size:13px;padding:10px;font-weight:500}
 .btn-ghost:hover{color:var(--text)}
@@ -161,7 +161,7 @@ function renderQuote(){
   var total    = +(preTotal + tax).toFixed(2);
 
   var discRow = discPct > 0
-    ? '<div class="quote-row"><span class="label">'+discPct+'% frequency discount</span><span class="val" style="color:var(--brand);">−'+fmt(discount)+'</span></div>'
+    ? '<div class="quote-row"><span class="label">'+discPct+'% frequency discount</span><span class="val" style="color:var(--blue);">−'+fmt(discount)+'</span></div>'
     : '';
 
   var summaryHtml = subtotal
@@ -172,7 +172,7 @@ function renderQuote(){
         + '<hr class="quote-divider">'
         + '<div class="quote-total-row"><span>Total</span><span>'+fmt(total)+'</span></div>'
       + '</div>'
-    : '<div class="quote-summary"><div class="quote-row"><span class="label">Service</span><span class="val">'+(LEAD.service||'Custom')+'</span></div><div class="quote-row" style="margin-top:8px"><span style="font-size:13px;color:var(--muted);">Custom quote — we'll confirm pricing after a walkthrough.</span></div></div>';
+    : '<div class="quote-summary"><div class="quote-row"><span class="label">Service</span><span class="val">'+(LEAD.service||'Custom')+'</span></div><div class="quote-row" style="margin-top:8px"><span style="font-size:13px;color:var(--muted);">Custom quote — we\'ll confirm pricing after a walkthrough.</span></div></div>';
 
   var details = [];
   if(LEAD.service) details.push('<div class="quote-row"><span class="label">Service</span><span class="val">'+LEAD.service+'</span></div>');
@@ -181,7 +181,7 @@ function renderQuote(){
 
   document.getElementById('app').innerHTML = ''
     + '<div class="card">'
-    +   '<div class="card-head"><h2>Aloha, '+LEAD.firstName+'! 🌺</h2><p>Here's your personalized quote from Hawaii Natural Clean. Review the details below, then click Continue to review our policies and book your cleaning.</p></div>'
+    +   '<div class="card-head"><h2>Aloha, '+LEAD.firstName+'! 🌺</h2><p>Here\'s your personalized quote from Hawaii Natural Clean. Review the details below, then click Continue to review our policies and book your cleaning.</p></div>'
     +   '<div class="card-body">'
     +     (details.length ? '<div class="quote-name" style="margin-bottom:8px;">'+details.join('')+'</div>' : '')
     +     summaryHtml
@@ -205,7 +205,7 @@ var POLICIES = [
   {
     id:'p3',
     title:'Property access',
-    detail:'Please ensure we have access to your property at the scheduled time. You'll be asked to provide entry instructions when booking.'
+    detail:'Please ensure we have access to your property at the scheduled time. You\'ll be asked to provide entry instructions when booking.'
   },
   {
     id:'p4',
@@ -263,7 +263,7 @@ function renderBook(){
 
   document.getElementById('app').innerHTML = ''
     + '<div class="card">'
-    +   '<div class="card-head"><h2>Pick your date</h2><p>Choose a preferred date and time. We'll confirm availability and send you a booking confirmation.</p></div>'
+    +   '<div class="card-head"><h2>Pick your date</h2><p>Choose a preferred date and time. We\'ll confirm availability and send you a booking confirmation.</p></div>'
     +   '<div class="card-body">'
     +     '<div class="field-row">'
     +       '<div class="field"><label>Preferred date</label><input type="date" id="bk-date" min="'+today+'"></div>'

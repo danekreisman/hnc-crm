@@ -50,16 +50,16 @@ export default async function handler(req, res) {
             </div>
             <div style="display:flex;justify-content:space-between;padding-top:12px;border-top:1px solid #e0e0dd;margin-top:8px;">
               <span style="font-weight:700;font-size:16px;">Total</span>
-              <span style="font-weight:700;font-size:16px;color:#1D9E75;">${amount}</span>
+              <span style="font-weight:700;font-size:16px;color:#3BB8E3;">${amount}</span>
             </div>
           </div>
 
-          <div style="background:#f0faf6;border:1px solid #9ae6b4;border-radius:10px;padding:16px;margin-bottom:24px;">
-            <p style="font-weight:600;color:#276749;margin:0 0 8px;">Payment options:</p>
-            <p style="color:#276749;margin:0;font-size:14px;">✓ ACH bank transfer — <strong>FREE</strong> (3-5 business days)<br>✓ Credit/debit card — <strong>3% processing fee added</strong></p>
+          <div style="background:#eaf7fb;border:1px solid #79D3E1;border-radius:10px;padding:16px;margin-bottom:24px;">
+            <p style="font-weight:600;color:#16758F;margin:0 0 8px;">Payment options:</p>
+            <p style="color:#16758F;margin:0;font-size:14px;">✓ ACH bank transfer — <strong>FREE</strong> (3-5 business days)<br>✓ Credit/debit card — <strong>3% processing fee added</strong></p>
           </div>
 
-          ${invoiceUrl ? `<a href="${invoiceUrl}" style="display:block;background:#1D9E75;color:#fff;text-align:center;padding:14px 24px;border-radius:10px;text-decoration:none;font-weight:600;font-size:16px;margin-bottom:24px;">View & Pay Invoice →</a>` : ''}
+          ${invoiceUrl ? `<a href="${invoiceUrl}" style="display:block;background:#3BB8E3;color:#fff;text-align:center;padding:14px 24px;border-radius:10px;text-decoration:none;font-weight:600;font-size:16px;margin-bottom:24px;">View & Pay Invoice →</a>` : ''}
           
           ${notes ? `<p style="color:#666;font-size:14px;">${notes}</p>` : ''}
           
@@ -97,7 +97,7 @@ export default async function handler(req, res) {
           <h2 style="font-size:22px;font-weight:700;margin-bottom:8px;">Thank you, ${clientName}! 🌺</h2>
           <p style="color:#666;margin-bottom:24px;">Your home has been cleaned and we hope everything looks great!</p>
           <p style="color:#666;margin-bottom:24px;">If you have a moment, we would really appreciate a Google review — it helps us grow and serve more families in Hawaii.</p>
-          <a href="https://g.page/r/hawaiinaturalclean/review" style="display:block;background:#1D9E75;color:#fff;text-align:center;padding:14px 24px;border-radius:10px;text-decoration:none;font-weight:600;font-size:16px;margin-bottom:24px;">Leave a Google Review →</a>
+          <a href="https://g.page/r/hawaiinaturalclean/review" style="display:block;background:#3BB8E3;color:#fff;text-align:center;padding:14px 24px;border-radius:10px;text-decoration:none;font-weight:600;font-size:16px;margin-bottom:24px;">Leave a Google Review →</a>
           <p style="color:#666;font-size:14px;">See you next time! — The Hawaii Natural Clean Team</p>
           <p style="color:#999;font-size:12px;margin-top:32px;padding-top:16px;border-top:1px solid #e8e8e5;">Hawaii Natural Clean · Oahu & Maui, Hawaii · hawaiinaturalclean.com</p>
         </div>
@@ -116,13 +116,13 @@ export default async function handler(req, res) {
       if (bk.condition && bk.condition.surcharge > 0) breakdownRows.push(`<tr><td style="color:#666;padding:6px 0;">Condition surcharge (${bk.condition.tier})</td><td style="text-align:right;font-weight:500;">+$${Number(bk.condition.surcharge).toFixed(2)}</td></tr>`);
 
       const discountRow = q.discount_pct > 0
-        ? `<tr><td style="color:#059669;padding:6px 0;">${frequency || 'Frequency'} discount (${q.discount_pct}% off)</td><td style="text-align:right;color:#059669;font-weight:500;">−$${Number(q.discount).toFixed(2)}</td></tr>`
+        ? `<tr><td style="color:#1F9EC6;padding:6px 0;">${frequency || 'Frequency'} discount (${q.discount_pct}% off)</td><td style="text-align:right;color:#1F9EC6;font-weight:500;">−$${Number(q.discount).toFixed(2)}</td></tr>`
         : '';
 
       const finalBookUrl = bookingToken
         ? `https://hnc-crm.vercel.app/book.html?bt=${bookingToken}`
         : (bookingUrl || 'https://hnc-crm.vercel.app/book.html');
-      const bookBtn = `<a href="${finalBookUrl}" style="display:block;background:#1D9E75;color:#fff;text-align:center;padding:14px 24px;border-radius:10px;text-decoration:none;font-weight:700;font-size:16px;margin-bottom:24px;">Book Now →</a>`;
+      const bookBtn = `<a href="${finalBookUrl}" style="display:block;background:#3BB8E3;color:#fff;text-align:center;padding:14px 24px;border-radius:10px;text-decoration:none;font-weight:700;font-size:16px;margin-bottom:24px;">Book Now →</a>`;
 
       html = `
         <div style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;max-width:600px;margin:0 auto;padding:32px 24px;color:#1a1a1a;background:#ffffff;">
@@ -150,7 +150,7 @@ export default async function handler(req, res) {
               ${discountRow}
               <tr style="border-top:2px solid #e2e8f0;">
                 <td style="padding:12px 0 0;font-size:18px;font-weight:700;color:#0f172a;">Total</td>
-                <td style="text-align:right;padding:12px 0 0;font-size:22px;font-weight:800;color:#1D9E75;">$${Number(q.total).toFixed(2)}</td>
+                <td style="text-align:right;padding:12px 0 0;font-size:22px;font-weight:800;color:#3BB8E3;">$${Number(q.total).toFixed(2)}</td>
               </tr>
             </table>
           </div>

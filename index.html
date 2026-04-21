@@ -1668,6 +1668,7 @@ function _generateUUID(){
 }
 
 function _generateRecurringDates(yr,mo,dy,freq){ // FIXED: lim -> max
+  console.log('[_generateRecurringDates] v2 - BUG FIXED - using max not lim');
   var dates=[];
   var start=new Date(yr,mo-1,dy);
   // Normalize common aliases

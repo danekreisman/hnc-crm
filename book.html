@@ -365,7 +365,8 @@ function drawCalendar(){
     var clickable = !past && !sun && !blk;
     var onclick   = clickable ? ' onclick="pickDate(\''+ds+'\')"' : '';
     var title     = sun?'Closed Sundays':blk?'Fully booked':past?'Past date':'';
-    gridHtml += '<div class="'+cls+'"'+onclick+(title?' title="'+title+'"':')+'>'+d+'</div>';
+    var titleAttr = title ? ' title="'+title+'"' : '';
+    gridHtml += '<div class="'+cls+'"'+onclick+titleAttr+'>'+d+'</div>';
   }
 
   calEl.innerHTML = '<div class="cal-nav">'

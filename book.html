@@ -9,123 +9,124 @@
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
 <style>
 :root {
-  --brand:#3BB8E3; --brand-light:#eaf7fb; --brand-border:#9adcf0;
-  --blue:#3BB8E3; --blue-light:#eaf7fb; --blue-border:#9adcf0;
+  --blue:#3BB8E3; --blue2:#59C7E2; --blue3:#79D3E1;
+  --blue-light:#eaf7fb; --blue-border:#9adcf0;
+  --blue-dark:#1F9EC6; --blue-deeper:#16758F;
+  --gold:#F2E19B; --gold-dark:#7A5A00;
   --text:#0f1c24; --muted:#5b7683; --border:#e3eef2;
   --bg:#f7fbfc; --panel:#fff;
-  --radius:14px; --shadow:0 4px 24px rgba(15,42,53,.08);
+  --radius:14px;
+  --shadow:0 4px 24px rgba(15,42,53,.08);
+  --shadow-lg:0 8px 40px rgba(15,42,53,.12);
 }
 *{box-sizing:border-box;margin:0;padding:0}
-html,body{min-height:100vh;background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;font-size:15px}
-body{background:linear-gradient(160deg,#eaf7fb 0%,#f7fbfc 40%,#f0faf6 100%)}
+html,body{min-height:100vh;font-family:'DM Sans',sans-serif;font-size:15px;color:var(--text)}
+body{background:linear-gradient(160deg,#eaf7fb 0%,#f7fbfc 40%,#eaf7fb 100%)}
 
-/* Layout */
-.wrap{max-width:560px;margin:0 auto;padding:32px 16px 64px}
+.wrap{max-width:580px;margin:0 auto;padding:32px 16px 64px}
+
+/* Logo */
 .logo-row{display:flex;align-items:center;justify-content:center;gap:12px;margin-bottom:36px}
 .logo-row img{height:44px}
 .logo-row .brand{font-family:'Playfair Display',serif;font-size:18px;color:var(--text);line-height:1.2}
-.logo-row .brand span{display:block;font-family:'DM Sans',sans-serif;font-size:12px;color:var(--muted);font-weight:500;letter-spacing:.06em;text-transform:uppercase}
+.logo-row .brand span{display:block;font-family:'DM Sans',sans-serif;font-size:11px;color:var(--muted);font-weight:600;letter-spacing:.08em;text-transform:uppercase;margin-top:1px}
 
-/* Progress steps */
+/* Steps */
 .steps{display:flex;align-items:center;justify-content:center;gap:0;margin-bottom:32px}
-.step{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.04em;text-transform:uppercase}
-.step-dot{width:28px;height:28px;border-radius:50%;border:2px solid var(--border);background:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:var(--muted);transition:all .3s}
+.step{display:flex;align-items:center;gap:7px;font-size:11px;font-weight:700;color:var(--muted);letter-spacing:.06em;text-transform:uppercase}
+.step-dot{width:28px;height:28px;border-radius:50%;border:2px solid var(--border);background:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:var(--muted);transition:all .3s;flex-shrink:0}
 .step.active .step-dot{border-color:var(--blue);background:var(--blue);color:#fff}
 .step.done .step-dot{border-color:var(--blue);background:var(--blue);color:#fff}
 .step.active{color:var(--blue)}
-.step-line{width:40px;height:2px;background:var(--border);margin:0 4px;transition:all .3s}
+.step-line{width:36px;height:2px;background:var(--border);margin:0 4px;transition:all .3s;flex-shrink:0}
 .step-line.done{background:var(--blue)}
 
 /* Card */
 .card{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden}
-.card-head{padding:22px 24px 0;border-bottom:1px solid var(--border);padding-bottom:18px}
-.card-head h2{font-family:'Playfair Display',serif;font-size:22px;font-weight:700;color:var(--text);margin-bottom:4px}
-.card-head p{font-size:13px;color:var(--muted);line-height:1.5}
+.card-head{padding:22px 24px 18px;border-bottom:1px solid var(--border)}
+.card-head h2{font-family:'Playfair Display',serif;font-size:22px;font-weight:700;margin-bottom:5px}
+.card-head p{font-size:13px;color:var(--muted);line-height:1.55}
 .card-body{padding:24px}
 
 /* Quote summary */
-.quote-summary{background:var(--blue-light);border:1px solid var(--blue-border);border-radius:10px;padding:16px 18px;margin-bottom:20px}
-.quote-row{display:flex;justify-content:space-between;align-items:center;font-size:13px;padding:3px 0}
-.quote-row .label{color:var(--muted)}
-.quote-row .val{font-weight:600;color:var(--text)}
-.quote-divider{border:none;border-top:1px solid var(--blue-border);margin:10px 0}
-.quote-total-row{display:flex;justify-content:space-between;font-size:17px;font-weight:700;color:var(--blue)}
-.quote-name{font-size:16px;font-weight:600;margin-bottom:12px;color:var(--text)}
+.quote-block{background:var(--blue-light);border:1px solid var(--blue-border);border-radius:10px;padding:16px 18px;margin-bottom:20px}
+.quote-meta{display:flex;gap:24px;margin-bottom:12px}
+.quote-meta-item .label{font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.05em}
+.quote-meta-item .val{font-size:14px;font-weight:600;color:var(--text);margin-top:2px}
+.price-table{background:#fff;border:1px solid var(--blue-border);border-radius:8px;padding:12px 14px}
+.price-row{display:flex;justify-content:space-between;font-size:13px;padding:3px 0;color:var(--muted)}
+.price-row .amount{font-weight:500;color:var(--text)}
+.price-row.discount .amount{color:var(--blue-dark)}
+.price-divider{border:none;border-top:1px solid var(--blue-border);margin:8px 0}
+.price-total{display:flex;justify-content:space-between;font-size:16px;font-weight:700;color:var(--blue-dark)}
 
-/* Policy checklist */
-.policy-section{margin-bottom:20px}
-.policy-title{font-size:12px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);margin-bottom:10px}
-.policy-item{display:flex;gap:12px;align-items:flex-start;padding:12px 14px;border:1px solid var(--border);border-radius:10px;margin-bottom:8px;cursor:pointer;transition:border-color .2s,background .2s;background:#fff}
+/* Rush fee */
+.rush-notice{border-radius:10px;padding:12px 14px;margin-top:14px;font-size:13px;line-height:1.5}
+.rush-notice.same-day{background:#fef2f2;border:1px solid #fca5a5;color:#b91c1c}
+.rush-notice.next-day{background:#fff7ed;border:1px solid #fdba74;color:#9a3412}
+.rush-notice.two-day{background:#fefce8;border:1px solid #fde68a;color:#78350f}
+.rush-fee-label{font-size:15px;font-weight:700;margin-bottom:3px}
+
+/* Policy items */
+.policy-item{display:flex;gap:12px;align-items:flex-start;padding:12px 14px;border:1.5px solid var(--border);border-radius:10px;margin-bottom:8px;cursor:pointer;background:#fff;transition:border-color .2s,background .2s}
 .policy-item:hover{border-color:var(--blue-border);background:var(--blue-light)}
-.policy-item.checked{border-color:var(--blue-border);background:var(--blue-light)}
-.policy-item input[type=checkbox]{width:18px;height:18px;accent-color:var(--blue);flex-shrink:0;margin-top:1px;cursor:pointer}
-.policy-item .pi-text strong{display:block;font-size:13px;font-weight:600;color:var(--text);margin-bottom:2px}
-.policy-item .pi-text span{font-size:12px;color:var(--muted);line-height:1.5}
-
-/* Form fields */
-.field{margin-bottom:16px}
-.field label{display:block;font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.05em;text-transform:uppercase;margin-bottom:6px}
-.field input,.field select,.field textarea{width:100%;padding:11px 14px;border:1px solid var(--border);border-radius:10px;font-size:14px;font-family:'DM Sans',sans-serif;color:var(--text);background:#fff;transition:border-color .2s}
-.field input:focus,.field select:focus,.field textarea:focus{outline:none;border-color:var(--blue)}
-.field textarea{min-height:80px;resize:vertical}
-.field-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-
-/* Buttons */
-.btn{display:block;width:100%;padding:14px;border:none;border-radius:10px;font-size:15px;font-weight:700;font-family:'DM Sans',sans-serif;cursor:pointer;transition:all .2s;text-align:center}
-.btn-primary{background:var(--blue);color:#fff;box-shadow:0 4px 16px rgba(59,184,227,.3)}
-.btn-primary:hover{filter:brightness(1.07);box-shadow:0 6px 20px rgba(59,184,227,.4)}
-.btn-primary:disabled{opacity:.6;cursor:not-allowed}
-.btn-ghost{background:transparent;color:var(--muted);font-size:13px;padding:10px;font-weight:500}
-.btn-ghost:hover{color:var(--text)}
-
-/* States */
-.error-banner{background:#fee;border:1px solid #fca5a5;border-radius:10px;padding:14px 16px;font-size:13px;color:#c0392b;margin-bottom:20px;text-align:center}
-.success-screen{text-align:center;padding:40px 24px}
-.success-screen .checkmark{font-size:52px;margin-bottom:16px}
-.success-screen h2{font-family:'Playfair Display',serif;font-size:24px;margin-bottom:8px}
-.success-screen p{color:var(--muted);font-size:14px;line-height:1.6;max-width:340px;margin:0 auto}
-.loading{text-align:center;padding:60px 24px;color:var(--muted);font-size:14px}
-
-/* Hidden */
-.hidden{display:none!important}
+.policy-item.checked{border-color:var(--blue);background:var(--blue-light)}
+.policy-item input[type=checkbox]{width:18px;height:18px;accent-color:var(--blue);flex-shrink:0;margin-top:2px;cursor:pointer}
+.pi-title{font-size:13px;font-weight:600;color:var(--text);margin-bottom:2px}
+.pi-detail{font-size:12px;color:var(--muted);line-height:1.5}
 
 /* Calendar */
-.cal-wrap{user-select:none}
 .cal-nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
-.cal-nav button{background:none;border:1px solid var(--border);border-radius:8px;width:32px;height:32px;cursor:pointer;font-size:16px;color:var(--muted);display:flex;align-items:center;justify-content:center;transition:all .15s}
-.cal-nav button:hover{border-color:var(--blue);color:var(--blue)}
-.cal-nav .cal-title{font-weight:700;font-size:15px;color:var(--text)}
+.cal-nav-btn{background:#fff;border:1px solid var(--border);border-radius:8px;width:32px;height:32px;cursor:pointer;font-size:18px;color:var(--muted);display:flex;align-items:center;justify-content:center;transition:all .15s;line-height:1}
+.cal-nav-btn:hover:not(:disabled){border-color:var(--blue);color:var(--blue)}
+.cal-nav-btn:disabled{opacity:.3;cursor:not-allowed}
+.cal-month{font-weight:700;font-size:15px;color:var(--text)}
 .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
-.cal-day-hdr{text-align:center;font-size:11px;font-weight:700;color:var(--muted);letter-spacing:.05em;padding:4px 0;text-transform:uppercase}
-.cal-day{aspect-ratio:1;display:flex;align-items:center;justify-content:center;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;transition:all .15s;border:1.5px solid transparent;position:relative}
-.cal-day:hover:not(.blocked):not(.past):not(.empty){background:var(--blue-light);border-color:var(--blue-border);color:var(--blue)}
-.cal-day.today{border-color:var(--blue-border);color:var(--blue)}
-.cal-day.selected{background:var(--blue);color:#fff;border-color:var(--blue);font-weight:700}
-.cal-day.selected:hover{background:var(--blue)}
-.cal-day.blocked{background:#fef2f2;color:#fca5a5;cursor:not-allowed;text-decoration:line-through}
-.cal-day.past{color:var(--border);cursor:not-allowed}
+.cal-hdr{text-align:center;font-size:10px;font-weight:700;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;padding:5px 0}
+.cal-day{aspect-ratio:1;display:flex;align-items:center;justify-content:center;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;border:1.5px solid transparent;transition:all .15s;position:relative}
+.cal-day:hover:not(.blocked):not(.past):not(.empty):not(.sunday){background:var(--blue-light);border-color:var(--blue-border);color:var(--blue)}
+.cal-day.today{border-color:var(--blue-border);font-weight:700}
+.cal-day.selected{background:var(--blue) !important;color:#fff !important;border-color:var(--blue) !important;font-weight:700}
+.cal-day.blocked{background:#fef2f2;color:#fca5a5;cursor:not-allowed;text-decoration:line-through;font-size:12px}
+.cal-day.past{color:#d1d5db;cursor:not-allowed}
 .cal-day.empty{cursor:default}
-.cal-day.sunday{color:#fca5a5;cursor:not-allowed;}
-.cal-day.loading{opacity:.5;pointer-events:none}
-.cal-legend{display:flex;gap:16px;margin-top:10px;flex-wrap:wrap}
-.cal-legend span{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted)}
-.cal-legend i{width:12px;height:12px;border-radius:3px;display:inline-block}
-.avail-badge{font-size:10px;position:absolute;bottom:2px;right:3px;color:var(--blue);font-weight:700;opacity:.7}
+.cal-day.sunday{color:#fca5a5;cursor:not-allowed}
+.cal-legend{display:flex;gap:14px;margin-top:10px;flex-wrap:wrap}
+.cal-legend-item{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted)}
+.cal-legend-swatch{width:12px;height:12px;border-radius:3px;flex-shrink:0}
 
 /* Time slots */
-.slot-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}
-.slot-btn{padding:9px 6px;border:1.5px solid var(--border);border-radius:8px;background:#fff;font-size:13px;font-family:inherit;cursor:pointer;transition:all .15s;text-align:center;color:var(--text)}
+.slots-section{margin-top:16px}
+.slots-label{font-size:11px;font-weight:700;color:var(--muted);letter-spacing:.07em;text-transform:uppercase;margin-bottom:8px}
+.slot-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.slot-btn{padding:10px 6px;border:1.5px solid var(--border);border-radius:8px;background:#fff;font-size:13px;font-family:inherit;cursor:pointer;transition:all .15s;text-align:center;color:var(--text);font-weight:500}
 .slot-btn:hover:not(:disabled){border-color:var(--blue);color:var(--blue);background:var(--blue-light)}
-.slot-btn.selected{background:var(--blue);color:#fff;border-color:var(--blue);font-weight:600}
-.slot-btn:disabled{opacity:.35;cursor:not-allowed;text-decoration:line-through}
-.slots-label{font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.05em;text-transform:uppercase;margin-top:16px;margin-bottom:4px}
+.slot-btn.selected{background:var(--blue);color:#fff;border-color:var(--blue);font-weight:700}
+.slot-btn:disabled{opacity:.3;cursor:not-allowed;text-decoration:line-through}
 
-/* Rush fee notice */
-.rush-notice{border-radius:10px;padding:12px 14px;margin-top:12px;font-size:13px;line-height:1.5;display:none;}
-.rush-notice.same-day{background:#fef2f2;border:1px solid #fca5a5;color:#c0392b;}
-.rush-notice.next-day{background:#fff7ed;border:1px solid #fdba74;color:#9a3412;}
-.rush-notice.two-day{background:#fefce8;border:1px solid #fde68a;color:#78350f;}
-.rush-notice .rush-fee{font-size:17px;font-weight:700;margin-bottom:2px;}
+/* Buttons */
+.btn-primary{display:block;width:100%;padding:14px;border:none;border-radius:10px;font-size:15px;font-weight:700;font-family:inherit;cursor:pointer;background:var(--blue);color:#fff;box-shadow:0 4px 16px rgba(59,184,227,.3);transition:all .2s;text-align:center;margin-top:16px}
+.btn-primary:hover:not(:disabled){filter:brightness(1.07);box-shadow:0 6px 20px rgba(59,184,227,.4)}
+.btn-primary:disabled{opacity:.4;cursor:not-allowed;box-shadow:none}
+.btn-ghost{display:block;width:100%;padding:10px;background:none;border:none;color:var(--muted);font-size:13px;font-family:inherit;cursor:pointer;margin-top:8px;font-weight:500}
+.btn-ghost:hover{color:var(--text)}
+
+/* Form */
+.field{margin-top:16px}
+.field label{display:block;font-size:11px;font-weight:700;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;margin-bottom:6px}
+.field label span{font-weight:400;text-transform:none;letter-spacing:0}
+.field textarea{width:100%;padding:11px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-family:inherit;color:var(--text);resize:vertical;min-height:80px;transition:border-color .2s}
+.field textarea:focus{outline:none;border-color:var(--blue)}
+
+/* Alerts */
+.error-banner{background:#fef2f2;border:1px solid #fca5a5;border-radius:10px;padding:14px;font-size:13px;color:#b91c1c;margin-top:12px;text-align:center}
+.loading-msg{text-align:center;padding:20px;color:var(--muted);font-size:13px}
+
+/* Success */
+.success-screen{text-align:center;padding:40px 24px}
+.success-icon{font-size:52px;margin-bottom:16px}
+.success-screen h2{font-family:'Playfair Display',serif;font-size:24px;margin-bottom:10px}
+.success-screen p{color:var(--muted);font-size:14px;line-height:1.65;max-width:360px;margin:0 auto}
 </style>
 </head>
 <body>
@@ -135,231 +136,375 @@ body{background:linear-gradient(160deg,#eaf7fb 0%,#f7fbfc 40%,#f0faf6 100%)}
     <div class="brand">Hawaii Natural Clean<span>Booking Portal</span></div>
   </div>
 
-  <!-- Progress -->
-  <div class="steps" id="steps">
-    <div class="step active" id="s1"><div class="step-dot">1</div>Your quote</div>
-    <div class="step-line" id="l1"></div>
-    <div class="step" id="s2"><div class="step-dot">2</div>Policies</div>
-    <div class="step-line" id="l2"></div>
-    <div class="step" id="s3"><div class="step-dot">3</div>Book</div>
+  <div class="steps" id="steps-bar">
+    <div class="step active" id="step1"><div class="step-dot">1</div>Your quote</div>
+    <div class="step-line" id="line1"></div>
+    <div class="step" id="step2"><div class="step-dot">2</div>Policies</div>
+    <div class="step-line" id="line2"></div>
+    <div class="step" id="step3"><div class="step-dot">3</div>Book</div>
   </div>
 
-  <div id="app">
-    <div class="loading">Loading your quote…</div>
-  </div>
+  <div id="app"><div class="card"><div class="card-body loading-msg">Loading your quote&hellip;</div></div></div>
 </div>
 
 <script>
-const TAX = 0.04712;
-let LEAD = null;
-let TOKEN = null;
+// ─── State ────────────────────────────────────────────────────────────────
+var TOKEN    = new URLSearchParams(location.search).get('bt');
+var LEAD     = null;
+var AVAIL    = null;   // { blocked_dates:[], busy_times:{} }
+var CAL_YEAR = 0;
+var CAL_MON  = 0;     // 0-indexed
+var SEL_DATE = null;
+var SEL_TIME = null;
+var RUSH_FEE = 0;
 
-// ── helpers ──────────────────────────────────────────────────────────────
-function qs(id){ return document.getElementById(id); }
+var ALL_SLOTS = ['8:00 AM','9:00 AM','10:00 AM','11:00 AM','12:00 PM','1:00 PM','2:00 PM','3:00 PM','4:00 PM'];
+var TAX_RATE  = 0.04712;
+
+// ─── Helpers ──────────────────────────────────────────────────────────────
+function $(id){ return document.getElementById(id); }
 function fmt(n){ return '$' + Number(n).toFixed(2); }
-function step(n){
+function setStep(n){
   [1,2,3].forEach(function(i){
-    var s = qs('s'+i); var l = qs('l'+i);
-    s.className = 'step' + (i<n?' done':i===n?' active':'');
-    if(l) l.className = 'step-line' + (i<n?' done':'');
+    $('step'+i).className = 'step'+(i<n?' done':i===n?' active':'');
+    if($('line'+i)) $('line'+i).className = 'step-line'+(i<n?' done':'');
   });
 }
+function today(){ var d=new Date();d.setHours(0,0,0,0);return d; }
+function toISO(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
 
-// ── token from URL ────────────────────────────────────────────────────────
-const params = new URLSearchParams(location.search);
-TOKEN = params.get('bt');
-
+// ─── Boot ─────────────────────────────────────────────────────────────────
 if(!TOKEN){
-  document.getElementById('app').innerHTML = '<div class="card"><div class="card-body error-banner">No booking link detected. Please use the link from your quote email.</div></div>';
+  $('app').innerHTML='<div class="card"><div class="card-body"><div class="error-banner">No booking link detected. Please use the link from your quote email.</div><p style="text-align:center;color:var(--muted);font-size:13px;margin-top:14px">Questions? Call or text <strong>(808) 468-5356</strong></p></div></div>';
 } else {
   loadLead();
 }
 
 async function loadLead(){
   try {
-    const r = await fetch('/api/lead-book?token='+encodeURIComponent(TOKEN));
-    const data = await r.json();
-    if(!r.ok) throw new Error(data.error || 'Invalid link');
-    LEAD = data;
-    renderQuote();
+    var r = await fetch('/api/lead-book?token='+encodeURIComponent(TOKEN));
+    var j = await r.json();
+    if(!r.ok) throw new Error(j.error || 'Invalid link');
+    LEAD = j;
+    renderStep1();
   } catch(e){
-    document.getElementById('app').innerHTML = '<div class="card"><div class="card-body"><div class="error-banner">'+e.message+'</div><p style="text-align:center;color:var(--muted);font-size:13px;margin-top:12px">Need help? Call or text us at <strong>(808) 468-5356</strong></p></div></div>';
+    $('app').innerHTML='<div class="card"><div class="card-body"><div class="error-banner">'+e.message+'</div><p style="text-align:center;color:var(--muted);font-size:13px;margin-top:14px">Questions? Call or text <strong>(808) 468-5356</strong></p></div></div>';
   }
 }
 
-// ── Step 1: Quote summary ─────────────────────────────────────────────────
-function renderQuote(){
-  step(1);
-  var q = LEAD.quoteData || {};
-  var subtotal = q.subtotal || LEAD.quoteTotal;
-  var discount = q.discount || 0;
-  var discPct  = q.discount_pct || 0;
-  var preTotal = q.total || LEAD.quoteTotal || 0;
-  var tax      = +(preTotal * TAX).toFixed(2);
-  var total    = +(preTotal + tax).toFixed(2);
+// ─────────────────────────────────────────────────────────────────────────
+// STEP 1 — Quote summary
+// ─────────────────────────────────────────────────────────────────────────
+function renderStep1(){
+  setStep(1);
+  var q         = LEAD.quoteData || {};
+  var subtotal  = q.subtotal != null ? Number(q.subtotal) : (LEAD.quoteTotal ? Number(LEAD.quoteTotal) : null);
+  var discount  = Number(q.discount || 0);
+  var discPct   = Number(q.discount_pct || 0);
+  var preTotal  = q.total != null ? Number(q.total) : (subtotal != null ? subtotal - discount : null);
+  var tax       = preTotal != null ? +(preTotal * TAX_RATE).toFixed(2) : null;
+  var grandTotal= preTotal != null && tax != null ? +(preTotal + tax).toFixed(2) : null;
 
-  var discRow = discPct > 0
-    ? '<div class="quote-row"><span class="label">'+discPct+'% frequency discount</span><span class="val" style="color:var(--blue);">−'+fmt(discount)+'</span></div>'
-    : '';
+  var metaHtml = '';
+  if(LEAD.service)   metaHtml += '<div class="quote-meta-item"><div class="label">Service</div><div class="val">'+esc(LEAD.service)+'</div></div>';
+  if(LEAD.frequency) metaHtml += '<div class="quote-meta-item"><div class="label">Frequency</div><div class="val">'+esc(LEAD.frequency)+'</div></div>';
+  if(LEAD.beds||LEAD.baths) metaHtml += '<div class="quote-meta-item"><div class="label">Property</div><div class="val">'+(LEAD.beds||'?')+' bed / '+(LEAD.baths||'?')+' bath</div></div>';
 
-  var summaryHtml = subtotal
-    ? '<div class="quote-summary">'
-        + '<div class="quote-row"><span class="label">Subtotal</span><span class="val">'+fmt(subtotal)+'</span></div>'
-        + discRow
-        + '<div class="quote-row"><span class="label">Hawaii GET (4.712%)</span><span class="val">'+fmt(tax)+'</span></div>'
-        + '<hr class="quote-divider">'
-        + '<div class="quote-total-row"><span>Total</span><span>'+fmt(total)+'</span></div>'
-      + '</div>'
-    : '<div class="quote-summary"><div class="quote-row"><span class="label">Service</span><span class="val">'+(LEAD.service||'Custom')+'</span></div><div class="quote-row" style="margin-top:8px"><span style="font-size:13px;color:var(--muted);">Custom quote — we\'ll confirm pricing after a walkthrough.</span></div></div>';
+  var priceHtml = '';
+  if(grandTotal != null){
+    priceHtml = '<div class="price-table">'
+      +(subtotal!=null?'<div class="price-row"><span>Subtotal</span><span class="amount">'+fmt(subtotal)+'</span></div>':'')
+      +(discPct>0?'<div class="price-row discount"><span>'+discPct+'% frequency discount</span><span class="amount">&minus;'+fmt(discount)+'</span></div>':'')
+      +'<div class="price-row"><span>Hawaii GET (4.712%)</span><span class="amount">'+fmt(tax)+'</span></div>'
+      +'<hr class="price-divider">'
+      +'<div class="price-total"><span>Total</span><span>'+fmt(grandTotal)+'</span></div>'
+      +'</div>';
+  } else {
+    priceHtml = '<div class="price-table" style="color:var(--muted);font-size:13px;">Custom quote &mdash; we will confirm pricing after a walkthrough.</div>';
+  }
 
-  var details = [];
-  if(LEAD.service) details.push('<div class="quote-row"><span class="label">Service</span><span class="val">'+LEAD.service+'</span></div>');
-  if(LEAD.frequency) details.push('<div class="quote-row"><span class="label">Frequency</span><span class="val">'+LEAD.frequency+'</span></div>');
-  if(LEAD.beds||LEAD.baths) details.push('<div class="quote-row"><span class="label">Property</span><span class="val">'+(LEAD.beds||'—')+' bed / '+(LEAD.baths||'—')+' bath</span></div>');
-
-  document.getElementById('app').innerHTML = ''
-    + '<div class="card">'
-    +   '<div class="card-head"><h2>Aloha, '+LEAD.firstName+'! 🌺</h2><p>Here\'s your personalized quote from Hawaii Natural Clean. Review the details below, then click Continue to review our policies and book your cleaning.</p></div>'
-    +   '<div class="card-body">'
-    +     (details.length ? '<div class="quote-name" style="margin-bottom:8px;">'+details.join('')+'</div>' : '')
-    +     summaryHtml
-    +     '<button class="btn btn-primary" onclick="renderPolicies()">Continue →</button>'
-    +   '</div>'
-    + '</div>';
+  $('app').innerHTML = '<div class="card">'
+    +'<div class="card-head"><h2>Aloha, '+esc(LEAD.firstName)+'! &#127946;</h2>'
+    +'<p>Here is your personalized quote from Hawaii Natural Clean. Review the details below, then click Continue to review our policies and book your cleaning.</p></div>'
+    +'<div class="card-body">'
+    +'<div class="quote-block">'
+    +(metaHtml?'<div class="quote-meta">'+metaHtml+'</div>':'')
+    +priceHtml
+    +'</div>'
+    +'<button class="btn-primary" onclick="renderStep2()">Continue &rarr;</button>'
+    +'</div></div>';
 }
 
-// ── Step 2: Policies ──────────────────────────────────────────────────────
+function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c];}); }
+
+// ─────────────────────────────────────────────────────────────────────────
+// STEP 2 — Policies
+// ─────────────────────────────────────────────────────────────────────────
 var POLICIES = [
-  {
-    id:'p1',
-    title:'Cancellation policy',
-    detail:'Please provide at least 24 hours notice to cancel or reschedule. Late cancellations may incur a fee.'
-  },
-  {
-    id:'p2',
-    title:'Home preparation',
-    detail:'Please tidy clutter from surfaces, do dishes or put them away, and secure any pets before our team arrives. This helps us focus on deep cleaning.'
-  },
-  {
-    id:'p3',
-    title:'Property access',
-    detail:'Please ensure we have access to your property at the scheduled time. You\'ll be asked to provide entry instructions when booking.'
-  },
-  {
-    id:'p4',
-    title:'Payment terms',
-    detail:'Payment is due on the day of service. We accept ACH bank transfer (free) and credit/debit card (3% processing fee).'
-  },
-  {
-    id:'p5',
-    title:'I agree to the terms of service',
-    detail:'By proceeding I authorise Hawaii Natural Clean to perform cleaning services as described and agree to the above policies.'
-  }
+  { id:'p1', title:'Cancellation policy',
+    detail:'Please provide at least 24 hours notice to cancel or reschedule. Late cancellations may incur a fee.' },
+  { id:'p2', title:'Home preparation',
+    detail:'Please tidy clutter from surfaces, do dishes or put them away, and secure any pets before our team arrives. This helps us focus on deep cleaning.' },
+  { id:'p3', title:'Property access',
+    detail:'Please ensure we have access to your property at the scheduled time. You will be asked to provide entry instructions when booking.' },
+  { id:'p4', title:'Payment terms',
+    detail:'Payment is due on the day of service. We accept ACH bank transfer (free) and credit/debit card (3% processing fee).' },
+  { id:'p5', title:'I agree to the terms of service',
+    detail:'By proceeding I authorise Hawaii Natural Clean to perform cleaning services as described and agree to the policies above.' }
 ];
 
-function renderPolicies(){
-  step(2);
+function renderStep2(){
+  setStep(2);
   var items = POLICIES.map(function(p){
     return '<div class="policy-item" id="pi-'+p.id+'" onclick="togglePolicy(\''+p.id+'\')">'
-      + '<input type="checkbox" id="cb-'+p.id+'" onchange="togglePolicy(\''+p.id+'\')" onclick="event.stopPropagation()">'
-      + '<div class="pi-text"><strong>'+p.title+'</strong><span>'+p.detail+'</span></div>'
-      + '</div>';
+      +'<input type="checkbox" id="cb-'+p.id+'" onclick="event.stopPropagation();togglePolicy(\''+p.id+'\')">'
+      +'<div><div class="pi-title">'+esc(p.title)+'</div><div class="pi-detail">'+esc(p.detail)+'</div></div>'
+      +'</div>';
   }).join('');
 
-  document.getElementById('app').innerHTML = ''
-    + '<div class="card">'
-    +   '<div class="card-head"><h2>Policies & checklist</h2><p>Please read and agree to all items below to continue with your booking.</p></div>'
-    +   '<div class="card-body">'
-    +     '<div class="policy-section">'+items+'</div>'
-    +     '<button class="btn btn-primary" id="policy-btn" onclick="checkPolicies()" disabled style="opacity:.5">Agree & Continue →</button>'
-    +     '<button class="btn btn-ghost" onclick="renderQuote()">← Back</button>'
-    +   '</div>'
-    + '</div>';
+  $('app').innerHTML = '<div class="card">'
+    +'<div class="card-head"><h2>Policies &amp; checklist</h2>'
+    +'<p>Please read and agree to all items below to continue with your booking.</p></div>'
+    +'<div class="card-body">'
+    +items
+    +'<button class="btn-primary" id="policy-btn" onclick="confirmPolicies()" disabled>Agree &amp; Continue &rarr;</button>'
+    +'<button class="btn-ghost" onclick="renderStep1()">&larr; Back</button>'
+    +'</div></div>';
 }
 
 function togglePolicy(id){
-  var cb = document.getElementById('cb-'+id);
-  var item = document.getElementById('pi-'+id);
+  var cb   = $('cb-'+id);
+  var item = $('pi-'+id);
+  if(!cb) return;
   cb.checked = !cb.checked;
-  item.className = 'policy-item' + (cb.checked ? ' checked' : '');
-  // check if all ticked
-  var allDone = POLICIES.every(function(p){ return document.getElementById('cb-'+p.id) && document.getElementById('cb-'+p.id).checked; });
-  var btn = document.getElementById('policy-btn');
-  if(btn){ btn.disabled = !allDone; btn.style.opacity = allDone ? '1' : '.5'; }
+  item.className = 'policy-item'+(cb.checked?' checked':'');
+  var allOk = POLICIES.every(function(p){ var c=$('cb-'+p.id); return c&&c.checked; });
+  var btn = $('policy-btn');
+  if(btn){ btn.disabled=!allOk; }
 }
 
-function checkPolicies(){
-  var allDone = POLICIES.every(function(p){ var cb=document.getElementById('cb-'+p.id); return cb&&cb.checked; });
-  if(!allDone){ alert('Please agree to all policies to continue.'); return; }
-  renderBook();
+function confirmPolicies(){
+  var allOk = POLICIES.every(function(p){ var c=$('cb-'+p.id); return c&&c.checked; });
+  if(!allOk){ alert('Please agree to all items to continue.'); return; }
+  renderStep3();
 }
 
-// ── Step 3: Book ──────────────────────────────────────────────────────────
-function renderBook(){
-  step(3);
-  var today = new Date().toISOString().slice(0,10);
+// ─────────────────────────────────────────────────────────────────────────
+// STEP 3 — Calendar + time slots
+// ─────────────────────────────────────────────────────────────────────────
+async function renderStep3(){
+  setStep(3);
+  SEL_DATE = null;
+  SEL_TIME = null;
+  RUSH_FEE = 0;
 
-  document.getElementById('app').innerHTML = ''
-    + '<div class="card">'
-    +   '<div class="card-head"><h2>Pick your date</h2><p>Choose a preferred date and time. We\'ll confirm availability and send you a booking confirmation.</p></div>'
-    +   '<div class="card-body">'
-    +     '<div class="field-row">'
-    +       '<div class="field"><label>Preferred date</label><input type="date" id="bk-date" min="'+today+'"></div>'
-    +       '<div class="field"><label>Preferred time</label><select id="bk-time">'
-    +         '<option>8:00 AM</option><option>9:00 AM</option><option>10:00 AM</option>'
-    +         '<option>11:00 AM</option><option>12:00 PM</option><option>1:00 PM</option>'
-    +         '<option>2:00 PM</option><option>3:00 PM</option><option>4:00 PM</option>'
-    +       '</select></div>'
-    +     '</div>'
-    +     '<div class="field"><label>Entry instructions & notes <span style="font-weight:400;text-transform:none;letter-spacing:0;">(optional)</span></label>'
-    +       '<textarea id="bk-notes" placeholder="Gate code, pets, parking, any special requests…"></textarea>'
-    +     '</div>'
-    +     '<div id="bk-error"></div>'
-    +     '<button class="btn btn-primary" id="bk-submit" onclick="submitBooking()">Confirm booking request →</button>'
-    +     '<button class="btn btn-ghost" onclick="renderPolicies()">← Back</button>'
-    +   '</div>'
-    + '</div>';
-}
+  var t = today();
+  CAL_YEAR = t.getFullYear();
+  CAL_MON  = t.getMonth();
 
-async function submitBooking(){
-  var date  = SEL_DATE;
-  var time  = SEL_TIME;
-  var notes = document.getElementById('bk-notes') ? document.getElementById('bk-notes').value : '';
-  var btn   = document.getElementById('bk-submit');
-  var errEl = document.getElementById('bk-error');
+  $('app').innerHTML = '<div class="card">'
+    +'<div class="card-head"><h2>Pick your date</h2>'
+    +'<p>Select an available date and time. Blocked dates are fully booked based on your team\'s live schedule.</p></div>'
+    +'<div class="card-body">'
+    +'<div id="cal-area"><div class="loading-msg">Loading availability&hellip;</div></div>'
+    +'<div id="slots-area"></div>'
+    +'<div id="rush-area"></div>'
+    +'<div class="field"><label>Entry instructions &amp; notes <span>(optional)</span></label>'
+    +'<textarea id="bk-notes" placeholder="Gate code, pets, parking, any special requests..."></textarea></div>'
+    +'<div id="bk-error"></div>'
+    +'<button class="btn-primary" id="bk-btn" onclick="submitBooking()" disabled>Select a date and time to continue</button>'
+    +'<button class="btn-ghost" onclick="renderStep2()">&larr; Back</button>'
+    +'</div></div>';
 
-  if(!date || !time){ errEl.innerHTML='<div class="error-banner" style="margin-bottom:12px;">Please select a date and time.</div>'; return; }
-
-  btn.disabled = true; btn.textContent = 'Sending…';
-
+  // Load availability
   try {
-    var r = await fetch('/api/lead-book', {
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ token: TOKEN, date, time, notes, service: LEAD.service, rushFee: RUSH_FEE })
-    });
-    var data = await r.json();
-    if(!r.ok) throw new Error(data.error || 'Something went wrong');
-    renderSuccess(date, time);
+    var island = (LEAD && LEAD.island) || 'Oahu';
+    var r = await fetch('/api/availability?island='+encodeURIComponent(island)+'&days=60');
+    AVAIL = await r.json();
   } catch(e){
-    btn.disabled = false; btn.textContent = 'Confirm booking request →';
-    errEl.innerHTML = '<div class="error-banner" style="margin-bottom:12px;">'+e.message+'</div>';
+    AVAIL = { blocked_dates:[], busy_times:{} };
+  }
+  drawCalendar();
+}
+
+function drawCalendar(){
+  var calEl = $('cal-area');
+  if(!calEl) return;
+
+  var tod     = today();
+  var todStr  = toISO(tod);
+  var blocked = (AVAIL && AVAIL.blocked_dates) || [];
+  var busy    = (AVAIL && AVAIL.busy_times)    || {};
+
+  var firstOfMonth = new Date(CAL_YEAR, CAL_MON, 1);
+  var startDay     = firstOfMonth.getDay();        // 0=Sun
+  var daysInMonth  = new Date(CAL_YEAR, CAL_MON+1, 0).getDate();
+  var monthName    = firstOfMonth.toLocaleDateString('en-US',{month:'long',year:'numeric'});
+
+  // Prev button disabled if showing current month
+  var isCurrentMonth = (CAL_YEAR===tod.getFullYear() && CAL_MON===tod.getMonth());
+
+  var gridHtml = '';
+  ['Su','Mo','Tu','We','Th','Fr','Sa'].forEach(function(d){ gridHtml+='<div class="cal-hdr">'+d+'</div>'; });
+  for(var i=0;i<startDay;i++) gridHtml+='<div class="cal-day empty"></div>';
+
+  for(var d=1;d<=daysInMonth;d++){
+    var ds  = CAL_YEAR+'-'+String(CAL_MON+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');
+    var dt  = new Date(ds+'T00:00:00');
+    var sun = dt.getDay()===0;
+    var past= ds<todStr;
+    var blk = blocked.indexOf(ds)>=0;
+    var sel = ds===SEL_DATE;
+    var cls = 'cal-day';
+    if(sel)  cls+=' selected';
+    else if(past) cls+=' past';
+    else if(sun)  cls+=' sunday';
+    else if(blk)  cls+=' blocked';
+    else if(ds===todStr) cls+=' today';
+
+    var clickable = !past && !sun && !blk;
+    var onclick   = clickable ? ' onclick="pickDate(\''+ds+'\')"' : '';
+    var title     = sun?'Closed Sundays':blk?'Fully booked':past?'Past date':'';
+    gridHtml += '<div class="'+cls+'"'+onclick+(title?' title="'+title+'"':')+'>'+d+'</div>';
+  }
+
+  calEl.innerHTML = '<div class="cal-nav">'
+    +'<button class="cal-nav-btn" onclick="calMove(-1)"'+(isCurrentMonth?' disabled':'')+'>&#8249;</button>'
+    +'<span class="cal-month">'+monthName+'</span>'
+    +'<button class="cal-nav-btn" onclick="calMove(1)">&#8250;</button>'
+    +'</div>'
+    +'<div class="cal-grid">'+gridHtml+'</div>'
+    +'<div class="cal-legend">'
+    +'<div class="cal-legend-item"><div class="cal-legend-swatch" style="background:var(--blue)"></div>Selected</div>'
+    +'<div class="cal-legend-item"><div class="cal-legend-swatch" style="background:#fef2f2;border:1px solid #fca5a5"></div>Fully booked</div>'
+    +'<div class="cal-legend-item"><div class="cal-legend-swatch" style="background:#e5e7eb"></div>Unavailable</div>'
+    +'</div>';
+}
+
+function calMove(dir){
+  CAL_MON += dir;
+  if(CAL_MON>11){ CAL_MON=0; CAL_YEAR++; }
+  if(CAL_MON<0){ CAL_MON=11; CAL_YEAR--; }
+  drawCalendar();
+}
+
+function pickDate(ds){
+  SEL_DATE = ds;
+  SEL_TIME = null;
+  RUSH_FEE = 0;
+  drawCalendar();
+  drawSlots(ds);
+  drawRushFee(ds);
+  updateSubmitBtn();
+}
+
+function drawSlots(ds){
+  var slotsEl = $('slots-area');
+  if(!slotsEl) return;
+  var busy = (AVAIL && AVAIL.busy_times && AVAIL.busy_times[ds]) || [];
+  var dt   = new Date(ds+'T00:00:00');
+  var pretty = dt.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});
+
+  var btns = ALL_SLOTS.map(function(s){
+    var isBusy = busy.indexOf(s)>=0;
+    var sel    = s===SEL_TIME;
+    return '<button class="slot-btn'+(sel?' selected':'')+'"'
+      +(isBusy?' disabled title="Fully booked"':' onclick="pickSlot(\''+s+'\')"')
+      +'>'+s+'</button>';
+  }).join('');
+
+  slotsEl.innerHTML = '<div class="slots-section">'
+    +'<div class="slots-label">Available times &mdash; '+pretty+'</div>'
+    +'<div class="slot-grid">'+btns+'</div>'
+    +'</div>';
+}
+
+function pickSlot(s){
+  SEL_TIME = s;
+  drawSlots(SEL_DATE);
+  updateSubmitBtn();
+}
+
+function getRushInfo(ds){
+  var t    = today();
+  var pick = new Date(ds+'T00:00:00');
+  var days = Math.round((pick-t)/(864e5));
+  if(days===0) return { fee:200, label:'Same-day', cls:'same-day' };
+  if(days===1) return { fee:100, label:'Next-day',  cls:'next-day'  };
+  if(days===2) return { fee:50,  label:'2-day',     cls:'two-day'   };
+  return { fee:0, label:null, cls:null };
+}
+
+function drawRushFee(ds){
+  var rushEl = $('rush-area');
+  if(!rushEl) return;
+  var r = getRushInfo(ds);
+  RUSH_FEE = r.fee;
+  if(!r.fee){ rushEl.innerHTML=''; return; }
+
+  var q         = LEAD.quoteData || {};
+  var preTotal  = q.total!=null ? Number(q.total) : (LEAD.quoteTotal ? Number(LEAD.quoteTotal) : null);
+  var tax       = preTotal!=null ? +(preTotal*TAX_RATE).toFixed(2) : null;
+  var newTotal  = preTotal!=null && tax!=null ? fmt(preTotal+tax+r.fee) : null;
+
+  rushEl.innerHTML = '<div class="rush-notice '+r.cls+'">'
+    +'<div class="rush-fee-label">+'+fmt(r.fee)+' '+r.label+' booking fee</div>'
+    +(newTotal?'<div>'+r.label+' requests require extra scheduling coordination. New total with tax: <strong>'+newTotal+'</strong></div>'
+    :'<div>'+r.label+' requests require extra scheduling coordination.</div>')
+    +'</div>';
+}
+
+function updateSubmitBtn(){
+  var btn = $('bk-btn');
+  if(!btn) return;
+  if(SEL_DATE && SEL_TIME){
+    btn.disabled = false;
+    btn.textContent = 'Confirm booking request \u2192';
+  } else {
+    btn.disabled = true;
+    btn.textContent = 'Select a date and time to continue';
   }
 }
 
-// ── Success ───────────────────────────────────────────────────────────────
-function renderSuccess(date, time){
-  qs('steps').style.display = 'none';
-  var d = new Date(date+'T12:00:00');
-  var pretty = d.toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric'});
-  document.getElementById('app').innerHTML = ''
-    + '<div class="card">'
-    +   '<div class="success-screen">'
-    +     '<div class="checkmark">🌺</div>'
-    +     '<h2>Request received!</h2>'
-    +     '<p>We\'ve got your booking request for <strong>'+pretty+'</strong> at <strong>'+time+'</strong>.<br><br>Our team will confirm availability and send you a final confirmation shortly. If you have any questions, call or text us at <strong>(808) 468-5356</strong>.</p>'
-    +   '</div>'
-    + '</div>';
+// ─────────────────────────────────────────────────────────────────────────
+// SUBMIT
+// ─────────────────────────────────────────────────────────────────────────
+async function submitBooking(){
+  if(!SEL_DATE||!SEL_TIME){ return; }
+  var btn   = $('bk-btn');
+  var errEl = $('bk-error');
+  var notes = $('bk-notes') ? $('bk-notes').value : '';
+  btn.disabled=true; btn.textContent='Sending\u2026';
+
+  try {
+    var r = await fetch('/api/lead-book',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ token:TOKEN, date:SEL_DATE, time:SEL_TIME, notes:notes, service:LEAD.service, rushFee:RUSH_FEE })
+    });
+    var j = await r.json();
+    if(!r.ok) throw new Error(j.error||'Something went wrong');
+    renderSuccess();
+  } catch(e){
+    btn.disabled=false; btn.textContent='Confirm booking request \u2192';
+    if(errEl) errEl.innerHTML='<div class="error-banner">'+esc(e.message)+'</div>';
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// SUCCESS
+// ─────────────────────────────────────────────────────────────────────────
+function renderSuccess(){
+  $('steps-bar').style.display='none';
+  var dt     = new Date(SEL_DATE+'T12:00:00');
+  var pretty = dt.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});
+  $('app').innerHTML = '<div class="card"><div class="success-screen">'
+    +'<div class="success-icon">&#127946;</div>'
+    +'<h2>Request received!</h2>'
+    +'<p>We have got your booking request for <strong>'+pretty+'</strong> at <strong>'+esc(SEL_TIME)+'</strong>.'
+    +(RUSH_FEE?' A '+getRushInfo(SEL_DATE).label.toLowerCase()+' fee of '+fmt(RUSH_FEE)+' applies.':'')
+    +'<br><br>Our team will confirm availability and send you a final confirmation shortly. Questions? Call or text us at <strong>(808) 468-5356</strong>.</p>'
+    +'</div></div>';
 }
 </script>
 </body>

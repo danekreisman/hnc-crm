@@ -345,6 +345,12 @@ textarea{font-family:inherit;}
 @keyframes toastSlideOut{from{opacity:1;transform:translateX(0)}to{opacity:0;transform:translateX(420px)}}
 .hnc-toast{animation:toastSlideIn 0.35s cubic-bezier(0.34,1.56,0.64,1) forwards;}
 .hnc-toast.toast-exit{animation:toastSlideOut 0.3s cubic-bezier(0.4,0,1,1) forwards;}
+/* === PANEL SLIDE-IN === */
+@keyframes panelSlideIn{from{opacity:0;transform:translateX(48px) scale(.98)}to{opacity:1;transform:translateX(0) scale(1)}}
+.panel-entering{animation:panelSlideIn .28s cubic-bezier(.34,1.06,.64,1) forwards!important;}
+/* === SECTION FADE === */
+@keyframes sectionFadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.vc.active{animation:sectionFadeIn .22s cubic-bezier(.4,0,.2,1);}
 /* === BUTTON PULSE GLOW === */
 @keyframes hncPulseGlow{0%{box-shadow:0 0 0 0 rgba(59,184,227,.5)}70%{box-shadow:0 0 0 11px rgba(59,184,227,0)}100%{box-shadow:0 0 0 0 rgba(59,184,227,0)}}
 @keyframes hncPulseGlowGreen{0%{box-shadow:0 0 0 0 rgba(16,185,129,.5)}70%{box-shadow:0 0 0 11px rgba(16,185,129,0)}100%{box-shadow:0 0 0 0 rgba(16,185,129,0)}}
@@ -2703,7 +2709,7 @@ function _openApptInner(a,dateKey){
   if(cancelRecBtn) cancelRecBtn.style.display=a.recurring?'':'none';
   var deleteRecBtn=document.getElementById('delete-recurring-btn');
   if(deleteRecBtn) deleteRecBtn.style.display=a.recurring?'':'none';
-  document.getElementById('appt-overlay').classList.remove('hidden');
+  openOverlay('appt-overlay');
   // Disable Charge button if client has no card on file
   try { updateApptChargeButtonState(); } catch(e){}
 }
@@ -3392,7 +3398,7 @@ function openClient(id){
   var thinkingEl = document.getElementById('cl-ai-thinking');
   if(summaryEl){ summaryEl.style.display='none'; summaryEl.textContent=''; }
   if(thinkingEl){ thinkingEl.style.display='none'; }
-  document.getElementById('client-overlay').classList.remove('hidden');
+  openOverlay('client-overlay');
   setTimeout(updateChargeBtn, 50);
 }
 
@@ -3497,7 +3503,7 @@ function openLead(id){
   var leadThinkEl=document.getElementById('lead-ai-thinking');
   if(leadSumEl){leadSumEl.style.display='none';leadSumEl.textContent='';}
   if(leadThinkEl){leadThinkEl.style.display='none';}
-  document.getElementById('lead-overlay').classList.remove('hidden');
+  openOverlay('lead-overlay');
   setTimeout(generateLeadSummary, 400);
 }
 
@@ -3601,7 +3607,7 @@ function openCleaner(id){
   });
   var bg=document.getElementById('cp-bg');bg.textContent=d.bgcheck;bg.className='badge '+(d.bgcheck==='Cleared'?'bac':'bpn');
   hideCleanerEdit();
-  document.getElementById('cleaner-overlay').classList.remove('hidden');
+  openOverlay('cleaner-overlay');
 }
 
 function toggleCleanerActive(){
@@ -3725,9 +3731,21 @@ function closeOverlay(id){
       panel.style.transition='';
       panel.style.transform='';
       panel.style.opacity='';
+      panel.classList.remove('panel-entering');
     },210);
   } else {
     overlay.classList.add('hidden');
+  }
+}
+function openOverlay(id){
+  var overlay=document.getElementById(id);
+  if(!overlay)return;
+  overlay.classList.remove('hidden');
+  var panel=overlay.querySelector('.panel');
+  if(panel){
+    panel.classList.remove('panel-entering');
+    void panel.offsetWidth; // reflow to restart animation
+    panel.classList.add('panel-entering');
   }
 }
 
@@ -4605,13 +4623,13 @@ function handleTopCta(){
     document.getElementById('na-address-row').style.display='';
     document.getElementById('na-residential-fields').style.display='';
     document.getElementById('na-save-prop-row').style.display='';
-    document.getElementById('new-appt-overlay').classList.remove('hidden');
+    openOverlay('new-appt-overlay');
     populateCleanerDropdown('na-cleaner');
     calcPrice();
   }
-  else if(currentView==='pipeline'||currentView==='dashboard'){document.getElementById('new-lead-overlay').classList.remove('hidden');}
-  else if(currentView==='clients'){document.getElementById('new-client-overlay').classList.remove('hidden');}
-  else if(currentView==='cleaners'){document.getElementById('new-cleaner-overlay').classList.remove('hidden');}
+  else if(currentView==='pipeline'||currentView==='dashboard'){openOverlay('new-lead-overlay');}
+  else if(currentView==='clients'){openOverlay('new-client-overlay');}
+  else if(currentView==='cleaners'){openOverlay('new-cleaner-overlay');}
   else if(currentView==='automations'){openNewAuto();}
   else if(currentView==='payments'){openCustomInvoice();}
   else if(currentView==='messaging'){openNewMsgOverlay();}
@@ -4622,7 +4640,12 @@ function sv(view,el){
   try{sessionStorage.setItem('hnc_currentView', view);}catch(e){}
   document.querySelectorAll('.vc').forEach(function(v){v.classList.remove('active');});
   document.querySelectorAll('.nav-item').forEach(function(n){n.classList.remove('active');});
-  document.getElementById('view-'+view).classList.add('active');
+  var target=document.getElementById('view-'+view);
+  target.classList.add('active');
+  // Re-trigger CSS animation on section switch
+  target.style.animation='none';
+  void target.offsetWidth;
+  target.style.animation='';
   if(el)el.classList.add('active');
   var titles={dashboard:'Dashboard',calendar:'Calendar',pipeline:'Pipeline',clients:'Clients',tasks:'VA Tasks',messaging:'Messaging',cleaners:'Cleaners',payroll:'Payroll',reporting:'Reporting',automations:'Automations',payments:'Payments',settings:'Settings',agent:'AI Agent'};
   var ctas={dashboard:'+ New lead',calendar:'+ New appointment',pipeline:'+ New lead',clients:'+ Add client',tasks:'+ Add task',messaging:'+ New message',cleaners:'+ Add cleaner',payroll:'Log hours',reporting:'Export',automations:'+ New automation',payments:'+ New invoice',settings:'',agent:''};
@@ -5993,7 +6016,7 @@ function openNewAuto(){
   document.getElementById('auton-conditions').innerHTML = '';
   document.getElementById('auton-actions').innerHTML = '';
   autoAddAction();
-  document.getElementById('new-auto-overlay').classList.remove('hidden');
+  openOverlay('new-auto-overlay');
   document.getElementById('auton-trigger').onchange = autoOnTriggerChange;
   autoOnTriggerChange();
 }
@@ -6014,7 +6037,7 @@ function autoEdit(id){
   document.getElementById('auton-actions').innerHTML = '';
   (a.conditions||[]).forEach(function(c){ autoAddCondition(c); });
   (a.actions||[]).forEach(function(ac){ autoAddAction(ac); });
-  document.getElementById('new-auto-overlay').classList.remove('hidden');
+  openOverlay('new-auto-overlay');
   document.getElementById('auton-trigger').onchange = autoOnTriggerChange;
   autoOnTriggerChange();
 }
@@ -6778,7 +6801,7 @@ setTimeout(function(){ try{ repPopulateBucketDropdown(); repRender(); }catch(e){
 /* PAYMENTS */
 var stripeConnected=false;
 
-function openStripeConnect(){document.getElementById('stripe-overlay').classList.remove('hidden');}
+function openStripeConnect(){openOverlay('stripe-overlay');}
 
 function saveStripeConnect(){
   var key=document.getElementById('stripe-key').value;
@@ -6812,7 +6835,7 @@ function viewReceipt(client){
   showPaymentToast('Receipt for '+client+' — payment confirmed.',null,'success');
 }
 
-function openNewInvoice(){document.getElementById('new-invoice-overlay').classList.remove('hidden');}
+function openNewInvoice(){openOverlay('new-invoice-overlay');}
 
 function createInvoice(method){
   var client=document.getElementById('inv-client').value;
@@ -7507,7 +7530,7 @@ function openCustomInvoice(){
   addCustomInvoiceLine();
   refreshCustomInvoiceAppts();
   recalcCustomInvoiceTotals();
-  document.getElementById('custom-invoice-overlay').classList.remove('hidden');
+  openOverlay('custom-invoice-overlay');
 }
 function addCustomInvoiceLine(){
   var container = document.getElementById('custom-inv-lines');
@@ -7754,7 +7777,7 @@ function sendBulkInvoice(method){
   });
 }
 
-function openAchSettings(){document.getElementById('ach-settings-overlay').classList.remove('hidden');}
+function openAchSettings(){openOverlay('ach-settings-overlay');}
 
 function saveAchSettings(){
   var surcharge=0;
@@ -7814,7 +7837,7 @@ function openApptEditProperty(){
     if(condEl2) condEl2.value=currentAppt.condition||'7';
     console.log('[openApptEditProperty] no matching property — opening add mode for addr='+apptAddr);
   }
-  document.getElementById('add-property-overlay').classList.remove('hidden');
+  openOverlay('add-property-overlay');
 }
 
 /* APPOINTMENT ACTIONS */
@@ -7832,7 +7855,7 @@ function openApptInvoice(){
     +'<div class="info-row"><span class="info-label">Phone on file</span><span class="info-val">'+(client?client.phone:'—')+'</span></div>';
   var termsSel=document.getElementById('appt-inv-terms');
   termsSel.value=isCommercial?'net30':'now';
-  document.getElementById('appt-invoice-overlay').classList.remove('hidden');
+  openOverlay('appt-invoice-overlay');
 }
 
 async function sendApptInvoice(method){
@@ -7984,7 +8007,7 @@ function openApptCharge(){
   document.getElementById('charge-fee').textContent='$'+fee.toFixed(2);
   document.getElementById('charge-total').textContent='$'+total.toFixed(2);
   document.getElementById('charge-card-info').textContent=client?client.payment:'No card on file';
-  document.getElementById('appt-charge-overlay').classList.remove('hidden');
+  openOverlay('appt-charge-overlay');
 }
 
 async function executeCharge(){
@@ -8083,7 +8106,7 @@ function openInviteCleaner(){
   updateInvitePreview();
   document.getElementById('invite-note').value='';
   document.getElementById('invite-success').classList.remove('show');
-  document.getElementById('invite-cleaner-overlay').classList.remove('hidden');
+  openOverlay('invite-cleaner-overlay');
 }
 
 function updateInvitePreview(){
@@ -8258,7 +8281,7 @@ function openNewMsgOverlay(){
   document.getElementById('nm-body').value='';
   document.getElementById('nm-phone').value='';
   document.getElementById('nm-contact').value='';
-  document.getElementById('new-msg-overlay').classList.remove('hidden');
+  openOverlay('new-msg-overlay');
 }
 
 function updateNewMsgPhone(){
@@ -9315,7 +9338,7 @@ function scheduleFromClient(){
   if(calNav) sv('calendar', calNav);
   setTimeout(function(){
     // Open booking form
-    document.getElementById('new-appt-overlay').classList.remove('hidden');
+    openOverlay('new-appt-overlay');
     populateCleanerDropdown('na-cleaner');
     calcPrice();
     // Pre-fill all client info
@@ -9517,7 +9540,7 @@ function openAddProperty(context){
   document.getElementById('prop-flat-rate').value = '';
   var condEl = document.getElementById('prop-cond');
   if(condEl) condEl.value = '7';
-  document.getElementById('add-property-overlay').classList.remove('hidden');
+  openOverlay('add-property-overlay');
 }
 
 function editProperty(idx){
@@ -9540,7 +9563,7 @@ function editProperty(idx){
   document.getElementById('prop-flat-rate').value = p.flatRate || '';
   var condEl = document.getElementById('prop-cond');
   if(condEl) condEl.value = p.condition || '7';
-  document.getElementById('add-property-overlay').classList.remove('hidden');
+  openOverlay('add-property-overlay');
 }
 
 async function saveProperty(){
@@ -9892,7 +9915,7 @@ function openNewApptEditProperty(){
     document.getElementById('prop-baths').value = '2';
     var condElNA = document.getElementById('prop-cond');
     if(condElNA) condElNA.value = '7';
-    document.getElementById('add-property-overlay').classList.remove('hidden');
+    openOverlay('add-property-overlay');
     return;
   }
 
@@ -9913,7 +9936,7 @@ function openNewApptEditProperty(){
   document.getElementById('prop-notes').value = prop.notes || '';
   var condElEdit = document.getElementById('prop-cond');
   if(condElEdit) condElEdit.value = prop.condition || '7';
-  document.getElementById('add-property-overlay').classList.remove('hidden');
+  openOverlay('add-property-overlay');
 }
 
 /* ── PROPERTY SELECTOR — EDIT APPOINTMENT FORM ── */
@@ -9982,7 +10005,7 @@ function applyEditProperty(){
     document.getElementById('prop-baths').value = '2';
     var condElAE = document.getElementById('prop-cond');
     if(condElAE) condElAE.value = '7';
-    document.getElementById('add-property-overlay').classList.remove('hidden');
+    openOverlay('add-property-overlay');
     return;
   }
 
@@ -10033,16 +10056,26 @@ document.addEventListener('DOMContentLoaded', function(){
 
   // Global button pulse glow — fires on every btn click
   document.addEventListener('click', function(e){
-    var btn = e.target.closest('.btn-primary, .action-btn.green, .action-btn.red, .trigger-btn, .btn:not(.close-btn)');
+    // Skip close buttons, appointment pills, nav items, and calendar controls
+    var btn = e.target.closest('button, .btn, .action-btn');
     if(!btn) return;
+    if(btn.classList.contains('close-btn')) return;
+    if(btn.classList.contains('appt')) return;
+    if(btn.classList.contains('cal-view-btn')) return;
+    if(btn.closest('.nav-item')) return;
+
     var cls = 'hnc-btn-pulse';
-    if(btn.classList.contains('action-btn') && btn.classList.contains('red')) cls = 'hnc-btn-pulse-red';
-    else if(btn.classList.contains('btn-primary') || (btn.classList.contains('action-btn') && btn.classList.contains('green'))) cls = 'hnc-btn-pulse-green';
+    var isRed = btn.classList.contains('red') || btn.style.color==='#c53030' || btn.style.background==='#fed7d7';
+    var isGreen = btn.classList.contains('green') || btn.classList.contains('btn-primary') ||
+                  (btn.style.background && btn.style.background.includes('10b981'));
+    if(isRed) cls = 'hnc-btn-pulse-red';
+    else if(isGreen) cls = 'hnc-btn-pulse-green';
+
     btn.classList.remove('hnc-btn-pulse','hnc-btn-pulse-green','hnc-btn-pulse-red');
-    void btn.offsetWidth; // force reflow to restart animation
+    void btn.offsetWidth;
     btn.classList.add(cls);
     setTimeout(function(){ btn.classList.remove('hnc-btn-pulse','hnc-btn-pulse-green','hnc-btn-pulse-red'); }, 600);
-  }, true);
+  }, true); // capture phase so it fires even inside stopPropagation zones
 });
 
 // Run immediately from localStorage — don't wait for Supabase
@@ -10515,7 +10548,7 @@ Your total will update automatically when you select a payment method.</textarea
 })();
 </script>
   <script src="/gcal-sync.js?v=1"></script>
-<script>document.addEventListener('click',function(e){var nav=e.target.closest('.nav-item');if(nav){var crm=document.querySelector('.crm');if(crm)crm.classList.remove('nav-open');}var cell=e.target.closest('.cal-day');if(cell&&window.setCalView&&typeof window.curDay!=='undefined'){var n=cell.querySelector('.dn2');if(!n)return;var day=parseInt(n.textContent,10);if(!day)return;var tm=window.curMonth,ty=window.curYear;if(cell.classList.contains('om')){if(day>15){tm--;if(tm<1){tm=12;ty--;}}else{tm++;if(tm>12){tm=1;ty++;}}}window.curDay=day;window.curMonth=tm;window.curYear=ty;var b=document.getElementById('btn-day');if(b)window.setCalView('day',b);}},true);function scrollActivePayrollPillIntoView(){var c=document.getElementById('payroll-period-buttons');if(!c)return;var a=c.querySelector('.pbtn.active')||c.querySelector('.pbtn[style*="background"]')||c.querySelector('.pbtn:not(.pbtn)');if(a){c.scrollLeft=Math.max(0,a.offsetLeft-16);}}var _payrollObs=new MutationObserver(function(){scrollActivePayrollPillIntoView();});var _payrollContainer=document.getElementById('payroll-period-buttons');if(_payrollContainer){_payrollObs.observe(_payrollContainer,{childList:true,subtree:true,attributes:true,attributeFilter:['class','style']});_payrollContainer.addEventListener('click',function(){setTimeout(scrollActivePayrollPillIntoView,50);});}setTimeout(scrollActivePayrollPillIntoView,500);setTimeout(scrollActivePayrollPillIntoView,1500);</script>
+<script>document.addEventListener('click',function(e){var nav=e.target.closest('.nav-item');if(nav){var crm=document.querySelector('.crm');if(crm)crm.classList.remove('nav-open');}var cell=e.target.closest('.cal-day');if(cell&&!e.target.closest('.appt')&&window.setCalView&&typeof window.curDay!=='undefined'){var n=cell.querySelector('.dn2');if(!n)return;var day=parseInt(n.textContent,10);if(!day)return;var tm=window.curMonth,ty=window.curYear;if(cell.classList.contains('om')){if(day>15){tm--;if(tm<1){tm=12;ty--;}}else{tm++;if(tm>12){tm=1;ty++;}}}window.curDay=day;window.curMonth=tm;window.curYear=ty;var b=document.getElementById('btn-day');if(b)window.setCalView('day',b);}},true);function scrollActivePayrollPillIntoView(){var c=document.getElementById('payroll-period-buttons');if(!c)return;var a=c.querySelector('.pbtn.active')||c.querySelector('.pbtn[style*="background"]')||c.querySelector('.pbtn:not(.pbtn)');if(a){c.scrollLeft=Math.max(0,a.offsetLeft-16);}}var _payrollObs=new MutationObserver(function(){scrollActivePayrollPillIntoView();});var _payrollContainer=document.getElementById('payroll-period-buttons');if(_payrollContainer){_payrollObs.observe(_payrollContainer,{childList:true,subtree:true,attributes:true,attributeFilter:['class','style']});_payrollContainer.addEventListener('click',function(){setTimeout(scrollActivePayrollPillIntoView,50);});}setTimeout(scrollActivePayrollPillIntoView,500);setTimeout(scrollActivePayrollPillIntoView,1500);</script>
 <!-- ═════════ IMPORT / PURGE / UNDO FEATURES ═════════ -->
 <script>
 (function(){

@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hawaii Natural Clean — Get a Quote</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    :root {
+      --primary: #2d5a3d; /* Deep forest green */
+      --accent: #d4a574; /* Warm sand */
+      --accent-light: #f5e6d3; /* Light sand */
+      --text-dark: #1a1a1a;
+      --text-light: #666;
+      --border: #e0d5c7;
+      --success: #4a9d6f;
+      --error: #c84630;
+      --bg-light: #fefdfb;
+    }
+
+    body {
+      font-family: 'Segoe UI', 'Trebuchet MS', sans-serif;
+      color: var(--text-dark);
+      background: linear-gradient(135deg, var(--bg-light) 0%, #f9f5f0 100%);
+      padding: 20px;
+      min-height: 100vh;
+    }
+
+    .form-container {
+      max-width: 500px;
+      margin: 0 auto;
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 8px 24px rgba(45, 90, 61, 0.08);
+      overflow: hidden;
+    }
+
+    .form-header {
+      background: linear-gradient(135deg, var(--primary) 0%, #3d6e4d 100%);
+      color: white;
+      padding: 40px 30px;
+      text-align: center;
+    }
+
+    .form-header h1 {
+      font-size: 28px;
+      font-weight: 600;
+      margin-bottom: 8px;
+      letter-spacing: -0.5px;
+    }
+
+    .form-header p {
+      font-size: 14px;
+      opacity: 0.95;
+      font-weight: 300;
+    }
+
+    .form-body {
+      padding: 40px 30px;
+    }
+
+    .form-group {
+      margin-bottom: 24px;
+    }
+
+    .form-group:last-of-type {
+      margin-bottom: 0;
+    }
+
+    label {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-dark);
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .required {
+      color: var(--error);
+    }
+
+    input[type="text"],
+    input[type="email"],
+    input[type="tel"],
+    input[type="date"],
+    select,
+    textarea {
+      width: 100%;
+      padding: 12px 14px;
+      border: 1.5px solid var(--border);
+      border-radius: 8px;
+      font-size: 14px;
+      font-family: inherit;
+      background: white;
+      color: var(--text-dark);
+      transition: all 0.2s ease;
+    }
+
+    input[type="text"]:focus,
+    input[type="email"]:focus,
+    input[type="tel"]:focus,
+    input[type="date"]:focus,
+    select:focus,
+    textarea:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(45, 90, 61, 0.1);
+      background: #fafaf8;
+    }
+
+    textarea {
+      resize: vertical;
+      min-height: 100px;
+      font-family: inherit;
+    }
+
+    .checkbox-group {
+      display: flex;
+      gap: 16px;
+      margin-top: 10px;
+      flex-wrap: wrap;
+    }
+
+    .checkbox-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex: 1;
+      min-width: 140px;
+    }
+
+    .checkbox-item input[type="checkbox"] {
+      width: 18px;
+      height: 18px;
+      cursor: pointer;
+      accent-color: var(--primary);
+    }
+
+    .checkbox-item label {
+      margin: 0;
+      font-weight: 400;
+      text-transform: none;
+      letter-spacing: normal;
+      font-size: 13px;
+      cursor: pointer;
+      flex: 1;
+    }
+
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    .form-row.full {
+      grid-template-columns: 1fr;
+    }
+
+    .submit-btn {
+      width: 100%;
+      padding: 14px 24px;
+      background: linear-gradient(135deg, var(--primary) 0%, #3d6e4d 100%);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      margin-top: 10px;
+    }
+
+    .submit-btn:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 20px rgba(45, 90, 61, 0.25);
+    }
+
+    .submit-btn:active:not(:disabled) {
+      transform: translateY(0);
+    }
+
+    .submit-btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    .form-message {
+      padding: 14px;
+      border-radius: 8px;
+      font-size: 13px;
+      margin-bottom: 20px;
+      display: none;
+      animation: slideIn 0.3s ease;
+    }
+
+    .form-message.show {
+      display: block;
+    }
+
+    .form-message.success {
+      background: #e8f5e9;
+      color: #2e7d32;
+      border: 1.5px solid #c8e6c9;
+    }
+
+    .form-message.error {
+      background: #ffebee;
+      color: #c62828;
+      border: 1.5px solid #ffcdd2;
+    }
+
+    .field-error {
+      color: var(--error);
+      font-size: 12px;
+      margin-top: 4px;
+      display: none;
+    }
+
+    .field-error.show {
+      display: block;
+    }
+
+    input.error,
+    textarea.error,
+    select.error {
+      border-color: var(--error);
+      background: #fff5f5;
+    }
+
+    .info-banner {
+      background: linear-gradient(135deg, var(--accent-light) 0%, #f8ede3 100%);
+      padding: 12px 14px;
+      border-radius: 8px;
+      font-size: 12px;
+      color: #5d4a3a;
+      margin-bottom: 20px;
+      border-left: 3px solid var(--accent);
+    }
+
+    @keyframes slideIn {
+      from {
+        opacity: 0;
+        transform: translateY(-10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .loading-spinner {
+      display: inline-block;
+      width: 16px;
+      height: 16px;
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      border-top-color: white;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin-right: 8px;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .form-footer {
+      padding: 20px 30px;
+      background: #f9f7f4;
+      border-top: 1px solid var(--border);
+      font-size: 12px;
+      color: var(--text-light);
+      text-align: center;
+    }
+
+    @media (max-width: 600px) {
+      .form-container {
+        border-radius: 0;
+      }
+
+      .form-header {
+        padding: 30px 20px;
+      }
+
+      .form-header h1 {
+        font-size: 24px;
+      }
+
+      .form-body {
+        padding: 30px 20px;
+      }
+
+      .form-row {
+        grid-template-columns: 1fr;
+        gap: 12px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="form-container">
+    <div class="form-header">
+      <h1>Get a Free Quote</h1>
+      <p>Professional cleaning for Oahu & Maui</p>
+    </div>
+
+    <form id="leadForm" class="form-body">
+      <div class="form-message" id="formMessage"></div>
+
+      <div class="info-banner">
+        💬 We'll respond within 24 hours. Your information is secure and never shared.
+      </div>
+
+      <!-- Name -->
+      <div class="form-group">
+        <label for="fullName">Your Name <span class="required">*</span></label>
+        <input
+          type="text"
+          id="fullName"
+          name="fullName"
+          placeholder="John Doe"
+          required
+        >
+        <div class="field-error" id="error-fullName"></div>
+      </div>
+
+      <!-- Contact Info -->
+      <div class="form-row">
+        <div class="form-group">
+          <label for="email">Email <span class="required">*</span></label>
+          <input
+            type="email"
+            id="email"
+            name="email"
+            placeholder="you@example.com"
+            required
+          >
+          <div class="field-error" id="error-email"></div>
+        </div>
+        <div class="form-group">
+          <label for="phone">Phone <span class="required">*</span></label>
+          <input
+            type="tel"
+            id="phone"
+            name="phone"
+            placeholder="(808) 555-0000"
+            required
+          >
+          <div class="field-error" id="error-phone"></div>
+        </div>
+      </div>
+
+      <!-- Property Address -->
+      <div class="form-group">
+        <label for="address">Property Address <span class="required">*</span></label>
+        <input
+          type="text"
+          id="address"
+          name="address"
+          placeholder="123 Main St, Honolulu, HI 96815"
+          required
+        >
+        <div class="field-error" id="error-address"></div>
+      </div>
+
+      <!-- Property Details -->
+      <div class="form-row">
+        <div class="form-group">
+          <label for="beds">Bedrooms</label>
+          <select id="beds" name="beds">
+            <option value="">Select...</option>
+            <option value="1">1</option>
+            <option value="2">2</option>
+            <option value="3">3</option>
+            <option value="4">4</option>
+            <option value="5">5+</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="baths">Bathrooms</label>
+          <select id="baths" name="baths">
+            <option value="">Select...</option>
+            <option value="1">1</option>
+            <option value="1.5">1.5</option>
+            <option value="2">2</option>
+            <option value="2.5">2.5</option>
+            <option value="3">3+</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Service Type -->
+      <div class="form-group">
+        <label>Service Type <span class="required">*</span></label>
+        <div class="checkbox-group">
+          <div class="checkbox-item">
+            <input
+              type="checkbox"
+              id="regular"
+              name="serviceType"
+              value="Regular Cleaning"
+            >
+            <label for="regular">Regular</label>
+          </div>
+          <div class="checkbox-item">
+            <input
+              type="checkbox"
+              id="deep"
+              name="serviceType"
+              value="Deep Cleaning"
+            >
+            <label for="deep">Deep</label>
+          </div>
+          <div class="checkbox-item">
+            <input
+              type="checkbox"
+              id="moveout"
+              name="serviceType"
+              value="Move-out Cleaning"
+            >
+            <label for="moveout">Move-out</label>
+          </div>
+        </div>
+        <div class="field-error" id="error-serviceType"></div>
+      </div>
+
+      <!-- Frequency -->
+      <div class="form-group">
+        <label for="frequency">How often would you like cleaning? <span class="required">*</span></label>
+        <select id="frequency" name="frequency" required>
+          <option value="">Select frequency...</option>
+          <option value="Weekly">Weekly</option>
+          <option value="Biweekly">Every 2 weeks</option>
+          <option value="Monthly">Monthly</option>
+          <option value="One-time">One-time</option>
+          <option value="Other">Other (explain below)</option>
+        </select>
+        <div class="field-error" id="error-frequency"></div>
+      </div>
+
+      <!-- Additional Notes -->
+      <div class="form-group">
+        <label for="notes">Anything else we should know?</label>
+        <textarea
+          id="notes"
+          name="notes"
+          placeholder="E.g., pet allergies, specific areas needing attention, etc."
+        ></textarea>
+      </div>
+
+      <!-- Submit -->
+      <button type="submit" class="submit-btn" id="submitBtn">
+        Get Your Free Quote
+      </button>
+    </form>
+
+    <div class="form-footer">
+      <p>© Hawaii Natural Clean • Honest, thorough, local.</p>
+    </div>
+  </div>
+
+  <script>
+    const form = document.getElementById('leadForm');
+    const submitBtn = document.getElementById('submitBtn');
+    const formMessage = document.getElementById('formMessage');
+
+    // Form validation
+    const validators = {
+      fullName: (value) => value.trim().length >= 2 ? null : 'Name must be at least 2 characters',
+      email: (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value) ? null : 'Invalid email address',
+      phone: (value) => /^\d{10,}|^\([0-9]{3}\)\s?[0-9]{3}-?[0-9]{4}/.test(value.replace(/\D/g, '')) ? null : 'Invalid phone number',
+      address: (value) => value.trim().length >= 5 ? null : 'Please enter a valid address',
+      serviceType: (value) => {
+        const checkedServices = Array.from(document.querySelectorAll('input[name="serviceType"]:checked'));
+        return checkedServices.length > 0 ? null : 'Please select at least one service type';
+      },
+      frequency: (value) => value ? null : 'Please select a frequency'
+    };
+
+    function validateField(fieldName) {
+      const field = document.getElementById(fieldName);
+      const errorEl = document.getElementById(`error-${fieldName}`);
+      const value = fieldName === 'serviceType' 
+        ? Array.from(document.querySelectorAll('input[name="serviceType"]:checked')).map(el => el.value).join(', ')
+        : field.value;
+
+      const error = validators[fieldName]?.(value);
+
+      if (error) {
+        field?.classList.add('error');
+        errorEl.textContent = error;
+        errorEl.classList.add('show');
+        return false;
+      } else {
+        field?.classList.remove('error');
+        errorEl.classList.remove('show');
+        return true;
+      }
+    }
+
+    function validateForm() {
+      return Object.keys(validators).every(fieldName => {
+        return validateField(fieldName);
+      });
+    }
+
+    // Real-time validation
+    Object.keys(validators).forEach(fieldName => {
+      if (fieldName === 'serviceType') {
+        document.querySelectorAll('input[name="serviceType"]').forEach(el => {
+          el.addEventListener('change', () => validateField(fieldName));
+        });
+      } else {
+        const field = document.getElementById(fieldName);
+        if (field) {
+          field.addEventListener('blur', () => validateField(fieldName));
+          field.addEventListener('input', () => validateField(fieldName));
+        }
+      }
+    });
+
+    // Form submission
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      if (!validateForm()) {
+        showMessage('Please fix the errors above', 'error');
+        return;
+      }
+
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = '<span class="loading-spinner"></span>Submitting...';
+
+      try {
+        const formData = new FormData(form);
+        const data = {
+          name: formData.get('fullName'),
+          email: formData.get('email'),
+          phone: formData.get('phone'),
+          address: formData.get('address'),
+          beds: formData.get('beds') || null,
+          baths: formData.get('baths') || null,
+          serviceType: Array.from(document.querySelectorAll('input[name="serviceType"]:checked'))
+            .map(el => el.value)
+            .join(', '),
+          frequency: formData.get('frequency'),
+          notes: formData.get('notes'),
+          source: 'website_form',
+          submittedAt: new Date().toISOString()
+        };
+
+        // Submit to CRM backend
+        const response = await fetch('/api/lead-capture', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data)
+        });
+
+        if (!response.ok) {
+          throw new Error(`Server error: ${response.statusText}`);
+        }
+
+        const result = await response.json();
+
+        // Clear form
+        form.reset();
+        document.querySelectorAll('input.error, textarea.error, select.error').forEach(el => {
+          el.classList.remove('error');
+        });
+
+        showMessage(
+          '✓ Thanks! We\'ll reach out within 24 hours to confirm availability.',
+          'success'
+        );
+
+        // Scroll to message
+        setTimeout(() => {
+          formMessage.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 100);
+
+      } catch (error) {
+        console.error('Form submission error:', error);
+        showMessage('Something went wrong. Please try again or call us at (808) 555-0000.', 'error');
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Get Your Free Quote';
+      }
+    });
+
+    function showMessage(text, type) {
+      formMessage.textContent = text;
+      formMessage.className = `form-message show ${type}`;
+    }
+  </script>
+</body>
+</html>

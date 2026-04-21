@@ -1376,51 +1376,26 @@ Mahalo 🌺</textarea>
         <div id="lead-ai-summary" style="background:#f5f0ff;border:1px solid #e9d8fd;border-radius:10px;padding:12px 13px;margin-bottom:10px;font-size:12px;color:#44337a;line-height:1.7;display:none;"></div>
         <div class="panel-section">Notes</div>
         <div class="info-block"><div style="font-size:12px;color:var(--text);line-height:1.6;" id="lead-notes">—</div></div>
-        <div class="panel-section">Suggested quote</div>
+        <div class="panel-section">Quote</div>
         <div id="suggested-quote-card" style="background:#f0f9ff;border:1px solid #bfdbfe;border-radius:10px;padding:12px 13px;margin-bottom:10px;display:none;">
           <div id="suggested-quote-loading" style="text-align:center;color:var(--text-muted);font-size:12px;">⏳ Calculating quote...</div>
           <div id="suggested-quote-content" style="display:none;">
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
-              <div style="border-right:1px solid #dbeafe;padding-right:10px;">
-                <div style="font-size:11px;color:var(--text-muted);">Service</div>
+            <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+              <div>
+                <div style="font-size:12px;color:var(--text-muted);">Service</div>
                 <div style="font-size:13px;font-weight:600;color:var(--text);margin-top:2px;" id="sug-service">—</div>
               </div>
               <div>
-                <div style="font-size:11px;color:var(--text-muted);">Duration</div>
-                <div style="font-size:13px;font-weight:600;color:var(--text);margin-top:2px;" id="sug-duration">—</div>
+                <div style="font-size:12px;color:var(--text-muted);">Frequency</div>
+                <div style="font-size:13px;font-weight:600;color:var(--text);margin-top:2px;" id="sug-frequency">—</div>
+              </div>
+              <div style="background:#dcfce7;border:1px solid #86efac;border-radius:8px;padding:8px 16px;text-align:center;">
+                <div style="font-size:10px;color:#15803d;text-transform:uppercase;letter-spacing:.05em;">Total</div>
+                <div style="font-size:20px;font-weight:700;color:#15803d;margin-top:2px;" id="sug-total">$0</div>
               </div>
             </div>
-            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px;">
-              <div style="background:#fff;border:1px solid #dbeafe;border-radius:6px;padding:8px;text-align:center;">
-                <div style="font-size:10px;color:var(--text-muted);">Subtotal</div>
-                <div style="font-size:14px;font-weight:600;color:var(--text);margin-top:2px;" id="sug-subtotal">$0</div>
-              </div>
-              <div style="background:#fff;border:1px solid #dbeafe;border-radius:6px;padding:8px;text-align:center;">
-                <div style="font-size:10px;color:var(--text-muted);">Discount</div>
-                <div style="font-size:14px;font-weight:600;color:var(--text);margin-top:2px;" id="sug-discount">—</div>
-              </div>
-              <div style="background:#dcfce7;border:1px solid #86efac;border-radius:6px;padding:8px;text-align:center;">
-                <div style="font-size:10px;color:#15803d;">Total</div>
-                <div style="font-size:14px;font-weight:600;color:#15803d;margin-top:2px;" id="sug-total">$0</div>
-              </div>
-            </div>
-            <div id="sug-breakdown" style="font-size:11px;color:var(--text-muted);line-height:1.5;background:#fff;border:1px solid #dbeafe;border-radius:6px;padding:8px;"></div>
             <div id="sug-error" style="background:#fee;border:1px solid #fca;border-radius:6px;padding:8px 10px;margin-top:10px;font-size:11px;color:#c5192d;display:none;"></div>
           </div>
-        </div>
-        <div class="panel-section">Send quote</div>
-        <div class="info-block" style="padding:12px 13px;">
-          <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px;">Generate and send a quote to this lead</div>
-          <div class="form-two" style="margin-bottom:8px;">
-            <div class="form-row" style="margin:0;"><label>Est. price</label><input type="text" id="quote-price" placeholder="e.g. $950/mo"></div>
-            <div class="form-row" style="margin:0;"><label>Valid for</label><select id="quote-validity"><option>7 days</option><option>14 days</option><option>30 days</option></select></div>
-          </div>
-          <div class="form-row" style="margin-bottom:8px;"><label>Custom message (optional)</label><textarea id="quote-msg" style="min-height:50px;" placeholder="Add a personal note to the quote..."></textarea></div>
-          <div style="display:flex;gap:7px;">
-            <button class="action-btn green" style="flex:1;" onclick="sendQuote('email')">Send quote via email (PDF)</button>
-            <button class="action-btn blue" style="flex:1;" onclick="sendQuote('sms')">Send quote via SMS</button>
-          </div>
-          <div class="success-bar" id="quote-success" style="margin-top:8px;margin-bottom:0;">Quote sent successfully!</div>
         </div>
         <div class="action-grid" style="margin-top:14px;">
           <button class="action-btn green full" onclick="scheduleLeadAppointment()">Book appointment</button>
@@ -3537,8 +3512,8 @@ function openLead(id){
   ['contact','phone','email','address','value','service','sqft','source','date','action','due','assigned','notes'].forEach(function(f){
     var el=document.getElementById('lead-'+f);if(el)el.textContent=d[f]||'—';
   });
-  document.getElementById('quote-price').value=d.value||'';
-  document.getElementById('quote-success').classList.remove('show');
+  document.getElementById('quote-price') && (document.getElementById('quote-price').value = d.value||'');
+  document.getElementById('quote-success') && document.getElementById('quote-success').classList.remove('show');
   hideLeadEdit();
   var leadSumEl=document.getElementById('lead-ai-summary');
   var leadThinkEl=document.getElementById('lead-ai-thinking');
@@ -9569,37 +9544,8 @@ async function loadSuggestedQuote(){
       loading.style.display = 'none';
     } else {
       document.getElementById('sug-service').textContent = result.service || '—';
-      document.getElementById('sug-duration').textContent = (result.duration_minutes || 0) + ' min';
-      document.getElementById('sug-subtotal').textContent = '$' + result.subtotal.toFixed(2);
-      
-      if(result.discount_pct > 0) {
-        document.getElementById('sug-discount').textContent = '-' + result.discount_pct + '% ($' + result.discount.toFixed(2) + ')';
-      } else {
-        document.getElementById('sug-discount').textContent = 'None';
-      }
-      
+      document.getElementById('sug-frequency').textContent = d.frequency || '—';
       document.getElementById('sug-total').textContent = '$' + result.total.toFixed(2);
-      
-      var breakdown = '';
-      if(result.breakdown) {
-        if(result.breakdown.bedrooms) {
-          breakdown += '<strong>Bedrooms:</strong> ' + result.breakdown.bedrooms.tier + ' ($' + result.breakdown.bedrooms.price.toFixed(2) + ')<br>';
-        }
-        if(result.breakdown.bathrooms) {
-          breakdown += '<strong>Bathrooms:</strong> ' + result.breakdown.bathrooms.tier + ' ($' + result.breakdown.bathrooms.price.toFixed(2) + ')<br>';
-        }
-        if(result.breakdown.sqft) {
-          breakdown += '<strong>Sqft tier:</strong> ' + result.breakdown.sqft.tier + ' ($' + result.breakdown.sqft.price.toFixed(2) + ')<br>';
-        }
-        if(result.breakdown.condition && result.breakdown.condition.surcharge > 0) {
-          breakdown += '<strong>Condition:</strong> ' + result.breakdown.condition.tier + ' (Score: ' + result.breakdown.condition.score + '/10)<br>';
-        }
-        if(result.breakdown.frequency) {
-          breakdown += '<strong>Frequency:</strong> ' + result.breakdown.frequency;
-        }
-      }
-      
-      document.getElementById('sug-breakdown').innerHTML = breakdown || 'Standard quote';
       loading.style.display = 'none';
       content.style.display = 'block';
     }

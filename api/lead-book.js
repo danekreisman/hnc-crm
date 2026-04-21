@@ -53,7 +53,7 @@ export default async function handler(req, res) {
 
   // ── POST: submit booking request ──────────────────────────────────────
   if (req.method === 'POST') {
-    const { token, date, time, notes, service } = req.body;
+    const { token, date, time, notes, service, rushFee } = req.body;
     if (!token || !date) return res.status(400).json({ error: 'Missing required fields' });
 
     const supabase = db();
@@ -69,10 +69,15 @@ export default async function handler(req, res) {
     await supabase.from('leads').update({ stage: 'Quoted' }).eq('id', lead.id);
 
     // Log booking request as a note on the lead
+    const rushLabel = rushFee === 200 ? 'Same-day (+$200)'
+      : rushFee === 100 ? 'Next-day (+$100)'
+      : rushFee === 50  ? '2-day (+$50)'
+      : null;
     const requestNote = [
       `📅 BOOKING REQUEST via portal`,
       `Date: ${date}`,
       `Time: ${time || 'Flexible'}`,
+      rushLabel ? `Rush fee: ${rushLabel}` : null,
       notes ? `Notes: ${notes}` : null,
     ].filter(Boolean).join('\n');
 
@@ -86,7 +91,8 @@ export default async function handler(req, res) {
 
     // Notify via SMS to HNC number
     const BASE_URL = 'https://hnc-crm.vercel.app';
-    const adminSms = `📅 New booking request from ${lead.name}!\nService: ${lead.service || service}\nDate: ${date} at ${time || 'flexible'}\nQuote: ${lead.quote_total ? '$'+Number(lead.quote_total).toFixed(2) : 'TBD'}`;
+    const rushStr = rushFee > 0 ? ` + $${rushFee} rush fee` : '';
+    const adminSms = `📅 New booking request from ${lead.name}!\nService: ${lead.service || service}\nDate: ${date} at ${time || 'flexible'}\nQuote: ${lead.quote_total ? '$'+Number(lead.quote_total).toFixed(2) : 'TBD'}${rushStr}`;
     try {
       await fetch(`${BASE_URL}/api/send-sms`, {
         method: 'POST',

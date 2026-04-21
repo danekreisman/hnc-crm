@@ -185,7 +185,7 @@ body{font-family:'Josefin Sans',sans-serif;color:var(--text);overflow-x:hidden;}
 .island-card .ic-name{font-size:13px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--text);}
 
 /* Service cards */
-.svc-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px;}
+.svc-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:8px;}
 .svc-card{
   border:1.5px solid var(--border);border-radius:12px;
   padding:18px 14px;cursor:pointer;transition:all .2s;
@@ -194,6 +194,17 @@ body{font-family:'Josefin Sans',sans-serif;color:var(--text);overflow-x:hidden;}
 .svc-card:hover{border-color:var(--blue2);background:var(--white);transform:translateY(-1px);}
 .svc-card.selected{border-color:var(--blue);background:#eef9fd;}
 .svc-card input{display:none;}
+.svc-card.full-w{grid-column:1/-1;flex-direction:row;justify-content:center;gap:10px;padding:14px;}
+/* Promo banner */
+.promo-banner{background:linear-gradient(135deg,#fff8e6,#fff3d4);border:1.5px solid #f2c94c;border-radius:10px;padding:12px 16px;margin-bottom:16px;display:none;font-size:13px;color:#7a5c00;line-height:1.5;gap:8px;align-items:flex-start;}
+.promo-banner.show{display:flex;}
+/* Condition slider */
+.condition-wrap{background:#f0f9ff;border:1.5px solid var(--blue4);border-radius:12px;padding:16px 18px;margin-bottom:16px;display:none;}
+.condition-wrap.show{display:block;}
+.condition-val{text-align:center;font-size:26px;font-weight:700;color:var(--blue);font-family:'Josefin Sans',sans-serif;margin-bottom:8px;}
+.condition-slider{width:100%;-webkit-appearance:none;appearance:none;height:6px;border-radius:3px;background:linear-gradient(90deg,#e05c5c,#f2c94c,#3BB8E3);outline:none;cursor:pointer;}
+.condition-slider::-webkit-slider-thumb{-webkit-appearance:none;width:22px;height:22px;border-radius:50%;background:var(--blue);border:3px solid white;box-shadow:0 2px 8px rgba(59,184,227,.4);cursor:pointer;}
+.condition-ends{display:flex;justify-content:space-between;font-size:11px;color:var(--text-muted);margin-top:6px;font-weight:300;}
 .svc-icon{font-size:26px;margin-bottom:7px;}
 .svc-name{font-size:12px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--text);margin-bottom:3px;}
 .svc-desc{font-size:11px;color:var(--text-muted);font-weight:300;letter-spacing:.02em;}
@@ -404,6 +415,7 @@ body{font-family:'Josefin Sans',sans-serif;color:var(--text);overflow-x:hidden;}
           <label class="island-card" id="ic-maui"><input type="radio" name="island" value="Maui"><span class="ic-em">🏄</span><span class="ic-name">Maui</span></label>
         </div>
       </div>
+      <div id="res-fields">
       <div class="frow">
         <div class="field">
           <label>Bedrooms</label>
@@ -418,6 +430,7 @@ body{font-family:'Josefin Sans',sans-serif;color:var(--text);overflow-x:hidden;}
         <label>Square footage <span class="opt">(optional)</span></label>
         <input type="number" id="sqft" placeholder="e.g. 1200">
       </div>
+      </div><!-- /res-fields -->
       <div class="btn-row">
         <button class="btn-back" onclick="prev(2)">Back</button>
         <button class="btn-next" onclick="next(2)">Continue <svg viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
@@ -436,13 +449,29 @@ body{font-family:'Josefin Sans',sans-serif;color:var(--text);overflow-x:hidden;}
           <label class="svc-card" id="sc-deep"><input type="radio" name="svc" value="Deep Cleaning"><div class="svc-icon">✨</div><div class="svc-name">Deep Clean</div><div class="svc-desc">Top-to-bottom detail</div></label>
           <label class="svc-card" id="sc-move"><input type="radio" name="svc" value="Move-out Cleaning"><div class="svc-icon">📦</div><div class="svc-name">Move-out</div><div class="svc-desc">Ready for next tenant</div></label>
           <label class="svc-card" id="sc-bnb"><input type="radio" name="svc" value="Airbnb Turnover"><div class="svc-icon">🏡</div><div class="svc-name">Airbnb Turnover</div><div class="svc-desc">Between guest stays</div></label>
+          <label class="svc-card full-w" id="sc-jan"><input type="radio" name="svc" value="Janitorial Cleaning"><div class="svc-icon">🏢</div><div class="svc-name">Janitorial</div><div class="svc-desc">Commercial & office spaces</div></label>
         </div>
         <div class="ferr" id="fe-svc"></div>
+      </div>
+
+      <!-- Promo banner — shown for Deep or Move-out -->
+      <div class="promo-banner" id="promoBanner">
+        <span>🎉</span>
+        <div><strong>Save 25% on your first deep or move-out clean</strong> when you sign up for a recurring regular cleaning plan. Ask us about it when we reach out!</div>
+      </div>
+
+      <!-- Condition slider — shown for Deep or Move-out -->
+      <div class="condition-wrap" id="conditionWrap">
+        <div style="font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--text-muted);margin-bottom:10px;">Property condition <span style="color:var(--error)">*</span></div>
+        <div class="condition-val" id="conditionVal">5</div>
+        <input type="range" class="condition-slider" id="condition" min="1" max="10" value="5">
+        <div class="condition-ends"><span>1 — Filthy 😬</span><span>10 — Pristine ✨</span></div>
       </div>
       <div class="field">
         <label>Frequency <span style="color:var(--error)">*</span></label>
         <div class="freq-wrap">
           <label class="fpill selected"><input type="radio" name="freq" value="Biweekly" checked>Every 2 weeks</label>
+          <label class="fpill"><input type="radio" name="freq" value="Every 3 weeks">Every 3 weeks</label>
           <label class="fpill"><input type="radio" name="freq" value="Weekly">Weekly</label>
           <label class="fpill"><input type="radio" name="freq" value="Monthly">Monthly</label>
           <label class="fpill"><input type="radio" name="freq" value="One-time">One-time</label>
@@ -476,8 +505,8 @@ body{font-family:'Josefin Sans',sans-serif;color:var(--text);overflow-x:hidden;}
   <!-- Success -->
   <div class="success" id="successView">
     <div class="success-icon"><svg viewBox="0 0 36 36" fill="none"><path d="M8 18l7 7 13-13" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-    <h2>You're all set!</h2>
-    <p>We'll reach out within 24 hours to confirm your quote and availability.</p>
+    <h2>Mahalo! 🌺</h2>
+    <p>We'll be in touch within the hour to go over your quote. Keep an eye on your phone!</p>
     <div class="success-card" id="successCard"></div>
     <div class="again" onclick="resetForm()">Submit another request</div>
   </div>
@@ -565,9 +594,86 @@ function validate(s){
 function next(s){if(validate(s))goTo(s,s+1);}
 function prev(s){goTo(s,s-1);}
 
-// Interactive cards
+// === PHONE FORMATTING ===
+document.getElementById('phone').addEventListener('input', function(e){
+  var digits = this.value.replace(/\D/g,'').substring(0,10);
+  var fmt = '';
+  if(digits.length > 0) fmt = '(' + digits.substring(0,3);
+  if(digits.length >= 4) fmt += ') ' + digits.substring(3,6);
+  if(digits.length >= 7) fmt += '-' + digits.substring(6,10);
+  this.value = fmt;
+});
+
+// === GOOGLE MAPS PLACES AUTOCOMPLETE ===
+window.initMapsLF = function(){
+  var input = document.getElementById('address');
+  if(!input || !window.google) return;
+  var ac = new google.maps.places.Autocomplete(input, {
+    componentRestrictions:{country:'us'},
+    fields:['formatted_address','geometry'],
+    types:['address']
+  });
+  ac.addListener('place_changed', function(){
+    var place = ac.getPlace();
+    if(place.formatted_address) input.value = place.formatted_address;
+  });
+};
+(function(){
+  var s = document.createElement('script');
+  s.src = 'https://maps.googleapis.com/maps/api/js?key=AIzaSyCkn8UeVuv5iek_Rm3jqdozF1HGMhSuGNk&libraries=places&callback=initMapsLF&loading=async';
+  s.async = true; s.defer = true;
+  document.head.appendChild(s);
+})();
+
+// === CONDITION SLIDER ===
+var conditionSlider = document.getElementById('condition');
+var conditionVal = document.getElementById('conditionVal');
+conditionSlider.addEventListener('input', function(){
+  conditionVal.textContent = this.value;
+});
+
+// === SERVICE CARD LOGIC ===
+var isJanitorial = false;
+document.querySelectorAll('input[name="svc"]').forEach(function(r){
+  r.addEventListener('change', function(){
+    document.querySelectorAll('.svc-card').forEach(function(c){c.classList.remove('selected');});
+    this.closest('.svc-card').classList.add('selected');
+    ce('svc');
+    var val = this.value;
+    var needsCondition = (val === 'Deep Cleaning' || val === 'Move-out Cleaning');
+    var needsPromo = needsCondition;
+    isJanitorial = (val === 'Janitorial Cleaning');
+
+    // Show/hide condition and promo
+    document.getElementById('conditionWrap').classList.toggle('show', needsCondition);
+    document.getElementById('promoBanner').classList.toggle('show', needsPromo);
+
+    // Show/hide res fields on step 2 (via sessionStorage flag)
+    sessionStorage.setItem('hnc_janitorial', isJanitorial ? '1' : '0');
+    var resFields = document.getElementById('res-fields');
+    if(resFields) resFields.style.display = isJanitorial ? 'none' : '';
+
+    // Update notes placeholder for janitorial
+    var notes = document.getElementById('notes');
+    if(notes){
+      notes.placeholder = isJanitorial
+        ? 'Describe the space and what needs to be done (e.g. office floors, restrooms, trash, frequency…)'
+        : 'Pets, entry instructions, areas to focus on…';
+    }
+  });
+});
+
+// Check janitorial flag on step 2 display
+document.addEventListener('DOMContentLoaded', function(){
+  // Restore janitorial state if form was already partly filled
+  if(sessionStorage.getItem('hnc_janitorial') === '1'){
+    var resFields = document.getElementById('res-fields');
+    if(resFields) resFields.style.display = 'none';
+  }
+});
+
+// Interactive cards (island, freq, src)
 document.querySelectorAll('input[name="island"]').forEach(function(r){r.addEventListener('change',function(){document.querySelectorAll('.island-card').forEach(function(c){c.classList.remove('selected');});this.closest('.island-card').classList.add('selected');});});
-document.querySelectorAll('input[name="svc"]').forEach(function(r){r.addEventListener('change',function(){document.querySelectorAll('.svc-card').forEach(function(c){c.classList.remove('selected');});this.closest('.svc-card').classList.add('selected');ce('svc');});});
 document.querySelectorAll('input[name="freq"]').forEach(function(r){r.addEventListener('change',function(){document.querySelectorAll('.fpill').forEach(function(c){c.classList.remove('selected');});this.closest('.fpill').classList.add('selected');ce('freq');});});
 document.querySelectorAll('input[name="src"]').forEach(function(r){r.addEventListener('change',function(){document.querySelectorAll('.spill').forEach(function(c){c.classList.remove('selected');});this.closest('.spill').classList.add('selected');});});
 
@@ -576,6 +682,8 @@ async function doSubmit(){
   var btn=document.getElementById('submitBtn');
   btn.disabled=true;
   btn.innerHTML='<div class="spinner"></div>';
+  var svc=(document.querySelector('input[name="svc"]:checked')||{}).value||'';
+  var needsCondition=(svc==='Deep Cleaning'||svc==='Move-out Cleaning');
   var data={
     name:document.getElementById('fullName').value.trim(),
     email:document.getElementById('email').value.trim(),
@@ -584,7 +692,8 @@ async function doSubmit(){
     beds:document.getElementById('beds').value||null,
     baths:document.getElementById('baths').value||null,
     sqft:document.getElementById('sqft').value||null,
-    serviceType:(document.querySelector('input[name="svc"]:checked')||{}).value||'',
+    condition:needsCondition?document.getElementById('condition').value:null,
+    serviceType:svc,
     frequency:(document.querySelector('input[name="freq"]:checked')||{}).value||'',
     referralSource:(document.querySelector('input[name="src"]:checked')||{}).value||null,
     notes:document.getElementById('notes').value.trim()||null,
@@ -601,7 +710,11 @@ async function doSubmit(){
     var sv=document.getElementById('successView');
     sv.classList.add('show');
     document.getElementById('successCard').innerHTML=
-      row('Service',data.serviceType)+row('Frequency',data.frequency)+row('Island',data.island)+(data.referralSource?row('Heard via',data.referralSource):'');
+      row('Service',data.serviceType)+
+      row('Frequency',data.frequency)+
+      row('Island',data.island)+
+      (data.condition?row('Condition',data.condition+'/10'):'')+
+      (data.referralSource?row('Heard via',data.referralSource):'');
   }catch(err){
     var eb=document.getElementById('e3');
     eb.textContent=err.message||'Something went wrong. Please try again.';
@@ -618,6 +731,11 @@ function resetForm(){
   document.getElementById('stepsContainer').style.display='';
   document.getElementById('successView').classList.remove('show');
   document.querySelectorAll('input[type=text],input[type=email],input[type=tel],input[type=number],textarea,select').forEach(function(el){el.value='';});
+  document.getElementById('conditionWrap').classList.remove('show');
+  document.getElementById('promoBanner').classList.remove('show');
+  var resFields = document.getElementById('res-fields');
+  if(resFields) resFields.style.display = '';
+  sessionStorage.removeItem('hnc_janitorial');
   document.getElementById('step'+cur).classList.remove('active');
   document.getElementById('step1').classList.add('active');
   cur=1;updateProg(1);

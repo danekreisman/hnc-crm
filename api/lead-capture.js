@@ -12,16 +12,20 @@ export default async function handler(req, res) {
     return res.status(400).json({ success: false, message: 'Please fill in all required fields.' });
   }
 
-  const db = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
+  const db = createClient(
+    process.env.SUPABASE_URL,
+    process.env.SUPABASE_SERVICE_ROLE_KEY,
+    { auth: { persistSession: false } }
+  );
 
   const noteParts = [
     d.notes        || null,
-    d.serviceType  ? 'Service: '   + d.serviceType  : null,
-    d.frequency    ? 'Frequency: ' + d.frequency    : null,
-    d.island       ? 'Island: '    + d.island       : null,
-    d.beds         ? 'Beds: '      + d.beds         : null,
-    d.baths        ? 'Baths: '     + d.baths        : null,
-    d.sqft         ? 'Sqft: '      + d.sqft         : null,
+    d.serviceType  ? 'Service: '   + d.serviceType   : null,
+    d.frequency    ? 'Frequency: ' + d.frequency      : null,
+    d.island       ? 'Island: '    + d.island         : null,
+    d.beds         ? 'Beds: '      + d.beds           : null,
+    d.baths        ? 'Baths: '     + d.baths          : null,
+    d.sqft         ? 'Sqft: '      + d.sqft           : null,
     d.condition    ? 'Condition: ' + d.condition + '/10' : null,
   ].filter(Boolean);
 

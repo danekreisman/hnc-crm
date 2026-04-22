@@ -76,7 +76,9 @@ export default async function handler(req, res) {
     if (leadErr || !lead) return res.status(404).json({ error: 'Invalid token' });
 
     const firstName = lead.name.trim().split(' ')[0];
-    const phone     = (lead.phone || '').replace(/\D/g, '');
+    const rawPhone  = (lead.phone || '').trim();
+    const phone     = rawPhone.replace(/\D/g, '');
+    const e164      = rawPhone.startsWith('+') ? rawPhone.replace(/[^0-9+]/g, '') : '+1' + phone;
     const quoteData = lead.quote_data || {};
     const TAX_RATE  = 0.04712;
 
@@ -190,8 +192,34 @@ export default async function handler(req, res) {
         body: JSON.stringify({ to: '+18083484888', message: adminSms })
       }, TIMEOUTS.OPENPHONE);
     } catch (err) {
-      // SMS failure does NOT fail the booking — it's already saved
       await logError('lead-book:admin-sms', err, { leadId: lead.id });
+    }
+
+    // ── 8. Policy agreement SMS — only if client hasn't already agreed ─────
+    // New clients have policies_agreed_at = null. Existing clients who already
+    // agreed are skipped automatically so they don't get a repeat message.
+    try {
+      const { data: clientRecord } = await supabase
+        .from('clients')
+        .select('policies_agreed_at')
+        .eq('id', clientId)
+        .maybeSingle();
+
+      if (clientRecord && !clientRecord.policies_agreed_at) {
+        const policyLink = `${BASE_URL}/agree.html?c=${clientId}`;
+        const policyMsg  = `Hi ${firstName}! Before your first cleaning with Hawaii Natural Clean, please take a moment to review and agree to our service policies: ${policyLink} 🌺`;
+        await fetchWithTimeout(`${BASE_URL}/api/send-sms`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ to: e164, message: policyMsg })
+        }, TIMEOUTS.OPENPHONE);
+        console.log('[lead-book] Policy agreement SMS sent to', e164);
+      } else {
+        console.log('[lead-book] Client already agreed to policies — skipping SMS');
+      }
+    } catch (err) {
+      // Policy SMS failure does NOT fail the booking
+      await logError('lead-book:policy-sms', err, { leadId: lead.id, clientId });
     }
 
     return res.status(200).json({

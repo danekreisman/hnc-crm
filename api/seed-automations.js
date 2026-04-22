@@ -14,7 +14,7 @@ export default async function handler(req, res) {
     { auth: { persistSession: false } }
   );
 
-  // The 4 pre-built automations
+  // The 4 pre-built lead automations
   const automations = [
     {
       name: 'Initial 3-day follow-up',
@@ -83,27 +83,64 @@ export default async function handler(req, res) {
     }
   ];
 
+  // OLD automations to restore
+  const oldAutomations = [
+    {
+      name: 'New Lead — Auto Quote',
+      enabled: true,
+      trigger: 'form_submission',
+      trigger_value: 'all',
+      logic: 'AND'
+    },
+    {
+      name: 'Janitorial Lead — Walkthrough Request',
+      enabled: true,
+      trigger: 'form_submission',
+      trigger_value: 'all',
+      logic: 'AND'
+    }
+  ];
+
   try {
-    // Delete any existing system automations first
+    // Delete ONLY System lead automations (not old automations)
     await db
       .from('lead_automations')
       .delete()
       .eq('created_by', 'System');
 
-    // Insert the new automations
-    const { data, error } = await db
+    // Insert the new lead automations
+    const { data: newAutos, error: insertError } = await db
       .from('lead_automations')
       .insert(automations)
       .select();
 
-    if (error) throw error;
+    if (insertError) throw insertError;
 
-    console.log(`[seed-automations] Created ${data.length} automations`);
+    // Restore old automations (check if they exist first)
+    const { data: existingOld } = await db
+      .from('automations')
+      .select('id')
+      .in('name', oldAutomations.map(a => a.name));
+
+    let restoredOld = [];
+    if (!existingOld || existingOld.length === 0) {
+      const { data: restored, error: restoreError } = await db
+        .from('automations')
+        .insert(oldAutomations)
+        .select();
+
+      if (restoreError) throw restoreError;
+      restoredOld = restored || [];
+    }
+
+    console.log(`[seed-automations] Created ${newAutos.length} lead automations, restored ${restoredOld.length} old automations`);
 
     return res.status(200).json({
       success: true,
-      created: data.length,
-      automations: data
+      created_lead_automations: newAutos.length,
+      restored_old_automations: restoredOld.length,
+      lead_automations: newAutos,
+      old_automations: restoredOld
     });
   } catch (error) {
     console.error('[seed-automations]', error);

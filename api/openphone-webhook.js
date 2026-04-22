@@ -54,6 +54,20 @@ export default async function handler(req, res) {
     return clients.find(c => c.phone && c.phone.replace(/\D/g, '').slice(-10) === digits) || null;
   }
 
+  async function findLeadByPhone(phone) {
+    if (!phone) return null;
+    const digits = phone.replace(/\D/g, '').slice(-10);
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/leads?select=id,phone&limit=100`, {
+      headers: {
+        'apikey': SUPABASE_KEY,
+        'Authorization': `Bearer ${SUPABASE_KEY}`
+      }
+    });
+    const leads = await res.json();
+    if (!Array.isArray(leads)) return null;
+    return leads.find(l => l.phone && l.phone.replace(/\D/g, '').slice(-10) === digits) || null;
+  }
+
   try {
     const event = req.body;
     const type = event.type;
@@ -65,6 +79,7 @@ export default async function handler(req, res) {
       const from = data.from;
       const body = data.body || '';
       const client = await findClientByPhone(from);
+      const lead = await findLeadByPhone(from);
 
       await supabaseInsert('messages', {
         thread_id: data.conversationId || from,
@@ -77,6 +92,24 @@ export default async function handler(req, res) {
         read: false,
         quo_message_id: data.id || null
       });
+
+      // If this is a lead response, track it
+      if (lead) {
+        const updateRes = await fetch(`${SUPABASE_URL}/rest/v1/leads?id=eq.${lead.id}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': SUPABASE_KEY,
+            'Authorization': `Bearer ${SUPABASE_KEY}`,
+            'Prefer': 'return=minimal'
+          },
+          body: JSON.stringify({
+            response_count: (lead.response_count || 0) + 1,
+            last_responded_at: new Date().toISOString()
+          })
+        });
+        console.log('Lead response tracked:', lead.id, updateRes.status);
+      }
     }
 
     if (type === 'call.completed' && data) {

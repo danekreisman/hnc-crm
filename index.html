@@ -4823,7 +4823,7 @@ function sv(view,el){
   document.getElementById('search-results').style.display='none';
   document.getElementById('sec-btn').textContent=secs[view]||'Filter';
   if(view==='messaging')renderInbox();
-  if(view==='automations')renderAutoList();
+  if(view==='automations')loadLeadAutomations();
   if(view==='reporting'){ try{ repPopulateBucketDropdown(); }catch(e){} repRender(); }
   if(view==='settings'){initTemplateEditor();initPayrollSettingsUI();};
   if(view==='payroll')refreshPayrollPeriods();
@@ -6073,8 +6073,10 @@ var AUTO_OPS = [
   {k:'in',label:'is one of (comma list)'}
 ];
 var AUTO_ACTIONS = [
-  {k:'sms',     label:'Send SMS',        fields:['to','body']},
-  {k:'email',   label:'Send email',      fields:['to','subject','body']},
+  {k:'sms',     label:'Send SMS',        fields:['message','delay_minutes']},
+  {k:'email',   label:'Send email',      fields:['subject','message','delay_minutes']},
+  {k:'segment_move', label:'Move to segment', fields:['new_segment','delay_minutes']},
+  {k:'internal_notification', label:'Internal notification', fields:['message','delay_minutes']},
   {k:'tag',     label:'Add tag to client',fields:['tag']},
   {k:'assign',  label:'Assign cleaner',  fields:['cleaner_id']},
   {k:'task',    label:'Create task',     fields:['title','due_hours']},
@@ -6267,7 +6269,7 @@ function openNewAuto(){
   _autoEditingId = null;
   document.getElementById('auton-name').value = '';
   document.getElementById('auton-enabled').checked = true;
-  document.getElementById('auton-trigger').value = 'appointment.created';
+  document.getElementById('auton-trigger').value = 'form_submission';
   document.getElementById('auton-trigger-value').value = '';
   document.getElementById('auton-trigger-extra').style.display = 'none';
   document.getElementById('auton-logic').value = 'AND';
@@ -6275,8 +6277,7 @@ function openNewAuto(){
   document.getElementById('auton-actions').innerHTML = '';
   autoAddAction();
   openOverlay('new-auto-overlay');
-  document.getElementById('auton-trigger').onchange = autoOnTriggerChange;
-  autoOnTriggerChange();
+  updateTriggerExtra();
 }
 function autoOnTriggerChange(){
   var t = document.getElementById('auton-trigger').value;
@@ -6415,7 +6416,182 @@ function autoDelete(id){
   autoSaveLocal(); autoDeleteRemote(id); renderAutoList();
 }
 
-/* -------- evaluator & actions -------- */
+// ============================================================================
+// LEAD AUTOMATIONS - New builder for lead_automations table
+// ============================================================================
+
+function updateTriggerExtra(){
+  var trigger = document.getElementById('auton-trigger').value;
+  var needsValue = ['days_since_response', 'scheduled', 'booking_completed'];
+  var extraDiv = document.getElementById('auton-trigger-extra');
+  var label = document.getElementById('auton-trigger-label');
+  
+  if(needsValue.indexOf(trigger) >= 0){
+    extraDiv.style.display = 'block';
+    if(trigger === 'days_since_response') label.textContent = 'Days since response';
+    else if(trigger === 'scheduled') label.textContent = 'Time of day (HH:MM, e.g. 09:00)';
+    else if(trigger === 'booking_completed') label.textContent = 'Hours after booking completed';
+  } else {
+    extraDiv.style.display = 'none';
+  }
+}
+
+async function leadAutoSave(){
+  var name = document.getElementById('auton-name').value.trim();
+  if(!name){ alert('Please name this automation'); return; }
+  
+  var triggerType = document.getElementById('auton-trigger').value;
+  var triggerValue = document.getElementById('auton-trigger-value').value.trim();
+  
+  // Build trigger_config
+  var triggerConfig = {};
+  if(triggerType === 'form_submission') triggerConfig = {};
+  else if(triggerType === 'days_since_response') triggerConfig = { days: parseInt(triggerValue) || 7 };
+  else if(triggerType === 'scheduled') triggerConfig = { time_of_day: triggerValue || '09:00', days: ['MO','TU','WE','TH','FR','SA','SU'] };
+  else if(triggerType === 'booking_completed') triggerConfig = { hours_after: parseInt(triggerValue) || 24 };
+  
+  // Build actions array
+  var actions = [];
+  document.querySelectorAll('#auton-actions .auto-act').forEach(function(r){
+    var act = { type: r.querySelector('.aa-type').value };
+    var delayField = r.querySelector('[data-k="delay_minutes"]');
+    if(delayField) act.delay_minutes = parseInt(delayField.value) || 0;
+    
+    r.querySelectorAll('.aa-f').forEach(function(f){
+      if(f.dataset.k !== 'delay_minutes') act[f.dataset.k] = f.value;
+    });
+    actions.push(act);
+  });
+  
+  if(!actions.length){ alert('Add at least one action'); return; }
+  
+  var automation = {
+    name: name,
+    description: '',
+    trigger_type: triggerType,
+    trigger_config: triggerConfig,
+    actions: actions,
+    is_enabled: document.getElementById('auton-enabled').checked,
+    created_by: 'HNC Team'
+  };
+  
+  try {
+    var res = await fetch('/api/save-automation', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(automation)
+    });
+    
+    if(!res.ok) throw new Error('Failed to save automation');
+    
+    var data = await res.json();
+    console.log('Automation saved:', data);
+    
+    alert('Automation saved successfully!');
+    closeOverlay('new-auto-overlay');
+    loadLeadAutomations(); // Refresh the list
+  } catch(e){
+    alert('Error saving automation: ' + e.message);
+    console.error(e);
+  }
+}
+
+async function loadLeadAutomations(){
+  try {
+    if(typeof supabase === 'undefined' || !supabase) return;
+    
+    var { data, error } = await supabase
+      .from('lead_automations')
+      .select('*')
+      .eq('is_enabled', true);
+    
+    if(error) throw error;
+    
+    console.log('Loaded automations:', data);
+    
+    // Update the UI with automation count
+    var countEl = document.getElementById('auto-active-count');
+    if(countEl) countEl.textContent = (data || []).length;
+    
+    renderLeadAutoList(data || []);
+  } catch(e){
+    console.warn('Failed to load automations:', e.message);
+  }
+}
+
+function renderLeadAutoList(automationList){
+  var host = document.getElementById('auto-list');
+  if(!host) return;
+  
+  host.innerHTML = '';
+  
+  if(!automationList || automationList.length === 0){
+    host.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-muted);">No automations yet. Create your first one!</div>';
+    return;
+  }
+  
+  automationList.forEach(function(auto){
+    var card = document.createElement('div');
+    card.className = 'tw';
+    card.style.cssText = 'padding:14px 16px;margin-bottom:10px;border-left:3px solid var(--brand-500);';
+    
+    var status = auto.is_enabled ? '<span class="badge" style="background:#dcfce7;color:#166534;">ACTIVE</span>' : '<span class="badge bin">DISABLED</span>';
+    var triggerLabel = auto.trigger_type.replace(/_/g, ' ').toUpperCase();
+    
+    card.innerHTML = 
+      '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;">' +
+      '  <div style="flex:1;">' +
+      '    <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">' +
+      '      <b style="font-size:14px;">' + auto.name + '</b>' +
+      '      ' + status +
+      '    </div>' +
+      '    <div style="font-size:12px;color:var(--text-muted);">Trigger: <b>' + triggerLabel + '</b> · ' + (auto.actions?.length || 0) + ' action(s)</div>' +
+      '  </div>' +
+      '  <div style="display:flex;gap:6px;flex-shrink:0;">' +
+      '    <button class="btn" style="font-size:12px;padding:6px 10px;" onclick="toggleLeadAuto(\'' + auto.id + '\')">' + (auto.is_enabled ? 'Disable' : 'Enable') + '</button>' +
+      '    <button class="btn" style="font-size:12px;padding:6px 10px;color:#c53030;" onclick="deleteLeadAuto(\'' + auto.id + '\')">Delete</button>' +
+      '  </div>' +
+      '</div>';
+    
+    host.appendChild(card);
+  });
+}
+
+async function toggleLeadAuto(id){
+  try {
+    if(typeof supabase === 'undefined' || !supabase) return;
+    
+    var { error } = await supabase
+      .from('lead_automations')
+      .update({ is_enabled: supabase.rpc('not', { col: 'is_enabled' }) })
+      .eq('id', id);
+    
+    if(error) throw error;
+    loadLeadAutomations();
+  } catch(e){
+    alert('Error updating automation: ' + e.message);
+  }
+}
+
+async function deleteLeadAuto(id){
+  if(!confirm('Delete this automation? This cannot be undone.')) return;
+  
+  try {
+    if(typeof supabase === 'undefined' || !supabase) return;
+    
+    var { error } = await supabase
+      .from('lead_automations')
+      .delete()
+      .eq('id', id);
+    
+    if(error) throw error;
+    loadLeadAutomations();
+  } catch(e){
+    alert('Error deleting automation: ' + e.message);
+  }
+}
+
+/* -------- evaluator & actions --------
 function autoMatchCondition(c, ctx){
   var v = ctx[c.field];
   var cmp = c.value;
@@ -6586,6 +6762,7 @@ function autoTick(){
 autoLoadLocal();
 renderAutoList();
 autoLoadRemote().then(function(){ renderAutoList(); });
+loadLeadAutomations(); // Load lead automations from Supabase
 setInterval(autoTick, 60*1000);
 
 /* ============================================================
@@ -10443,26 +10620,18 @@ loadSettings();
 
       <div class="section-title" style="margin:0 0 8px 0;font-size:13px;">When &mdash; Trigger</div>
       <div class="form-row">
-        <select id="auton-trigger">
-          <option value="appointment.created">Appointment is created</option>
-          <option value="appointment.updated">Appointment is updated</option>
-          <option value="appointment.cancelled">Appointment is cancelled</option>
-          <option value="appointment.completed">Appointment is completed (marked done)</option>
-          <option value="appointment.paid">Appointment is marked paid</option>
-          <option value="appointment.before_24h">24 hours before appointment start</option>
-          <option value="appointment.before_2h">2 hours before appointment start</option>
-          <option value="appointment.before_custom">Custom hours before appointment</option>
-          <option value="appointment.after_complete">Hours after job completed</option>
-          <option value="lead.created">New lead is created</option>
-          <option value="lead.stale">Lead inactive for N days</option>
-          <option value="client.inactive">Client inactive for N days</option>
-          <option value="schedule.daily">Every day at specific time</option>
+        <select id="auton-trigger" onchange="updateTriggerExtra()">
+          <option value="form_submission">Form submission (new lead from website)</option>
+          <option value="lead_created">Any new lead is created</option>
+          <option value="days_since_response">Lead hasn't responded for N days</option>
+          <option value="scheduled">Scheduled (every day/week at specific time)</option>
+          <option value="booking_completed">Booking/appointment completed</option>
         </select>
       </div>
 
       <div class="form-row" id="auton-trigger-extra" style="display:none;">
-        <label>Trigger value (hours / days / time)</label>
-        <input type="text" id="auton-trigger-value" placeholder="e.g. 48 or 18:00">
+        <label id="auton-trigger-label">Number of days</label>
+        <input type="text" id="auton-trigger-value" placeholder="e.g. 7 or 09:00">
       </div>
 
       <div style="height:1px;background:var(--border);margin:14px 0;"></div>
@@ -10491,19 +10660,19 @@ loadSettings();
 
       <div style="height:1px;background:var(--border);margin:14px 0;"></div>
 
-      <div style="font-size:12px;color:var(--muted);margin-bottom:6px;">Template variables (click to copy &mdash; paste into any message body):</div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:6px;">Template variables (click to copy — paste into any message body):</div>
       <div style="display:flex;flex-wrap:wrap;gap:6px;">
-        <button type="button" class="chan-btn" onclick="autoCopyVar('{client_name}')">{client_name}</button>
-        <button type="button" class="chan-btn" onclick="autoCopyVar('{date}')">{date}</button>
-        <button type="button" class="chan-btn" onclick="autoCopyVar('{time}')">{time}</button>
-        <button type="button" class="chan-btn" onclick="autoCopyVar('{cleaner}')">{cleaner}</button>
-        <button type="button" class="chan-btn" onclick="autoCopyVar('{address}')">{address}</button>
+        <button type="button" class="chan-btn" onclick="autoCopyVar('{firstName}')">{firstName}</button>
+        <button type="button" class="chan-btn" onclick="autoCopyVar('{name}')">{name}</button>
         <button type="button" class="chan-btn" onclick="autoCopyVar('{service}')">{service}</button>
-        <button type="button" class="chan-btn" onclick="autoCopyVar('{price}')">{price}</button>
+        <button type="button" class="chan-btn" onclick="autoCopyVar('{frequency}')">{frequency}</button>
+        <button type="button" class="chan-btn" onclick="autoCopyVar('{address}')">{address}</button>
+        <button type="button" class="chan-btn" onclick="autoCopyVar('{phone}')">{phone}</button>
+        <button type="button" class="chan-btn" onclick="autoCopyVar('{quote_total}')">{quote_total}</button>
       </div>
 
       <div class="form-actions" style="margin-top:18px;">
-        <button class="btn btn-primary" onclick="autoSave()">Save automation</button>
+        <button class="btn btn-primary" onclick="leadAutoSave()">Save automation</button>
         <button class="btn" onclick="closeOverlay('new-auto-overlay')">Cancel</button>
       </div>
       <div class="success-bar" id="auton-success">Automation saved!</div>

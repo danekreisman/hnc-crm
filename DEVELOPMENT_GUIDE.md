@@ -203,4 +203,18 @@ Run through this checklist:
 
 ---
 
-*Last updated: April 2026 — after completing the 4-step foundation.*
+## Changes — April 2026 (Session 2)
+
+**Auto policy agreement SMS** added to `lead-book.js`:
+- After booking commits, checks `clients.policies_agreed_at`
+- New clients (null) → SMS sent with `agree.html?c=CLIENT_ID` link
+- Returning clients (date set) → SMS skipped silently
+- SMS failure never fails the booking
+
+**Bug fixed:** e164 phone formatting in `lead-book.js` — the `+` was being stripped before the E.164 check, causing numbers like `+18085551234` to become `+1118085551234`. Fixed by preserving the raw phone string before sanitization.
+
+**Known gap:** `lead-capture.js` still sends policy link manually from CRM. Consider auto-sending on lead creation too (lower priority — most leads aren't clients yet).
+
+---
+
+*Last updated: April 2026 — Session 2 (policy agreement auto-send).*

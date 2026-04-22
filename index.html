@@ -334,6 +334,12 @@ textarea{font-family:inherit;}
 .policy-row textarea{min-height:56px;resize:vertical;line-height:1.5;}
 .policy-remove-btn{background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:16px;padding:2px 4px;line-height:1;margin-top:2px;border-radius:4px;transition:color .15s;}
 .policy-remove-btn:hover{color:#e16b6b;}
+.auto-toggle{position:relative;display:inline-flex;align-items:center;cursor:pointer;gap:7px;font-size:12px;font-weight:500;color:var(--text-muted);}
+.auto-toggle input{opacity:0;width:0;height:0;position:absolute;}
+.auto-toggle-track{width:34px;height:19px;border-radius:20px;background:#d1d5db;transition:background .2s;flex-shrink:0;position:relative;}
+.auto-toggle input:checked + .auto-toggle-track{background:var(--brand-500);}
+.auto-toggle-thumb{position:absolute;top:2px;left:2px;width:15px;height:15px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.2);transition:transform .2s;}
+.auto-toggle input:checked ~ .auto-toggle-thumb{transform:translateX(15px);}
 .template-tab.active{background:var(--brand-500);color:#fff;border-color:var(--brand-500);}
 .template-tab:hover:not(.active){background:var(--bg-soft);}
 .auto-card{background:#fff;border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:10px;display:flex;align-items:flex-start;gap:14px;}
@@ -6607,15 +6613,14 @@ async function loadLeadAutomations(){
     var { data, error } = await db
       .from('lead_automations')
       .select('*')
-      .eq('is_enabled', true);
+      .order('created_at', { ascending: true });
     
     if(error) throw error;
     
-    console.log('Loaded automations:', data);
-    
-    // Update the UI with automation count
+    // Update the UI with active automation count
+    var active = (data || []).filter(function(a){ return a.is_enabled; });
     var countEl = document.getElementById('auto-active-count');
-    if(countEl) countEl.textContent = (data || []).length;
+    if(countEl) countEl.textContent = active.length;
     
     renderLeadAutoList(data || []);
   } catch(e){
@@ -6649,20 +6654,25 @@ function renderLeadAutoList(automationList){
       else if(auto.trigger_config.hours_after) triggerDetail = ' · ' + auto.trigger_config.hours_after + 'h after';
       else if(auto.trigger_config.time_of_day) triggerDetail = ' · ' + auto.trigger_config.time_of_day;
     }
+    var toggleId = 'toggle-' + auto.id;
+    card.style.opacity = auto.is_enabled ? '1' : '0.55';
     card.innerHTML =
       '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;">' +
       '  <div style="flex:1;">' +
       '    <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">' +
       '      <b style="font-size:14px;">' + auto.name + '</b>' +
-      '      ' + status +
+      '      ' + (auto.is_enabled ? '' : '<span style="font-size:11px;color:var(--text-muted);background:var(--bg-soft);border:1px solid var(--border);border-radius:20px;padding:1px 8px;">Off</span>') +
       '    </div>' +
       '    <div style="font-size:12px;color:var(--text-muted);">Trigger: <b>' + triggerLabel + '</b>' + triggerDetail + ' · ' + actionSummary + '</div>' +
       '    <div style="font-size:12px;color:var(--text-muted);margin-top:3px;font-style:italic;">' + ((auto.actions||[])[0]?.message || '').substring(0,80) + ((((auto.actions||[])[0]?.message)||'').length > 80 ? '…' : '') + '</div>' +
       '  </div>' +
-      '  <div style="display:flex;gap:6px;flex-shrink:0;">' +
+      '  <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">' +
+      '    <label class="auto-toggle" title="' + (auto.is_enabled ? 'Disable' : 'Enable') + ' automation">' +
+      '      <input type="checkbox" id="' + toggleId + '" ' + (auto.is_enabled ? 'checked' : '') + ' onchange="toggleLeadAuto(\'' + auto.id + '\',this.checked)">' +
+      '      <div class="auto-toggle-track"><div class="auto-toggle-thumb"></div></div>' +
+      '    </label>' +
       '    <button class="btn" style="font-size:12px;padding:6px 10px;background:var(--brand-50);color:var(--brand-700);border-color:var(--brand-300);" onclick="openAutoTest(\'' + auto.id + '\')">▶ Test</button>' +
       '    <button class="btn" style="font-size:12px;padding:6px 10px;" onclick="editLeadAuto(\'' + auto.id + '\')">Edit</button>' +
-      '    <button class="btn" style="font-size:12px;padding:6px 10px;" onclick="toggleLeadAuto(\'' + auto.id + '\',' + auto.is_enabled + ')">' + (auto.is_enabled ? 'Disable' : 'Enable') + '</button>' +
       '    <button class="btn" style="font-size:12px;padding:6px 10px;color:#c53030;" onclick="deleteLeadAuto(\'' + auto.id + '\')">Delete</button>' +
       '  </div>' +
       '</div>';
@@ -6671,17 +6681,19 @@ function renderLeadAutoList(automationList){
   });
 }
 
-async function toggleLeadAuto(id, currentState){
+async function toggleLeadAuto(id, newState){
+  // newState is the desired state (true = on, false = off)
   try {
     if(!db) return;
     var { error } = await db
       .from('lead_automations')
-      .update({ is_enabled: !currentState })
+      .update({ is_enabled: !!newState })
       .eq('id', id);
     if(error) throw error;
     loadLeadAutomations();
   } catch(e){
     alert('Error updating automation: ' + e.message);
+    loadLeadAutomations(); // Reload to reset toggle to correct state
   }
 }
 

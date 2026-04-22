@@ -6445,57 +6445,63 @@ function updateTriggerExtra(){
 async function leadAutoSave(){
   var name = document.getElementById('auton-name').value.trim();
   if(!name){ alert('Please name this automation'); return; }
-  
+
   var triggerType = document.getElementById('auton-trigger').value;
   var triggerValue = document.getElementById('auton-trigger-value').value.trim();
-  
-  // Build trigger_config
+
   var triggerConfig = {};
   if(triggerType === 'form_submission') triggerConfig = {};
   else if(triggerType === 'days_since_response') triggerConfig = { days: parseInt(triggerValue) || 7 };
   else if(triggerType === 'scheduled') triggerConfig = { time_of_day: triggerValue || '09:00', days: ['MO','TU','WE','TH','FR','SA','SU'] };
   else if(triggerType === 'booking_completed') triggerConfig = { hours_after: parseInt(triggerValue) || 24 };
-  
-  // Build actions array
+
   var actions = [];
   document.querySelectorAll('#auton-actions .auto-act').forEach(function(r){
     var act = { type: r.querySelector('.aa-type').value };
     var delayField = r.querySelector('[data-k="delay_minutes"]');
     if(delayField) act.delay_minutes = parseInt(delayField.value) || 0;
-    
     r.querySelectorAll('.aa-f').forEach(function(f){
       if(f.dataset.k !== 'delay_minutes') act[f.dataset.k] = f.value;
     });
     actions.push(act);
   });
-  
+
   if(!actions.length){ alert('Add at least one action'); return; }
-  
+
   var automation = {
     name: name,
     description: '',
     trigger_type: triggerType,
     trigger_config: triggerConfig,
     actions: actions,
-    is_enabled: document.getElementById('auton-enabled').checked,
-    created_by: 'HNC Team'
+    is_enabled: document.getElementById('auton-enabled').checked
   };
-  
+
   try {
-    var res = await fetch('/api/save-automation', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(automation)
-    });
-    
-    if(!res.ok) throw new Error('Failed to save automation');
-    
-    var data = await res.json();
-    console.log('Automation saved:', data);
-    
-    alert('Automation saved successfully!');
+    if(_editingLeadAutoId) {
+      // UPDATE
+      if(!db) throw new Error('Database not available');
+      var { error } = await db
+        .from('lead_automations')
+        .update(automation)
+        .eq('id', _editingLeadAutoId);
+      if(error) throw error;
+    } else {
+      // CREATE
+      automation.created_by = 'HNC Team';
+      var res = await fetch('/api/save-automation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(automation)
+      });
+      if(!res.ok) throw new Error('Failed to save automation');
+    }
+
+    _editingLeadAutoId = null;
+    var titleEl = document.querySelector('#new-auto-overlay .panel-title');
+    if(titleEl) titleEl.textContent = 'New automation';
     closeOverlay('new-auto-overlay');
-    loadLeadAutomations(); // Refresh the list
+    loadLeadAutomations();
   } catch(e){
     alert('Error saving automation: ' + e.message);
     console.error(e);
@@ -6544,17 +6550,26 @@ function renderLeadAutoList(automationList){
     var status = auto.is_enabled ? '<span class="badge" style="background:#dcfce7;color:#166534;">ACTIVE</span>' : '<span class="badge bin">DISABLED</span>';
     var triggerLabel = auto.trigger_type.replace(/_/g, ' ').toUpperCase();
     
-    card.innerHTML = 
+    var actionSummary = (auto.actions || []).map(function(a){ return a.type; }).join(', ') || 'no actions';
+    var triggerDetail = '';
+    if(auto.trigger_config) {
+      if(auto.trigger_config.days && typeof auto.trigger_config.days === 'number') triggerDetail = ' · ' + auto.trigger_config.days + ' days';
+      else if(auto.trigger_config.hours_after) triggerDetail = ' · ' + auto.trigger_config.hours_after + 'h after';
+      else if(auto.trigger_config.time_of_day) triggerDetail = ' · ' + auto.trigger_config.time_of_day;
+    }
+    card.innerHTML =
       '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;">' +
       '  <div style="flex:1;">' +
       '    <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">' +
       '      <b style="font-size:14px;">' + auto.name + '</b>' +
       '      ' + status +
       '    </div>' +
-      '    <div style="font-size:12px;color:var(--text-muted);">Trigger: <b>' + triggerLabel + '</b> · ' + (auto.actions?.length || 0) + ' action(s)</div>' +
+      '    <div style="font-size:12px;color:var(--text-muted);">Trigger: <b>' + triggerLabel + '</b>' + triggerDetail + ' · ' + actionSummary + '</div>' +
+      '    <div style="font-size:12px;color:var(--text-muted);margin-top:3px;font-style:italic;">' + ((auto.actions||[])[0]?.message || '').substring(0,80) + ((((auto.actions||[])[0]?.message)||'').length > 80 ? '…' : '') + '</div>' +
       '  </div>' +
       '  <div style="display:flex;gap:6px;flex-shrink:0;">' +
-      '    <button class="btn" style="font-size:12px;padding:6px 10px;" onclick="toggleLeadAuto(\'' + auto.id + '\')">' + (auto.is_enabled ? 'Disable' : 'Enable') + '</button>' +
+      '    <button class="btn" style="font-size:12px;padding:6px 10px;" onclick="editLeadAuto(\'' + auto.id + '\')">Edit</button>' +
+      '    <button class="btn" style="font-size:12px;padding:6px 10px;" onclick="toggleLeadAuto(\'' + auto.id + '\',' + auto.is_enabled + ')">' + (auto.is_enabled ? 'Disable' : 'Enable') + '</button>' +
       '    <button class="btn" style="font-size:12px;padding:6px 10px;color:#c53030;" onclick="deleteLeadAuto(\'' + auto.id + '\')">Delete</button>' +
       '  </div>' +
       '</div>';
@@ -6563,21 +6578,78 @@ function renderLeadAutoList(automationList){
   });
 }
 
-async function toggleLeadAuto(id){
+async function toggleLeadAuto(id, currentState){
   try {
     if(!db) return;
-    
     var { error } = await db
       .from('lead_automations')
-      .update({ is_enabled: true }) // For now, just enable
+      .update({ is_enabled: !currentState })
       .eq('id', id);
-    
     if(error) throw error;
     loadLeadAutomations();
   } catch(e){
     alert('Error updating automation: ' + e.message);
   }
 }
+
+var _editingLeadAutoId = null;
+
+async function editLeadAuto(id) {
+  try {
+    if(!db) return;
+    var { data, error } = await db
+      .from('lead_automations')
+      .select('*')
+      .eq('id', id)
+      .single();
+    if(error) throw error;
+
+    _editingLeadAutoId = id;
+
+    // Pre-fill fields
+    document.getElementById('auton-name').value = data.name || '';
+    document.getElementById('auton-enabled').checked = !!data.is_enabled;
+    document.getElementById('auton-trigger').value = data.trigger_type || 'form_submission';
+
+    // Set trigger config value
+    var triggerValue = '';
+    var cfg = data.trigger_config || {};
+    if(typeof cfg.days === 'number') triggerValue = cfg.days;
+    else if(cfg.hours_after) triggerValue = cfg.hours_after;
+    else if(cfg.time_of_day) triggerValue = cfg.time_of_day;
+    document.getElementById('auton-trigger-value').value = triggerValue;
+    updateTriggerExtra();
+
+    // Rebuild actions
+    var actionsContainer = document.getElementById('auton-actions');
+    actionsContainer.innerHTML = '';
+    (data.actions || []).forEach(function(action) {
+      autoAddAction();
+      var rows = actionsContainer.querySelectorAll('.auto-act');
+      var lastRow = rows[rows.length - 1];
+      if(!lastRow) return;
+      var typeSelect = lastRow.querySelector('.aa-type');
+      if(typeSelect) { typeSelect.value = action.type; typeSelect.dispatchEvent(new Event('change')); }
+      setTimeout(function() {
+        var msgField = lastRow.querySelector('[data-k="message"]');
+        if(msgField && action.message) msgField.value = action.message;
+        var delayField = lastRow.querySelector('[data-k="delay_minutes"]');
+        if(delayField && action.delay_minutes != null) delayField.value = action.delay_minutes;
+        var segField = lastRow.querySelector('[data-k="new_segment"]');
+        if(segField && action.new_segment) segField.value = action.new_segment;
+      }, 50);
+    });
+
+    // Update overlay title
+    var titleEl = document.querySelector('#new-auto-overlay .panel-title');
+    if(titleEl) titleEl.textContent = 'Edit automation';
+
+    openOverlay('new-auto-overlay');
+  } catch(e) {
+    alert('Error loading automation: ' + e.message);
+  }
+}
+
 
 async function deleteLeadAuto(id){
   if(!confirm('Delete this automation? This cannot be undone.')) return;

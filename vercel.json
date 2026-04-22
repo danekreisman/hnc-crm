@@ -1,5 +1,15 @@
 {
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api/$1" }
+  ],
+  "crons": [
+    {
+      "path": "/api/run-automations",
+      "schedule": "0 */6 * * *"
+    },
+    {
+      "path": "/api/update-segments",
+      "schedule": "0 5 * * *"
+    }
   ]
 }

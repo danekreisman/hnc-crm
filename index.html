@@ -7506,7 +7506,7 @@ function showPaymentToast(msg,callback,type){
 
 
 /* PAYMENTS RENDER (live data) */
-async function renderPaymentsSection(){ checkStripeConnectivity(); refreshCardOnFileCache();
+async function renderPaymentsSection(){ checkStripeConnectivity();
   try {
     if (typeof db === 'undefined' || !db || !db.from) return;
     // Pull completed-but-not-invoiced appointments
@@ -7530,6 +7530,10 @@ async function renderPaymentsSection(){ checkStripeConnectivity(); refreshCardOn
       // Group appointments by client (id or name)
       var groups = {};
       var groupOrder = [];
+      // Only pre-fetch card status for clients with pending appointments (not all clients)
+      var _pendingClientIds = appts.map(function(a){ return a.client_id; }).filter(Boolean);
+      if (_pendingClientIds.length > 0) refreshCardOnFileCache(_pendingClientIds);
+
       appts.forEach(function(a){
         var cid = a.client_id || '';
         var rec = null;
@@ -8053,53 +8057,60 @@ async function checkStripeConnectivity(){
 
 // Card-on-file cache: { clientId: { customerId, hasCard } }
 window._cardCache = window._cardCache || {};
-async function refreshCardOnFileCache(){
+window._cardCacheRefreshing = false;
+
+// Only fetch cards for a specific set of client IDs (those with pending appointments)
+// This prevents hammering Stripe with 100+ calls for every client in the DB
+async function refreshCardOnFileCache(limitToIds){
+  if (window._cardCacheRefreshing) return; // Prevent concurrent runs
   if (typeof clientDB === 'undefined') return;
-  var ids = Object.keys(clientDB).filter(function(id){ return id.length >= 30 && clientDB[id].email; });
-  for (var i = 0; i < ids.length; i++) {
-    var id = ids[i];
-    if (window._cardCache[id]) continue;
-    var c = clientDB[id];
-    try {
-      var resp = await fetch('/api/stripe-invoice', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ action: 'find_customer_cards', customerEmail: c.email }) });
-      var data = await resp.json();
-      if (data && data.success) {
-        var hasCard = (data.cards && data.cards.length > 0);
-        window._cardCache[id] = { customerId: data.customerId, hasCard: hasCard };
-        // Persist customerId to DB and clientDB for fast future reference
-        if (data.customerId && (!c.stripeCustomerId && !c.stripe_customer_id)) {
-          try { await db.from('clients').update({ stripe_customer_id: data.customerId }).eq('id', id); } catch(e){}
-          c.stripeCustomerId = data.customerId;
-        }
-      } else {
-        window._cardCache[id] = { customerId: null, hasCard: false };
-      }
-    } catch(e){ window._cardCache[id] = { customerId: null, hasCard: false }; }
-  }
-  // Re-render pending so Charge buttons appear
-  if (typeof renderPendingOnly === 'function') renderPendingOnly();
-  else if (typeof renderPaymentsSection === 'function') {
-    // Re-render only if currently on payments view to avoid loops
-    try { var v = (typeof currentView !== 'undefined') ? currentView : ''; if (v === 'payments') {
-      // Light re-render: just toggle Charge button visibility for known cached clients
-      document.querySelectorAll('.pending-group-header, .pending-sub-row').forEach(function(row){
-        var cid = row.getAttribute('data-client-id');
-        if (cid && window._cardCache[cid] && window._cardCache[cid].hasCard) {
-          // If the row doesn't already have a Charge button, fully re-render
-          if (!row.querySelector('button[data-charge-btn]')) {
-            // Trigger a render — use a small delay to avoid recursion
-            setTimeout(function(){ try { renderPaymentsSectionLight(); } catch(e){} }, 50);
+
+  window._cardCacheRefreshing = true;
+  try {
+    // If specific IDs passed, only check those. Otherwise skip — don't check all clients.
+    var ids = limitToIds
+      ? limitToIds.filter(function(id){ return id && !window._cardCache[id] && clientDB[id] && clientDB[id].email; })
+      : []; // No limitToIds = nothing to fetch
+
+    for (var i = 0; i < ids.length; i++) {
+      var id = ids[i];
+      var c = clientDB[id];
+      try {
+        var resp = await fetch('/api/stripe-invoice', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ action: 'find_customer_cards', customerEmail: c.email }) });
+        var data = await resp.json();
+        if (data && data.success) {
+          var hasCard = (data.cards && data.cards.length > 0);
+          window._cardCache[id] = { customerId: data.customerId, hasCard: hasCard };
+          if (data.customerId && (!c.stripeCustomerId && !c.stripe_customer_id)) {
+            try { await db.from('clients').update({ stripe_customer_id: data.customerId }).eq('id', id); } catch(e){}
+            c.stripeCustomerId = data.customerId;
           }
+        } else {
+          window._cardCache[id] = { customerId: null, hasCard: false };
         }
-      });
-    } } catch(e){}
+      } catch(e){ window._cardCache[id] = { customerId: null, hasCard: false }; }
+    }
+
+    // Only re-render if we actually fetched something and we're still on payments view
+    if (ids.length > 0 && typeof renderPendingOnly === 'function') {
+      renderPendingOnly();
+    }
+  } finally {
+    window._cardCacheRefreshing = false;
   }
 }
+
+// Fetch card status for a single client on demand (used when opening charge modal)
+async function fetchCardForClient(clientId){
+  if (!clientId || window._cardCache[clientId]) return;
+  if (typeof clientDB === 'undefined' || !clientDB[clientId]) return;
+  await refreshCardOnFileCache([clientId]);
+}
+
 function renderPaymentsSectionLight(){
-  // Just rebuild pending rows by calling the full renderer (it reads cache for hasCard)
   if (window._renderingPayments) return;
   window._renderingPayments = true;
-  try { renderPaymentsSection(); } finally { setTimeout(function(){ window._renderingPayments = false; }, 100); }
+  try { renderPaymentsSection(); } finally { setTimeout(function(){ window._renderingPayments = false; }, 200); }
 }
 
 // Check Stripe for any unpaid DB invoices and mark them paid if Stripe says so

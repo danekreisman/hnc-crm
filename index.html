@@ -9501,8 +9501,8 @@ function renderPolicyEditor() {
   list.innerHTML = _policies.map(function(p, i) {
     return '<div class="policy-row" data-index="' + i + '">'
       + '<div class="policy-row-fields">'
-      + '<input type="text" placeholder="Policy title" value="' + esc(p.title) + '" oninput="updatePolicy(' + i + ','title',this.value)">'
-      + '<textarea placeholder="Description shown to client" oninput="updatePolicy(' + i + ','detail',this.value)">' + esc(p.detail) + '</textarea>'
+      + '<input type="text" placeholder="Policy title" value="' + esc(p.title) + '" oninput="updatePolicy(' + i + ',\'title\',this.value)">'
+      + '<textarea placeholder="Description shown to client" oninput="updatePolicy(' + i + ',\'detail\',this.value)">' + esc(p.detail) + '</textarea>'
       + '</div>'
       + '<button class="policy-remove-btn" onclick="removePolicy(' + i + ')" title="Remove">✕</button>'
       + '</div>';

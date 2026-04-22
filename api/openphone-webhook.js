@@ -1,3 +1,5 @@
+import { isWebhookProcessed, recordWebhook } from './utils/webhook-idempotency.js';
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
 
@@ -72,8 +74,24 @@ export default async function handler(req, res) {
     const event = req.body;
     const type = event.type;
     const data = event.data?.object;
+    const eventId = event.id; // OpenPhone event ID for idempotency
 
-    console.log('OpenPhone webhook received:', type);
+    console.log('OpenPhone webhook received:', type, 'Event ID:', eventId);
+
+    // IDEMPOTENCY CHECK: Skip if this webhook was already processed
+    if (eventId) {
+      try {
+        const alreadyProcessed = await isWebhookProcessed(eventId, 'openphone', SUPABASE_KEY);
+        if (alreadyProcessed) {
+          console.log('[openphone-webhook] Webhook already processed:', eventId);
+          return res.status(200).json({ received: true, type, alreadyProcessed: true });
+        }
+      } catch (idempotencyErr) {
+        console.error('[openphone-webhook] Idempotency check failed:', idempotencyErr.message);
+        // If idempotency check fails, fail the webhook to be safe
+        return res.status(500).json({ error: 'Idempotency check failed' });
+      }
+    }
 
     if (type === 'message.received' && data) {
       const from = data.from;
@@ -150,6 +168,16 @@ export default async function handler(req, res) {
         transcript: transcript,
         status: 'transcript_ready'
       }, 'call_id');
+    }
+
+    // Record the webhook as processed
+    if (eventId) {
+      try {
+        await recordWebhook(eventId, 'openphone', type, event, SUPABASE_KEY);
+      } catch (recordErr) {
+        console.warn('[openphone-webhook] Failed to record webhook:', recordErr.message);
+        // Don't fail the whole webhook if recording fails, but log it
+      }
     }
 
     return res.status(200).json({ received: true, type });

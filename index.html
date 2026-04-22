@@ -319,6 +319,18 @@ textarea{font-family:inherit;}
 .agent-bubble-ai strong{font-weight:600;}
 .agent-thinking{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text-muted);padding:4px 0;}
 .template-tab{font-size:12px;padding:5px 12px;border-radius:20px;border:1px solid var(--border-strong);background:#fff;color:var(--text-muted);cursor:pointer;font-family:inherit;}
+.settings-section{margin-bottom:24px;}
+.settings-section-header{display:flex;align-items:flex-start;gap:12px;padding:10px 0 10px 14px;border-left:3px solid var(--brand-500);margin-bottom:12px;}
+.settings-section-icon{font-size:20px;line-height:1;margin-top:1px;}
+.settings-section-title{font-size:14px;font-weight:700;color:var(--text);margin-bottom:2px;}
+.settings-section-desc{font-size:12px;color:var(--text-muted);line-height:1.5;}
+.settings-card{background:#fff;border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:10px;}
+.policy-row{display:flex;gap:10px;align-items:flex-start;background:var(--bg-soft);border:1px solid var(--border);border-radius:10px;padding:12px;}
+.policy-row-fields{flex:1;display:flex;flex-direction:column;gap:6px;}
+.policy-row input,.policy-row textarea{font-size:12px;padding:6px 10px;border:1px solid var(--border);border-radius:7px;font-family:inherit;color:var(--text);background:#fff;width:100%;}
+.policy-row textarea{min-height:56px;resize:vertical;line-height:1.5;}
+.policy-remove-btn{background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:16px;padding:2px 4px;line-height:1;margin-top:2px;border-radius:4px;transition:color .15s;}
+.policy-remove-btn:hover{color:#e16b6b;}
 .template-tab.active{background:var(--brand-500);color:#fff;border-color:var(--brand-500);}
 .template-tab:hover:not(.active){background:var(--bg-soft);}
 .auto-card{background:#fff;border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:10px;display:flex;align-items:flex-start;gap:14px;}
@@ -779,70 +791,227 @@ textarea{font-family:inherit;}
         <!-- SETTINGS VIEW -->
       <div id="view-settings" class="vc">
 
-        <!-- BUSINESS INFO -->
-        <div style="background:#fff;border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:18px;">
-          <div style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:14px;">Business info</div>
-          <div class="form-two">
-            <div class="form-row"><label>Business name</label><input type="text" id="set-biz-name" value="Hawaii Natural Clean"></div>
-            <div class="form-row"><label>From email</label><input type="email" id="set-from-email" value="dane@hawaiinaturalclean.com"></div>
-          </div>
-          <div class="form-two">
-            <div class="form-row"><label>Phone</label><input type="tel" id="set-phone" value="(808) 468-5356"></div>
-            <div class="form-row"><label>Website</label><input type="text" id="set-website" value="hawaiinaturalclean.com"></div>
-          </div>
-          <div class="form-row"><label>Logo URL</label><input type="text" id="set-logo" placeholder="https://hawaiinaturalclean.com/logo.png"></div>
-          <div style="display:flex;gap:8px;margin-top:4px;align-items:center;">
-            <div id="set-logo-preview" style="width:48px;height:48px;border:1px solid var(--border);border-radius:8px;display:flex;align-items:center;justify-content:center;overflow:hidden;background:var(--bg-soft);">
-              <span style="font-size:10px;color:var(--text-muted);">Logo</span>
+        <!-- ─── SECTION HELPER ─────────────────────────────────────────── -->
+        <!-- Each section: header bar + card content -->
+
+        <!-- ═══ 1. BUSINESS ══════════════════════════════════════════════ -->
+        <div class="settings-section">
+          <div class="settings-section-header">
+            <span class="settings-section-icon">🏢</span>
+            <div>
+              <div class="settings-section-title">Business</div>
+              <div class="settings-section-desc">Your business name, contact info, and branding</div>
             </div>
-            <button class="btn" style="font-size:12px;" onclick="previewLogo()">Preview logo</button>
           </div>
-          <div style="margin-top:12px;">
-            <button class="btn btn-primary" style="font-size:12px;" onclick="saveSettings()">Save settings</button>
+          <div class="settings-card">
+            <div class="form-two">
+              <div class="form-row"><label>Business name</label><input type="text" id="set-biz-name" value="Hawaii Natural Clean"></div>
+              <div class="form-row"><label>From email</label><input type="email" id="set-from-email" value="dane@hawaiinaturalclean.com"></div>
+            </div>
+            <div class="form-two">
+              <div class="form-row"><label>Phone</label><input type="tel" id="set-phone" value="(808) 468-5356"></div>
+              <div class="form-row"><label>Website</label><input type="text" id="set-website" value="hawaiinaturalclean.com"></div>
+            </div>
+            <div class="form-row"><label>Logo URL</label><input type="text" id="set-logo" placeholder="https://hawaiinaturalclean.com/logo.png"></div>
+            <div style="display:flex;gap:8px;margin-top:4px;align-items:center;">
+              <div id="set-logo-preview" style="width:48px;height:48px;border:1px solid var(--border);border-radius:8px;display:flex;align-items:center;justify-content:center;overflow:hidden;background:var(--bg-soft);">
+                <span style="font-size:10px;color:var(--text-muted);">Logo</span>
+              </div>
+              <button class="btn" style="font-size:12px;" onclick="previewLogo()">Preview logo</button>
+            </div>
+            <div style="margin-top:14px;">
+              <button class="btn btn-primary" style="font-size:12px;" onclick="saveSettings()">Save settings</button>
+            </div>
           </div>
         </div>
 
-        <!-- EMAIL TEMPLATES -->
-        <div style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:12px;">Email templates</div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;" id="template-tabs">
-          <button class="template-tab active" onclick="switchTemplate('invoice',this)">Invoice</button>
-          <button class="template-tab" onclick="switchTemplate('reminder',this)">Appointment reminder</button>
-          <button class="template-tab" onclick="switchTemplate('thankyou',this)">Job complete</button>
-          <button class="template-tab" onclick="switchTemplate('receipt',this)">Payment receipt</button>
-          <button class="template-tab" onclick="switchTemplate('reactivation',this)">Reactivation</button>
-          <button class="template-tab" onclick="switchTemplate('quote',this)">Quote</button>
-          <button class="template-tab" onclick="switchTemplate('lead_followup',this)">Lead follow-up</button>
-          <button class="template-tab" onclick="switchTemplate('invoice_reminder',this)">Unpaid invoice</button>
+        <!-- ═══ 2. COMMUNICATION ══════════════════════════════════════════ -->
+        <div class="settings-section">
+          <div class="settings-section-header">
+            <span class="settings-section-icon">📧</span>
+            <div>
+              <div class="settings-section-title">Communication</div>
+              <div class="settings-section-desc">Email and SMS templates sent to clients</div>
+            </div>
+          </div>
+
+          <!-- Email templates -->
+          <div class="settings-card" style="margin-bottom:12px;">
+            <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:12px;">Email templates</div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;" id="template-tabs">
+              <button class="template-tab active" onclick="switchTemplate('invoice',this)">Invoice</button>
+              <button class="template-tab" onclick="switchTemplate('reminder',this)">Appointment reminder</button>
+              <button class="template-tab" onclick="switchTemplate('thankyou',this)">Job complete</button>
+              <button class="template-tab" onclick="switchTemplate('receipt',this)">Payment receipt</button>
+              <button class="template-tab" onclick="switchTemplate('reactivation',this)">Reactivation</button>
+              <button class="template-tab" onclick="switchTemplate('quote',this)">Quote</button>
+              <button class="template-tab" onclick="switchTemplate('lead_followup',this)">Lead follow-up</button>
+              <button class="template-tab" onclick="switchTemplate('invoice_reminder',this)">Unpaid invoice</button>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+              <div style="font-size:13px;font-weight:600;color:var(--text);" id="template-title">Invoice email</div>
+              <button class="btn" style="font-size:11px;" onclick="resetTemplate()">Reset to default</button>
+            </div>
+            <div class="form-row"><label>Subject line</label><input type="text" id="tmpl-subject"></div>
+            <div class="form-row"><label>Email body</label>
+              <textarea id="tmpl-body" style="min-height:180px;font-size:12px;line-height:1.7;"></textarea>
+            </div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;">
+              <button class="tone-btn" onclick="insertTmplVar('{{client_name}}')">+ Client name</button>
+              <button class="tone-btn" onclick="insertTmplVar('{{amount}}')">+ Amount</button>
+              <button class="tone-btn" onclick="insertTmplVar('{{service}}')">+ Service</button>
+              <button class="tone-btn" onclick="insertTmplVar('{{date}}')">+ Date</button>
+              <button class="tone-btn" onclick="insertTmplVar('{{time}}')">+ Time</button>
+              <button class="tone-btn" onclick="insertTmplVar('{{cleaner}}')">+ Cleaner</button>
+              <button class="tone-btn" onclick="insertTmplVar('{{invoice_url}}')">+ Invoice link</button>
+              <button class="tone-btn" onclick="insertTmplVar('{{business_name}}')">+ Business name</button>
+              <button class="tone-btn" onclick="insertTmplVar('{{phone}}')">+ Phone</button>
+            </div>
+            <div style="display:flex;gap:8px;">
+              <button class="btn btn-primary" style="font-size:12px;" onclick="saveTemplate()">Save template</button>
+              <button class="btn" style="font-size:12px;background:var(--brand-50);color:#276749;border-color:#9ae6b4;" onclick="previewTemplate()">Preview email</button>
+            </div>
+            <div class="success-bar" id="tmpl-success">Template saved!</div>
+          </div>
+
+          <!-- SMS templates -->
+          <div class="settings-card">
+            <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:4px;">SMS templates</div>
+            <div style="font-size:12px;color:var(--text-muted);margin-bottom:14px;">Use {client_name}, {amount}, {due_date}, {invoice_link} as placeholders.</div>
+            <div class="form-row">
+              <label>Invoice email subject</label>
+              <input type="text" id="tmpl-email-subject" value="Invoice from Hawaii Natural Clean" style="font-size:12px;">
+            </div>
+            <div class="form-row">
+              <label>Invoice email body</label>
+              <textarea id="tmpl-email-body" style="min-height:100px;font-size:12px;">Hi {client_name},
+
+Please find your invoice for ${amount} attached. Payment is due {due_date}.
+
+Pay online here: {invoice_link}
+
+Thank you for choosing Hawaii Natural Clean!
+Mahalo 🌺</textarea>
+            </div>
+            <div class="form-row">
+              <label>SMS invoice message</label>
+              <textarea id="tmpl-sms-invoice" style="min-height:80px;font-size:12px;">Hi {client_name}, your invoice for ${amount} from Hawaii Natural Clean is ready. Pay here: {invoice_link}</textarea>
+            </div>
+            <div class="form-row">
+              <label>SMS payment confirmation</label>
+              <textarea id="tmpl-sms-paid" style="min-height:80px;font-size:12px;">Hi {client_name}, we received your payment of ${amount}. Thank you! See you on your next clean. 🌺</textarea>
+            </div>
+            <button class="btn btn-primary" onclick="saveMessageTemplates()" style="margin-top:8px;font-size:12px;">Save SMS templates</button>
+            <div class="success-bar" id="msg-tmpl-success">Templates saved!</div>
+          </div>
         </div>
 
-        <div style="background:#fff;border:1px solid var(--border);border-radius:12px;padding:20px;">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
-            <div style="font-size:13px;font-weight:600;color:var(--text);" id="template-title">Invoice email</div>
-            <button class="btn" style="font-size:11px;" onclick="resetTemplate()">Reset to default</button>
+        <!-- ═══ 3. CLIENT POLICIES ════════════════════════════════════════ -->
+        <div class="settings-section">
+          <div class="settings-section-header">
+            <span class="settings-section-icon">📋</span>
+            <div>
+              <div class="settings-section-title">Client policies</div>
+              <div class="settings-section-desc">These appear on the agreement form sent to new clients. Clients must check each one before submitting.</div>
+            </div>
           </div>
-          <div class="form-row"><label>Subject line</label><input type="text" id="tmpl-subject"></div>
-          <div class="form-row"><label>Email body</label>
-            <textarea id="tmpl-body" style="min-height:180px;font-size:12px;line-height:1.7;"></textarea>
+          <div class="settings-card">
+            <div id="policy-items-list" style="display:flex;flex-direction:column;gap:10px;margin-bottom:14px;"></div>
+            <button class="btn" style="font-size:12px;margin-bottom:14px;" onclick="addPolicyItem()">+ Add policy</button>
+            <div style="display:flex;gap:8px;align-items:center;">
+              <button class="btn btn-primary" style="font-size:12px;" onclick="savePolicies()">Save policies</button>
+              <span style="font-size:12px;color:var(--text-muted);">Changes apply immediately to the client agreement form.</span>
+            </div>
+            <div class="success-bar" id="policy-success">Policies saved!</div>
           </div>
-          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;">
-            <button class="tone-btn" onclick="insertTmplVar('{{client_name}}')">+ Client name</button>
-            <button class="tone-btn" onclick="insertTmplVar('{{amount}}')">+ Amount</button>
-            <button class="tone-btn" onclick="insertTmplVar('{{service}}')">+ Service</button>
-            <button class="tone-btn" onclick="insertTmplVar('{{date}}')">+ Date</button>
-            <button class="tone-btn" onclick="insertTmplVar('{{time}}')">+ Time</button>
-            <button class="tone-btn" onclick="insertTmplVar('{{cleaner}}')">+ Cleaner</button>
-            <button class="tone-btn" onclick="insertTmplVar('{{invoice_url}}')">+ Invoice link</button>
-            <button class="tone-btn" onclick="insertTmplVar('{{business_name}}')">+ Business name</button>
-            <button class="tone-btn" onclick="insertTmplVar('{{phone}}')">+ Phone</button>
-          </div>
-          <div style="display:flex;gap:8px;">
-            <button class="btn btn-primary" style="font-size:12px;" onclick="saveTemplate()">Save template</button>
-            <button class="btn" style="font-size:12px;background:var(--brand-50);color:#276749;border-color:#9ae6b4;" onclick="previewTemplate()">Preview email</button>
-          </div>
-          <div class="success-bar" id="tmpl-success">Template saved!</div>
         </div>
 
-        <!-- PREVIEW MODAL -->
+        <!-- ═══ 4. OPERATIONS ═════════════════════════════════════════════ -->
+        <div class="settings-section">
+          <div class="settings-section-header">
+            <span class="settings-section-icon">⚙️</span>
+            <div>
+              <div class="settings-section-title">Operations</div>
+              <div class="settings-section-desc">Payroll configuration and operational settings</div>
+            </div>
+          </div>
+          <div class="settings-card">
+            <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:12px;">Payroll</div>
+            <div class="form-two">
+              <div class="form-row"><label>Pay frequency</label>
+                <select id="set-payroll-frequency">
+                  <option value="weekly">Weekly</option>
+                  <option value="biweekly">Every 2 weeks</option>
+                  <option value="monthly">Monthly</option>
+                </select>
+              </div>
+              <div class="form-row"><label>Payday</label>
+                <select id="set-payroll-payday">
+                  <option value="monday">Monday</option>
+                  <option value="tuesday">Tuesday</option>
+                  <option value="wednesday">Wednesday</option>
+                  <option value="thursday">Thursday</option>
+                  <option value="friday">Friday</option>
+                  <option value="saturday">Saturday</option>
+                  <option value="sunday">Sunday</option>
+                </select>
+              </div>
+            </div>
+            <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">Each payday covers the previous Mon–Sun week. Payment is marked manually after you send via QuickBooks.</div>
+            <button class="btn btn-primary" onclick="savePayrollSettings()" style="margin-top:14px;font-size:12px;">Save payroll settings</button>
+            <div class="success-bar" id="payroll-settings-success">Payroll settings saved!</div>
+          </div>
+        </div>
+
+        <!-- ═══ 5. DATA ════════════════════════════════════════════════════ -->
+        <div class="settings-section">
+          <div class="settings-section-header">
+            <span class="settings-section-icon">📥</span>
+            <div>
+              <div class="settings-section-title">Data</div>
+              <div class="settings-section-desc">Import historical records into the CRM</div>
+            </div>
+          </div>
+          <div class="settings-card">
+            <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:6px;">Import historical bookings</div>
+            <div style="font-size:13px;color:var(--text-muted);margin-bottom:14px;">Upload a CSV export of past bookings. The tool dedupes by client + date + price, auto-creates missing cleaners as Inactive, and tags every row with a batch ID so you can undo.</div>
+            <div id="import-dropzone" style="border:2px dashed var(--border);border-radius:10px;padding:28px;text-align:center;cursor:pointer;transition:all .15s;">
+              <input type="file" id="import-file-input" accept=".csv,.xlsx" style="display:none;" onchange="handleImportFile(event)"/>
+              <div style="font-size:14px;color:var(--text);margin-bottom:6px;">Drop CSV/XLSX here or click to choose</div>
+              <div style="font-size:12px;color:var(--text-muted);">Expected columns: Client Name, Email, Phone, Address, Booking Date, Service Type, Booking Status, Total Price, Cleaner Assigned, Cleaner Pay</div>
+            </div>
+            <div id="import-preview" style="display:none;margin-top:16px;"></div>
+            <div id="import-actions" style="display:none;margin-top:14px;gap:10px;">
+              <button class="btn btn-primary" onclick="commitImport()" id="import-commit-btn">Commit import</button>
+              <button class="btn" onclick="cancelImport()">Cancel</button>
+            </div>
+            <div id="import-result" style="display:none;margin-top:12px;padding:10px;background:var(--brand-50);border-radius:8px;font-size:13px;"></div>
+            <div style="margin-top:18px;padding-top:14px;border-top:1px solid var(--border);">
+              <div style="font-size:13px;color:var(--text-muted);margin-bottom:8px;">Previous imports</div>
+              <div id="import-batches-list" style="font-size:13px;"></div>
+              <button class="btn" onclick="loadImportBatches()" style="margin-top:8px;font-size:12px;">Refresh list</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- ═══ 6. DANGER ZONE ════════════════════════════════════════════ -->
+        <div class="settings-section">
+          <div class="settings-section-header" style="border-left-color:#ef4444;">
+            <span class="settings-section-icon">🔴</span>
+            <div>
+              <div class="settings-section-title" style="color:#b91c1c;">Danger zone</div>
+              <div class="settings-section-desc">Destructive actions that cannot be undone</div>
+            </div>
+          </div>
+          <div class="settings-card" style="border-color:#ef4444;">
+            <div style="display:flex;gap:10px;flex-wrap:wrap;">
+              <button class="btn" onclick="purgeAllTestData()" style="background:#fef2f2;color:#b91c1c;border:1px solid #fecaca;">Purge ALL bookings &amp; clients</button>
+            </div>
+            <div style="margin-top:10px;font-size:12px;color:var(--text-muted);">Requires typing <strong>DELETE</strong> to confirm. Deletes every row in the appointments and clients tables.</div>
+          </div>
+        </div>
+
+        <!-- Email preview modal (unchanged) -->
         <div id="email-preview-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;align-items:center;justify-content:center;">
           <div style="background:#fff;border-radius:12px;width:90%;max-width:600px;max-height:80vh;overflow:auto;padding:24px;position:relative;">
             <button onclick="closeEmailPreview()" style="position:absolute;top:12px;right:12px;background:none;border:none;font-size:18px;cursor:pointer;">&#x2715;</button>
@@ -851,99 +1020,8 @@ textarea{font-family:inherit;}
           </div>
         </div>
 
-        <!-- MESSAGE TEMPLATES -->
-        <div style="background:#fff;border:1px solid var(--border);border-radius:12px;padding:20px;margin-top:18px;">
-          <div class="panel-section" style="margin-top:0;">Invoice Message Templates</div>
-          <div style="font-size:12px;color:var(--text-muted);margin-bottom:12px;">Customize the messages sent when you invoice clients. Use {client_name}, {amount}, {due_date}, {invoice_link} as placeholders.</div>
-          <div class="form-row">
-            <label>Email subject line</label>
-            <input type="text" id="tmpl-email-subject" value="Invoice from Hawaii Natural Clean" style="font-size:12px;">
-          </div>
-          <div class="form-row">
-            <label>Email body</label>
-            <textarea id="tmpl-email-body" style="min-height:100px;font-size:12px;">Hi {client_name},
-
-Please find your invoice for ${amount} attached. Payment is due {due_date}.
-
-Pay online here: {invoice_link}
-
-Thank you for choosing Hawaii Natural Clean!
-Mahalo 🌺</textarea>
-          </div>
-          <div class="form-row">
-            <label>SMS invoice message</label>
-            <textarea id="tmpl-sms-invoice" style="min-height:80px;font-size:12px;">Hi {client_name}, your invoice for ${amount} from Hawaii Natural Clean is ready. Pay here: {invoice_link}</textarea>
-          </div>
-          <div class="form-row">
-            <label>SMS payment confirmation</label>
-            <textarea id="tmpl-sms-paid" style="min-height:80px;font-size:12px;">Hi {client_name}, we received your payment of ${amount}. Thank you! See you on your next clean. 🌺</textarea>
-          </div>
-          <button class="btn btn-primary" onclick="saveMessageTemplates()" style="margin-top:8px;">Save templates</button>
-          <div class="success-bar" id="msg-tmpl-success">Templates saved!</div>
-        <!-- PAYROLL SETTINGS -->
-        <div style="background:#fff;border:1px solid #eee;border-radius:10px;padding:20px;margin-top:16px">
-          <div style="font-size:11px;font-weight:600;color:#aaa;margin-bottom:12px;letter-spacing:0.5px;text-transform:uppercase">Payroll</div>
-          <div class="form-two">
-            <div class="form-row"><label>Pay frequency</label>
-              <select id="set-payroll-frequency">
-                <option value="weekly">Weekly</option>
-                <option value="biweekly">Every 2 weeks</option>
-                <option value="monthly">Monthly</option>
-              </select>
-            </div>
-            <div class="form-row"><label>Payday</label>
-              <select id="set-payroll-payday">
-                <option value="monday">Monday</option>
-                <option value="tuesday">Tuesday</option>
-                <option value="wednesday">Wednesday</option>
-                <option value="thursday">Thursday</option>
-                <option value="friday">Friday</option>
-                <option value="saturday">Saturday</option>
-                <option value="sunday">Sunday</option>
-              </select>
-            </div>
-          </div>
-          <div style="font-size:12px;color:#888;margin-top:4px">Each payday covers the previous Mon–Sun week. Payment is marked manually after you send via QuickBooks.</div>
-          <button class="btn btn-primary" onclick="savePayrollSettings()" style="margin-top:12px">Save payroll settings</button>
-          <div class="success-bar" id="payroll-settings-success">Payroll settings saved!</div>
-        </div>
-
-        <!-- IMPORT HISTORICAL BOOKINGS -->
-        <div style="background:#fff;border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:18px;">
-          <div style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:6px;">Import historical bookings</div>
-          <div style="font-size:13px;color:var(--text-muted);margin-bottom:14px;">Upload a CSV export of past bookings. The tool dedupes by client + date + price, auto-creates missing cleaners as Inactive, and tags every row with a batch ID so you can undo.</div>
-          <div id="import-dropzone" style="border:2px dashed var(--border);border-radius:10px;padding:28px;text-align:center;cursor:pointer;transition:all .15s;">
-            <input type="file" id="import-file-input" accept=".csv,.xlsx" style="display:none;" onchange="handleImportFile(event)"/>
-            <div style="font-size:14px;color:var(--text);margin-bottom:6px;">Drop CSV/XLSX here or click to choose</div>
-            <div style="font-size:12px;color:var(--text-muted);">Expected columns: Client Name, Email, Phone, Address, Booking Date, Service Type, Booking Status, Total Price, Cleaner Assigned, Cleaner Pay</div>
-          </div>
-          <div id="import-preview" style="display:none;margin-top:16px;"></div>
-          <div id="import-actions" style="display:none;margin-top:14px;gap:10px;">
-            <button class="btn btn-primary" onclick="commitImport()" id="import-commit-btn">Commit import</button>
-            <button class="btn" onclick="cancelImport()">Cancel</button>
-          </div>
-          <div id="import-result" style="display:none;margin-top:12px;padding:10px;background:var(--brand-50);border-radius:8px;font-size:13px;"></div>
-
-          <div style="margin-top:18px;padding-top:14px;border-top:1px solid var(--border);">
-            <div style="font-size:13px;color:var(--text-muted);margin-bottom:8px;">Previous imports</div>
-            <div id="import-batches-list" style="font-size:13px;"></div>
-            <button class="btn" onclick="loadImportBatches()" style="margin-top:8px;font-size:12px;">Refresh list</button>
-          </div>
-        </div>
-
-        <!-- DANGER ZONE -->
-        <div style="background:#fff;border:1px solid #ef4444;border-radius:12px;padding:20px;margin-bottom:18px;">
-          <div style="font-size:14px;font-weight:600;color:#b91c1c;margin-bottom:6px;">Danger zone</div>
-          <div style="font-size:13px;color:var(--text-muted);margin-bottom:14px;">Destructive actions. These cannot be undone.</div>
-          <div style="display:flex;gap:10px;flex-wrap:wrap;">
-            <button class="btn" onclick="purgeAllTestData()" style="background:#fef2f2;color:#b91c1c;border:1px solid #fecaca;">Purge ALL bookings &amp; clients</button>
-          </div>
-          <div style="margin-top:10px;font-size:12px;color:var(--text-muted);">Requires typing <strong>DELETE</strong> to confirm. Deletes every row in the appointments and clients tables.</div>
-        </div>
-
-        </div>
-
       </div>
+
 
       <!-- AI AGENT VIEW -->      </div>
 
@@ -4831,7 +4909,7 @@ function sv(view,el){
   if(view==='messaging')renderInbox();
   if(view==='automations')loadLeadAutomations();
   if(view==='reporting'){ try{ repPopulateBucketDropdown(); }catch(e){} repRender(); }
-  if(view==='settings'){initTemplateEditor();initPayrollSettingsUI();};
+  if(view==='settings'){initTemplateEditor();initPayrollSettingsUI();loadPolicies();};
   if(view==='payroll')refreshPayrollPeriods();
 }
 
@@ -9407,6 +9485,77 @@ async function sendEmail(type, data) {
 }
 
 // Initialize template editor with first template
+// ─── Policy editor ────────────────────────────────────────────────────────────
+var _policies = [];
+
+async function loadPolicies() {
+  try {
+    var r = await fetch('/api/get-policies');
+    var data = await r.json();
+    _policies = data.policies || [];
+  } catch(e) {
+    _policies = [];
+  }
+  renderPolicyEditor();
+}
+
+function renderPolicyEditor() {
+  var list = document.getElementById('policy-items-list');
+  if (!list) return;
+  if (_policies.length === 0) {
+    list.innerHTML = '<div style="font-size:13px;color:var(--text-muted);padding:8px 0;">No policies yet. Click + Add policy to get started.</div>';
+    return;
+  }
+  list.innerHTML = _policies.map(function(p, i) {
+    return '<div class="policy-row" data-index="' + i + '">'
+      + '<div class="policy-row-fields">'
+      + '<input type="text" placeholder="Policy title" value="' + esc(p.title) + '" oninput="updatePolicy(' + i + ','title',this.value)">'
+      + '<textarea placeholder="Description shown to client" oninput="updatePolicy(' + i + ','detail',this.value)">' + esc(p.detail) + '</textarea>'
+      + '</div>'
+      + '<button class="policy-remove-btn" onclick="removePolicy(' + i + ')" title="Remove">✕</button>'
+      + '</div>';
+  }).join('');
+}
+
+function updatePolicy(index, field, value) {
+  if (_policies[index]) _policies[index][field] = value;
+}
+
+function addPolicyItem() {
+  var newId = 'p' + Date.now();
+  _policies.push({ id: newId, title: '', detail: '' });
+  renderPolicyEditor();
+  // Focus the new title input
+  var rows = document.querySelectorAll('#policy-items-list .policy-row');
+  var lastRow = rows[rows.length - 1];
+  if (lastRow) { var inp = lastRow.querySelector('input'); if (inp) inp.focus(); }
+}
+
+function removePolicy(index) {
+  _policies.splice(index, 1);
+  renderPolicyEditor();
+}
+
+async function savePolicies() {
+  // Basic validation — all policies need a title
+  var invalid = _policies.find(function(p) { return !p.title || !p.title.trim(); });
+  if (invalid) { alert('Each policy needs a title.'); return; }
+
+  try {
+    var { error } = await db.from('settings').upsert(
+      { key: 'policy_items', value: JSON.stringify(_policies), updated_at: new Date().toISOString() },
+      { onConflict: 'key' }
+    );
+    if (error) throw error;
+    var bar = document.getElementById('policy-success');
+    if (bar) { bar.classList.add('show'); setTimeout(function(){ bar.classList.remove('show'); }, 2500); }
+  } catch(e) {
+    alert('Failed to save policies: ' + e.message);
+  }
+}
+
+function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c];}); }
+
 function initTemplateEditor() {
   var tmpl = emailTemplates[currentTemplate];
   document.getElementById('tmpl-subject').value = tmpl.subject;

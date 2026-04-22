@@ -48,18 +48,7 @@ body{background:linear-gradient(160deg,#eaf7fb 0%,#f7fbfc 40%,#eaf7fb 100%)}
 <script>
 var CLIENT_ID = new URLSearchParams(location.search).get('c');
 
-var POLICIES = [
-  { id:'p1', title:'Cancellation policy',
-    detail:'Please provide at least 24 hours notice to cancel or reschedule. Late cancellations may incur a fee.' },
-  { id:'p2', title:'Home preparation',
-    detail:'Please tidy clutter from surfaces, do dishes or put them away, and secure any pets before our team arrives. This helps us focus on deep cleaning.' },
-  { id:'p3', title:'Property access',
-    detail:'Please ensure we have access to your property at the scheduled time. You will be asked to provide entry instructions when booking.' },
-  { id:'p4', title:'Payment terms',
-    detail:'Payment is due on the day of service. We accept ACH bank transfer (free) and credit/debit card (3% processing fee).' },
-  { id:'p5', title:'I agree to the terms of service',
-    detail:'By proceeding I authorise Hawaii Natural Clean to perform cleaning services and agree to all policies above.' }
-];
+var POLICIES = [];
 
 function $(id){ return document.getElementById(id); }
 function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c];}); }
@@ -67,7 +56,17 @@ function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){retur
 if(!CLIENT_ID){
   $('app').innerHTML='<div class="card"><div class="card-body"><div class="error-banner">Invalid link. Please use the link sent to you by Hawaii Natural Clean.</div></div></div>';
 } else {
-  renderPolicies();
+  // Load policies dynamically so they can be edited from Settings
+  fetch('/api/get-policies')
+    .then(function(r){ return r.json(); })
+    .then(function(data){
+      POLICIES = data.policies || [];
+      renderPolicies();
+    })
+    .catch(function(){
+      // Fallback: show generic error
+      $('app').innerHTML='<div class="card"><div class="card-body"><div class="error-banner">Unable to load policies. Please try again or contact Hawaii Natural Clean at (808) 468-5356.</div></div></div>';
+    });
 }
 
 function renderPolicies(){

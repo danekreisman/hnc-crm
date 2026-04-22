@@ -694,6 +694,12 @@ textarea{font-family:inherit;}
           <button class="btn btn-primary" onclick="openNewAuto()" style="font-size:12px;padding:6px 12px;">+ New automation</button>
         </div>
         <div id="auto-list"></div>
+
+        <div style="display:flex;justify-content:space-between;align-items:center;margin:18px 0 10px;">
+          <div class="section-title" style="margin:0;">Lead automations</div>
+          <button class="btn btn-primary" onclick="openNewAuto()" style="font-size:12px;padding:6px 12px;">+ New automation</button>
+        </div>
+        <div id="lead-auto-list"></div>
       </div>
 
       <!-- PAYMENTS VIEW -->
@@ -6520,7 +6526,7 @@ async function loadLeadAutomations(){
 }
 
 function renderLeadAutoList(automationList){
-  var host = document.getElementById('auto-list');
+  var host = document.getElementById('lead-auto-list');
   if(!host) return;
   
   host.innerHTML = '';

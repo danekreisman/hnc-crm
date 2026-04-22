@@ -1,3 +1,6 @@
+import { fetchWithTimeout, TIMEOUTS } from './utils/with-timeout.js';
+import { logError } from './utils/error-logger.js';
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -188,30 +191,29 @@ export default async function handler(req, res) {
       `;
     }
 
-    const response = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${RESEND_API_KEY}`,
-        'Content-Type': 'application/json'
+    const response = await fetchWithTimeout(
+      'https://api.resend.com/emails',
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${RESEND_API_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ from: FROM_EMAIL, to: [to], subject: subject, html: html })
       },
-      body: JSON.stringify({
-        from: FROM_EMAIL,
-        to: [to],
-        subject: subject,
-        html: html
-      })
-    });
+      TIMEOUTS.RESEND
+    );
 
     const data = await response.json();
-    console.log('Resend response:', response.status, JSON.stringify(data));
 
     if (response.ok) {
       return res.status(200).json({ success: true, id: data.id });
     } else {
+      await logError('send-email', `Resend API error: ${response.status}`, { to, subject, error: data });
       return res.status(400).json({ success: false, error: data });
     }
   } catch (err) {
-    console.error('Email error:', err);
+    await logError('send-email', err, { to, subject, type });
     return res.status(500).json({ success: false, error: err.message });
   }
 }

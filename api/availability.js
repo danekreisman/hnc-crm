@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { logError } from './utils/error-logger.js';
 
 const TIME_SLOTS = [
   '8:00 AM','9:00 AM','10:00 AM','11:00 AM',
@@ -62,6 +63,7 @@ export default async function handler(req, res) {
   const endStr   = endDate.toISOString().slice(0, 10);
 
   // ── 1. Active cleaners for this island ──────────────────────────────────
+  try {
   const { data: cleaners } = await db
     .from('cleaners')
     .select('id, island')
@@ -157,4 +159,8 @@ export default async function handler(req, res) {
     total_cleaners: totalCleaners,
     island,
   });
+  } catch (err) {
+    await logError('availability', err, { island, days });
+    return res.status(500).json({ error: 'Failed to fetch availability', detail: err.message });
+  }
 }

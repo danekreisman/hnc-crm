@@ -1,50 +1,62 @@
+import { fetchWithTimeout, TIMEOUTS } from './utils/with-timeout.js';
+import { logError } from './utils/error-logger.js';
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
+  if (req.method === 'OPTIONS') return res.status(200).end();
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
-  }
+  const { to, message, statusOnly } = req.body;
+  const QUO_API_KEY = process.env.QUO_API_KEY;
+  const QUO_NUMBER  = process.env.QUO_NUMBER;
 
   try {
-    const { to, message, statusOnly } = req.body;
-    const QUO_API_KEY = process.env.QUO_API_KEY;
-    const QUO_NUMBER = process.env.QUO_NUMBER;
-
     if (statusOnly) {
-      const response = await fetch('https://api.openphone.com/v1/phone-numbers', {
-        headers: { 'Authorization': QUO_API_KEY }
-      });
+      const response = await fetchWithTimeout(
+        'https://api.openphone.com/v1/phone-numbers',
+        { headers: { 'Authorization': QUO_API_KEY } },
+        TIMEOUTS.OPENPHONE
+      );
       const data = await response.json();
       return res.status(200).json({ success: response.ok, status: response.status, data });
+    }
+
+    if (!to || !message) {
+      return res.status(400).json({ success: false, error: 'to and message are required' });
     }
 
     let phone = to.replace(/[^0-9+]/g, '');
     if (!phone.startsWith('+')) phone = '+1' + phone;
 
-    const response = await fetch('https://api.openphone.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Authorization': QUO_API_KEY,
-        'Content-Type': 'application/json'
+    const response = await fetchWithTimeout(
+      'https://api.openphone.com/v1/messages',
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': QUO_API_KEY,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ content: message, from: QUO_NUMBER, to: [phone] })
       },
-      body: JSON.stringify({
-        content: message,
-        from: QUO_NUMBER,
-        to: [phone]
-      })
-    });
+      TIMEOUTS.OPENPHONE
+    );
 
     const data = await response.json();
-    console.log('Send SMS response:', response.status, JSON.stringify(data));
+
+    if (!response.ok) {
+      await logError('send-sms', `OpenPhone API error: ${response.status}`, {
+        to: phone,
+        status: response.status,
+        response: data
+      });
+    }
 
     return res.status(200).json({ success: response.ok, status: response.status, data });
+
   } catch (err) {
-    console.error('SMS error:', err);
+    await logError('send-sms', err, { to, messageLength: message?.length });
     return res.status(500).json({ success: false, error: err.message });
   }
 }

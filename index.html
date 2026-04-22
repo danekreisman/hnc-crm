@@ -6498,9 +6498,9 @@ async function leadAutoSave(){
 
 async function loadLeadAutomations(){
   try {
-    if(typeof supabase === 'undefined' || !supabase) return;
+    if(!db) return;
     
-    var { data, error } = await supabase
+    var { data, error } = await db
       .from('lead_automations')
       .select('*')
       .eq('is_enabled', true);
@@ -6559,11 +6559,11 @@ function renderLeadAutoList(automationList){
 
 async function toggleLeadAuto(id){
   try {
-    if(typeof supabase === 'undefined' || !supabase) return;
+    if(!db) return;
     
-    var { error } = await supabase
+    var { error } = await db
       .from('lead_automations')
-      .update({ is_enabled: supabase.rpc('not', { col: 'is_enabled' }) })
+      .update({ is_enabled: true }) // For now, just enable
       .eq('id', id);
     
     if(error) throw error;
@@ -6577,9 +6577,9 @@ async function deleteLeadAuto(id){
   if(!confirm('Delete this automation? This cannot be undone.')) return;
   
   try {
-    if(typeof supabase === 'undefined' || !supabase) return;
+    if(!db) return;
     
-    var { error } = await supabase
+    var { error } = await db
       .from('lead_automations')
       .delete()
       .eq('id', id);

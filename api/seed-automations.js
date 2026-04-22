@@ -8,6 +8,15 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') { res.status(200).end(); return; }
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
+  // Safety check: require explicit confirmation to prevent accidental re-seeding
+  const { confirm } = req.body || {};
+  if (confirm !== 'yes_reseed') {
+    return res.status(400).json({ 
+      error: 'Safety check failed. Pass { "confirm": "yes_reseed" } in body to proceed.',
+      warning: 'This endpoint deletes and re-creates System lead automations. Only run intentionally.'
+    });
+  }
+
   const db = createClient(
     process.env.SUPABASE_URL,
     process.env.SUPABASE_SERVICE_ROLE_KEY,

@@ -1,4 +1,5 @@
 import { fetchWithTimeout, TIMEOUTS } from './utils/with-timeout.js';
+import { validateOrFail, SCHEMAS } from './utils/validate.js';
 import { logError } from './utils/error-logger.js';
 
 export default async function handler(req, res) {
@@ -10,7 +11,8 @@ export default async function handler(req, res) {
 
   const { prompt, clientId } = req.body;
 
-  if (!prompt) return res.status(400).json({ error: 'Prompt required' });
+  const invalid = validateOrFail(req.body, SCHEMAS.aiSummary);
+  if (invalid) return res.status(400).json(invalid);
 
   try {
     const response = await fetchWithTimeout(

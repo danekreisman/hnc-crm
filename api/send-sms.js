@@ -1,4 +1,5 @@
 import { fetchWithTimeout, TIMEOUTS } from './utils/with-timeout.js';
+import { validateOrFail, SCHEMAS } from './utils/validate.js';
 import { logError } from './utils/error-logger.js';
 
 export default async function handler(req, res) {
@@ -23,9 +24,8 @@ export default async function handler(req, res) {
       return res.status(200).json({ success: response.ok, status: response.status, data });
     }
 
-    if (!to || !message) {
-      return res.status(400).json({ success: false, error: 'to and message are required' });
-    }
+    const invalid = validateOrFail(req.body, SCHEMAS.sendSms);
+    if (invalid) return res.status(400).json(invalid);
 
     let phone = to.replace(/[^0-9+]/g, '');
     if (!phone.startsWith('+')) phone = '+1' + phone;

@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { validateOrFail, SCHEMAS } from './utils/validate.js';
 import { fetchWithTimeout, TIMEOUTS } from './utils/with-timeout.js';
 import { logError } from './utils/error-logger.js';
 
@@ -60,7 +61,8 @@ export default async function handler(req, res) {
   // ── POST: book ─────────────────────────────────────────────────────────
   if (req.method === 'POST') {
     const { token, date, time, notes, service, rushFee } = req.body;
-    if (!token || !date || !time) return res.status(400).json({ error: 'Missing required fields' });
+    const invalid = validateOrFail(req.body, SCHEMAS.booking);
+    if (invalid) return res.status(400).json(invalid);
 
     const supabase = db();
 

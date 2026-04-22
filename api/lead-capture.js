@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { validateOrFail, SCHEMAS } from './utils/validate.js';
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -8,9 +9,8 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   const d = req.body;
-  if (!d || !d.name || !d.email || !d.phone || !d.address) {
-    return res.status(400).json({ success: false, message: 'Please fill in all required fields.' });
-  }
+  const invalid = validateOrFail(d, SCHEMAS.leadCapture);
+  if (invalid) return res.status(400).json(invalid);
 
   const db = createClient(
     process.env.SUPABASE_URL,

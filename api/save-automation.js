@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { validateOrFail, validateActions, SCHEMAS } from './utils/validate.js';
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -10,11 +11,12 @@ export default async function handler(req, res) {
 
   const { name, description, trigger_type, trigger_config, actions, is_enabled, created_by } = req.body;
 
-  if (!name || !trigger_type || !actions || !Array.isArray(actions)) {
-    return res.status(400).json({ 
-      success: false, 
-      message: 'Missing required fields: name, trigger_type, actions' 
-    });
+  const invalid = validateOrFail(req.body, SCHEMAS.saveAutomation);
+  if (invalid) return res.status(400).json(invalid);
+
+  const actionErrors = validateActions(actions);
+  if (actionErrors.length > 0) {
+    return res.status(400).json({ success: false, error: 'Invalid actions', details: actionErrors });
   }
 
   const db = createClient(

@@ -336,10 +336,10 @@ textarea{font-family:inherit;}
 .policy-remove-btn:hover{color:#e16b6b;}
 .auto-toggle{position:relative;display:inline-flex;align-items:center;cursor:pointer;gap:7px;font-size:12px;font-weight:500;color:var(--text-muted);}
 .auto-toggle input{opacity:0;width:0;height:0;position:absolute;}
-.auto-toggle-track{width:34px;height:19px;border-radius:20px;background:#d1d5db;transition:background .2s;flex-shrink:0;position:relative;}
+.auto-toggle-track{width:36px;height:20px;border-radius:20px;background:#d1d5db;transition:background .25s ease;flex-shrink:0;position:relative;}
 .auto-toggle input:checked + .auto-toggle-track{background:var(--brand-500);}
-.auto-toggle-thumb{position:absolute;top:2px;left:2px;width:15px;height:15px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.2);transition:transform .2s;}
-.auto-toggle input:checked ~ .auto-toggle-thumb{transform:translateX(15px);}
+.auto-toggle-thumb{position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.25);transition:transform .25s cubic-bezier(.34,1.56,.64,1);}
+.auto-toggle input:checked + .auto-toggle-track .auto-toggle-thumb{transform:translateX(16px);}
 .template-tab.active{background:var(--brand-500);color:#fff;border-color:var(--brand-500);}
 .template-tab:hover:not(.active){background:var(--bg-soft);}
 .auto-card{background:#fff;border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:10px;display:flex;align-items:flex-start;gap:14px;}
@@ -752,11 +752,20 @@ textarea{font-family:inherit;}
             <!-- Send test section -->
             <div id="auto-test-send-section" style="display:none;border-top:1px solid var(--border);padding-top:16px;">
               <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:4px;">Send test for real</div>
-              <div style="font-size:12px;color:var(--text-muted);margin-bottom:12px;">Enter a number or email to receive the actual test messages. Won't affect any real lead records.</div>
-              <div style="display:flex;gap:8px;">
-                <input type="text" id="auto-test-to" placeholder="Phone (SMS) or email address" style="flex:1;font-size:13px;padding:8px 12px;border:1px solid var(--border);border-radius:8px;font-family:inherit;">
-                <button class="btn btn-primary" onclick="sendAutoTest()" style="font-size:13px;white-space:nowrap;">Send test</button>
+              <div style="font-size:12px;color:var(--text-muted);margin-bottom:14px;">Won't affect any real lead records. Only fills in the field for the action types your automation uses.</div>
+              <div id="auto-test-sms-row" style="display:none;margin-bottom:8px;">
+                <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px;">💬 SMS — send to phone</div>
+                <div style="display:flex;gap:8px;">
+                  <input type="tel" id="auto-test-phone" placeholder="(808) 555-0000" style="flex:1;font-size:13px;padding:8px 12px;border:1px solid var(--border);border-radius:8px;font-family:inherit;">
+                </div>
               </div>
+              <div id="auto-test-email-row" style="display:none;margin-bottom:12px;">
+                <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px;">📧 Email — send to address</div>
+                <div style="display:flex;gap:8px;">
+                  <input type="email" id="auto-test-email" placeholder="you@example.com" style="flex:1;font-size:13px;padding:8px 12px;border:1px solid var(--border);border-radius:8px;font-family:inherit;">
+                </div>
+              </div>
+              <button class="btn btn-primary" onclick="sendAutoTest()" style="font-size:13px;width:100%;">Send test</button>
               <div id="auto-test-result" style="margin-top:10px;font-size:12px;display:none;"></div>
             </div>
 
@@ -9611,65 +9620,90 @@ function previewAutoActions() {
 
   document.getElementById('auto-test-preview').style.display = actions.length > 0 ? 'block' : 'none';
   document.getElementById('auto-test-send-section').style.display = actions.length > 0 ? 'block' : 'none';
+  // Show/hide phone and email fields based on action types present
+  var hasSms   = actions.some(function(a){ return a.type === 'sms'; });
+  var hasEmail = actions.some(function(a){ return a.type === 'email'; });
+  document.getElementById('auto-test-sms-row').style.display   = hasSms   ? 'block' : 'none';
+  document.getElementById('auto-test-email-row').style.display = hasEmail ? 'block' : 'none';
 }
 
 async function sendAutoTest() {
   if (!_testAuto) return;
-  var to = document.getElementById('auto-test-to').value.trim();
-  if (!to) { alert('Enter a phone number or email to send the test to.'); return; }
 
-  var sel = document.getElementById('auto-test-lead');
-  var leadId = sel.value;
-  var lead = _testLeads.find(function(l) { return l.id === leadId; }) || { name: 'Test Lead', service: 'Regular Cleaning', phone: '' };
+  var testPhone = (document.getElementById('auto-test-phone')?.value || '').trim();
+  var testEmail = (document.getElementById('auto-test-email')?.value || '').trim();
+  var sel       = document.getElementById('auto-test-lead');
+  var leadId    = sel.value;
+  var lead      = _testLeads.find(function(l) { return l.id === leadId; }) || { name: 'Test Lead', service: 'Regular Cleaning', phone: '' };
 
   var actions = (_testAuto.actions || []).filter(function(a) { return a.type === 'sms' || a.type === 'email'; });
   if (actions.length === 0) {
-    alert('No SMS or email actions to send — only messaging actions can be tested.');
+    alert('No SMS or email actions to test in this automation.');
     return;
   }
+
+  var hasSms   = actions.some(function(a){ return a.type === 'sms'; });
+  var hasEmail = actions.some(function(a){ return a.type === 'email'; });
+
+  if (hasSms && !testPhone)   { alert('Enter a phone number to receive the SMS test.'); return; }
+  if (hasEmail && !testEmail) { alert('Enter an email address to receive the email test.'); return; }
 
   var resultEl = document.getElementById('auto-test-result');
   resultEl.style.display = 'block';
   resultEl.style.color = 'var(--text-muted)';
   resultEl.textContent = 'Sending...';
 
-  var sent = 0, failed = 0;
+  var sent = 0, failed = 0, skipped = 0;
+
   for (var i = 0; i < actions.length; i++) {
     var action = actions[i];
     var message = substituteTestVars(action.message || '', lead);
     try {
-      if (action.type === 'sms') {
+      if (action.type === 'sms' && testPhone) {
         var r = await fetch('/api/send-sms', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ to: to, message: '[TEST] ' + message })
+          body: JSON.stringify({ to: testPhone, message: '[TEST] ' + message })
         });
-        if (r.ok) sent++; else failed++;
-      } else if (action.type === 'email') {
+        var j = await r.json();
+        if (r.ok && j.success !== false) sent++; else { failed++; console.error('SMS failed:', j); }
+      } else if (action.type === 'email' && testEmail) {
         var r = await fetch('/api/send-email', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            to: to,
+            to: testEmail,
             subject: '[TEST] ' + substituteTestVars(action.subject || _testAuto.name, lead),
             type: 'generic',
-            clientName: lead.name.split(' ')[0],
+            clientName: (lead.name || 'Test').split(' ')[0],
             notes: message
           })
         });
-        if (r.ok) sent++; else failed++;
+        var j = await r.json();
+        if (r.ok && j.success !== false) sent++; else { failed++; console.error('Email failed:', j); }
+      } else {
+        skipped++;
       }
     } catch(e) {
       failed++;
+      console.error('Test action error:', e);
     }
   }
 
-  if (failed === 0) {
+  var parts = [];
+  if (sent > 0)    parts.push(sent + ' sent');
+  if (failed > 0)  parts.push(failed + ' failed');
+  if (skipped > 0) parts.push(skipped + ' skipped');
+
+  if (failed === 0 && sent > 0) {
     resultEl.style.color = '#166534';
-    resultEl.textContent = '✓ ' + sent + ' message' + (sent !== 1 ? 's' : '') + ' sent to ' + to + '. Check your phone/inbox.';
-  } else {
+    resultEl.textContent = '✓ ' + parts.join(', ') + '. Check your phone/inbox.';
+  } else if (failed > 0) {
     resultEl.style.color = '#b91c1c';
-    resultEl.textContent = sent + ' sent, ' + failed + ' failed. Check error_logs in Supabase.';
+    resultEl.textContent = parts.join(', ') + '. Check browser console for details.';
+  } else {
+    resultEl.style.color = 'var(--text-muted)';
+    resultEl.textContent = 'Nothing to send — check that phone/email fields are filled.';
   }
 }
 

@@ -217,4 +217,11 @@ Run through this checklist:
 
 ---
 
-*Last updated: April 2026 — Session 2 (policy agreement auto-send).*
+**Session 3 — Settings redesign + policy editor:**
+- Settings reorganized into 6 subsections: Business, Communication, Client Policies, Operations, Data, Danger Zone
+- Added `/api/get-policies.js` — returns policy items from `settings` table, falls back to defaults
+- `agree.html` now loads policies dynamically from `/api/get-policies` (no longer hardcoded)
+- Policy editor in Settings: edit titles/text, add/remove items, saves as JSON to `settings` table key `policy_items`
+- **Cleaning checklist** noted as future feature — will live under Operations in Settings
+
+*Last updated: April 2026 — Session 3 (settings redesign + policy editor).*

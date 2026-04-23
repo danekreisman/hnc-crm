@@ -1,5 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 
+const HNC_BUSINESS_PHONE = '(808) 468-5356';
+
 export default async function handler(req, res) {
   // Only allow POST from Vercel cron or internal calls
   if (req.method !== 'POST') {
@@ -229,6 +231,11 @@ export default async function handler(req, res) {
 
             if (!leadData) continue;
 
+            // Compute once per lead — available to both SMS and email AI personalization
+            const bookingUrlForLead = leadData.booking_token
+              ? `${BASE_URL}/book.html?bt=${leadData.booking_token}`
+              : null;
+
             console.log(`[${executionId}] Executing ${actions?.length || 0} actions for lead: ${leadData.name}`);
 
             // Track execution
@@ -280,6 +287,8 @@ export default async function handler(req, res) {
                           channel: 'sms',
                           leadId: leadData.id,
                           purpose: automation.name,
+                          bookingUrl: bookingUrlForLead,
+                          businessPhone: HNC_BUSINESS_PHONE,
                         })
                       });
                       const aiData = await aiRes.json();
@@ -326,6 +335,8 @@ export default async function handler(req, res) {
                           channel: 'email',
                           leadId: leadData.id,
                           purpose: automation.name,
+                          bookingUrl: bookingUrlForLead,
+                          businessPhone: HNC_BUSINESS_PHONE,
                         })
                       });
                       const aiData = await aiRes.json();
@@ -337,11 +348,6 @@ export default async function handler(req, res) {
                       console.warn(`[${executionId}] AI personalize failed, using template:`, aiErr.message);
                     }
                   }
-
-                  // If lead was previously quoted, include a Book Now button that preserves the quote
-                  const bookingUrlForLead = leadData.booking_token
-                    ? `${BASE_URL}/book.html?bt=${leadData.booking_token}`
-                    : null;
 
                   const emailRes = await fetch(`${BASE_URL}/api/send-email`, {
                     method: 'POST',
@@ -469,5 +475,5 @@ function substituteVars(template, leadData) {
     .replace(/\{frequency\}/g, leadData.frequency || '')
     .replace(/\{address\}/g, leadData.address || '')
     .replace(/\{quote_total\}/g, leadData.quote_total || 'custom')
-    .replace(/\{phone\}/g, '(808) 468-5356');
+    .replace(/\{phone\}/g, HNC_BUSINESS_PHONE);
 }

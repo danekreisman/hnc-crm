@@ -5,12 +5,14 @@
  * pulled from the client/lead record, recent OpenPhone calls, and SMS history.
  *
  * Body:
- *   template:   string  (required) — the raw template to personalize
- *   channel:    'sms' | 'email' (required)
- *   clientId:   string  (optional) — if present, pulls client + history
- *   leadId:     string  (optional) — if present, pulls lead + history
- *   phone:      string  (optional) — used to find call/message history
- *   purpose:    string  (optional) — short hint like "3-day follow-up" for tone
+ *   template:      string  (required) — the raw template to personalize
+ *   channel:       'sms' | 'email'  (required)
+ *   clientId:      string  (optional) — if present, pulls client + history
+ *   leadId:        string  (optional) — if present, pulls lead + history
+ *   phone:         string  (optional) — used to find call/message history
+ *   purpose:       string  (optional) — short hint like "3-day follow-up" for tone
+ *   bookingUrl:    string  (optional) — personalized booking link for quoted leads
+ *   businessPhone: string  (optional) — HNC business phone number for call/text CTA
  *
  * Returns:
  *   { message: string, personalized: boolean, reason?: string }
@@ -36,14 +38,22 @@ VOICE RULES — FOLLOW STRICTLY:
 - Emojis: 🌺 can appear at most ONCE per message, and only if the template already uses it or the tone calls for it. Never force it.
 - Do NOT invent facts. Only reference what's in the provided context.
 - Do NOT reference sensitive topics from transcripts: medical issues, family problems, financial stress, relationship issues, personal tragedy. ONLY use logistics: pets, schedule preferences, property details, service preferences, previous requests.
-- Keep the original message's core intent and call-to-action intact.
+- Keep the original message's core intent intact. (The booking call-to-action may be rewritten per the BOOKING CHANNELS rules below.)
+
+BOOKING CHANNELS — FOLLOW STRICTLY, OVERRIDES TEMPLATE WORDING:
+HNC has exactly three ways a lead can book. Never mention a generic "website", "our site", "online portal", or "booking platform" — only use the channels explicitly listed in context.
+
+- If context includes BOTH a "Booking link" and a "Business phone": present all three options — call, text, or tap the booking link. Include the phone number and the link verbatim.
+- If context includes ONLY a "Business phone" (no booking link): offer only call or text. Do NOT mention any link, form, booking page, or website.
+- If context includes NEITHER: do not mention booking channels at all. Keep the template's intent without inventing a booking pitch.
+
+If the template says "book on our website", "book online", or anything similar, REPLACE that wording with the correct channel(s) per the rules above. This is the one case where overriding the template's exact call-to-action is required.
 
 LENGTH RULES:
 - For SMS: MUST stay under 320 characters. Shorter is better.
 - For email body: 2–4 short paragraphs max. Concise.
 
-OUTPUT:
-Return ONLY the rewritten message text. No preamble, no explanation, no quotes around it, no "Here is the message:". Just the message itself, ready to send.`;
+OUTPUT: Return ONLY the rewritten message text. No preamble, no explanation, no quotes around it, no "Here is the message:". Just the message itself, ready to send.`;
 
 // Suspicious patterns that suggest Claude went off the rails
 const SUSPICIOUS_PATTERNS = [
@@ -60,7 +70,7 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const { template, channel, clientId, leadId, phone, purpose } = req.body || {};
+  const { template, channel, clientId, leadId, phone, purpose, bookingUrl, businessPhone } = req.body || {};
 
   // Basic validation — we fall back to template if anything is off, never error
   if (!template || typeof template !== 'string' || template.trim().length === 0) {
@@ -71,6 +81,18 @@ export default async function handler(req, res) {
   }
   if (template.length > 5000) {
     return res.status(400).json({ error: 'template must be under 5000 characters' });
+  }
+
+  if (bookingUrl !== undefined && bookingUrl !== null) {
+    if (typeof bookingUrl !== 'string' || bookingUrl.length > 500) {
+      return res.status(400).json({ error: 'bookingUrl must be a string under 500 characters' });
+    }
+  }
+
+  if (businessPhone !== undefined && businessPhone !== null) {
+    if (typeof businessPhone !== 'string' || businessPhone.length > 30) {
+      return res.status(400).json({ error: 'businessPhone must be a string under 30 characters' });
+    }
   }
 
   const fallback = (reason) => res.status(200).json({
@@ -86,8 +108,8 @@ export default async function handler(req, res) {
       { auth: { persistSession: false } }
     );
 
-    // ─── Build context from DB ────────────────────────────────────────────
-    let subject = null;     // client or lead record
+    // ─── Build context from DB ──────────────────────────────────────────────
+    let subject = null; // client or lead record
     let contactPhone = phone || null;
 
     if (clientId) {
@@ -131,21 +153,21 @@ export default async function handler(req, res) {
       if (msgs) recentSms = msgs.reverse(); // chronological
     }
 
-    // ─── If we have no context at all, just return the template ───────────
-    if (!subject && !lastCall && recentSms.length === 0) {
+    // ─── If we have no context at all, just return the template ─────────────
+    if (!subject && !lastCall && recentSms.length === 0 && !bookingUrl && !businessPhone) {
       return fallback('no_context_available');
     }
 
-    // ─── Build the context block for Claude ───────────────────────────────
+    // ─── Build the context block for Claude ───────────────────────────────────
     const contextLines = [];
 
     if (subject) {
       const firstName = (subject.name || '').split(' ')[0];
       contextLines.push(`Client name: ${subject.name || 'unknown'} (use "${firstName || 'there'}")`);
-      if (subject.service)       contextLines.push(`Service: ${subject.service}`);
-      if (subject.address)       contextLines.push(`Address: ${subject.address}`);
-      if (subject.quote_total)   contextLines.push(`Quote amount: $${subject.quote_total}`);
-      if (subject.segment)       contextLines.push(`Segment: ${subject.segment}`);
+      if (subject.service) contextLines.push(`Service: ${subject.service}`);
+      if (subject.address) contextLines.push(`Address: ${subject.address}`);
+      if (subject.quote_total) contextLines.push(`Quote amount: $${subject.quote_total}`);
+      if (subject.segment) contextLines.push(`Segment: ${subject.segment}`);
       if (subject.kind === 'lead' && subject.stage) contextLines.push(`Lead stage: ${subject.stage}`);
     }
 
@@ -162,6 +184,9 @@ export default async function handler(req, res) {
       contextLines.push(`Recent SMS exchange:\n${smsLines}`);
     }
 
+    if (bookingUrl) contextLines.push(`Booking link (use verbatim): ${bookingUrl}`);
+    if (businessPhone) contextLines.push(`Business phone (for call/text, use verbatim): ${businessPhone}`);
+
     const userPrompt = [
       `Channel: ${channel.toUpperCase()}`,
       purpose ? `Purpose: ${purpose}` : null,
@@ -175,7 +200,7 @@ export default async function handler(req, res) {
       'Rewrite the template using the context. Output only the final message.',
     ].filter(Boolean).join('\n');
 
-    // ─── Call Claude ──────────────────────────────────────────────────────
+    // ─── Call Claude ──────────────────────────────────────────────────────────
     const response = await fetchWithTimeout(
       'https://api.anthropic.com/v1/messages',
       {
@@ -200,7 +225,8 @@ export default async function handler(req, res) {
       await logError('ai-personalize', `Anthropic ${response.status}`, {
         status: response.status,
         body: body.slice(0, 500),
-        clientId, leadId,
+        clientId,
+        leadId,
       });
       return fallback('ai_service_error');
     }
@@ -211,8 +237,10 @@ export default async function handler(req, res) {
     if (!message) return fallback('empty_response');
 
     // Strip accidental quote wrapping
-    if ((message.startsWith('"') && message.endsWith('"')) ||
-        (message.startsWith('\u201C') && message.endsWith('\u201D'))) {
+    if (
+      (message.startsWith('"') && message.endsWith('"')) ||
+      (message.startsWith('\u201C') && message.endsWith('\u201D'))
+    ) {
       message = message.slice(1, -1).trim();
     }
 

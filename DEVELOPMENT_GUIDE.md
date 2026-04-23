@@ -289,3 +289,25 @@ git push https://danekreisman:YOUR_PAT@github.com/danekreisman/hnc-crm.git main
 - `run-automations.js` still not fully using `logError` — add when next touching that file.
 
 *Last updated: April 2026 — Session 6 (AI booking channel fix + git HTTPS deployment method documented).*
+
+### Session A — Unsubscribe infrastructure
+
+**Shipped:**
+- `supabase/add_unsubscribe.sql`: adds `unsubscribed_at TIMESTAMPTZ` to both `leads` and `clients` tables with partial indexes for fast filtering.
+- `api/unsubscribe.js`: new GET endpoint — `/api/unsubscribe?id={id}&type=lead|client`. Sets `unsubscribed_at`, renders a branded HTML confirmation page. Idempotent (handles already-unsubscribed gracefully).
+- `api/send-email.js`: `renderBrandedEmail` now accepts `unsubscribeUrl` param. Discreet "Unsubscribe" link rendered in footer of all marketing emails (generic, lead_followup, reactivation types). Transactional emails (invoice, reminder, receipt) are excluded.
+- `api/run-automations.js`: blacklist guard now also skips records where `unsubscribed_at IS NOT NULL`. Email action passes `unsubscribeUrl` pointing to `/api/unsubscribe?id={leadId}&type=lead`. `logError` import added; now used in both AI personalize catch blocks.
+
+**Schema changes:**
+- `leads.unsubscribed_at TIMESTAMPTZ` (nullable, default null)
+- `clients.unsubscribed_at TIMESTAMPTZ` (nullable, default null)
+
+**Still pending (Session B — Holiday Broadcasts):**
+- `broadcasts` table + `broadcast_sends` table
+- `/api/send-broadcast` endpoint (audience query → loop → Resend → record)
+- Cron/manual trigger for scheduled broadcasts
+- UI: Broadcasts section with holiday calendar, template picker, audience selector, preview
+- Holiday email templates (Easter, 4th of July, Thanksgiving, Christmas) designed by Claude
+
+*Last updated: April 2026 — Session A (unsubscribe infrastructure).*
+

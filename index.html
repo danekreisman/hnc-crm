@@ -12757,18 +12757,18 @@ function showToast(msg, isError) {
 var _tasks = { open: [], done: [] };
 
 async function loadTasks() {
-  closeTaskModal();
-  // Render cached state immediately while API loads
+  if (document.getElementById('task-modal-overlay')) {
+    document.getElementById('task-modal-overlay').style.display = 'none';
+  }
+  // Render cached state immediately while data loads
   renderTasks();
   try {
-    const [openResp, doneResp] = await Promise.all([
-      fetch('/api/tasks?status=open'),
-      fetch('/api/tasks?status=completed'),
+    var [openRes, doneRes] = await Promise.all([
+      db.from('tasks').select('*, leads(name,phone), clients(name,phone)').eq('status','open').order('due_date', {ascending:true, nullsFirst:false}),
+      db.from('tasks').select('*, leads(name,phone), clients(name,phone)').eq('status','completed').order('completed_at', {ascending:false}).limit(20),
     ]);
-    const openData = await openResp.json();
-    const doneData = await doneResp.json();
-    _tasks.open = openData.tasks || [];
-    _tasks.done  = doneData.tasks || [];
+    _tasks.open = openRes.data  || [];
+    _tasks.done = doneRes.data  || [];
     renderTasks();
   } catch(e) {
     console.error('loadTasks error', e);

@@ -12758,6 +12758,8 @@ var _tasks = { open: [], done: [] };
 
 async function loadTasks() {
   closeTaskModal();
+  // Render cached state immediately while API loads
+  renderTasks();
   try {
     const [openResp, doneResp] = await Promise.all([
       fetch('/api/tasks?status=open'),
@@ -12846,27 +12848,60 @@ function renderTaskCard(t, done) {
 }
 
 async function completeTaskById(id) {
+  // Optimistic — move to done immediately
+  var task = _tasks.open.find(function(t){ return t.id === id; });
+  if (!task) return;
+  _tasks.open = _tasks.open.filter(function(t){ return t.id !== id; });
+  task.status = 'completed';
+  task.completed_at = new Date().toISOString();
+  _tasks.done.unshift(task);
+  renderTasks();
+
+  // Show undo toast for 5 seconds
+  var undone = false;
+  var toastEl = document.createElement('div');
+  toastEl.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#1e293b;color:#fff;padding:10px 16px;border-radius:10px;font-size:13px;display:flex;align-items:center;gap:12px;z-index:9999;box-shadow:0 4px 20px rgba(0,0,0,.3);';
+  toastEl.innerHTML = 'Task completed ✓ <button onclick="this.closest('div')._undo()" style="background:#3b82f6;border:none;color:#fff;padding:4px 10px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;">Undo</button>';
+  toastEl._undo = function() {
+    undone = true;
+    _tasks.done = _tasks.done.filter(function(t){ return t.id !== id; });
+    task.status = 'open';
+    delete task.completed_at;
+    _tasks.open.unshift(task);
+    renderTasks();
+    toastEl.remove();
+  };
+  document.body.appendChild(toastEl);
+  setTimeout(function() {
+    if (toastEl.parentNode) toastEl.remove();
+  }, 5000);
+
+  // Sync to API in background
   try {
     await fetch('/api/tasks', {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
       body: JSON.stringify({ action: 'complete', id }),
     });
-    await loadTasks();
-    showToast('Task completed ✓');
-  } catch(e) { showToast('Failed to complete task', true); }
+  } catch(e) {
+    if (!undone) showToast('Sync failed — reload to refresh', true);
+  }
 }
 
 async function deleteTaskById(id) {
+  // Optimistic — remove from UI instantly
+  _tasks.open = _tasks.open.filter(function(t){ return t.id !== id; });
+  _tasks.done = _tasks.done.filter(function(t){ return t.id !== id; });
+  renderTasks();
+  showToast('Task deleted');
+  // Sync to API in background
   try {
     await fetch('/api/tasks', {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
       body: JSON.stringify({ action: 'delete', id }),
     });
-    await loadTasks();
-    showToast('Task deleted');
-  } catch(e) { showToast('Failed to delete task', true); }
+  } catch(e) { console.error('Delete sync failed', e); }
 }
 
 function openTaskModal() {

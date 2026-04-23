@@ -9,8 +9,16 @@
 -- ─────────────────────────────────────────────────────────────────────────────
 
 -- Ensure we have a unique constraint on name so upserts work cleanly
-ALTER TABLE lead_automations
-  ADD CONSTRAINT IF NOT EXISTS lead_automations_name_unique UNIQUE (name);
+-- (ADD CONSTRAINT IF NOT EXISTS isn't valid Postgres, so we check first)
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'lead_automations_name_unique'
+  ) THEN
+    ALTER TABLE lead_automations
+      ADD CONSTRAINT lead_automations_name_unique UNIQUE (name);
+  END IF;
+END $$;
 
 -- ══════════════════════════════════════════════════════════════════════════════
 -- SEQUENCE 1: NEW LEAD — Day 3 Follow-up

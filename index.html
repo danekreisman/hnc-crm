@@ -12804,33 +12804,46 @@ function renderTaskCard(t, done) {
   var isOverdue = !done && t.due_date && t.due_date < today;
   var typeLabel = {invoice:'Invoice',call_lead:'Call lead',call_client:'Call client',project:'Project',other:'Task'}[t.type] || 'Task';
   var typeColor = {invoice:'#3b82f6',call_lead:'#f59e0b',call_client:'#8b5cf6',project:'#10b981',other:'#6b7280'}[t.type] || '#6b7280';
-  var priorityDot = {high:'🔴',medium:'🟡',low:'🟢'}[t.priority] || '';
+  var priorityDot = {high:'\uD83D\uDD34',medium:'\uD83D\uDFE1',low:'\uD83D\uDFE2'}[t.priority] || '';
   var relName = (t.leads && t.leads.name) || (t.clients && t.clients.name) || '';
   var dueStr = t.due_date ? new Date(t.due_date + 'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'}) : '';
+  var borderStyle = isOverdue ? 'border-left:3px solid var(--red);' : done ? 'opacity:.7;' : '';
+  var titleStyle = done ? 'text-decoration:line-through;color:var(--text-muted);' : '';
+  var dueColor = isOverdue ? 'var(--red)' : 'var(--text-muted)';
 
-  return '<div class="card" style="padding:14px 16px;margin-bottom:8px;' + (isOverdue ? 'border-left:3px solid var(--red);' : done ? 'opacity:.7;' : '') + '">'
+  var checkCol = done
+    ? '<span style="font-size:14px;margin-top:2px;">\u2705</span>'
+    : '<input type="checkbox" data-task-id="' + t.id + '" style="margin-top:2px;cursor:pointer;width:16px;height:16px;flex-shrink:0;" title="Mark complete" onchange="completeTaskById(this.dataset.taskId)">';
+
+  var deleteBtn = !done
+    ? '<button data-task-id="' + t.id + '" onclick="deleteTaskById(this.dataset.taskId)" style="border:none;background:none;cursor:pointer;color:var(--text-muted);font-size:16px;padding:0;line-height:1;" title="Delete">&times;</button>'
+    : '';
+
+  var brief = t.ai_brief
+    ? '<details style="margin-top:8px;"><summary style="font-size:11px;font-weight:600;color:var(--brand-500);cursor:pointer;">\u2728 AI brief</summary><div style="font-size:12px;line-height:1.6;margin-top:6px;padding:10px;background:var(--bg-soft);border-radius:8px;white-space:pre-wrap;">' + esc(t.ai_brief) + '</div></details>'
+    : '';
+
+  return '<div class="card" style="padding:14px 16px;margin-bottom:8px;' + borderStyle + '">'
     + '<div style="display:flex;align-items:flex-start;gap:12px;">'
-    + (!done ? '<input type="checkbox" style="margin-top:2px;cursor:pointer;width:16px;height:16px;flex-shrink:0;" onchange="completeTask('' + t.id + '')" title="Mark complete">' : '<span style="font-size:14px;">✅</span>')
+    + checkCol
     + '<div style="flex:1;min-width:0;">'
     + '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
-    + '<span style="font-size:13px;font-weight:600;' + (done ? 'text-decoration:line-through;color:var(--text-muted);' : '') + '">' + esc(t.title) + '</span>'
+    + '<span style="font-size:13px;font-weight:600;' + titleStyle + '">' + esc(t.title) + '</span>'
     + '<span style="font-size:10px;background:' + typeColor + '20;color:' + typeColor + ';padding:2px 7px;border-radius:99px;border:1px solid ' + typeColor + '40;">' + typeLabel + '</span>'
-    + (priorityDot ? '<span style="font-size:11px;">' + priorityDot + '</span>' : '')
+    + (priorityDot ? '<span>' + priorityDot + '</span>' : '')
     + (isOverdue ? '<span style="font-size:10px;color:var(--red);font-weight:600;">OVERDUE</span>' : '')
     + '</div>'
-    + (relName ? '<div style="font-size:11px;color:var(--text-muted);margin-top:2px;">↳ ' + esc(relName) + '</div>' : '')
+    + (relName ? '<div style="font-size:11px;color:var(--text-muted);margin-top:2px;">&rarr; ' + esc(relName) + '</div>' : '')
     + (t.description ? '<div style="font-size:12px;color:var(--text-muted);margin-top:4px;">' + esc(t.description) + '</div>' : '')
-    + (t.ai_brief ? '<details style="margin-top:8px;"><summary style="font-size:11px;font-weight:600;color:var(--brand-500);cursor:pointer;">✨ AI brief</summary><div style="font-size:12px;line-height:1.6;margin-top:6px;padding:10px;background:var(--bg-soft);border-radius:8px;white-space:pre-wrap;">' + esc(t.ai_brief) + '</div></details>' : '')
+    + brief
     + '</div>'
     + '<div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">'
-    + (dueStr ? '<span style="font-size:11px;color:' + (isOverdue ? 'var(--red)' : 'var(--text-muted)') + ';">' + dueStr + '</span>' : '')
-    + (!done ? '<button onclick="deleteTask('' + t.id + '')" style="border:none;background:none;cursor:pointer;color:var(--text-muted);font-size:14px;padding:0;" title="Delete">&times;</button>' : '')
-    + '</div>'
-    + '</div>'
-    + '</div>';
+    + (dueStr ? '<span style="font-size:11px;color:' + dueColor + ';">' + dueStr + '</span>' : '')
+    + deleteBtn
+    + '</div></div></div>';
 }
 
-async function completeTask(id) {
+async function completeTaskById(id) {
   try {
     await fetch('/api/tasks', {
       method: 'POST',
@@ -12842,7 +12855,7 @@ async function completeTask(id) {
   } catch(e) { showToast('Failed to complete task', true); }
 }
 
-async function deleteTask(id) {
+async function deleteTaskById(id) {
   if (!confirm('Delete this task?')) return;
   try {
     await fetch('/api/tasks', {

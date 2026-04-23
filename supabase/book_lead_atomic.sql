@@ -73,8 +73,10 @@ BEGIN
   -- ── 3. Close the lead ─────────────────────────────────────────────────
   UPDATE leads
   SET
-    stage         = 'Closed won',
-    quote_sent_at = NOW()
+    stage             = 'Closed won',
+    segment           = 'booked',
+    segment_moved_at  = NOW(),
+    quote_sent_at     = NOW()
   WHERE id = p_lead_id;
 
   -- ── Return both IDs so the caller knows what was created ──────────────

@@ -356,6 +356,62 @@ git push https://danekreisman:YOUR_PAT@github.com/danekreisman/hnc-crm.git main
 
 ---
 
+
+---
+
+## Session Log — April 24 2026
+
+### What was built
+
+**Auto-mark jobs complete** (`api/run-job-completions.js`, cron: hourly)
+- Finds scheduled/assigned appointments where date + time + duration_hours has passed, marks them completed
+- Skips appointments without duration_hours
+
+**Invoice overdue reminders** (`api/run-invoice-reminders.js`, cron: daily 7pm HST)
+- Finds unpaid invoices older than 7 days, sends SMS to client
+- Fetches Stripe hosted_invoice_url and includes pay link in the SMS
+- Throttled to once per 3 days via invoices.last_reminder_at
+
+**Policy agreement reminders** (`api/run-policy-reminders.js`, cron: daily 8pm HST)
+- Finds clients with policies_agreed_at = NULL + upcoming appointment
+- Sends one-time SMS with agree.html link
+- Records policy_reminder_sent_at so it never re-sends
+
+**AI review requests** (`api/run-review-requests.js`, cron: daily 9pm HST)
+- Finds appointments completed in last 7 days with no review request sent
+- Fetches full OpenPhone conversation history (SMS + call summaries)
+- Claude evaluates sentiment — only sends Google review SMS if satisfied + confidence >= 0.7
+- Safety guard: manual calls require testClientId in body (cron bypasses via x-vercel-cron header)
+- Review URL stored in settings table, editable from Settings → Business tab
+
+**Shared OpenPhone history utility** (`api/utils/openphone-history.js`)
+- Fetches up to 200 SMS messages + 25 call summaries from OpenPhone API by phone number
+- Used by: run-review-requests, ai-personalize, ai-summary
+- Caches phoneNumberId per cold start
+
+**All AI features now use live OpenPhone data:**
+- ai-personalize.js — replaced Supabase messages/call_transcripts queries with OpenPhone API
+- ai-summary.js — server-side enriches prompt with OpenPhone history before sending to Claude
+- Prompt tightened: factual only, no speculation about causes, quote specific dates/exchanges
+
+**Settings UI** — Google Review URL field added to Business tab, saves to settings table
+
+### SQL migrations run
+- `invoices.last_reminder_at TIMESTAMPTZ`
+- `clients.policy_reminder_sent_at TIMESTAMPTZ`
+- `appointments.review_requested_at TEXT`
+- `appointments.updated_at TIMESTAMPTZ`
+
+### Key gotchas from this session
+- `updated_at DEFAULT NOW()` on a new column sets ALL existing rows to the current time — do not use this to filter "recently updated" records. Use the appointment date field instead.
+- NEVER run bulk-action endpoints against production without testClientId/testEmail. See Testing Rules section.
+- ai-summary max_tokens was 300 — too low to cover both SMS and call history. Now 600.
+- The messages table (inbound SMS webhook) is separate from OpenPhone API — the API has full history (both directions), the table only has inbound and was empty anyway.
+
+### Test data to clean up
+- Test Customer (client `190807dc-9745-4712-a1ce-99fedd51c7b9`) — test record created during session. Can delete if not needed.
+
+
 ## Session Log
 
 ### Session: Booking Audit + Reminders (April 23 2026)

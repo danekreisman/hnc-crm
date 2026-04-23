@@ -9680,13 +9680,13 @@ async function sendAutoTest() {
           if (r.ok && j.success !== false) sent++; else { failed++; console.error('SMS failed:', j); }
         }
         if (testEmail) {
-          // Deliver SMS content to email as a clean preview
+          // Deliver SMS content to email — use business name as subject
           var r2 = await fetch('/api/send-email', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               to: testEmail,
-              subject: _testAuto.name,
+              subject: 'Hawaii Natural Clean',
               type: 'generic',
               clientName: (lead.name || 'Test').split(' ')[0],
               notes: message
@@ -9702,7 +9702,7 @@ async function sendAutoTest() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               to: testEmail,
-              subject: substituteTestVars(action.subject || _testAuto.name, lead),
+              subject: substituteTestVars(action.subject || 'Hawaii Natural Clean', lead),
               type: 'generic',
               clientName: (lead.name || 'Test').split(' ')[0],
               notes: message
@@ -9731,19 +9731,23 @@ async function sendAutoTest() {
   }
 
   var parts = [];
-  if (sent > 0)    parts.push(sent + ' sent');
+  if (sent > 0)    parts.push(sent + ' message' + (sent !== 1 ? 's' : '') + ' sent');
   if (failed > 0)  parts.push(failed + ' failed');
   if (skipped > 0) parts.push(skipped + ' skipped');
 
+  var destinations = [];
+  if (testPhone) destinations.push('phone ' + testPhone);
+  if (testEmail) destinations.push(testEmail);
+
   if (failed === 0 && sent > 0) {
     resultEl.style.color = '#166534';
-    resultEl.textContent = '✓ ' + parts.join(', ') + '. Check your phone/inbox.';
+    resultEl.textContent = '✓ Sent to ' + destinations.join(' and ') + '. Check your phone/inbox.';
   } else if (failed > 0) {
     resultEl.style.color = '#b91c1c';
     resultEl.textContent = parts.join(', ') + '. Check browser console for details.';
   } else {
     resultEl.style.color = 'var(--text-muted)';
-    resultEl.textContent = 'Nothing to send — check that phone/email fields are filled.';
+    resultEl.textContent = 'Nothing to send — fill in a phone number or email above.';
   }
 }
 

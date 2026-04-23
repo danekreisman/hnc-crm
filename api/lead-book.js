@@ -69,7 +69,7 @@ export default async function handler(req, res) {
     // 1. Look up lead
     const { data: lead, error: leadErr } = await supabase
       .from('leads')
-      .select('id,name,email,phone,address,service,sqft,quote_total,quote_data,notes,booking_token')
+      .select('id,name,email,phone,address,service,sqft,quote_total,quote_data,notes,booking_token,stage')
       .eq('booking_token', token)
       .maybeSingle();
 

@@ -481,7 +481,7 @@ async function submitBooking(){
     var r = await fetch('/api/lead-book',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ token:TOKEN, date:SEL_DATE, time:SEL_TIME, notes:notes, service:LEAD.service, rushFee:RUSH_FEE })
+      body: JSON.stringify({ token:TOKEN, date:SEL_DATE, time:SEL_TIME, notes:notes, service:LEAD.service, rushFee:RUSH_FEE, policiesAgreed: true })
     });
     var j = await r.json();
     if(!r.ok) throw new Error(j.error||'Something went wrong');

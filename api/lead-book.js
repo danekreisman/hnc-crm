@@ -75,6 +75,13 @@ export default async function handler(req, res) {
 
     if (leadErr || !lead) return res.status(404).json({ error: 'Invalid token' });
 
+    // Guard against double-submissions — lead already booked
+    if (lead.stage === 'Closed won') {
+      return res.status(409).json({
+        error: "You're already booked! If you need to make changes, please call or text us at (808) 468-5356."
+      });
+    }
+
     const firstName = lead.name.trim().split(' ')[0];
     const rawPhone  = (lead.phone || '').trim();
     const phone     = rawPhone.replace(/\D/g, '');

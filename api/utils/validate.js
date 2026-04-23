@@ -121,9 +121,10 @@ export const SCHEMAS = {
   },
 
   booking: {
-    token: { required: true, rules: [is.nonEmpty, is.maxLength(200)], message: 'Booking token is required' },
-    date:  { required: true, rules: [is.date],                        message: 'Date must be a valid date (YYYY-MM-DD)' },
-    time:  { required: true, rules: [is.nonEmpty, is.maxLength(20)],  message: 'Time is required' },
+    token:          { required: true,  rules: [is.nonEmpty, is.maxLength(200)],          message: 'Booking token is required' },
+    date:           { required: true,  rules: [is.date],                                   message: 'Date must be a valid date (YYYY-MM-DD)' },
+    time:           { required: true,  rules: [is.nonEmpty, is.maxLength(20)],             message: 'Time is required' },
+    policiesAgreed: { required: true,  rules: [(v) => v === true],                        message: 'You must agree to all policies to complete your booking' },
   },
 
 };

@@ -10,6 +10,18 @@ import { createClient } from '@supabase/supabase-js';
 import { fetchWithTimeout, TIMEOUTS } from './utils/with-timeout.js';
 import { logError } from './utils/error-logger.js';
 
+async function getStripeInvoiceUrl(stripeInvoiceId) {
+  if (!stripeInvoiceId) return null;
+  try {
+    const Stripe = (await import('stripe')).default;
+    const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+    const inv = await stripe.invoices.retrieve(stripeInvoiceId);
+    return inv.hosted_invoice_url || null;
+  } catch (e) {
+    return null; // non-fatal — just skip the link
+  }
+}
+
 const BASE_URL      = 'https://hnc-crm.vercel.app';
 const BUSINESS_NAME = 'Hawaii Natural Clean';
 const BUSINESS_PHONE = '(808) 468-5356';
@@ -32,7 +44,7 @@ export default async function handler(req, res) {
     const { data: invoices, error } = await db
       .from('invoices')
       .select(`
-        id, amount, created_at, status, last_reminder_at,
+        id, amount, total, created_at, status, stripe_invoice_id, last_reminder_at,
         clients ( id, name, phone )
       `)
       .lt('created_at', sevenDaysAgo)
@@ -57,7 +69,12 @@ export default async function handler(req, res) {
       const amount = invoice.total ? `$${Number(invoice.total).toFixed(2)}` : (invoice.amount ? `$${Number(invoice.amount).toFixed(2)}` : 'your balance');
       const daysOut = Math.floor((Date.now() - new Date(invoice.created_at)) / (1000 * 60 * 60 * 24));
 
-      const message = `Aloha ${firstName}, this is a friendly reminder from ${BUSINESS_NAME}. You have an outstanding invoice of ${amount} that is ${daysOut} days past due. Please call or text us at ${BUSINESS_PHONE} to settle your balance. Mahalo 🌺`;
+      const invoiceUrl = await getStripeInvoiceUrl(invoice.stripe_invoice_id);
+      const payLine = invoiceUrl
+        ? `Pay here: ${invoiceUrl}`
+        : `Please call or text us at ${BUSINESS_PHONE} to settle your balance.`;
+
+      const message = `Aloha ${firstName}, this is a friendly reminder from ${BUSINESS_NAME}. You have an outstanding invoice of ${amount} that is ${daysOut} days past due. ${payLine} Questions? Call or text ${BUSINESS_PHONE}. Mahalo 🌺`;
 
       try {
         const resp = await fetchWithTimeout(`${BASE_URL}/api/send-sms`, {

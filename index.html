@@ -810,7 +810,9 @@ textarea{font-family:inherit;}
             <!-- Template picker -->
             <div style="margin-bottom:20px;">
               <div style="font-size:13px;font-weight:600;margin-bottom:10px;">Holiday template</div>
-              <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;" id="bc-template-grid">
+              <!-- Holidays -->
+              <div style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text-muted);margin-bottom:6px;">Holidays</div>
+              <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:14px;" id="bc-template-grid">
                 <div class="bc-tmpl-card" onclick="selectBcTemplate('easter')" data-key="easter" style="border:2px solid var(--border);border-radius:12px;padding:14px;cursor:pointer;transition:all .15s;">
                   <div style="font-size:22px;margin-bottom:6px;">🌸</div>
                   <div style="font-size:13px;font-weight:600;">Easter / Spring</div>
@@ -830,6 +832,49 @@ textarea{font-family:inherit;}
                   <div style="font-size:22px;margin-bottom:6px;">🎄</div>
                   <div style="font-size:13px;font-weight:600;">Christmas</div>
                   <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Mele Kalikimaka</div>
+                </div>
+              </div>
+              <!-- Seasonal / Hawaii -->
+              <div style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text-muted);margin-bottom:6px;">Seasonal &amp; Hawaii</div>
+              <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:14px;">
+                <div class="bc-tmpl-card" onclick="selectBcTemplate('new_year')" data-key="new_year" style="border:2px solid var(--border);border-radius:12px;padding:14px;cursor:pointer;transition:all .15s;">
+                  <div style="font-size:22px;margin-bottom:6px;">🎉</div>
+                  <div style="font-size:13px;font-weight:600;">New Year</div>
+                  <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Fresh start offer</div>
+                </div>
+                <div class="bc-tmpl-card" onclick="selectBcTemplate('allergy_season')" data-key="allergy_season" style="border:2px solid var(--border);border-radius:12px;padding:14px;cursor:pointer;transition:all .15s;">
+                  <div style="font-size:22px;margin-bottom:6px;">🤧</div>
+                  <div style="font-size:13px;font-weight:600;">Allergy Season</div>
+                  <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Deep clean for allergens</div>
+                </div>
+                <div class="bc-tmpl-card" onclick="selectBcTemplate('back_to_school')" data-key="back_to_school" style="border:2px solid var(--border);border-radius:12px;padding:14px;cursor:pointer;transition:all .15s;">
+                  <div style="font-size:22px;margin-bottom:6px;">🎒</div>
+                  <div style="font-size:13px;font-weight:600;">Back to School</div>
+                  <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Reset home routines</div>
+                </div>
+                <div class="bc-tmpl-card" onclick="selectBcTemplate('storm_season')" data-key="storm_season" style="border:2px solid var(--border);border-radius:12px;padding:14px;cursor:pointer;transition:all .15s;">
+                  <div style="font-size:22px;margin-bottom:6px;">🌧️</div>
+                  <div style="font-size:13px;font-weight:600;">Storm Season</div>
+                  <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Post-storm & mold prevention</div>
+                </div>
+                <div class="bc-tmpl-card" onclick="selectBcTemplate('tourist_season')" data-key="tourist_season" style="border:2px solid var(--border);border-radius:12px;padding:14px;cursor:pointer;transition:all .15s;">
+                  <div style="font-size:22px;margin-bottom:6px;">🌺</div>
+                  <div style="font-size:13px;font-weight:600;">Tourist Season</div>
+                  <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Airbnb & vacation rental owners</div>
+                </div>
+              </div>
+              <!-- Evergreen -->
+              <div style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text-muted);margin-bottom:6px;">Evergreen</div>
+              <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:0;">
+                <div class="bc-tmpl-card" onclick="selectBcTemplate('we_miss_you')" data-key="we_miss_you" style="border:2px solid var(--border);border-radius:12px;padding:14px;cursor:pointer;transition:all .15s;">
+                  <div style="font-size:22px;margin-bottom:6px;">💛</div>
+                  <div style="font-size:13px;font-weight:600;">We Miss You</div>
+                  <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Win back lapsed leads/clients</div>
+                </div>
+                <div class="bc-tmpl-card" onclick="selectBcTemplate('referral')" data-key="referral" style="border:2px solid var(--border);border-radius:12px;padding:14px;cursor:pointer;transition:all .15s;">
+                  <div style="font-size:22px;margin-bottom:6px;">🙌</div>
+                  <div style="font-size:13px;font-weight:600;">Referral Push</div>
+                  <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Share & earn $50 offer</div>
                 </div>
               </div>
             </div>
@@ -11877,10 +11922,20 @@ Your total will update automatically when you select a payment method.</textarea
 <script>
 // ── Broadcast holidays reference ─────────────────────────────────────────────
 var BC_HOLIDAYS = {
-  easter:       { label:'Easter / Spring',  emoji:'🌸', defaultSubject:'🌸 Spring is here — time for a fresh start',      month:3  },
-  '4th_of_july':{ label:'4th of July',      emoji:'🎆', defaultSubject:'🎆 4th of July is coming — is your home guest-ready?', month:6  },
-  thanksgiving: { label:'Thanksgiving',     emoji:'🦃', defaultSubject:'🦃 Thanksgiving is almost here — hosting?',         month:10 },
-  christmas:    { label:'Christmas',        emoji:'🎄', defaultSubject:'🎄 Mele Kalikimaka — gift yourself a clean home',   month:11 },
+  // ── Seasonal holidays ──────────────────────────────────────────────────────
+  easter:        { label:'Easter / Spring',   emoji:'🌸', defaultSubject:'🌸 Spring is here — time for a fresh start',               cat:'holiday' },
+  '4th_of_july': { label:'4th of July',       emoji:'🎆', defaultSubject:'🎆 4th of July is coming — is your home guest-ready?',      cat:'holiday' },
+  thanksgiving:  { label:'Thanksgiving',      emoji:'🦃', defaultSubject:'🦃 Thanksgiving is almost here — hosting?',                 cat:'holiday' },
+  christmas:     { label:'Christmas',         emoji:'🎄', defaultSubject:'🎄 Mele Kalikimaka — gift yourself a clean home',           cat:'holiday' },
+  // ── Seasonal / Hawaii-specific ────────────────────────────────────────────
+  new_year:      { label:'New Year',          emoji:'🎉', defaultSubject:"🎉 A fresh start — your home deserves it too",              cat:'seasonal' },
+  allergy_season:{ label:'Allergy Season',    emoji:'🤧', defaultSubject:'🤧 Allergy season is here — is your home ready?',           cat:'seasonal' },
+  back_to_school:{ label:'Back to School',    emoji:'🎒', defaultSubject:'🎒 Back to school — reset your home routine',               cat:'seasonal' },
+  storm_season:  { label:'Storm Season',      emoji:'🌧️', defaultSubject:'🌧️ Storm season in Hawaii — protect your home',            cat:'hawaii'   },
+  tourist_season:{ label:'Tourist Season',    emoji:'🌺', defaultSubject:"🌺 Tourist season is coming — Airbnb owners, are you ready?", cat:'hawaii' },
+  // ── Evergreen ─────────────────────────────────────────────────────────────
+  we_miss_you:   { label:'We Miss You',       emoji:'💛', defaultSubject:"🌺 It's been a while — we miss you",                        cat:'evergreen' },
+  referral:      { label:'Referral Push',     emoji:'🙌', defaultSubject:"🙌 Know someone who'd love a clean home? You'll both benefit", cat:'evergreen' },
 };
 
 var bcCurrentAudience = 'both';

@@ -72,6 +72,119 @@ const HOLIDAY_TEMPLATES = {
     ctaUrl: `https://${WEBSITE}`,
   },
 
+
+  new_year: {
+    defaultSubject: '🎉 A fresh start — your home deserves it too',
+    preheader: 'New year, clean home. Let's do this.',
+    heading: 'Happy New Year! 🎉',
+    intro: (firstName) => `Aloha ${firstName}! As you step into the new year, there's no better way to start fresh than with a clean, organized home.`,
+    body: `
+      <p style="margin:0 0 16px;color:#0F172A;font-size:15px;line-height:1.65;">New beginnings deserve a clean slate — literally. Whether it's clearing out the holiday clutter, deep cleaning after hosting, or simply resetting your space for the year ahead, we're here to help.</p>
+      <div style="background:#EFF9FC;border-radius:12px;padding:20px 24px;margin:0 0 20px;text-align:center;">
+        <p style="margin:0 0 6px;color:#0F172A;font-size:18px;font-weight:700;font-family:Georgia,serif;">🌟 New Year Special</p>
+        <p style="margin:0;color:#64748B;font-size:14px;">Book your first clean of the year in January and mention this email for 10% off.</p>
+      </div>
+      <p style="margin:0 0 20px;color:#0F172A;font-size:15px;line-height:1.65;">Start the year the right way. Call, text, or tap below to schedule. Mahalo and Happy New Year! 🌺</p>`,
+    ctaText: 'Start the year fresh',
+    ctaUrl: `https://${WEBSITE}`,
+  },
+
+  allergy_season: {
+    defaultSubject: '🤧 Allergy season is here — is your home ready?',
+    preheader: 'Reduce dust, dander, and allergens before they get to you.',
+    heading: 'Allergy season is back 🤧',
+    intro: (firstName) => `Aloha ${firstName}! Spring is beautiful in Hawaii — but it also brings dust, pollen, and allergens into your home.`,
+    body: `
+      <p style="margin:0 0 16px;color:#0F172A;font-size:15px;line-height:1.65;">A professional deep clean removes the hidden allergens that regular cleaning misses — dust mites in carpets, pet dander on upholstery, mold spores in bathrooms, and built-up debris in air vents and ceiling fans.</p>
+      <div style="background:#EFF9FC;border-radius:12px;padding:20px 24px;margin:0 0 20px;text-align:center;">
+        <p style="margin:0 0 6px;color:#0F172A;font-size:18px;font-weight:700;font-family:Georgia,serif;">🌬️ Breathe easier at home</p>
+        <p style="margin:0;color:#64748B;font-size:14px;">Our spring deep clean targets allergen hotspots — baseboards, ceiling fans, vents, blinds, and more.</p>
+      </div>
+      <p style="margin:0 0 20px;color:#0F172A;font-size:15px;line-height:1.65;">Your family deserves clean air at home. Call, text, or tap below to schedule. Mahalo! 🌺</p>`,
+    ctaText: 'Book an allergen deep clean',
+    ctaUrl: `https://${WEBSITE}`,
+  },
+
+  back_to_school: {
+    defaultSubject: '🎒 Back to school — reset your home routine',
+    preheader: 'New routines start with a clean home.',
+    heading: 'Back to school season 🎒',
+    intro: (firstName) => `Aloha ${firstName}! With school back in session, routines are shifting — and a freshly cleaned home makes the transition so much smoother.`,
+    body: `
+      <p style="margin:0 0 16px;color:#0F172A;font-size:15px;line-height:1.65;">Summer is officially over. The kids are back in school, schedules are tightening, and the last thing anyone needs is to spend their weekends cleaning. Let us handle it — so you can spend that time on what matters.</p>
+      <div style="background:#FDF7E0;border:1px solid #F2E19B;border-radius:12px;padding:20px 24px;margin:0 0 20px;text-align:center;">
+        <p style="margin:0 0 6px;color:#0F172A;font-size:18px;font-weight:700;font-family:Georgia,serif;">📚 Back-to-School Reset</p>
+        <p style="margin:0;color:#64748B;font-size:14px;">Book a recurring clean this August and lock in your regular schedule before slots fill up.</p>
+      </div>
+      <p style="margin:0 0 20px;color:#0F172A;font-size:15px;line-height:1.65;">Reclaim your weekends this school year. Call, text, or tap below to get started. Mahalo! 🌺</p>`,
+    ctaText: 'Set up recurring cleans',
+    ctaUrl: `https://${WEBSITE}`,
+  },
+
+  storm_season: {
+    defaultSubject: '🌧️ Storm season in Hawaii — protect your home',
+    preheader: 'Post-storm cleaning and mold prevention tips.',
+    heading: 'Storm season reminder 🌧️',
+    intro: (firstName) => `Aloha ${firstName}! Hurricane season is here in Hawaii (June–November), and we want to make sure your home is ready — before and after any storms.`,
+    body: `
+      <p style="margin:0 0 16px;color:#0F172A;font-size:15px;line-height:1.65;">Hawaii's tropical climate means post-storm moisture can lead to mold and mildew fast — especially in bathrooms, under sinks, and along window seals. A thorough post-storm clean removes debris, addresses moisture hotspots, and helps prevent long-term damage.</p>
+      <div style="background:#EFF9FC;border-radius:12px;padding:20px 24px;margin:0 0 20px;text-align:center;">
+        <p style="margin:0 0 6px;color:#0F172A;font-size:18px;font-weight:700;font-family:Georgia,serif;">🛡️ Storm prep & post-storm clean</p>
+        <p style="margin:0;color:#64748B;font-size:14px;">We offer priority post-storm cleans for Oahu and Maui — mention this email when you call.</p>
+      </div>
+      <p style="margin:0 0 20px;color:#0F172A;font-size:15px;line-height:1.65;">Stay safe out there. If you need us after a storm, we'll be here. Call, text, or tap below. Mahalo! 🌺</p>`,
+    ctaText: 'Schedule a post-storm clean',
+    ctaUrl: `https://${WEBSITE}`,
+  },
+
+  tourist_season: {
+    defaultSubject: '🌺 Tourist season is coming — Airbnb owners, are you ready?',
+    preheader: 'Peak season means peak demand. Get your property guest-ready.',
+    heading: 'Peak tourist season is coming 🌺',
+    intro: (firstName) => `Aloha ${firstName}! Hawaii's peak visitor season runs December through April, and if you're hosting on Airbnb, VRBO, or renting your property, now is the time to get it ready.`,
+    body: `
+      <p style="margin:0 0 16px;color:#0F172A;font-size:15px;line-height:1.65;">A spotless property means 5-star reviews, repeat bookings, and happier guests. We specialize in vacation rental turnovers across Oahu and Maui — between guests, for the season, or as a one-time deep clean before the rush.</p>
+      <div style="background:#FDF7E0;border:1px solid #F2E19B;border-radius:12px;padding:20px 24px;margin:0 0 20px;text-align:center;">
+        <p style="margin:0 0 6px;color:#0F172A;font-size:18px;font-weight:700;font-family:Georgia,serif;">🏠 Vacation rental special</p>
+        <p style="margin:0;color:#64748B;font-size:14px;">Book a pre-season deep clean + set up recurring turnover cleans for the season. Mention this email.</p>
+      </div>
+      <p style="margin:0 0 20px;color:#0F172A;font-size:15px;line-height:1.65;">Peak season slots fill up fast. Call, text, or tap below to lock in your dates. Mahalo! 🌺</p>`,
+    ctaText: 'Book pre-season cleaning',
+    ctaUrl: `https://${WEBSITE}`,
+  },
+
+  we_miss_you: {
+    defaultSubject: '🌺 It's been a while — we miss you',
+    preheader: 'We'd love to welcome you back.',
+    heading: 'We've been thinking about you 🌺',
+    intro: (firstName) => `Aloha ${firstName}! It's been a while since we've seen you, and we just wanted to reach out and say — we miss you.`,
+    body: `
+      <p style="margin:0 0 16px;color:#0F172A;font-size:15px;line-height:1.65;">Life gets busy. We get it. But whenever you're ready for a fresh, clean home again, we'll be right here — same quality, same care, same familiar faces.</p>
+      <div style="background:#EFF9FC;border-radius:12px;padding:20px 24px;margin:0 0 20px;text-align:center;">
+        <p style="margin:0 0 6px;color:#0F172A;font-size:18px;font-weight:700;font-family:Georgia,serif;">🎁 Welcome back offer</p>
+        <p style="margin:0;color:#64748B;font-size:14px;">Mention this email when you book and we'll take 15% off your first clean back.</p>
+      </div>
+      <p style="margin:0 0 20px;color:#0F172A;font-size:15px;line-height:1.65;">No pressure, no hard sell — just an open door whenever you're ready. We'd love to have you back. Mahalo! 🌺</p>`,
+    ctaText: 'Book my comeback clean',
+    ctaUrl: `https://${WEBSITE}`,
+  },
+
+  referral: {
+    defaultSubject: '🙌 Know someone who'd love a clean home? You'll both benefit',
+    preheader: 'Share Hawaii Natural Clean and earn a reward.',
+    heading: 'Share the aloha 🙌',
+    intro: (firstName) => `Aloha ${firstName}! If you've enjoyed having your home cleaned by us, chances are someone you know would love it too.`,
+    body: `
+      <p style="margin:0 0 16px;color:#0F172A;font-size:15px;line-height:1.65;">We've built our business almost entirely on referrals from people like you, and we're so grateful for your trust. If you know a friend, neighbor, or colleague who could use a great cleaning service, we'd love the introduction.</p>
+      <div style="background:#FDF7E0;border:1px solid #F2E19B;border-radius:12px;padding:20px 24px;margin:0 0 20px;text-align:center;">
+        <p style="margin:0 0 6px;color:#0F172A;font-size:18px;font-weight:700;font-family:Georgia,serif;">💛 Refer a friend, get $50 off</p>
+        <p style="margin:0;color:#64748B;font-size:14px;">When your referral books their first clean, you both get $50 off your next service.</p>
+      </div>
+      <p style="margin:0 0 20px;color:#0F172A;font-size:15px;line-height:1.65;">Just have them mention your name when they call or text. It's that simple. Mahalo for spreading the aloha! 🌺</p>`,
+    ctaText: 'Share with a friend',
+    ctaUrl: `https://${WEBSITE}`,
+  },
+
   christmas: {
     defaultSubject: '🎄 Mele Kalikimaka — gift yourself a clean home',
     preheader: 'The holidays are here. Let us help you celebrate.',

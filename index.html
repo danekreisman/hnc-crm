@@ -12856,7 +12856,6 @@ async function completeTaskById(id) {
 }
 
 async function deleteTaskById(id) {
-  if (!confirm('Delete this task?')) return;
   try {
     await fetch('/api/tasks', {
       method: 'POST',

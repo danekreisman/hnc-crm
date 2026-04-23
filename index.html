@@ -10748,7 +10748,7 @@ async function generateClientSummary(){
     var response = await fetch('/api/ai-summary', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt: prompt })
+      body: JSON.stringify({ prompt: prompt, clientPhone: cdata && cdata.phone || '' })
     });
     var data = await response.json();
     var text = data.summary || 'Could not generate summary.';
@@ -10876,7 +10876,7 @@ async function generateLeadSummary(){
     var response = await fetch('/api/ai-summary', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt: prompt })
+      body: JSON.stringify({ prompt: prompt, clientPhone: cdata && cdata.phone || '' })
     });
     var data = await response.json();
     thinkingEl.style.display = 'none';

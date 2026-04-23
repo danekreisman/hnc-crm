@@ -25,6 +25,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { fetchWithTimeout, TIMEOUTS } from './utils/with-timeout.js';
 import { logError } from './utils/error-logger.js';
+import { getOpenPhoneHistory } from './utils/openphone-history.js';
 
 const SYSTEM_PROMPT = `You are the messaging voice of Hawaii Natural Clean (HNC), a premium residential and commercial cleaning company serving Oahu and Maui.
 
@@ -126,32 +127,18 @@ export default async function handler(req, res) {
       }
     }
 
-    // Last call summary (if phone known)
-    let lastCall = null;
+    // Full conversation history from OpenPhone API (SMS + call summaries)
+    let openPhoneHistory = '';
     if (contactPhone) {
-      const digits = contactPhone.replace(/\D/g, '').slice(-10);
-      const { data: calls } = await db
-        .from('call_transcripts')
-        .select('summary, called_at, direction')
-        .ilike('phone', `%${digits}%`)
-        .not('summary', 'is', null)
-        .order('called_at', { ascending: false })
-        .limit(1);
-      if (calls && calls[0]) lastCall = calls[0];
+      openPhoneHistory = await getOpenPhoneHistory(contactPhone, {
+        apiKey: process.env.QUO_API_KEY,
+        maxSms: 200,
+        maxCalls: 25,
+      });
     }
-
-    // Last few SMS messages (if phone known)
-    let recentSms = [];
-    if (contactPhone) {
-      const digits = contactPhone.replace(/\D/g, '').slice(-10);
-      const { data: msgs } = await db
-        .from('messages')
-        .select('direction, body, created_at')
-        .ilike('contact_phone', `%${digits}%`)
-        .order('created_at', { ascending: false })
-        .limit(3);
-      if (msgs) recentSms = msgs.reverse(); // chronological
-    }
+    // Keep backward-compat vars so the rest of the function still works
+    const lastCall = null;
+    const recentSms = [];
 
     // ─── If we have no context at all, just return the template ─────────────
     if (!subject && !lastCall && recentSms.length === 0 && !bookingUrl && !businessPhone) {
@@ -171,17 +158,9 @@ export default async function handler(req, res) {
       if (subject.kind === 'lead' && subject.stage) contextLines.push(`Lead stage: ${subject.stage}`);
     }
 
-    if (lastCall && lastCall.summary) {
-      // Truncate summaries to avoid token bloat or accidental sensitive content dumps
-      const truncated = lastCall.summary.slice(0, 400);
-      contextLines.push(`Last call summary: ${truncated}`);
-    }
-
-    if (recentSms.length > 0) {
-      const smsLines = recentSms
-        .map(m => `${m.direction === 'inbound' ? 'Client' : 'Us'}: ${(m.body || '').slice(0, 200)}`)
-        .join('\n');
-      contextLines.push(`Recent SMS exchange:\n${smsLines}`);
+    // Full OpenPhone conversation history (SMS + call summaries)
+    if (openPhoneHistory) {
+      contextLines.push(`Conversation history (SMS + calls):\n${openPhoneHistory}`);
     }
 
     if (bookingUrl) contextLines.push(`Booking link (use verbatim): ${bookingUrl}`);

@@ -14,6 +14,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { fetchWithTimeout, TIMEOUTS } from './utils/with-timeout.js';
 import { logError } from './utils/error-logger.js';
+import { getOpenPhoneHistory } from './utils/openphone-history.js';
 
 const BASE_URL       = 'https://hnc-crm.vercel.app';
 const BUSINESS_NAME  = 'Hawaii Natural Clean';
@@ -86,18 +87,12 @@ export default async function handler(req, res) {
       const phone = client.phone.replace(/\D/g, '');
       const e164  = client.phone.startsWith('+') ? client.phone : `+1${phone}`;
 
-      // ── 1. Pull recent SMS history from Supabase (OpenPhone webhooks) ──
-      const { data: messages } = await db
-        .from('messages')
-        .select('body, direction, created_at')
-        .eq('client_id', clientId)
-        .order('created_at', { ascending: false })
-        .limit(20);
-
-      const history = (messages || [])
-        .reverse()
-        .map(m => `[${m.direction === 'inbound' ? 'Client' : 'HNC'}]: ${m.body}`)
-        .join('\n');
+      // ── 1. Pull full conversation history from OpenPhone API ─────────────
+      const history = await getOpenPhoneHistory(client.phone, {
+        apiKey: process.env.QUO_API_KEY,
+        maxSms: 200,
+        maxCalls: 25,
+      });
 
       // ── 2. Ask AI: is this customer satisfied? ─────────────────────────
       let satisfied = false;

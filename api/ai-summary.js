@@ -1,4 +1,5 @@
 import { fetchWithTimeout, TIMEOUTS } from './utils/with-timeout.js';
+import { getOpenPhoneHistory } from './utils/openphone-history.js';
 import { validateOrFail, SCHEMAS } from './utils/validate.js';
 import { logError } from './utils/error-logger.js';
 
@@ -9,12 +10,25 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const { prompt, clientId } = req.body;
+  const { prompt, clientId, clientPhone } = req.body;
 
   const invalid = validateOrFail(req.body, SCHEMAS.aiSummary);
   if (invalid) return res.status(400).json(invalid);
 
   try {
+    // Enrich the prompt with live OpenPhone conversation history
+    let enrichedPrompt = prompt;
+    if (clientPhone) {
+      const history = await getOpenPhoneHistory(clientPhone, {
+        apiKey: process.env.QUO_API_KEY,
+        maxSms: 200,
+        maxCalls: 25,
+      });
+      if (history) {
+        enrichedPrompt += '\n\nLive conversation history from OpenPhone:\n' + history;
+      }
+    }
+
     const response = await fetchWithTimeout(
       'https://api.anthropic.com/v1/messages',
       {
@@ -27,7 +41,7 @@ export default async function handler(req, res) {
         body: JSON.stringify({
           model: 'claude-haiku-4-5-20251001',
           max_tokens: 300,
-          messages: [{ role: 'user', content: prompt }]
+          messages: [{ role: 'user', content: enrichedPrompt }]
         })
       },
       TIMEOUTS.ANTHROPIC,

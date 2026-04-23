@@ -37,7 +37,7 @@ const HOLIDAY_TEMPLATES = {
       </div>
       <p style="margin:0 0 20px;color:#0F172A;font-size:15px;line-height:1.65;">We serve Oahu and Maui with the same care we'd give our own homes. Call, text, or tap below to get scheduled. Mahalo! 🌺</p>`,
     ctaText: 'Book spring cleaning',
-    ctaUrl: `https://${WEBSITE}`,
+    ctaUrl: 'tel:8084685356',
   },
 
   '4th_of_july': {
@@ -53,7 +53,7 @@ const HOLIDAY_TEMPLATES = {
       </div>
       <p style="margin:0 0 20px;color:#0F172A;font-size:15px;line-height:1.65;">Slots before the holiday fill up fast — call or text us at ${PHONE} or tap below to lock in your date. Mahalo! 🌺</p>`,
     ctaText: 'Reserve my slot',
-    ctaUrl: `https://${WEBSITE}`,
+    ctaUrl: 'tel:8084685356',
   },
 
   thanksgiving: {
@@ -69,7 +69,7 @@ const HOLIDAY_TEMPLATES = {
       </div>
       <p style="margin:0 0 20px;color:#0F172A;font-size:15px;line-height:1.65;">Slots go fast this time of year. Call, text, or tap below to get on the schedule. Mahalo for your continued trust — we're grateful for you! 🌺</p>`,
     ctaText: 'Schedule before Thanksgiving',
-    ctaUrl: `https://${WEBSITE}`,
+    ctaUrl: 'tel:8084685356',
   },
 
 
@@ -86,7 +86,7 @@ const HOLIDAY_TEMPLATES = {
       </div>
       <p style="margin:0 0 20px;color:#0F172A;font-size:15px;line-height:1.65;">Start the year the right way. Call, text, or tap below to schedule. Mahalo and Happy New Year! 🌺</p>`,
     ctaText: 'Start the year fresh',
-    ctaUrl: `https://${WEBSITE}`,
+    ctaUrl: 'tel:8084685356',
   },
 
   allergy_season: {
@@ -102,7 +102,7 @@ const HOLIDAY_TEMPLATES = {
       </div>
       <p style="margin:0 0 20px;color:#0F172A;font-size:15px;line-height:1.65;">Your family deserves clean air at home. Call, text, or tap below to schedule. Mahalo! 🌺</p>`,
     ctaText: 'Book an allergen deep clean',
-    ctaUrl: `https://${WEBSITE}`,
+    ctaUrl: 'tel:8084685356',
   },
 
   back_to_school: {
@@ -118,7 +118,7 @@ const HOLIDAY_TEMPLATES = {
       </div>
       <p style="margin:0 0 20px;color:#0F172A;font-size:15px;line-height:1.65;">Reclaim your weekends this school year. Call, text, or tap below to get started. Mahalo! 🌺</p>`,
     ctaText: 'Set up recurring cleans',
-    ctaUrl: `https://${WEBSITE}`,
+    ctaUrl: 'tel:8084685356',
   },
 
   storm_season: {
@@ -134,7 +134,7 @@ const HOLIDAY_TEMPLATES = {
       </div>
       <p style="margin:0 0 20px;color:#0F172A;font-size:15px;line-height:1.65;">Stay safe out there. If you need us after a storm, we'll be here. Call, text, or tap below. Mahalo! 🌺</p>`,
     ctaText: 'Schedule a post-storm clean',
-    ctaUrl: `https://${WEBSITE}`,
+    ctaUrl: 'tel:8084685356',
   },
 
   tourist_season: {
@@ -150,7 +150,7 @@ const HOLIDAY_TEMPLATES = {
       </div>
       <p style="margin:0 0 20px;color:#0F172A;font-size:15px;line-height:1.65;">Peak season slots fill up fast. Call, text, or tap below to lock in your dates. Mahalo! 🌺</p>`,
     ctaText: 'Book pre-season cleaning',
-    ctaUrl: `https://${WEBSITE}`,
+    ctaUrl: 'tel:8084685356',
   },
 
   we_miss_you: {
@@ -166,7 +166,7 @@ const HOLIDAY_TEMPLATES = {
       </div>
       <p style="margin:0 0 20px;color:#0F172A;font-size:15px;line-height:1.65;">No pressure, no hard sell — just an open door whenever you're ready. We'd love to have you back. Mahalo! 🌺</p>`,
     ctaText: 'Book my comeback clean',
-    ctaUrl: `https://${WEBSITE}`,
+    ctaUrl: 'tel:8084685356',
   },
 
   referral: {
@@ -182,7 +182,7 @@ const HOLIDAY_TEMPLATES = {
       </div>
       <p style="margin:0 0 20px;color:#0F172A;font-size:15px;line-height:1.65;">Just have them mention your name when they call or text. It's that simple. Mahalo for spreading the aloha! 🌺</p>`,
     ctaText: 'Share with a friend',
-    ctaUrl: `https://${WEBSITE}`,
+    ctaUrl: 'tel:8084685356',
   },
 
   christmas: {
@@ -198,7 +198,7 @@ const HOLIDAY_TEMPLATES = {
       </div>
       <p style="margin:0 0 20px;color:#0F172A;font-size:15px;line-height:1.65;">December fills up quickly across Oahu and Maui. Call, text, or tap below to get scheduled before slots are gone. Mahalo, and happy holidays! 🌺</p>`,
     ctaText: 'Book holiday cleaning',
-    ctaUrl: `https://${WEBSITE}`,
+    ctaUrl: 'tel:8084685356',
   },
 };
 

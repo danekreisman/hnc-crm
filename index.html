@@ -9672,7 +9672,7 @@ async function saveSettings() {
   showPaymentToast('Settings saved!', null, 'success');
 }
 
-function loadSettings() {
+async function loadSettings() {
   var savedTemplates = localStorage.getItem('hnc_email_templates');
   if(savedTemplates){
     try {

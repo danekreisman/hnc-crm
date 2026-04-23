@@ -1,6 +1,22 @@
 {
   "rewrites": [
     {
+      "source": "/contact",
+      "destination": "/lead-form.html"
+    },
+    {
+      "source": "/book",
+      "destination": "/book.html"
+    },
+    {
+      "source": "/portal",
+      "destination": "/portal.html"
+    },
+    {
+      "source": "/agree",
+      "destination": "/agree.html"
+    },
+    {
       "source": "/api/(.*)",
       "destination": "/api/$1"
     }

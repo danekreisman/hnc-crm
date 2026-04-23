@@ -25,17 +25,17 @@ export default async function handler(req, res) {
   );
 
   try {
-    const today = new Date().toISOString().split('T')[0];
     const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString();
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
 
-    // Find overdue invoices with client phone, not reminded in last 3 days
+    // Find unpaid invoices older than 7 days, not reminded in last 3 days
     const { data: invoices, error } = await db
       .from('invoices')
       .select(`
-        id, amount, due_date, status, last_reminder_at,
+        id, amount, created_at, status, last_reminder_at,
         clients ( id, name, phone )
       `)
-      .lt('due_date', today)
+      .lt('created_at', sevenDaysAgo)
       .not('status', 'in', '("paid","void","cancelled")')
       .or(`last_reminder_at.is.null,last_reminder_at.lt.${threeDaysAgo}`);
 
@@ -54,12 +54,10 @@ export default async function handler(req, res) {
       const firstName = (client.name || 'there').split(' ')[0];
       const phone = client.phone.replace(/\D/g, '');
       const e164  = client.phone.startsWith('+') ? client.phone : `+1${phone}`;
-      const amount = invoice.amount ? `$${Number(invoice.amount).toFixed(2)}` : 'your balance';
-      const dueDate = new Date(invoice.due_date + 'T12:00:00').toLocaleDateString('en-US', {
-        month: 'short', day: 'numeric'
-      });
+      const amount = invoice.total ? `$${Number(invoice.total).toFixed(2)}` : (invoice.amount ? `$${Number(invoice.amount).toFixed(2)}` : 'your balance');
+      const daysOut = Math.floor((Date.now() - new Date(invoice.created_at)) / (1000 * 60 * 60 * 24));
 
-      const message = `Aloha ${firstName}, this is a friendly reminder from ${BUSINESS_NAME}. Your invoice of ${amount} (due ${dueDate}) is past due. Please call or text us at ${BUSINESS_PHONE} to settle your balance. Mahalo 🌺`;
+      const message = `Aloha ${firstName}, this is a friendly reminder from ${BUSINESS_NAME}. You have an outstanding invoice of ${amount} that is ${daysOut} days past due. Please call or text us at ${BUSINESS_PHONE} to settle your balance. Mahalo 🌺`;
 
       try {
         const resp = await fetchWithTimeout(`${BASE_URL}/api/send-sms`, {

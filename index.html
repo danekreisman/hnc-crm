@@ -399,6 +399,7 @@ textarea{font-family:inherit;}
     <div class="nav-item" onclick="sv('reporting',this)"><svg class="nav-icon" viewBox="0 0 16 16" fill="none"><rect x="2" y="9" width="3" height="5" rx="1" fill="currentColor" opacity=".5"/><rect x="6.5" y="6" width="3" height="8" rx="1" fill="currentColor" opacity=".7"/><rect x="11" y="3" width="3" height="11" rx="1" fill="currentColor"/></svg>Reporting</div>
     <div class="nav-section">Automate</div>
     <div class="nav-item" onclick="sv('automations',this)"><svg class="nav-icon" viewBox="0 0 16 16" fill="none"><path d="M3 8a5 5 0 0 1 5-5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M13 8a5 5 0 0 1-5 5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M11 3l2 0 0 2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M5 13l-2 0 0-2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>Automations</div>
+    <div class="nav-item" onclick="sv('broadcasts',this)"><svg class="nav-icon" viewBox="0 0 16 16" fill="none"><path d="M2 5h12v7a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5z" stroke="currentColor" stroke-width="1.3"/><path d="M2 5l6-4 6 4" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M6 16V9h4v7" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>Broadcasts</div>
     <div class="nav-item" onclick="sv('payments',this)"><svg class="nav-icon" viewBox="0 0 16 16" fill="none"><rect x="1" y="3" width="14" height="10" rx="2" stroke="currentColor" stroke-width="1.3"/><path d="M1 7h14" stroke="currentColor" stroke-width="1.3"/><rect x="3" y="10" width="3" height="1.5" rx=".5" fill="currentColor" opacity=".6"/></svg>Payments</div>
     <div class="nav-section">Config</div>
     <div class="nav-item" onclick="sv('settings',this)"><svg class="nav-icon" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="2.5" stroke="currentColor" stroke-width="1.3"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2M3.05 3.05l1.41 1.41M11.54 11.54l1.41 1.41M3.05 12.95l1.41-1.41M11.54 4.46l1.41-1.41" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>Settings</div>
@@ -769,6 +770,100 @@ textarea{font-family:inherit;}
               <div id="auto-test-result" style="margin-top:10px;font-size:12px;display:none;"></div>
             </div>
 
+          </div>
+        </div>
+      </div>
+
+      <!-- BROADCASTS VIEW -->
+      <div id="view-broadcasts" class="vc">
+        <div class="metrics" style="grid-template-columns:repeat(3,minmax(0,1fr));">
+          <div class="metric"><div class="metric-label">Scheduled</div><div class="metric-value" id="bc-scheduled-count">0</div><div class="metric-sub">Upcoming sends</div></div>
+          <div class="metric"><div class="metric-label">Total sent</div><div class="metric-value" id="bc-sent-count">0</div><div class="metric-sub up">All time</div></div>
+          <div class="metric"><div class="metric-label">Drafts</div><div class="metric-value" id="bc-draft-count">0</div><div class="metric-sub">In progress</div></div>
+        </div>
+
+        <!-- Holiday calendar strip -->
+        <div style="background:#fff;border:1px solid var(--border);border-radius:14px;padding:20px 22px;margin-bottom:18px;">
+          <div class="section-title" style="margin:0 0 16px;">Upcoming holidays</div>
+          <div id="bc-holiday-strip" style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;"></div>
+        </div>
+
+        <!-- Broadcasts list -->
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+          <div class="section-title" style="margin:0;">All broadcasts</div>
+          <button class="btn btn-primary" onclick="openNewBroadcast()" style="font-size:12px;padding:6px 12px;">+ New broadcast</button>
+        </div>
+        <div id="bc-list"></div>
+      </div>
+
+      <!-- NEW BROADCAST MODAL -->
+      <div id="bc-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9000;align-items:center;justify-content:center;padding:16px;">
+        <div style="background:#fff;border-radius:16px;width:100%;max-width:580px;max-height:92vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.18);">
+          <div style="padding:20px 22px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">
+            <div>
+              <div style="font-size:16px;font-weight:700;" id="bc-modal-title">New broadcast</div>
+              <div style="font-size:12px;color:var(--text-muted);">Send a holiday email to your leads, clients, or both</div>
+            </div>
+            <button onclick="closeBroadcastModal()" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--text-muted);">×</button>
+          </div>
+          <div style="padding:22px;">
+            <!-- Template picker -->
+            <div style="margin-bottom:20px;">
+              <div style="font-size:13px;font-weight:600;margin-bottom:10px;">Holiday template</div>
+              <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;" id="bc-template-grid">
+                <div class="bc-tmpl-card" onclick="selectBcTemplate('easter')" data-key="easter" style="border:2px solid var(--border);border-radius:12px;padding:14px;cursor:pointer;transition:all .15s;">
+                  <div style="font-size:22px;margin-bottom:6px;">🌸</div>
+                  <div style="font-size:13px;font-weight:600;">Easter / Spring</div>
+                  <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Spring cleaning offer</div>
+                </div>
+                <div class="bc-tmpl-card" onclick="selectBcTemplate('4th_of_july')" data-key="4th_of_july" style="border:2px solid var(--border);border-radius:12px;padding:14px;cursor:pointer;transition:all .15s;">
+                  <div style="font-size:22px;margin-bottom:6px;">🎆</div>
+                  <div style="font-size:13px;font-weight:600;">4th of July</div>
+                  <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Pre-holiday guest ready</div>
+                </div>
+                <div class="bc-tmpl-card" onclick="selectBcTemplate('thanksgiving')" data-key="thanksgiving" style="border:2px solid var(--border);border-radius:12px;padding:14px;cursor:pointer;transition:all .15s;">
+                  <div style="font-size:22px;margin-bottom:6px;">🦃</div>
+                  <div style="font-size:13px;font-weight:600;">Thanksgiving</div>
+                  <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Holiday hosting prep</div>
+                </div>
+                <div class="bc-tmpl-card" onclick="selectBcTemplate('christmas')" data-key="christmas" style="border:2px solid var(--border);border-radius:12px;padding:14px;cursor:pointer;transition:all .15s;">
+                  <div style="font-size:22px;margin-bottom:6px;">🎄</div>
+                  <div style="font-size:13px;font-weight:600;">Christmas</div>
+                  <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Mele Kalikimaka</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Subject line -->
+            <div style="margin-bottom:16px;">
+              <label style="display:block;font-size:13px;font-weight:600;margin-bottom:6px;">Subject line</label>
+              <input id="bc-subject" type="text" placeholder="Choose a template above to auto-fill" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-size:14px;box-sizing:border-box;" />
+            </div>
+
+            <!-- Audience -->
+            <div style="margin-bottom:16px;">
+              <div style="font-size:13px;font-weight:600;margin-bottom:8px;">Send to</div>
+              <div style="display:flex;gap:8px;">
+                <button class="bc-aud-btn active" onclick="selectBcAudience('both',this)" style="flex:1;padding:9px;border:2px solid var(--brand-500);border-radius:8px;background:rgba(59,184,227,.08);font-size:13px;font-weight:600;cursor:pointer;color:var(--brand-700);">Leads + Clients</button>
+                <button class="bc-aud-btn" onclick="selectBcAudience('leads',this)" style="flex:1;padding:9px;border:2px solid var(--border);border-radius:8px;background:none;font-size:13px;cursor:pointer;">Leads only</button>
+                <button class="bc-aud-btn" onclick="selectBcAudience('clients',this)" style="flex:1;padding:9px;border:2px solid var(--border);border-radius:8px;background:none;font-size:13px;cursor:pointer;">Clients only</button>
+              </div>
+            </div>
+
+            <!-- Schedule -->
+            <div style="margin-bottom:22px;">
+              <label style="display:block;font-size:13px;font-weight:600;margin-bottom:6px;">Schedule for (optional — leave blank to save as draft)</label>
+              <input id="bc-schedule" type="datetime-local" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-size:14px;box-sizing:border-box;" />
+            </div>
+
+            <input type="hidden" id="bc-editing-id" value="" />
+            <input type="hidden" id="bc-selected-template" value="" />
+            <input type="hidden" id="bc-selected-audience" value="both" />
+
+            <div style="display:flex;gap:10px;">
+              <button onclick="saveBroadcast(false)" style="flex:1;padding:12px;border:2px solid var(--border);border-radius:10px;background:none;font-size:14px;font-weight:600;cursor:pointer;">Save draft</button>
+              <button onclick="saveBroadcast(true)" id="bc-send-btn" style="flex:1;padding:12px;background:var(--brand-500);color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;">Save &amp; send now</button>
+            </div>
           </div>
         </div>
       </div>
@@ -4924,8 +5019,8 @@ function sv(view,el){
   void target.offsetWidth;
   target.style.animation='';
   if(el)el.classList.add('active');
-  var titles={dashboard:'Dashboard',calendar:'Calendar',pipeline:'Pipeline',clients:'Clients',tasks:'VA Tasks',messaging:'Messaging',cleaners:'Cleaners',payroll:'Payroll',reporting:'Reporting',automations:'Automations',payments:'Payments',settings:'Settings',agent:'AI Agent'};
-  var ctas={dashboard:'+ New lead',calendar:'+ New appointment',pipeline:'+ New lead',clients:'+ Add client',tasks:'+ Add task',messaging:'+ New message',cleaners:'+ Add cleaner',payroll:'Log hours',reporting:'Export',automations:'+ New automation',payments:'+ New invoice',settings:'',agent:''};
+  var titles={dashboard:'Dashboard',calendar:'Calendar',pipeline:'Pipeline',clients:'Clients',tasks:'VA Tasks',messaging:'Messaging',cleaners:'Cleaners',payroll:'Payroll',reporting:'Reporting',automations:'Automations',broadcasts:'Broadcasts',payments:'Payments',settings:'Settings',agent:'AI Agent'};
+  var ctas={dashboard:'+ New lead',calendar:'+ New appointment',pipeline:'+ New lead',clients:'+ Add client',tasks:'+ Add task',messaging:'+ New message',cleaners:'+ Add cleaner',payroll:'Log hours',reporting:'Export',automations:'+ New automation',broadcasts:'+ New broadcast',payments:'+ New invoice',settings:'',agent:''};
   var secs={calendar:'',payroll:'Export',reporting:'Export',automations:'Filter',payments:'Filter',settings:''};
   document.getElementById('page-title').textContent=titles[view]||view;
   document.getElementById('top-cta').textContent=ctas[view]||'+ New';
@@ -4938,6 +5033,7 @@ function sv(view,el){
   document.getElementById('sec-btn').textContent=secs[view]||'Filter';
   if(view==='messaging')renderInbox();
   if(view==='automations')loadLeadAutomations();
+  if(view==='broadcasts')loadBroadcasts();
   if(view==='reporting'){ try{ repPopulateBucketDropdown(); }catch(e){} repRender(); }
   if(view==='settings'){loadSettings();};
   if(view==='payroll')refreshPayrollPeriods();
@@ -11769,6 +11865,276 @@ Your total will update automatically when you select a payment method.</textarea
   script.onerror = function(){ console.error('[HNC Maps] failed to load Maps JS'); };
   document.head.appendChild(script);
 })();
+</script>
+<script>
+// ── Broadcast holidays reference ─────────────────────────────────────────────
+var BC_HOLIDAYS = {
+  easter:       { label:'Easter / Spring',  emoji:'🌸', defaultSubject:'🌸 Spring is here — time for a fresh start',      month:3  },
+  '4th_of_july':{ label:'4th of July',      emoji:'🎆', defaultSubject:'🎆 4th of July is coming — is your home guest-ready?', month:6  },
+  thanksgiving: { label:'Thanksgiving',     emoji:'🦃', defaultSubject:'🦃 Thanksgiving is almost here — hosting?',         month:10 },
+  christmas:    { label:'Christmas',        emoji:'🎄', defaultSubject:'🎄 Mele Kalikimaka — gift yourself a clean home',   month:11 },
+};
+
+var bcCurrentAudience = 'both';
+
+function selectBcTemplate(key) {
+  document.getElementById('bc-selected-template').value = key;
+  var tpl = BC_HOLIDAYS[key];
+  if (tpl) document.getElementById('bc-subject').value = tpl.defaultSubject;
+  document.querySelectorAll('.bc-tmpl-card').forEach(function(c) {
+    var isSelected = c.dataset.key === key;
+    c.style.borderColor = isSelected ? 'var(--brand-500)' : 'var(--border)';
+    c.style.background  = isSelected ? 'rgba(59,184,227,.08)' : '';
+  });
+}
+
+function selectBcAudience(val, btn) {
+  bcCurrentAudience = val;
+  document.getElementById('bc-selected-audience').value = val;
+  document.querySelectorAll('.bc-aud-btn').forEach(function(b) {
+    b.style.borderColor = 'var(--border)';
+    b.style.background  = 'none';
+    b.style.color       = '';
+    b.style.fontWeight  = '';
+  });
+  btn.style.borderColor = 'var(--brand-500)';
+  btn.style.background  = 'rgba(59,184,227,.08)';
+  btn.style.color       = 'var(--brand-700)';
+  btn.style.fontWeight  = '600';
+}
+
+function openNewBroadcast(broadcastData) {
+  document.getElementById('bc-modal-title').textContent = broadcastData ? 'Edit broadcast' : 'New broadcast';
+  document.getElementById('bc-editing-id').value    = broadcastData ? broadcastData.id : '';
+  document.getElementById('bc-subject').value        = broadcastData ? broadcastData.subject : '';
+  document.getElementById('bc-schedule').value       = broadcastData && broadcastData.scheduled_for
+    ? broadcastData.scheduled_for.slice(0,16) : '';
+  document.getElementById('bc-selected-template').value = broadcastData ? broadcastData.holiday_key : '';
+  document.getElementById('bc-selected-audience').value = broadcastData ? broadcastData.audience : 'both';
+  bcCurrentAudience = broadcastData ? broadcastData.audience : 'both';
+
+  // Reset template cards
+  document.querySelectorAll('.bc-tmpl-card').forEach(function(c) {
+    var isSelected = broadcastData && c.dataset.key === broadcastData.holiday_key;
+    c.style.borderColor = isSelected ? 'var(--brand-500)' : 'var(--border)';
+    c.style.background  = isSelected ? 'rgba(59,184,227,.08)' : '';
+  });
+
+  // Reset audience buttons
+  document.querySelectorAll('.bc-aud-btn').forEach(function(b) {
+    var aud = b.textContent.trim();
+    var map = {'Leads + Clients':'both','Leads only':'leads','Clients only':'clients'};
+    var isActive = map[aud] === bcCurrentAudience;
+    b.style.borderColor = isActive ? 'var(--brand-500)' : 'var(--border)';
+    b.style.background  = isActive ? 'rgba(59,184,227,.08)' : 'none';
+    b.style.color       = isActive ? 'var(--brand-700)' : '';
+    b.style.fontWeight  = isActive ? '600' : '';
+  });
+
+  var overlay = document.getElementById('bc-overlay');
+  overlay.style.display = 'flex';
+}
+
+function closeBroadcastModal() {
+  document.getElementById('bc-overlay').style.display = 'none';
+}
+
+async function saveBroadcast(sendNow) {
+  var templateKey = document.getElementById('bc-selected-template').value;
+  var subject     = document.getElementById('bc-subject').value.trim();
+  var schedule    = document.getElementById('bc-schedule').value;
+  var editingId   = document.getElementById('bc-editing-id').value;
+  var audience    = document.getElementById('bc-selected-audience').value || 'both';
+
+  if (!templateKey) { alert('Please select a holiday template.'); return; }
+  if (!subject)     { alert('Please enter a subject line.'); return; }
+
+  var tpl = BC_HOLIDAYS[templateKey];
+  var payload = {
+    name:         tpl.label,
+    holiday:      templateKey,
+    holiday_key:  templateKey,
+    subject:      subject,
+    audience:     audience,
+    status:       sendNow ? 'scheduled' : 'draft',
+    scheduled_for: schedule ? new Date(schedule).toISOString() : null,
+  };
+
+  try {
+    var url  = window.SUPABASE_URL + '/rest/v1/broadcasts';
+    var method = 'POST';
+    if (editingId) { url += '?id=eq.' + editingId; method = 'PATCH'; }
+
+    var resp = await fetch(url, {
+      method: method,
+      headers: {
+        'apikey':        window.SUPABASE_ANON_KEY,
+        'Authorization': 'Bearer ' + window.SUPABASE_ANON_KEY,
+        'Content-Type':  'application/json',
+        'Prefer':        editingId ? 'return=representation' : 'return=representation',
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!resp.ok) throw new Error('Failed to save broadcast');
+    var rows = await resp.json();
+    var savedId = editingId || (rows && rows[0] && rows[0].id);
+
+    closeBroadcastModal();
+
+    if (sendNow && savedId) {
+      await sendBroadcastNow(savedId);
+    } else {
+      loadBroadcasts();
+    }
+  } catch(e) {
+    alert('Error saving broadcast: ' + e.message);
+  }
+}
+
+async function sendBroadcastNow(broadcastId) {
+  try {
+    var btn = document.querySelector('[onclick*="sendBroadcastNow(\''+broadcastId+'\'"]');
+    if (btn) { btn.textContent = 'Sending...'; btn.disabled = true; }
+
+    var resp = await fetch('/api/send-broadcast', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ broadcastId }),
+    });
+    var data = await resp.json();
+
+    if (data.success) {
+      showToast('Sent to ' + data.sent + ' recipients!');
+    } else {
+      showToast('Error: ' + (data.error || 'Send failed'), true);
+    }
+    loadBroadcasts();
+  } catch(e) {
+    showToast('Send failed: ' + e.message, true);
+    loadBroadcasts();
+  }
+}
+
+async function deleteBroadcast(id) {
+  if (!confirm('Delete this broadcast?')) return;
+  await fetch(window.SUPABASE_URL + '/rest/v1/broadcasts?id=eq.' + id, {
+    method: 'DELETE',
+    headers: { 'apikey': window.SUPABASE_ANON_KEY, 'Authorization': 'Bearer ' + window.SUPABASE_ANON_KEY },
+  });
+  loadBroadcasts();
+}
+
+async function loadBroadcasts() {
+  try {
+    var resp = await fetch(window.SUPABASE_URL + '/rest/v1/broadcasts?order=created_at.desc', {
+      headers: { 'apikey': window.SUPABASE_ANON_KEY, 'Authorization': 'Bearer ' + window.SUPABASE_ANON_KEY },
+    });
+    var broadcasts = await resp.json();
+
+    // Update metrics
+    var scheduled = broadcasts.filter(function(b){ return b.status==='scheduled'; }).length;
+    var sent      = broadcasts.filter(function(b){ return b.status==='sent'; }).length;
+    var drafts    = broadcasts.filter(function(b){ return b.status==='draft'; }).length;
+    document.getElementById('bc-scheduled-count').textContent = scheduled;
+    document.getElementById('bc-sent-count').textContent      = sent;
+    document.getElementById('bc-draft-count').textContent     = drafts;
+
+    // Render holiday strip
+    renderHolidayStrip();
+
+    // Render list
+    var list = document.getElementById('bc-list');
+    if (!broadcasts.length) {
+      list.innerHTML = '<div style="text-align:center;padding:48px 20px;color:var(--text-muted);font-size:14px;">No broadcasts yet. Create your first holiday email above.</div>';
+      return;
+    }
+
+    var statusColors = { draft:'#94a3b8', scheduled:'#f59e0b', sending:'var(--brand-500)', sent:'#22c55e', failed:'#ef4444' };
+    list.innerHTML = broadcasts.map(function(b) {
+      var tpl = BC_HOLIDAYS[b.holiday_key] || { emoji:'📧', label: b.name };
+      var statusColor = statusColors[b.status] || '#94a3b8';
+      var dateStr = b.sent_at
+        ? 'Sent ' + new Date(b.sent_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})
+        : b.scheduled_for
+        ? 'Scheduled ' + new Date(b.scheduled_for).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})
+        : 'Not scheduled';
+
+      return '<div style="background:#fff;border:1px solid var(--border);border-radius:12px;padding:16px 18px;margin-bottom:10px;display:flex;align-items:center;gap:14px;">'
+        + '<div style="font-size:28px;flex-shrink:0;">' + tpl.emoji + '</div>'
+        + '<div style="flex:1;min-width:0;">'
+        +   '<div style="display:flex;align-items:center;gap:8px;margin-bottom:3px;">'
+        +     '<div style="font-size:14px;font-weight:600;color:var(--text);">' + escHtml(b.subject) + '</div>'
+        +     '<span style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:999px;background:' + statusColor + '20;color:' + statusColor + ';">' + b.status + '</span>'
+        +   '</div>'
+        +   '<div style="font-size:12px;color:var(--text-muted);">' + tpl.label + ' · ' + (b.audience==='both'?'Leads + Clients':b.audience) + ' · ' + dateStr + '</div>'
+        +   (b.status==='sent' ? '<div style="font-size:12px;color:var(--text-muted);margin-top:2px;">Sent to ' + (b.sent_count||0) + ' / ' + (b.recipient_count||0) + ' recipients</div>' : '')
+        + '</div>'
+        + '<div style="display:flex;gap:6px;flex-shrink:0;">'
+        + (b.status==='draft' || b.status==='scheduled'
+          ? '<button onclick="sendBroadcastNow(\'' + b.id + '\')" style="padding:6px 12px;background:var(--brand-500);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;">Send now</button>'
+          + '<button onclick="openNewBroadcast(' + JSON.stringify(b).replace(/"/g,'\"') + ')" style="padding:6px 10px;border:1px solid var(--border);border-radius:8px;background:none;font-size:12px;cursor:pointer;">Edit</button>'
+          : '')
+        + '<button onclick="deleteBroadcast(\'' + b.id + '\')" style="padding:6px 10px;border:1px solid var(--border);border-radius:8px;background:none;font-size:12px;cursor:pointer;color:var(--text-muted);">Delete</button>'
+        + '</div>'
+        + '</div>';
+    }).join('');
+
+  } catch(e) {
+    console.error('loadBroadcasts error:', e);
+  }
+}
+
+function renderHolidayStrip() {
+  var now = new Date();
+  var year = now.getFullYear();
+  var strip = document.getElementById('bc-holiday-strip');
+  if (!strip) return;
+
+  var holidays = [
+    { key:'easter',        emoji:'🌸', label:'Easter',     month:3,  day:20 },
+    { key:'4th_of_july',   emoji:'🎆', label:'4th of July', month:6,  day:4  },
+    { key:'thanksgiving',  emoji:'🦃', label:'Thanksgiving',month:10, day:27 },
+    { key:'christmas',     emoji:'🎄', label:'Christmas',  month:11, day:25 },
+  ];
+
+  strip.innerHTML = holidays.map(function(h) {
+    var hDate = new Date(year, h.month, h.day);
+    if (hDate < now) hDate = new Date(year + 1, h.month, h.day);
+    var diff = Math.round((hDate - now) / (1000 * 60 * 60 * 24));
+    var sendBy = new Date(hDate);
+    sendBy.setDate(sendBy.getDate() - 30);
+    var shouldSend = sendBy <= now && hDate > now;
+
+    return '<div style="border:1px solid var(--border);border-radius:12px;padding:14px;text-align:center;' + (shouldSend ? 'border-color:var(--brand-500);background:rgba(59,184,227,.05);' : '') + '">'
+      + '<div style="font-size:24px;margin-bottom:6px;">' + h.emoji + '</div>'
+      + '<div style="font-size:12px;font-weight:600;margin-bottom:4px;">' + h.label + '</div>'
+      + '<div style="font-size:11px;color:var(--text-muted);margin-bottom:10px;">' + diff + ' days away</div>'
+      + (shouldSend
+        ? '<button onclick="openNewBroadcastForHoliday(\'' + h.key + '\')" style="width:100%;padding:6px;background:var(--brand-500);color:#fff;border:none;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;">Schedule now</button>'
+        : '<div style="font-size:10px;color:var(--text-muted);">Send ~' + new Date(sendBy).toLocaleDateString('en-US',{month:'short',day:'numeric'}) + '</div>'
+      )
+      + '</div>';
+  }).join('');
+}
+
+function openNewBroadcastForHoliday(key) {
+  openNewBroadcast();
+  setTimeout(function(){ selectBcTemplate(key); }, 50);
+}
+
+function escHtml(str) {
+  if (!str) return '';
+  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function showToast(msg, isError) {
+  var t = document.createElement('div');
+  t.textContent = msg;
+  t.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:'+(isError?'#ef4444':'#22c55e')+';color:#fff;padding:10px 20px;border-radius:999px;font-size:13px;font-weight:600;z-index:99999;box-shadow:0 4px 16px rgba(0,0,0,.2);';
+  document.body.appendChild(t);
+  setTimeout(function(){ t.remove(); }, 3500);
+}
 </script>
   <script src="/gcal-sync.js?v=1"></script>
 <script>document.addEventListener('click',function(e){var nav=e.target.closest('.nav-item');if(nav){var crm=document.querySelector('.crm');if(crm)crm.classList.remove('nav-open');}var cell=e.target.closest('.cal-day');if(cell&&!e.target.closest('.appt')&&window.setCalView&&typeof window.curDay!=='undefined'){var n=cell.querySelector('.dn2');if(!n)return;var day=parseInt(n.textContent,10);if(!day)return;var tm=window.curMonth,ty=window.curYear;if(cell.classList.contains('om')){if(day>15){tm--;if(tm<1){tm=12;ty--;}}else{tm++;if(tm>12){tm=1;ty++;}}}window.curDay=day;window.curMonth=tm;window.curYear=ty;var b=document.getElementById('btn-day');if(b)window.setCalView('day',b);}},true);function scrollActivePayrollPillIntoView(){var c=document.getElementById('payroll-period-buttons');if(!c)return;var a=c.querySelector('.pbtn.active')||c.querySelector('.pbtn[style*="background"]')||c.querySelector('.pbtn:not(.pbtn)');if(a){c.scrollLeft=Math.max(0,a.offsetLeft-16);}}var _payrollObs=new MutationObserver(function(){scrollActivePayrollPillIntoView();});var _payrollContainer=document.getElementById('payroll-period-buttons');if(_payrollContainer){_payrollObs.observe(_payrollContainer,{childList:true,subtree:true,attributes:true,attributeFilter:['class','style']});_payrollContainer.addEventListener('click',function(){setTimeout(scrollActivePayrollPillIntoView,50);});}setTimeout(scrollActivePayrollPillIntoView,500);setTimeout(scrollActivePayrollPillIntoView,1500);</script>

@@ -1,6 +1,172 @@
 import { fetchWithTimeout, TIMEOUTS } from './utils/with-timeout.js';
 import { logError } from './utils/error-logger.js';
 
+/**
+ * Branded Email Shell for Hawaii Natural Clean
+ *
+ * Every email uses this shell so the look is consistent across all templates.
+ * Brand colors:
+ *   Primary blue:    #3BB8E3
+ *   Mid blue:        #59C7E2
+ *   Light blue:      #79D3E1
+ *   Pale blue tint:  #A5E6E9
+ *   Accent gold:     #F2E19B
+ *   Text dark:       #0F172A
+ *   Text muted:      #64748B
+ *   Border soft:     #E2E8F0
+ *   Background:      #FFFFFF  (white — the main brand color)
+ */
+
+const BRAND = {
+  primary:   '#3BB8E3',
+  mid:       '#59C7E2',
+  light:     '#79D3E1',
+  pale:      '#A5E6E9',
+  gold:      '#F2E19B',
+  text:      '#0F172A',
+  muted:     '#64748B',
+  border:    '#E2E8F0',
+  tintBlue:  '#EFF9FC',  // very subtle blue tint for info boxes
+  tintGold:  '#FDF7E0',  // very subtle gold tint for offer boxes
+};
+
+const LOGO_URL     = 'https://hnc-crm.vercel.app/hnc-logo.png';
+const BUSINESS     = 'Hawaii Natural Clean';
+const PHONE        = '(808) 468-5356';
+const WEBSITE      = 'hawaiinaturalclean.com';
+const REGION       = 'Oahu & Maui, Hawaii';
+
+/**
+ * Branded email shell — wraps any content in the HNC visual identity.
+ *
+ * @param {object} opts
+ * @param {string} opts.preheader  - Hidden preview text (first line in inbox previews)
+ * @param {string} opts.heading    - Main heading shown in the body
+ * @param {string} opts.intro      - Optional intro paragraph under the heading
+ * @param {string} opts.bodyHtml   - Core content (HTML allowed)
+ * @param {string} opts.ctaText    - Optional CTA button text
+ * @param {string} opts.ctaUrl     - Optional CTA button URL
+ * @param {string} opts.footnote   - Optional small note above the footer
+ */
+function renderBrandedEmail({ preheader = '', heading = '', intro = '', bodyHtml = '', ctaText = '', ctaUrl = '', footnote = '' }) {
+  const ctaBlock = (ctaText && ctaUrl) ? `
+    <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:28px 0;">
+      <tr><td align="center">
+        <a href="${ctaUrl}" style="display:inline-block;background:${BRAND.primary};color:#ffffff;text-decoration:none;font-weight:600;font-size:15px;padding:14px 32px;border-radius:999px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;letter-spacing:.01em;">${ctaText}</a>
+      </td></tr>
+    </table>` : '';
+
+  const footnoteBlock = footnote ? `
+    <p style="margin:28px 0 0;padding:16px;background:${BRAND.tintBlue};border-radius:10px;color:${BRAND.muted};font-size:13px;line-height:1.55;">${footnote}</p>` : '';
+
+  const introBlock = intro ? `
+    <p style="margin:0 0 20px;color:${BRAND.muted};font-size:15px;line-height:1.6;">${intro}</p>` : '';
+
+  const headingBlock = heading ? `
+    <h1 style="margin:0 0 12px;color:${BRAND.text};font-size:24px;font-weight:700;line-height:1.25;letter-spacing:-0.01em;font-family:Georgia,'Times New Roman',serif;">${heading}</h1>` : '';
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="x-apple-disable-message-reformatting">
+  <title>${BUSINESS}</title>
+  <style>
+    @media (max-width:600px) {
+      .hnc-container { width:100% !important; padding:24px 16px !important; }
+      .hnc-card { padding:28px 20px !important; }
+      .hnc-heading { font-size:22px !important; }
+    }
+  </style>
+</head>
+<body style="margin:0;padding:0;background:#FFFFFF;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased;">
+  <!-- Preheader (hidden in body, shown in inbox preview) -->
+  <div style="display:none;max-height:0;overflow:hidden;font-size:1px;line-height:1px;color:#FFFFFF;opacity:0;">${preheader}</div>
+
+  <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background:#FFFFFF;">
+    <tr>
+      <td align="center" style="padding:0;">
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" class="hnc-container" style="width:600px;max-width:600px;padding:40px 32px;">
+
+          <!-- Logo header -->
+          <tr>
+            <td align="center" style="padding:8px 0 20px;">
+              <img src="${LOGO_URL}" alt="${BUSINESS}" width="180" style="display:block;height:auto;max-width:180px;border:0;">
+            </td>
+          </tr>
+
+          <!-- Accent rule -->
+          <tr>
+            <td align="center" style="padding:0 0 32px;">
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0">
+                <tr>
+                  <td style="height:3px;width:48px;background:${BRAND.primary};border-radius:2px;line-height:3px;font-size:1px;">&nbsp;</td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Content card -->
+          <tr>
+            <td class="hnc-card" style="padding:0;">
+              ${headingBlock}
+              ${introBlock}
+              ${bodyHtml}
+              ${ctaBlock}
+              ${footnoteBlock}
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="padding:48px 0 0;text-align:center;border-top:1px solid ${BRAND.border};margin-top:48px;">
+              <div style="padding-top:24px;">
+                <p style="margin:0 0 6px;color:${BRAND.text};font-size:14px;font-weight:600;font-family:Georgia,serif;letter-spacing:.02em;">${BUSINESS}</p>
+                <p style="margin:0 0 4px;color:${BRAND.muted};font-size:12px;">${REGION}</p>
+                <p style="margin:0;color:${BRAND.muted};font-size:12px;">
+                  <a href="tel:${PHONE.replace(/\D/g, '')}" style="color:${BRAND.primary};text-decoration:none;">${PHONE}</a>
+                  &nbsp;·&nbsp;
+                  <a href="https://${WEBSITE}" style="color:${BRAND.primary};text-decoration:none;">${WEBSITE}</a>
+                </p>
+              </div>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+}
+
+// ─── Helper: build a two-column detail row (label + value) ─────────────────────
+function detailRow(label, value) {
+  return `<tr>
+    <td style="padding:10px 0;color:${BRAND.muted};font-size:14px;vertical-align:top;width:40%;">${label}</td>
+    <td style="padding:10px 0;color:${BRAND.text};font-size:14px;font-weight:500;text-align:right;">${value}</td>
+  </tr>`;
+}
+
+// ─── Helper: card container with optional title ────────────────────────────────
+function card(title, innerHtml) {
+  const titleBlock = title ? `<div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:${BRAND.muted};margin-bottom:14px;">${title}</div>` : '';
+  return `<div style="background:#FFFFFF;border:1px solid ${BRAND.border};border-radius:14px;padding:24px;margin:0 0 20px;">
+    ${titleBlock}
+    ${innerHtml}
+  </div>`;
+}
+
+// ─── Helper: offer / highlight box ─────────────────────────────────────────────
+function offerBox(heading, body) {
+  return `<div style="background:${BRAND.tintGold};border:1px solid ${BRAND.gold};border-radius:12px;padding:20px 24px;margin:0 0 20px;text-align:center;">
+    <p style="margin:0 0 6px;color:${BRAND.text};font-size:18px;font-weight:700;font-family:Georgia,serif;">${heading}</p>
+    <p style="margin:0;color:${BRAND.muted};font-size:13px;">${body}</p>
+  </div>`;
+}
+
+// ─── Main handler ──────────────────────────────────────────────────────────────
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -8,187 +174,225 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
+  let to, subject, type;
   try {
     const RESEND_API_KEY = process.env.RESEND_API_KEY;
-    const FROM_EMAIL = 'Hawaii Natural Clean <dane@hawaiinaturalclean.com>';
+    const FROM_EMAIL = `${BUSINESS} <dane@hawaiinaturalclean.com>`;
 
+    ({ to, subject, type } = req.body);
     const {
-      to,
-      subject,
-      type,
-      clientName,
-      amount,
-      service,
-      date,
-      time,
-      cleaner,
-      invoiceUrl,
-      terms,
-      notes
+      clientName, amount, service, date, time, cleaner,
+      invoiceUrl, terms, notes,
     } = req.body;
 
     if (!to || !subject) {
       return res.status(400).json({ success: false, error: 'to and subject are required' });
     }
 
-    // Build HTML based on email type
+    const firstName = (clientName || '').split(' ')[0] || 'there';
     let html = '';
 
+    // ─── INVOICE ─────────────────────────────────────────────────────────────
     if (type === 'invoice') {
-      html = `
-        <div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:32px 24px;color:#1a1a1a;">
-          <img src="https://hawaiinaturalclean.com/logo.png" alt="Hawaii Natural Clean" style="height:48px;margin-bottom:24px;" onerror="this.style.display='none'">
-          <h2 style="font-size:22px;font-weight:700;margin-bottom:8px;">Invoice from Hawaii Natural Clean</h2>
-          <p style="color:#666;margin-bottom:24px;">Hi ${clientName}, here is your invoice for recent cleaning services.</p>
-          
-          <div style="background:#f9f9f7;border-radius:12px;padding:20px;margin-bottom:24px;">
-            <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
-              <span style="color:#666;">Service</span><span style="font-weight:600;">${service || 'Cleaning service'}</span>
-            </div>
-            <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
-              <span style="color:#666;">Date</span><span>${date || ''}</span>
-            </div>
-            <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
-              <span style="color:#666;">Terms</span><span>${terms || 'Due now'}</span>
-            </div>
-            <div style="display:flex;justify-content:space-between;padding-top:12px;border-top:1px solid #e0e0dd;margin-top:8px;">
-              <span style="font-weight:700;font-size:16px;">Total</span>
-              <span style="font-weight:700;font-size:16px;color:#3BB8E3;">${amount}</span>
-            </div>
-          </div>
+      const detailTable = `<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+        ${detailRow('Service',  service || 'Cleaning service')}
+        ${detailRow('Date',     date || '')}
+        ${detailRow('Terms',    terms || 'Due now')}
+        <tr><td colspan="2" style="padding:8px 0;border-top:1px solid ${BRAND.border};"></td></tr>
+        <tr>
+          <td style="padding:10px 0;font-size:16px;font-weight:700;color:${BRAND.text};">Total</td>
+          <td style="padding:10px 0;font-size:20px;font-weight:800;color:${BRAND.primary};text-align:right;font-family:Georgia,serif;">${amount || ''}</td>
+        </tr>
+      </table>`;
 
-          <div style="background:#eaf7fb;border:1px solid #79D3E1;border-radius:10px;padding:16px;margin-bottom:24px;">
-            <p style="font-weight:600;color:#16758F;margin:0 0 8px;">Payment options:</p>
-            <p style="color:#16758F;margin:0;font-size:14px;">✓ ACH bank transfer — <strong>FREE</strong> (3-5 business days)<br>✓ Credit/debit card — <strong>3% processing fee added</strong></p>
-          </div>
+      html = renderBrandedEmail({
+        preheader: `Your invoice for ${service || 'cleaning services'} from ${BUSINESS}`,
+        heading: 'Your invoice is ready',
+        intro: `Aloha ${firstName} — here's your invoice for recent cleaning services. Mahalo for choosing us!`,
+        bodyHtml:
+          card('Invoice details', detailTable) +
+          `<div style="background:${BRAND.tintBlue};border-radius:10px;padding:16px 18px;margin:0 0 20px;">
+            <p style="margin:0 0 6px;color:${BRAND.text};font-size:13px;font-weight:600;">Payment options</p>
+            <p style="margin:0;color:${BRAND.muted};font-size:13px;line-height:1.6;">
+              ✓ ACH bank transfer — <strong style="color:${BRAND.text};">free</strong> (3–5 business days)<br>
+              ✓ Credit or debit card — 3% processing fee applied
+            </p>
+          </div>` +
+          (notes ? `<p style="margin:0 0 20px;color:${BRAND.muted};font-size:14px;line-height:1.6;">${notes}</p>` : ''),
+        ctaText:   invoiceUrl ? 'View & pay invoice' : '',
+        ctaUrl:    invoiceUrl || '',
+        footnote:  `Questions? Reply to this email or call <a href="tel:${PHONE.replace(/\D/g,'')}" style="color:${BRAND.primary};text-decoration:none;">${PHONE}</a>.`,
+      });
+    }
 
-          ${invoiceUrl ? `<a href="${invoiceUrl}" style="display:block;background:#3BB8E3;color:#fff;text-align:center;padding:14px 24px;border-radius:10px;text-decoration:none;font-weight:600;font-size:16px;margin-bottom:24px;">View & Pay Invoice →</a>` : ''}
-          
-          ${notes ? `<p style="color:#666;font-size:14px;">${notes}</p>` : ''}
-          
-          <p style="color:#999;font-size:12px;margin-top:32px;padding-top:16px;border-top:1px solid #e8e8e5;">Hawaii Natural Clean · Oahu & Maui, Hawaii · hawaiinaturalclean.com</p>
-        </div>
-      `;
-    } else if (type === 'reminder') {
-      html = `
-        <div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:32px 24px;color:#1a1a1a;">
-          <h2 style="font-size:22px;font-weight:700;margin-bottom:8px;">Appointment Reminder</h2>
-          <p style="color:#666;margin-bottom:24px;">Hi ${clientName}, just a friendly reminder about your upcoming cleaning!</p>
-          
-          <div style="background:#f9f9f7;border-radius:12px;padding:20px;margin-bottom:24px;">
-            <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
-              <span style="color:#666;">Service</span><span style="font-weight:600;">${service || 'Cleaning service'}</span>
-            </div>
-            <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
-              <span style="color:#666;">Date</span><span style="font-weight:600;">${date || ''}</span>
-            </div>
-            <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
-              <span style="color:#666;">Time</span><span style="font-weight:600;">${time || ''}</span>
-            </div>
-            <div style="display:flex;justify-content:space-between;">
-              <span style="color:#666;">Cleaner</span><span>${cleaner || 'Your Hawaii Natural Clean team'}</span>
-            </div>
-          </div>
+    // ─── APPOINTMENT REMINDER ───────────────────────────────────────────────
+    else if (type === 'reminder') {
+      const detailTable = `<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+        ${detailRow('Service', service || 'Cleaning')}
+        ${detailRow('Date',    date || '')}
+        ${detailRow('Time',    time || '')}
+        ${detailRow('Cleaner', cleaner || 'Your HNC team')}
+      </table>`;
 
-          <p style="color:#666;font-size:14px;">Questions? Reply to this email or text us at (808) 468-5356.</p>
-          <p style="color:#999;font-size:12px;margin-top:32px;padding-top:16px;border-top:1px solid #e8e8e5;">Hawaii Natural Clean · Oahu & Maui, Hawaii · hawaiinaturalclean.com</p>
-        </div>
-      `;
-    } else if (type === 'thankyou') {
-      html = `
-        <div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:32px 24px;color:#1a1a1a;">
-          <h2 style="font-size:22px;font-weight:700;margin-bottom:8px;">Thank you, ${clientName}! 🌺</h2>
-          <p style="color:#666;margin-bottom:24px;">Your home has been cleaned and we hope everything looks great!</p>
-          <p style="color:#666;margin-bottom:24px;">If you have a moment, we would really appreciate a Google review — it helps us grow and serve more families in Hawaii.</p>
-          <a href="https://g.page/r/hawaiinaturalclean/review" style="display:block;background:#3BB8E3;color:#fff;text-align:center;padding:14px 24px;border-radius:10px;text-decoration:none;font-weight:600;font-size:16px;margin-bottom:24px;">Leave a Google Review →</a>
-          <p style="color:#666;font-size:14px;">See you next time! — The Hawaii Natural Clean Team</p>
-          <p style="color:#999;font-size:12px;margin-top:32px;padding-top:16px;border-top:1px solid #e8e8e5;">Hawaii Natural Clean · Oahu & Maui, Hawaii · hawaiinaturalclean.com</p>
-        </div>
-      `;
-    } else if (type === 'quote') {
+      html = renderBrandedEmail({
+        preheader: `Reminder: your cleaning is coming up`,
+        heading: 'Your appointment is coming up',
+        intro: `Aloha ${firstName} — just a friendly reminder about your upcoming cleaning.`,
+        bodyHtml:
+          card('Appointment details', detailTable) +
+          `<p style="margin:0 0 20px;color:${BRAND.muted};font-size:14px;line-height:1.65;">A few things that help us do our best work: please tidy clutter from surfaces, do or put away dishes, and secure any pets before we arrive.</p>`,
+        footnote: `Need to reschedule? Reply here or text us at <a href="tel:${PHONE.replace(/\D/g,'')}" style="color:${BRAND.primary};text-decoration:none;">${PHONE}</a>.`,
+      });
+    }
+
+    // ─── JOB COMPLETE / THANK YOU + REVIEW ──────────────────────────────────
+    else if (type === 'thankyou') {
+      html = renderBrandedEmail({
+        preheader: `How did we do, ${firstName}?`,
+        heading: `Mahalo, ${firstName}! 🌺`,
+        intro: `Your home has been freshly cleaned. We hope it feels wonderful to come home to.`,
+        bodyHtml:
+          `<p style="margin:0 0 24px;color:${BRAND.text};font-size:15px;line-height:1.65;">If you have a moment, we'd be so grateful for a quick Google review. It means the world to a local Hawaii business and helps us serve more families across the islands.</p>`,
+        ctaText: 'Leave a Google review',
+        ctaUrl:  'https://g.page/r/hawaiinaturalclean/review',
+        footnote: `Any feedback — good or otherwise — reply here and Dane will read it personally.`,
+      });
+    }
+
+    // ─── PAYMENT RECEIPT ────────────────────────────────────────────────────
+    else if (type === 'receipt') {
+      const detailTable = `<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+        ${detailRow('Service', service || 'Cleaning')}
+        ${detailRow('Date',    date || '')}
+        <tr><td colspan="2" style="padding:8px 0;border-top:1px solid ${BRAND.border};"></td></tr>
+        <tr>
+          <td style="padding:10px 0;font-size:16px;font-weight:700;color:${BRAND.text};">Paid</td>
+          <td style="padding:10px 0;font-size:20px;font-weight:800;color:${BRAND.primary};text-align:right;font-family:Georgia,serif;">${amount || ''}</td>
+        </tr>
+      </table>`;
+
+      html = renderBrandedEmail({
+        preheader: `Payment received — mahalo!`,
+        heading: 'Payment received',
+        intro: `Aloha ${firstName} — we've received your payment. Mahalo!`,
+        bodyHtml: card('Receipt', detailTable),
+        footnote: `See you at your next clean. Any questions, just reply here.`,
+      });
+    }
+
+    // ─── REACTIVATION / WIN-BACK ────────────────────────────────────────────
+    else if (type === 'reactivation') {
+      html = renderBrandedEmail({
+        preheader: `We miss you — here's a little something`,
+        heading: `We'd love to see you again`,
+        intro: `Aloha ${firstName} — it's been a while, and we wanted to check in.`,
+        bodyHtml:
+          offerBox('10% off your next clean', 'One-time offer · reply to book') +
+          `<p style="margin:0 0 20px;color:${BRAND.muted};font-size:14px;line-height:1.65;">Homes change, schedules shift, and life happens. Whenever you're ready for a refresh, we're here.</p>`,
+        ctaText: 'Book my next clean',
+        ctaUrl:  `https://${WEBSITE}`,
+        footnote: `Or simply reply to this email and we'll take care of the rest. Mahalo!`,
+      });
+    }
+
+    // ─── QUOTE ──────────────────────────────────────────────────────────────
+    else if (type === 'quote') {
       const { quoteData, frequency, bookingUrl, bookingToken, customIntro } = req.body;
       const q = quoteData || {};
       const bk = q.breakdown || {};
-      const introText = customIntro || `Hi ${clientName}, thanks for reaching out! Here's your personalized quote from Hawaii Natural Clean.`;
 
-      // Build breakdown rows
-      const breakdownRows = [];
-      if (bk.bedrooms)  breakdownRows.push(`<tr><td style="color:#666;padding:6px 0;">${bk.bedrooms.tier}</td><td style="text-align:right;font-weight:500;">$${Number(bk.bedrooms.price).toFixed(2)}</td></tr>`);
-      if (bk.bathrooms) breakdownRows.push(`<tr><td style="color:#666;padding:6px 0;">${bk.bathrooms.tier}</td><td style="text-align:right;font-weight:500;">$${Number(bk.bathrooms.price).toFixed(2)}</td></tr>`);
-      if (bk.sqft)      breakdownRows.push(`<tr><td style="color:#666;padding:6px 0;">${bk.sqft.tier}</td><td style="text-align:right;font-weight:500;">$${Number(bk.sqft.price).toFixed(2)}</td></tr>`);
-      if (bk.condition && bk.condition.surcharge > 0) breakdownRows.push(`<tr><td style="color:#666;padding:6px 0;">Condition surcharge (${bk.condition.tier})</td><td style="text-align:right;font-weight:500;">+$${Number(bk.condition.surcharge).toFixed(2)}</td></tr>`);
+      // Quote summary table
+      const summaryRows = [];
+      summaryRows.push(detailRow('Service', service || 'Cleaning'));
+      if (frequency)         summaryRows.push(detailRow('Frequency', frequency));
+      if (q.duration_minutes) summaryRows.push(detailRow('Est. duration', `${q.duration_minutes} min`));
+      const summaryTable = `<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">${summaryRows.join('')}</table>`;
 
-      const discountRow = q.discount_pct > 0
-        ? `<tr><td style="color:#1F9EC6;padding:6px 0;">${frequency || 'Frequency'} discount (${q.discount_pct}% off)</td><td style="text-align:right;color:#1F9EC6;font-weight:500;">−$${Number(q.discount).toFixed(2)}</td></tr>`
-        : '';
+      // Price breakdown table
+      const priceRows = [];
+      if (bk.bedrooms)  priceRows.push(detailRow(bk.bedrooms.tier,  `$${Number(bk.bedrooms.price).toFixed(2)}`));
+      if (bk.bathrooms) priceRows.push(detailRow(bk.bathrooms.tier, `$${Number(bk.bathrooms.price).toFixed(2)}`));
+      if (bk.sqft)      priceRows.push(detailRow(bk.sqft.tier,      `$${Number(bk.sqft.price).toFixed(2)}`));
+      if (bk.condition && bk.condition.surcharge > 0) {
+        priceRows.push(detailRow(`Condition surcharge (${bk.condition.tier})`, `+$${Number(bk.condition.surcharge).toFixed(2)}`));
+      }
+      if (q.subtotal !== q.total) {
+        priceRows.push(`<tr><td colspan="2" style="padding:4px 0;border-top:1px solid ${BRAND.border};"></td></tr>`);
+        priceRows.push(detailRow('Subtotal', `$${Number(q.subtotal).toFixed(2)}`));
+      }
+      if (q.discount_pct > 0) {
+        priceRows.push(`<tr>
+          <td style="padding:10px 0;color:${BRAND.primary};font-size:14px;font-weight:500;">${frequency || 'Frequency'} discount (${q.discount_pct}% off)</td>
+          <td style="padding:10px 0;color:${BRAND.primary};font-size:14px;font-weight:600;text-align:right;">−$${Number(q.discount).toFixed(2)}</td>
+        </tr>`);
+      }
+      priceRows.push(`<tr><td colspan="2" style="padding:8px 0;border-top:2px solid ${BRAND.text};"></td></tr>`);
+      priceRows.push(`<tr>
+        <td style="padding:10px 0;font-size:18px;font-weight:700;color:${BRAND.text};">Total</td>
+        <td style="padding:10px 0;font-size:24px;font-weight:800;color:${BRAND.primary};text-align:right;font-family:Georgia,serif;">$${Number(q.total).toFixed(2)}</td>
+      </tr>`);
+      const priceTable = `<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">${priceRows.join('')}</table>`;
 
       const finalBookUrl = bookingToken
         ? `https://hnc-crm.vercel.app/book.html?bt=${bookingToken}`
         : (bookingUrl || 'https://hnc-crm.vercel.app/book.html');
-      const bookBtn = `<a href="${finalBookUrl}" style="display:block;background:#3BB8E3;color:#fff;text-align:center;padding:14px 24px;border-radius:10px;text-decoration:none;font-weight:700;font-size:16px;margin-bottom:24px;">Book Now →</a>`;
 
-      html = `
-        <div style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;max-width:600px;margin:0 auto;padding:32px 24px;color:#1a1a1a;background:#ffffff;">
-          <div style="text-align:center;margin-bottom:28px;">
-            <img src="https://hnc-crm.vercel.app/hnc-logo.png" alt="Hawaii Natural Clean" style="height:56px;" onerror="this.style.display='none'">
-          </div>
+      html = renderBrandedEmail({
+        preheader: `Your quote from ${BUSINESS} — ready to book`,
+        heading: `Your quote is ready 🌺`,
+        intro: customIntro || `Aloha ${firstName} — mahalo for reaching out. Here's your personalized quote.`,
+        bodyHtml:
+          card('Service summary', summaryTable) +
+          card('Price breakdown', priceTable),
+        ctaText: 'Book now',
+        ctaUrl:  finalBookUrl,
+        footnote: `Questions or want to adjust? Call or text <a href="tel:${PHONE.replace(/\D/g,'')}" style="color:${BRAND.primary};text-decoration:none;">${PHONE}</a> or reply to this email. We'll make it right.`,
+      });
+    }
 
-          <h2 style="font-size:24px;font-weight:700;margin:0 0 8px;color:#0f172a;">Your cleaning quote is ready 🌺</h2>
-          <p style="color:#64748b;font-size:15px;margin:0 0 24px;">${introText}</p>
+    // ─── LEAD FOLLOW-UP ─────────────────────────────────────────────────────
+    else if (type === 'lead_followup') {
+      html = renderBrandedEmail({
+        preheader: `Just checking in on your quote`,
+        heading: `Still thinking it over?`,
+        intro: `Aloha ${firstName} — wanted to check in on the quote we sent.`,
+        bodyHtml:
+          (notes ? `<p style="margin:0 0 20px;color:${BRAND.text};font-size:15px;line-height:1.65;">${notes}</p>` : `<p style="margin:0 0 20px;color:${BRAND.text};font-size:15px;line-height:1.65;">No pressure at all — just wanted to see if you had any questions or if there's anything we can adjust to make it work for you.</p>`),
+        ctaText: `Reply to book`,
+        ctaUrl:  `mailto:dane@hawaiinaturalclean.com`,
+        footnote: `Or call/text <a href="tel:${PHONE.replace(/\D/g,'')}" style="color:${BRAND.primary};text-decoration:none;">${PHONE}</a>. Mahalo!`,
+      });
+    }
 
-          <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:14px;padding:22px;margin-bottom:22px;">
-            <div style="font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#94a3b8;margin-bottom:14px;">Quote details</div>
-            <table style="width:100%;border-collapse:collapse;">
-              <tr><td style="color:#666;padding:6px 0;">Service</td><td style="text-align:right;font-weight:600;">${service || 'Cleaning'}</td></tr>
-              ${frequency ? `<tr><td style="color:#666;padding:6px 0;">Frequency</td><td style="text-align:right;font-weight:500;">${frequency}</td></tr>` : ''}
-              ${q.duration_minutes ? `<tr><td style="color:#666;padding:6px 0;">Est. duration</td><td style="text-align:right;font-weight:500;">${q.duration_minutes} min</td></tr>` : ''}
-            </table>
-          </div>
+    // ─── UNPAID INVOICE REMINDER ────────────────────────────────────────────
+    else if (type === 'invoice_reminder') {
+      html = renderBrandedEmail({
+        preheader: `A friendly reminder about your invoice`,
+        heading: `Friendly invoice reminder`,
+        intro: `Aloha ${firstName} — a quick note that we have an unpaid invoice on file.`,
+        bodyHtml: `<p style="margin:0 0 20px;color:${BRAND.text};font-size:15px;line-height:1.65;">${notes || `If you've already sent payment, mahalo — you can ignore this. Otherwise, the link below will take you to the invoice.`}</p>`,
+        ctaText: invoiceUrl ? 'View invoice' : '',
+        ctaUrl:  invoiceUrl || '',
+        footnote: `If there's an issue or you'd like to arrange something different, just reply here. No hassle.`,
+      });
+    }
 
-          <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:14px;padding:22px;margin-bottom:22px;">
-            <div style="font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#94a3b8;margin-bottom:14px;">Price breakdown</div>
-            <table style="width:100%;border-collapse:collapse;">
-              ${breakdownRows.join('')}
-              ${q.subtotal !== q.total ? `<tr style="border-top:1px solid #e2e8f0;"><td style="padding:10px 0 6px;color:#666;">Subtotal</td><td style="text-align:right;padding:10px 0 6px;">$${Number(q.subtotal).toFixed(2)}</td></tr>` : ''}
-              ${discountRow}
-              <tr style="border-top:2px solid #e2e8f0;">
-                <td style="padding:12px 0 0;font-size:18px;font-weight:700;color:#0f172a;">Total</td>
-                <td style="text-align:right;padding:12px 0 0;font-size:22px;font-weight:800;color:#3BB8E3;">$${Number(q.total).toFixed(2)}</td>
-              </tr>
-            </table>
-          </div>
+    // ─── GENERIC (used by automation test emails and ad-hoc sends) ──────────
+    else {
+      // The "notes" field holds the message content. We render it cleanly with
+      // paragraph breaks preserved. Uses the heading-free mode for a clean look.
+      const body = (notes || '')
+        .split(/\n\s*\n/)
+        .map(p => `<p style="margin:0 0 16px;color:${BRAND.text};font-size:15px;line-height:1.65;">${p.replace(/\n/g, '<br>')}</p>`)
+        .join('');
 
-          ${bookBtn}
-
-          <div style="background:#fefce8;border:1px solid #fde68a;border-radius:10px;padding:16px;margin-bottom:24px;">
-            <p style="margin:0;font-size:13px;color:#92400e;">📞 Questions? Call or text us at <strong>(808) 468-5356</strong> or reply to this email. We're happy to customize your quote!</p>
-          </div>
-
-          <p style="color:#94a3b8;font-size:12px;margin-top:32px;padding-top:16px;border-top:1px solid #f1f5f9;text-align:center;">Hawaii Natural Clean · Oahu & Maui, Hawaii · hawaiinaturalclean.com</p>
-        </div>
-      `;
-    } else if (type === 'reactivation') {
-      html = `
-        <div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:32px 24px;color:#1a1a1a;">
-          <h2 style="font-size:22px;font-weight:700;margin-bottom:8px;">We miss you, ${clientName}! 🌺</h2>
-          <p style="color:#666;margin-bottom:24px;">It has been a while since your last cleaning. We would love to have you back!</p>
-          <div style="background:#f5f0ff;border-radius:12px;padding:20px;margin-bottom:24px;text-align:center;">
-            <p style="font-size:18px;font-weight:700;color:#553c9a;margin:0;">10% off your next booking</p>
-            <p style="color:#666;font-size:14px;margin:8px 0 0;">This month only — reply to book</p>
-          </div>
-          <p style="color:#666;font-size:14px;">Reply to this email or text us at (808) 468-5356 to schedule.</p>
-          <p style="color:#999;font-size:12px;margin-top:32px;padding-top:16px;border-top:1px solid #e8e8e5;">Hawaii Natural Clean · Oahu & Maui, Hawaii · hawaiinaturalclean.com</p>
-        </div>
-      `;
-    } else {
-      // Generic email
-      html = `
-        <div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:32px 24px;color:#1a1a1a;">
-          <h2 style="font-size:22px;font-weight:700;margin-bottom:16px;">${subject}</h2>
-          <p style="color:#666;">${notes || ''}</p>
-          <p style="color:#999;font-size:12px;margin-top:32px;padding-top:16px;border-top:1px solid #e8e8e5;">Hawaii Natural Clean · Oahu & Maui, Hawaii · hawaiinaturalclean.com</p>
-        </div>
-      `;
+      html = renderBrandedEmail({
+        preheader: subject,
+        heading: '',
+        intro: '',
+        bodyHtml: body || `<p style="margin:0;color:${BRAND.text};font-size:15px;line-height:1.65;">${subject}</p>`,
+        footnote: `Reply here or text <a href="tel:${PHONE.replace(/\D/g,'')}" style="color:${BRAND.primary};text-decoration:none;">${PHONE}</a> anytime. Mahalo!`,
+      });
     }
 
     const response = await fetchWithTimeout(
@@ -199,7 +403,7 @@ export default async function handler(req, res) {
           'Authorization': `Bearer ${RESEND_API_KEY}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ from: FROM_EMAIL, to: [to], subject: subject, html: html })
+        body: JSON.stringify({ from: FROM_EMAIL, to: [to], subject, html })
       },
       TIMEOUTS.RESEND
     );

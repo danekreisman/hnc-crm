@@ -75,7 +75,7 @@ const HOLIDAY_TEMPLATES = {
 
   new_year: {
     defaultSubject: '🎉 A fresh start — your home deserves it too',
-    preheader: 'New year, clean home. Let's do this.',
+    preheader: "New year, clean home. Let's do this.",
     heading: 'Happy New Year! 🎉',
     intro: (firstName) => `Aloha ${firstName}! As you step into the new year, there's no better way to start fresh than with a clean, organized home.`,
     body: `
@@ -154,9 +154,9 @@ const HOLIDAY_TEMPLATES = {
   },
 
   we_miss_you: {
-    defaultSubject: '🌺 It's been a while — we miss you',
-    preheader: 'We'd love to welcome you back.',
-    heading: 'We've been thinking about you 🌺',
+    defaultSubject: "🌺 It's been a while — we miss you",
+    preheader: "We'd love to welcome you back.",
+    heading: "We've been thinking about you 🌺",
     intro: (firstName) => `Aloha ${firstName}! It's been a while since we've seen you, and we just wanted to reach out and say — we miss you.`,
     body: `
       <p style="margin:0 0 16px;color:#0F172A;font-size:15px;line-height:1.65;">Life gets busy. We get it. But whenever you're ready for a fresh, clean home again, we'll be right here — same quality, same care, same familiar faces.</p>
@@ -170,7 +170,7 @@ const HOLIDAY_TEMPLATES = {
   },
 
   referral: {
-    defaultSubject: '🙌 Know someone who'd love a clean home? You'll both benefit',
+    defaultSubject: "🙌 Know someone who'd love a clean home? You'll both benefit",
     preheader: 'Share Hawaii Natural Clean and earn a reward.',
     heading: 'Share the aloha 🙌',
     intro: (firstName) => `Aloha ${firstName}! If you've enjoyed having your home cleaned by us, chances are someone you know would love it too.`,

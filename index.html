@@ -897,7 +897,7 @@ textarea{font-family:inherit;}
 
             <!-- Schedule -->
             <div style="margin-bottom:22px;">
-              <label style="display:block;font-size:13px;font-weight:600;margin-bottom:6px;">Schedule for (optional — leave blank to save as draft)</label>
+              <label style="display:block;font-size:13px;font-weight:600;margin-bottom:6px;">Schedule date <span style="font-weight:400;color:var(--text-muted);">— set a future date to auto-send, or leave blank to send now</span></label>
               <input id="bc-schedule" type="datetime-local" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-size:14px;box-sizing:border-box;" />
             </div>
 
@@ -915,7 +915,7 @@ textarea{font-family:inherit;}
             </div>
             <div style="display:flex;gap:10px;">
               <button onclick="saveBroadcast(false)" style="flex:1;padding:12px;border:2px solid var(--border);border-radius:10px;background:none;font-size:14px;font-weight:600;cursor:pointer;">Save draft</button>
-              <button onclick="saveBroadcast(true)" id="bc-send-btn" style="flex:1;padding:12px;background:var(--brand-500);color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;">Save &amp; send now</button>
+              <button onclick="saveBroadcast(true)" id="bc-send-btn" style="flex:1;padding:12px;background:var(--brand-500);color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;" id="bc-send-btn">Schedule / Send now</button>
             </div>
           </div>
         </div>
@@ -12040,7 +12040,15 @@ async function saveBroadcast(sendNow) {
     closeBroadcastModal();
 
     if (sendNow && savedId) {
-      await sendBroadcastNow(savedId);
+      // If a future date is set, it's already scheduled — cron will fire it. No manual send needed.
+      var scheduledDate = document.getElementById('bc-schedule').value;
+      var isFuture = scheduledDate && new Date(scheduledDate) > new Date();
+      if (isFuture) {
+        showToast('Broadcast scheduled! It will send automatically on ' + new Date(scheduledDate).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'}) + '.');
+        loadBroadcasts();
+      } else {
+        await sendBroadcastNow(savedId);
+      }
     } else {
       loadBroadcasts();
     }

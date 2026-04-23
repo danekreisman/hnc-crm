@@ -11961,24 +11961,18 @@ async function saveBroadcast(sendNow) {
   };
 
   try {
-    var url  = window.SUPABASE_URL + '/rest/v1/broadcasts';
-    var method = 'POST';
-    if (editingId) { url += '?id=eq.' + editingId; method = 'PATCH'; }
-
-    var resp = await fetch(url, {
-      method: method,
-      headers: {
-        'apikey':        window.SUPABASE_ANON_KEY,
-        'Authorization': 'Bearer ' + window.SUPABASE_ANON_KEY,
-        'Content-Type':  'application/json',
-        'Prefer':        editingId ? 'return=representation' : 'return=representation',
-      },
-      body: JSON.stringify(payload),
-    });
-
-    if (!resp.ok) throw new Error('Failed to save broadcast');
-    var rows = await resp.json();
-    var savedId = editingId || (rows && rows[0] && rows[0].id);
+    var saveResp, savedId;
+    if (editingId) {
+      var { error: updErr } = await window.supabase
+        .from('broadcasts').update(payload).eq('id', editingId);
+      if (updErr) throw updErr;
+      savedId = editingId;
+    } else {
+      var { data: insRows, error: insErr } = await window.supabase
+        .from('broadcasts').insert([payload]).select();
+      if (insErr) throw insErr;
+      savedId = insRows && insRows[0] && insRows[0].id;
+    }
 
     closeBroadcastModal();
 
@@ -12018,19 +12012,17 @@ async function sendBroadcastNow(broadcastId) {
 
 async function deleteBroadcast(id) {
   if (!confirm('Delete this broadcast?')) return;
-  await fetch(window.SUPABASE_URL + '/rest/v1/broadcasts?id=eq.' + id, {
-    method: 'DELETE',
-    headers: { 'apikey': window.SUPABASE_ANON_KEY, 'Authorization': 'Bearer ' + window.SUPABASE_ANON_KEY },
-  });
+  await window.supabase.from('broadcasts').delete().eq('id', id);
   loadBroadcasts();
 }
 
 async function loadBroadcasts() {
   try {
-    var resp = await fetch(window.SUPABASE_URL + '/rest/v1/broadcasts?order=created_at.desc', {
-      headers: { 'apikey': window.SUPABASE_ANON_KEY, 'Authorization': 'Bearer ' + window.SUPABASE_ANON_KEY },
-    });
-    var broadcasts = await resp.json();
+    var { data: broadcasts, error: loadErr } = await window.supabase
+      .from('broadcasts')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (loadErr) throw loadErr;
 
     // Update metrics
     var scheduled = broadcasts.filter(function(b){ return b.status==='scheduled'; }).length;

@@ -11963,12 +11963,12 @@ async function saveBroadcast(sendNow) {
   try {
     var saveResp, savedId;
     if (editingId) {
-      var { error: updErr } = await window.supabase
+      var { error: updErr } = await db
         .from('broadcasts').update(payload).eq('id', editingId);
       if (updErr) throw updErr;
       savedId = editingId;
     } else {
-      var { data: insRows, error: insErr } = await window.supabase
+      var { data: insRows, error: insErr } = await db
         .from('broadcasts').insert([payload]).select();
       if (insErr) throw insErr;
       savedId = insRows && insRows[0] && insRows[0].id;
@@ -12012,13 +12012,13 @@ async function sendBroadcastNow(broadcastId) {
 
 async function deleteBroadcast(id) {
   if (!confirm('Delete this broadcast?')) return;
-  await window.supabase.from('broadcasts').delete().eq('id', id);
+  await db.from('broadcasts').delete().eq('id', id);
   loadBroadcasts();
 }
 
 async function loadBroadcasts() {
   try {
-    var { data: broadcasts, error: loadErr } = await window.supabase
+    var { data: broadcasts, error: loadErr } = await db
       .from('broadcasts')
       .select('*')
       .order('created_at', { ascending: false });

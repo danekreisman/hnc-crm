@@ -335,3 +335,49 @@ git push https://danekreisman:YOUR_PAT@github.com/danekreisman/hnc-crm.git main
 *Last updated: April 2026 — Session B (broadcast system + 11 templates).*
 
 
+
+---
+
+## Session Log
+
+### Session: Booking Audit + Reminders (April 23 2026)
+
+**Booking flow audit — all pass:**
+- Quote pre-fills correctly from lead record (name, service, price, GET tax)
+- Atomic RPC creates client + appointment + closes lead in one transaction
+- Confirmation email fires (step 6 in lead-book.js) — already existed
+- policies_agreed_at set at booking time via RPC — policy SMS correctly skips for form bookings
+
+**Fixes shipped:**
+- `api/utils/validate.js`: `policiesAgreed: true` required in booking schema
+- `book.html`: passes `policiesAgreed: true` in POST body
+- `api/lead-book.js`: duplicate booking guard (409 if lead already Closed Won) — also fixed bug where `stage` was missing from the POST select query, making the guard silently fail
+- `supabase/book_lead_atomic.sql`: sets `segment='booked'` + `segment_moved_at=NOW()` on lead close
+
+**⚠️ MANUAL STEP STILL PENDING:**
+Run `supabase/book_lead_atomic.sql` in Supabase SQL Editor to deploy the segment fix.
+URL: https://raw.githubusercontent.com/danekreisman/hnc-crm/main/supabase/book_lead_atomic.sql
+
+**Day-before reminders:**
+- `api/send-reminders.js`: finds appointments for tomorrow (status=scheduled/assigned), SMS to customer + assigned cleaner
+- FK disambiguation: use `cleaners!cleaner_id` (appointments has two FKs to cleaners)
+- `vercel.json`: cron daily at 4am UTC (6pm HST)
+- `index.html`: System card added to Automations section (green border, Cron·6pm HST badge)
+
+**Test data to clean up:**
+- Test Customer (lead ID `0d075c3d-10a2-4cb2-8403-9fa9351cf4bf`, client `190807dc-9745-4712-a1ce-99fedd51c7b9`) — delete client + appointment `fba7313f-299b-46bd-b17f-404772077e5e` (Apr 28) when done testing
+
+---
+
+## V1 Launch — Remaining TODO
+
+### Still blocking launch:
+1. **⚠️ Run book_lead_atomic.sql in Supabase** (segment fix — manual step, 2 minutes)
+2. **Auto-mark jobs complete** — when `estimated_end_time <= now()`, flip status to `completed`. Prerequisite for review requests.
+3. **Invoice overdue reminders** — SMS to clients with unpaid invoices past due date
+4. **Policy agreement reminders** — clients with `policies_agreed_at = NULL` (manually created, never went through book.html) get the `agree.html?c={id}` link via SMS
+
+### Nice-to-have (v1.1):
+5. **AI review requests** — after job completes, AI reads recent SMS/call history to gauge sentiment, only sends Google review request if customer seems satisfied
+6. Clean up Wayne Johnson test data: `UPDATE leads SET unsubscribed_at = NULL WHERE id = 'dad0671b-c992-47a7-bb52-100c019dcf63';`
+

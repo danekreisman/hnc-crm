@@ -9674,7 +9674,7 @@ async function sendAutoTest() {
           var r = await fetch('/api/send-sms', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ to: testPhone, message: '[TEST] ' + message })
+            body: JSON.stringify({ to: testPhone, message: message })
           });
           var j = await r.json();
           if (r.ok && j.success !== false) sent++; else { failed++; console.error('SMS failed:', j); }
@@ -9686,7 +9686,7 @@ async function sendAutoTest() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               to: testEmail,
-              subject: '[TEST] ' + _testAuto.name,
+              subject: _testAuto.name,
               type: 'generic',
               clientName: (lead.name || 'Test').split(' ')[0],
               notes: message
@@ -9702,7 +9702,7 @@ async function sendAutoTest() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               to: testEmail,
-              subject: '[TEST] ' + substituteTestVars(action.subject || _testAuto.name, lead),
+              subject: substituteTestVars(action.subject || _testAuto.name, lead),
               type: 'generic',
               clientName: (lead.name || 'Test').split(' ')[0],
               notes: message

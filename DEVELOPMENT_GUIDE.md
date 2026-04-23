@@ -359,6 +359,92 @@ git push https://danekreisman:YOUR_PAT@github.com/danekreisman/hnc-crm.git main
 
 ---
 
+---
+
+## Session Log — April 23 2026 (Day 2)
+
+### Completed this session
+
+**book_lead_atomic.sql segment fix**
+- Already live — Test Customer showed `segment='booked'` confirming the RPC deployed correctly
+- ⚠️ Still needs manual run in Supabase SQL Editor to deploy officially
+
+**Auto-mark jobs complete** (`api/run-job-completions.js`)
+- Cron: hourly
+- Finds scheduled/assigned appointments where date+time+duration_hours has passed → flips to `completed`
+- Tested ✅
+
+**Invoice overdue reminders** (`api/run-invoice-reminders.js`)
+- Cron: daily 7pm HST
+- Unpaid invoices older than 7 days → SMS with Stripe hosted_invoice_url pay link
+- Throttled: one reminder per 3 days via `invoices.last_reminder_at`
+- Tested ✅
+
+**Policy agreement reminders** (`api/run-policy-reminders.js`)
+- Cron: daily 8pm HST
+- Clients with `policies_agreed_at = NULL` + upcoming appointment → one-time SMS with agree.html link
+- One-send guard: `clients.policy_reminder_sent_at`
+- Tested ✅
+
+**SQL migration required** (`supabase/add_reminder_columns.sql`)
+```sql
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS last_reminder_at TIMESTAMPTZ;
+ALTER TABLE clients ADD COLUMN IF NOT EXISTS policy_reminder_sent_at TIMESTAMPTZ;
+```
+✅ Already run by Dane
+
+**Invoice reminder Stripe link**
+- `run-invoice-reminders.js` fetches `hosted_invoice_url` from Stripe for each invoice
+- Falls back to "call/text us" if no Stripe invoice or fetch fails
+
+**Google Review URL in Settings**
+- Stored in `settings` table under key `google_review_url`
+- Editable in Settings → Business tab — update whenever Google changes the link
+- Current value: `https://g.page/r/CfqMUR341NgqEBM/review`
+- `loadSettings()` made async to allow the Supabase fetch
+
+**AI review requests** (`api/run-review-requests.js`)
+- Cron: daily 9pm HST
+- Finds appointments completed in last 7 days with `review_requested_at IS NULL`
+- Pulls OpenPhone history → asks Claude: satisfied? (confidence >= 0.7 → send review SMS)
+- SAFETY GUARD: manual calls require `{ testClientId }` in body — cron bypasses via `x-vercel-cron` header
+- `review_requested_at` set to timestamp (sent) or `timestamp_skipped` (not sent)
+
+**SQL migration required** (`supabase/add_review_requested.sql`)
+```sql
+ALTER TABLE appointments ADD COLUMN IF NOT EXISTS review_requested_at TEXT;
+ALTER TABLE appointments ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
+```
+✅ Already run by Dane
+
+**OpenPhone history utility** (`api/utils/openphone-history.js`)
+- Fetches up to 200 SMS + 25 call summaries from OpenPhone API by phone number
+- Caches `phoneNumberId` per cold start
+- Returns formatted string ready for Claude prompt
+- Wired into: `run-review-requests.js`, `ai-personalize.js`, `ai-summary.js`
+
+**AI summary prompt tightened**
+- Before: "be specific and actionable, mention relationship health"
+- After: "only report what the data shows, do not speculate about causes or assume emotional states"
+- Prevents lines like "volume of calls suggests unresolved issues"
+- Tested on Jessica Baang — showed cleaner preferences, special requests, specific disputes with dates ✅
+
+---
+
+### Pending / Known issues
+- `book_lead_atomic.sql` — should be re-run in Supabase to confirm segment fix is live
+- Test data: Test Customer (lead `0d075c3d`, client `190807dc`, appt `fba7313f`) still in DB
+- Wayne Johnson unsubscribe still set: `UPDATE leads SET unsubscribed_at = NULL WHERE id = 'dad0671b-c992-47a7-bb52-100c019dcf63';`
+
+---
+
+### Testing rules (added this session — never break these)
+- Bulk endpoints (run-review-requests, run-automations, etc.) must NEVER be called without a scoped test param
+- Always test against your own record or a throwaway record you create + delete
+- `run-review-requests`: pass `{ testClientId }` for manual calls
+- `send-broadcast`: pass `{ testEmail }` for manual calls
+- AI summary: read-only, safe to run on any client profile — just generates text, sends nothing
+
 ## Session Log — April 24 2026
 
 ### What was built
@@ -411,6 +497,92 @@ git push https://danekreisman:YOUR_PAT@github.com/danekreisman/hnc-crm.git main
 ### Test data to clean up
 - Test Customer (client `190807dc-9745-4712-a1ce-99fedd51c7b9`) — test record created during session. Can delete if not needed.
 
+
+---
+
+## Session Log — April 23 2026 (Day 2)
+
+### Completed this session
+
+**book_lead_atomic.sql segment fix**
+- Already live — Test Customer showed `segment='booked'` confirming the RPC deployed correctly
+- ⚠️ Still needs manual run in Supabase SQL Editor to deploy officially
+
+**Auto-mark jobs complete** (`api/run-job-completions.js`)
+- Cron: hourly
+- Finds scheduled/assigned appointments where date+time+duration_hours has passed → flips to `completed`
+- Tested ✅
+
+**Invoice overdue reminders** (`api/run-invoice-reminders.js`)
+- Cron: daily 7pm HST
+- Unpaid invoices older than 7 days → SMS with Stripe hosted_invoice_url pay link
+- Throttled: one reminder per 3 days via `invoices.last_reminder_at`
+- Tested ✅
+
+**Policy agreement reminders** (`api/run-policy-reminders.js`)
+- Cron: daily 8pm HST
+- Clients with `policies_agreed_at = NULL` + upcoming appointment → one-time SMS with agree.html link
+- One-send guard: `clients.policy_reminder_sent_at`
+- Tested ✅
+
+**SQL migration required** (`supabase/add_reminder_columns.sql`)
+```sql
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS last_reminder_at TIMESTAMPTZ;
+ALTER TABLE clients ADD COLUMN IF NOT EXISTS policy_reminder_sent_at TIMESTAMPTZ;
+```
+✅ Already run by Dane
+
+**Invoice reminder Stripe link**
+- `run-invoice-reminders.js` fetches `hosted_invoice_url` from Stripe for each invoice
+- Falls back to "call/text us" if no Stripe invoice or fetch fails
+
+**Google Review URL in Settings**
+- Stored in `settings` table under key `google_review_url`
+- Editable in Settings → Business tab — update whenever Google changes the link
+- Current value: `https://g.page/r/CfqMUR341NgqEBM/review`
+- `loadSettings()` made async to allow the Supabase fetch
+
+**AI review requests** (`api/run-review-requests.js`)
+- Cron: daily 9pm HST
+- Finds appointments completed in last 7 days with `review_requested_at IS NULL`
+- Pulls OpenPhone history → asks Claude: satisfied? (confidence >= 0.7 → send review SMS)
+- SAFETY GUARD: manual calls require `{ testClientId }` in body — cron bypasses via `x-vercel-cron` header
+- `review_requested_at` set to timestamp (sent) or `timestamp_skipped` (not sent)
+
+**SQL migration required** (`supabase/add_review_requested.sql`)
+```sql
+ALTER TABLE appointments ADD COLUMN IF NOT EXISTS review_requested_at TEXT;
+ALTER TABLE appointments ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
+```
+✅ Already run by Dane
+
+**OpenPhone history utility** (`api/utils/openphone-history.js`)
+- Fetches up to 200 SMS + 25 call summaries from OpenPhone API by phone number
+- Caches `phoneNumberId` per cold start
+- Returns formatted string ready for Claude prompt
+- Wired into: `run-review-requests.js`, `ai-personalize.js`, `ai-summary.js`
+
+**AI summary prompt tightened**
+- Before: "be specific and actionable, mention relationship health"
+- After: "only report what the data shows, do not speculate about causes or assume emotional states"
+- Prevents lines like "volume of calls suggests unresolved issues"
+- Tested on Jessica Baang — showed cleaner preferences, special requests, specific disputes with dates ✅
+
+---
+
+### Pending / Known issues
+- `book_lead_atomic.sql` — should be re-run in Supabase to confirm segment fix is live
+- Test data: Test Customer (lead `0d075c3d`, client `190807dc`, appt `fba7313f`) still in DB
+- Wayne Johnson unsubscribe still set: `UPDATE leads SET unsubscribed_at = NULL WHERE id = 'dad0671b-c992-47a7-bb52-100c019dcf63';`
+
+---
+
+### Testing rules (added this session — never break these)
+- Bulk endpoints (run-review-requests, run-automations, etc.) must NEVER be called without a scoped test param
+- Always test against your own record or a throwaway record you create + delete
+- `run-review-requests`: pass `{ testClientId }` for manual calls
+- `send-broadcast`: pass `{ testEmail }` for manual calls
+- AI summary: read-only, safe to run on any client profile — just generates text, sends nothing
 
 ## Session Log
 

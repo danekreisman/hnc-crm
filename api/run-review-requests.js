@@ -29,6 +29,18 @@ export default async function handler(req, res) {
     { auth: { persistSession: false } }
   );
 
+  // ── Safety guard ─────────────────────────────────────────────────────────
+  // When called manually (not by cron), require an explicit testClientId to
+  // prevent accidentally processing real clients during development/testing.
+  // The Vercel cron caller sets x-vercel-cron header automatically.
+  const isCron = req.headers['x-vercel-cron'] === '1';
+  const { testClientId } = req.body || {};
+  if (!isCron && !testClientId) {
+    return res.status(400).json({
+      error: 'Manual calls require testClientId in body. To test, pass a specific client ID. Cron calls run automatically.'
+    });
+  }
+
   try {
     // Get review URL from settings
     const { data: reviewSetting } = await db
@@ -39,7 +51,7 @@ export default async function handler(req, res) {
     // (using date field since updated_at can't be relied on for existing rows)
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
     const today = new Date().toISOString().split('T')[0];
-    const { data: appointments, error } = await db
+    let query = db
       .from('appointments')
       .select(`
         id, date, time, service,
@@ -49,6 +61,13 @@ export default async function handler(req, res) {
       .gte('date', sevenDaysAgo)
       .lte('date', today)
       .is('review_requested_at', null);
+
+    // In test mode, restrict to the specified client only
+    if (testClientId) {
+      query = query.eq('client_id', testClientId);
+    }
+
+    const { data: appointments, error } = await query;
 
     if (error) throw error;
     if (!appointments?.length) {

@@ -5,6 +5,24 @@ Read it at the start of every session before touching any code.
 
 ---
 
+## Testing Rules — NEVER Break These
+
+**NEVER run bulk-action endpoints against production data during testing.**
+
+Endpoints that loop over real clients/appointments (run-review-requests, run-invoice-reminders, run-automations, etc.) must ONLY be tested using one of these approaches:
+
+1. **Pass a `testClientId` or `testEmail` param** — the endpoint restricts to that one record only
+2. **Create an isolated test record** (fake client/appointment), fire the endpoint, then immediately delete the test record
+3. **Use the cron path** — let it fire naturally in production on schedule
+
+When in doubt: create a throwaway record, test against that, delete it. Never call a bulk endpoint with no filters.
+
+Endpoints that already have test mode guards:
+- `run-review-requests.js` — requires `testClientId` for manual calls (cron bypasses automatically via `x-vercel-cron` header)
+- `send-broadcast.js` — accepts `testEmail` to send to one address only
+
+---
+
 ## Current Architecture
 
 **Hosting:** Vercel (auto-deploys from GitHub `danekreisman/hnc-crm`)

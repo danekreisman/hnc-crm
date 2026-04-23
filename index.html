@@ -9564,7 +9564,8 @@ async function openAutoTest(id) {
     document.getElementById('auto-test-preview').style.display = 'none';
     document.getElementById('auto-test-send-section').style.display = 'none';
     document.getElementById('auto-test-result').style.display = 'none';
-    document.getElementById('auto-test-to').value = '';
+    var ph = document.getElementById('auto-test-phone'); if(ph) ph.value = '';
+    var em = document.getElementById('auto-test-email'); if(em) em.value = '';
 
     // Show modal
     var overlay = document.getElementById('auto-test-overlay');

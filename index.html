@@ -9632,11 +9632,9 @@ function previewAutoActions() {
 
   document.getElementById('auto-test-preview').style.display = actions.length > 0 ? 'block' : 'none';
   document.getElementById('auto-test-send-section').style.display = actions.length > 0 ? 'block' : 'none';
-  // Show/hide phone and email fields based on action types present
-  var hasSms   = actions.some(function(a){ return a.type === 'sms'; });
-  var hasEmail = actions.some(function(a){ return a.type === 'email'; });
-  document.getElementById('auto-test-sms-row').style.display   = hasSms   ? 'block' : 'none';
-  document.getElementById('auto-test-email-row').style.display = hasEmail ? 'block' : 'none';
+  // Always show both fields — you can test SMS, email, or both for any automation
+  document.getElementById('auto-test-sms-row').style.display   = 'block';
+  document.getElementById('auto-test-email-row').style.display = 'block';
 }
 
 async function sendAutoTest() {
@@ -9654,11 +9652,10 @@ async function sendAutoTest() {
     return;
   }
 
-  var hasSms   = actions.some(function(a){ return a.type === 'sms'; });
-  var hasEmail = actions.some(function(a){ return a.type === 'email'; });
-
-  if (hasSms && !testPhone)   { alert('Enter a phone number to receive the SMS test.'); return; }
-  if (hasEmail && !testEmail) { alert('Enter an email address to receive the email test.'); return; }
+  if (!testPhone && !testEmail) {
+    alert('Enter a phone number, email address, or both to send the test.');
+    return;
+  }
 
   var resultEl = document.getElementById('auto-test-result');
   resultEl.style.display = 'block';
@@ -9671,28 +9668,59 @@ async function sendAutoTest() {
     var action = actions[i];
     var message = substituteTestVars(action.message || '', lead);
     try {
-      if (action.type === 'sms' && testPhone) {
-        var r = await fetch('/api/send-sms', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ to: testPhone, message: '[TEST] ' + message })
-        });
-        var j = await r.json();
-        if (r.ok && j.success !== false) sent++; else { failed++; console.error('SMS failed:', j); }
-      } else if (action.type === 'email' && testEmail) {
-        var r = await fetch('/api/send-email', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            to: testEmail,
-            subject: '[TEST] ' + substituteTestVars(action.subject || _testAuto.name, lead),
-            type: 'generic',
-            clientName: (lead.name || 'Test').split(' ')[0],
-            notes: message
-          })
-        });
-        var j = await r.json();
-        if (r.ok && j.success !== false) sent++; else { failed++; console.error('Email failed:', j); }
+      if (action.type === 'sms') {
+        if (testPhone) {
+          // Send SMS to phone
+          var r = await fetch('/api/send-sms', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ to: testPhone, message: '[TEST] ' + message })
+          });
+          var j = await r.json();
+          if (r.ok && j.success !== false) sent++; else { failed++; console.error('SMS failed:', j); }
+        }
+        if (testEmail) {
+          // Also deliver SMS content via email so you can test message content
+          var r2 = await fetch('/api/send-email', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              to: testEmail,
+              subject: '[TEST SMS] ' + _testAuto.name,
+              type: 'generic',
+              clientName: (lead.name || 'Test').split(' ')[0],
+              notes: '<b>This is what the SMS would say:</b><br><br>' + message
+            })
+          });
+          var j2 = await r2.json();
+          if (r2.ok && j2.success !== false) sent++; else { failed++; console.error('Email (SMS preview) failed:', j2); }
+        }
+      } else if (action.type === 'email') {
+        if (testEmail) {
+          var r = await fetch('/api/send-email', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              to: testEmail,
+              subject: '[TEST] ' + substituteTestVars(action.subject || _testAuto.name, lead),
+              type: 'generic',
+              clientName: (lead.name || 'Test').split(' ')[0],
+              notes: message
+            })
+          });
+          var j = await r.json();
+          if (r.ok && j.success !== false) sent++; else { failed++; console.error('Email failed:', j); }
+        }
+        if (testPhone) {
+          // Notify via SMS that an email action would fire
+          var r2 = await fetch('/api/send-sms', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ to: testPhone, message: '[TEST] Email action would fire: ' + (action.subject || _testAuto.name) })
+          });
+          var j2 = await r2.json();
+          if (r2.ok && j2.success !== false) sent++; else { failed++; }
+        }
       } else {
         skipped++;
       }

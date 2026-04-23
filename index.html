@@ -1413,6 +1413,7 @@ Mahalo 🌺</textarea>
           <button class="action-btn blue" onclick="openMsgFromClient()">Message</button>
           <button class="action-btn blue" onclick="scheduleFromClient()">Schedule job</button>
           <button class="action-btn amber full" onclick="showClientEdit()">Edit client</button>
+          <button class="action-btn red full" onclick="openCancelClient()">Cancel client</button>
           <button class="action-btn red full" onclick="deleteRecord('client')">Delete client</button>
         </div>
         <div class="success-bar" id="client-action-success" style="margin-top:10px;"></div>
@@ -6565,6 +6566,77 @@ function updateTriggerExtra(){
   }
 }
 
+// ─── Cancel Client + Blacklist ───────────────────────────────────────────────
+function openCancelClient() {
+  if (!currentClientId) return alert('No client selected');
+  // Reset modal state
+  document.getElementById('cc-reason').value = '';
+  document.getElementById('cc-blacklist').checked = false;
+  document.getElementById('cc-status').textContent = '';
+  document.getElementById('cc-confirm-btn').disabled = false;
+  openOverlay('cancel-client-overlay');
+}
+
+async function confirmCancelClient() {
+  if (!currentClientId) return;
+  var btn = document.getElementById('cc-confirm-btn');
+  var status = document.getElementById('cc-status');
+  var reason = document.getElementById('cc-reason').value.trim();
+  var blacklist = document.getElementById('cc-blacklist').checked;
+
+  btn.disabled = true;
+  status.textContent = 'Canceling...';
+
+  try {
+    if (!db) throw new Error('Database not available');
+
+    var now = new Date().toISOString();
+
+    // Update the client record
+    var clientUpdate = {
+      status: 'Canceled',
+      segment: 'canceled',
+      segment_moved_at: now,
+      canceled_at: now,
+      canceled_reason: reason || null,
+      do_not_contact: blacklist,
+    };
+    var { error: clientErr } = await db
+      .from('clients')
+      .update(clientUpdate)
+      .eq('id', currentClientId);
+    if (clientErr) throw clientErr;
+
+    // Also find and update the matching lead (by phone, then email)
+    var client = clientDB[currentClientId];
+    var leadUpdate = {
+      segment: 'canceled',
+      segment_moved_at: now,
+      do_not_contact: blacklist,
+    };
+    if (client && client.phone) {
+      await db.from('leads').update(leadUpdate).eq('phone', client.phone);
+    }
+    if (client && client.email) {
+      await db.from('leads').update(leadUpdate).eq('email', client.email);
+    }
+
+    status.innerHTML = blacklist
+      ? '<span style="color:#991b1b;font-weight:600;">&#10003; Client canceled and blacklisted. No further automations will fire.</span>'
+      : '<span style="color:#276749;font-weight:600;">&#10003; Client canceled. Win-back sequence will fire on day 14.</span>';
+
+    setTimeout(function() {
+      closeOverlay('cancel-client-overlay');
+      closeOverlay('client-overlay');
+      if (typeof loadClients === 'function') loadClients();
+    }, 2200);
+
+  } catch(e) {
+    status.innerHTML = '<span style="color:#dc2626;">Error: ' + (e.message || e) + '</span>';
+    btn.disabled = false;
+  }
+}
+
 async function leadAutoSave(){
   var name = document.getElementById('auton-name').value.trim();
   if(!name){ alert('Please name this automation'); return; }
@@ -11206,6 +11278,41 @@ loadMessageTemplates();
 loadSettings();
 
 </script>
+
+
+<!-- CANCEL CLIENT OVERLAY -->
+<div class="overlay hidden" id="cancel-client-overlay" onclick="closeOverlay('cancel-client-overlay')">
+  <div class="panel" onclick="event.stopPropagation()" style="max-width:440px;">
+    <div class="panel-header">
+      <div class="panel-title">Cancel client</div>
+      <button class="close-btn" onclick="closeOverlay('cancel-client-overlay')">&#x2715;</button>
+    </div>
+    <div class="panel-body">
+      <p style="font-size:14px;color:var(--text);line-height:1.55;margin:0 0 14px;">
+        Canceling a client moves them to the <b>canceled</b> segment. They will receive a gracious check-in after 14 days and a win-back offer after 60 days — unless you blacklist.
+      </p>
+
+      <div class="form-row">
+        <label style="font-size:12px;color:var(--text-muted);">Reason for cancellation <span style="opacity:.6;">(optional)</span></label>
+        <textarea id="cc-reason" rows="3" placeholder="e.g. Moving out of state, switching providers, price, etc." style="width:100%;"></textarea>
+      </div>
+
+      <label style="display:flex;align-items:flex-start;gap:10px;margin-top:10px;padding:12px 14px;background:#fef2f2;border:1px solid #fecaca;border-radius:10px;cursor:pointer;user-select:none;">
+        <input type="checkbox" id="cc-blacklist" style="margin:3px 0 0 0;cursor:pointer;">
+        <div style="flex:1;">
+          <div style="font-size:13px;font-weight:600;color:#991b1b;">Blacklist — never contact again</div>
+          <div style="font-size:12px;color:#7f1d1d;margin-top:3px;line-height:1.45;">All automations will be permanently skipped for this client. No more messages, emails, or win-back offers. Use this for clients who have requested no contact or been disruptive.</div>
+        </div>
+      </label>
+
+      <div style="display:flex;gap:8px;margin-top:18px;">
+        <button class="btn" onclick="closeOverlay('cancel-client-overlay')" style="flex:1;">Keep as active</button>
+        <button class="btn" onclick="confirmCancelClient()" id="cc-confirm-btn" style="flex:1;background:#dc2626;color:#fff;border-color:#dc2626;">Confirm cancellation</button>
+      </div>
+      <div id="cc-status" style="margin-top:10px;font-size:12px;color:var(--text-muted);"></div>
+    </div>
+  </div>
+</div>
 
 <!-- NEW AUTOMATION OVERLAY -->
 <div class="overlay hidden" id="new-auto-overlay" onclick="closeOverlay('new-auto-overlay')">

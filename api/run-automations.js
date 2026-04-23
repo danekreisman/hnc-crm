@@ -127,8 +127,11 @@ export default async function handler(req, res) {
         }
 
         // ────────────────────────────────────────────────────────────────────
-        // TRIGGER 5: days_in_segment (X days since lead was moved into segment)
-        // Used for: nurture sequences, one-time re-engagement, canceled win-back
+        // TRIGGER 5: days_in_segment (X days since moved into segment)
+        // Used for: nurture sequences, one-time re-engagement, canceled win-back.
+        // Checks BOTH the leads and clients tables, so canceled clients fire the
+        // canceled sequence just like canceled leads would.
+        // Blacklisted records (do_not_contact = true) are always skipped.
         // ────────────────────────────────────────────────────────────────────
         if (trigger_type === 'days_in_segment') {
           const targetSegment = trigger_config?.segment;
@@ -137,18 +140,60 @@ export default async function handler(req, res) {
             const lowerBound = new Date(now.getTime() - (days + 1) * 24 * 60 * 60 * 1000);
             const upperBound = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
 
-            // Leads in target segment, moved into it between days-1 and days ago
-            // This creates a 1-day window so each lead matches exactly once.
-            const { data, error } = await db
+            // Query leads
+            const leadsRes = await db
               .from('leads')
               .select('id')
               .eq('segment', targetSegment)
+              .eq('do_not_contact', false)
               .gte('segment_moved_at', lowerBound.toISOString())
               .lt('segment_moved_at',  upperBound.toISOString())
               .limit(50);
 
-            if (!error) matchingLeads = data || [];
+            // Query clients that are in the matching segment
+            const clientsRes = await db
+              .from('clients')
+              .select('id, phone, email, name')
+              .eq('segment', targetSegment)
+              .eq('do_not_contact', false)
+              .gte('segment_moved_at', lowerBound.toISOString())
+              .lt('segment_moved_at',  upperBound.toISOString())
+              .limit(50);
+
+            // For each matching client, find or create their lead record so the
+            // existing lead-based execution flow works uniformly. We match by
+            // phone first, then email.
+            const clientLeadIds = [];
+            for (const c of (clientsRes.data || [])) {
+              let leadRow = null;
+              if (c.phone) {
+                const { data: byPhone } = await db
+                  .from('leads').select('id').eq('phone', c.phone).limit(1);
+                if (byPhone && byPhone[0]) leadRow = byPhone[0];
+              }
+              if (!leadRow && c.email) {
+                const { data: byEmail } = await db
+                  .from('leads').select('id').eq('email', c.email).limit(1);
+                if (byEmail && byEmail[0]) leadRow = byEmail[0];
+              }
+              if (leadRow) clientLeadIds.push({ id: leadRow.id });
+            }
+
+            matchingLeads = [...(leadsRes.data || []), ...clientLeadIds];
           }
+        }
+
+        // Blacklist guard: re-filter matchingLeads to drop any do_not_contact leads
+        // (for trigger types that didn't filter upstream)
+        if (matchingLeads.length > 0) {
+          const ids = matchingLeads.map(l => l.id);
+          const { data: allowedRows } = await db
+            .from('leads')
+            .select('id')
+            .in('id', ids)
+            .eq('do_not_contact', false);
+          const allowedSet = new Set((allowedRows || []).map(r => r.id));
+          matchingLeads = matchingLeads.filter(l => allowedSet.has(l.id));
         }
 
         console.log(`[${executionId}] Found ${matchingLeads.length} matching leads for trigger: ${trigger_type}`);

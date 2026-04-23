@@ -361,6 +361,39 @@ git push https://danekreisman:YOUR_PAT@github.com/danekreisman/hnc-crm.git main
 
 ---
 
+
+---
+
+## V2 Roadmap
+
+Features deferred from v1 — build after launch and initial client feedback.
+
+**Email history in AI summaries**
+- Pull sent + received email threads per client/lead into AI summaries and review requests
+- Use Zoho Mail API (not Gmail — Dane uses Zoho, no need to switch)
+- Zoho Mail API: https://www.zoho.com/mail/help/api/
+- Pattern: same as openphone-history.js — fetch by email address, format for Claude prompt
+- Add to: ai-summary.js, ai-personalize.js, run-review-requests.js
+
+**AI automations builder**
+- Visual "When → If → Do" rule builder
+- Toggleable automations with run logs
+- Key differentiator for future SaaS productization
+
+**Customer portal enhancements**
+- Customers can view upcoming cleanings and past invoices
+- Currently basic — needs full self-service view
+
+**Post-job photo & notes (cleaner portal)**
+- Cleaners upload photos + notes after marking job complete
+- Saves to appointment record, visible on client profile
+- Builds documentation and trust with clients
+
+**Moving season / real estate broadcast templates**
+- Move-in/move-out cleans (May–July peak)
+- Open house staging cleans
+- Add to broadcast template library
+
 ## Session Log — April 23 2026 (Day 2)
 
 ### Completed this session
@@ -444,6 +477,39 @@ ALTER TABLE appointments ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT
 - `run-review-requests`: pass `{ testClientId }` for manual calls
 - `send-broadcast`: pass `{ testEmail }` for manual calls
 - AI summary: read-only, safe to run on any client profile — just generates text, sends nothing
+
+
+---
+
+## V2 Roadmap
+
+Features deferred from v1 — build after launch and initial client feedback.
+
+**Email history in AI summaries**
+- Pull sent + received email threads per client/lead into AI summaries and review requests
+- Use Zoho Mail API (not Gmail — Dane uses Zoho, no need to switch)
+- Zoho Mail API: https://www.zoho.com/mail/help/api/
+- Pattern: same as openphone-history.js — fetch by email address, format for Claude prompt
+- Add to: ai-summary.js, ai-personalize.js, run-review-requests.js
+
+**AI automations builder**
+- Visual "When → If → Do" rule builder
+- Toggleable automations with run logs
+- Key differentiator for future SaaS productization
+
+**Customer portal enhancements**
+- Customers can view upcoming cleanings and past invoices
+- Currently basic — needs full self-service view
+
+**Post-job photo & notes (cleaner portal)**
+- Cleaners upload photos + notes after marking job complete
+- Saves to appointment record, visible on client profile
+- Builds documentation and trust with clients
+
+**Moving season / real estate broadcast templates**
+- Move-in/move-out cleans (May–July peak)
+- Open house staging cleans
+- Add to broadcast template library
 
 ## Session Log — April 24 2026
 
@@ -500,6 +566,39 @@ ALTER TABLE appointments ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT
 
 ---
 
+
+---
+
+## V2 Roadmap
+
+Features deferred from v1 — build after launch and initial client feedback.
+
+**Email history in AI summaries**
+- Pull sent + received email threads per client/lead into AI summaries and review requests
+- Use Zoho Mail API (not Gmail — Dane uses Zoho, no need to switch)
+- Zoho Mail API: https://www.zoho.com/mail/help/api/
+- Pattern: same as openphone-history.js — fetch by email address, format for Claude prompt
+- Add to: ai-summary.js, ai-personalize.js, run-review-requests.js
+
+**AI automations builder**
+- Visual "When → If → Do" rule builder
+- Toggleable automations with run logs
+- Key differentiator for future SaaS productization
+
+**Customer portal enhancements**
+- Customers can view upcoming cleanings and past invoices
+- Currently basic — needs full self-service view
+
+**Post-job photo & notes (cleaner portal)**
+- Cleaners upload photos + notes after marking job complete
+- Saves to appointment record, visible on client profile
+- Builds documentation and trust with clients
+
+**Moving season / real estate broadcast templates**
+- Move-in/move-out cleans (May–July peak)
+- Open house staging cleans
+- Add to broadcast template library
+
 ## Session Log — April 23 2026 (Day 2)
 
 ### Completed this session
@@ -583,6 +682,39 @@ ALTER TABLE appointments ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT
 - `run-review-requests`: pass `{ testClientId }` for manual calls
 - `send-broadcast`: pass `{ testEmail }` for manual calls
 - AI summary: read-only, safe to run on any client profile — just generates text, sends nothing
+
+
+---
+
+## V2 Roadmap
+
+Features deferred from v1 — build after launch and initial client feedback.
+
+**Email history in AI summaries**
+- Pull sent + received email threads per client/lead into AI summaries and review requests
+- Use Zoho Mail API (not Gmail — Dane uses Zoho, no need to switch)
+- Zoho Mail API: https://www.zoho.com/mail/help/api/
+- Pattern: same as openphone-history.js — fetch by email address, format for Claude prompt
+- Add to: ai-summary.js, ai-personalize.js, run-review-requests.js
+
+**AI automations builder**
+- Visual "When → If → Do" rule builder
+- Toggleable automations with run logs
+- Key differentiator for future SaaS productization
+
+**Customer portal enhancements**
+- Customers can view upcoming cleanings and past invoices
+- Currently basic — needs full self-service view
+
+**Post-job photo & notes (cleaner portal)**
+- Cleaners upload photos + notes after marking job complete
+- Saves to appointment record, visible on client profile
+- Builds documentation and trust with clients
+
+**Moving season / real estate broadcast templates**
+- Move-in/move-out cleans (May–July peak)
+- Open house staging cleans
+- Add to broadcast template library
 
 ## Session Log
 

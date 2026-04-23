@@ -302,12 +302,35 @@ git push https://danekreisman:YOUR_PAT@github.com/danekreisman/hnc-crm.git main
 - `leads.unsubscribed_at TIMESTAMPTZ` (nullable, default null)
 - `clients.unsubscribed_at TIMESTAMPTZ` (nullable, default null)
 
-**Still pending (Session B — Holiday Broadcasts):**
-- `broadcasts` table + `broadcast_sends` table
-- `/api/send-broadcast` endpoint (audience query → loop → Resend → record)
-- Cron/manual trigger for scheduled broadcasts
-- UI: Broadcasts section with holiday calendar, template picker, audience selector, preview
-- Holiday email templates (Easter, 4th of July, Thanksgiving, Christmas) designed by Claude
+**Session B shipped** — see Session B entry below.
 
 *Last updated: April 2026 — Session A (unsubscribe infrastructure).*
+
+### Session B — Holiday Broadcast system
+
+**Shipped:**
+- `supabase/add_broadcasts.sql`: `broadcasts` + `broadcast_sends` tables with indexes.
+- `api/send-broadcast.js`: sends to all opted-in leads/clients (or both); dedupes by email; idempotent via `broadcast_sends`; supports `testEmail` param to send to a single address without touching the full audience.
+- `api/send-broadcast.js` template library — 11 branded templates:
+  - Holidays (4): Easter, 4th of July, Thanksgiving, Christmas
+  - Seasonal/Hawaii (5): New Year, Allergy Season, Back to School, Storm Season, Tourist Season
+  - Evergreen (2): We Miss You (15% win-back), Referral Push ($50 off)
+- `index.html`: Broadcasts nav + section with holiday strip, broadcast list, full create/edit modal with 11 categorized templates, audience selector, schedule date, test-email field, save-as-draft and send-now buttons.
+
+**Key patterns:**
+- Frontend uses `db.from('broadcasts')` — the Supabase client in index.html is `db`, NOT `window.supabase` (window.supabase is the library, db is the initialized client).
+- `testEmail` in send-broadcast body overrides audience with a single recipient — safe for testing before a real send.
+- Unsubscribed recipients are filtered out at send time (`.is('unsubscribed_at', null)`).
+
+**Schema added:**
+- `broadcasts` table (id, name, holiday, subject, holiday_key, audience, scheduled_for, sent_at, status, recipient_count, sent_count, created_at)
+- `broadcast_sends` table (id, broadcast_id, email, recipient_id, recipient_type, sent_at) — UNIQUE on (broadcast_id, email)
+
+**Pending — next session:**
+- Wayne Johnson test lead was left with `unsubscribed_at` set during testing — run: `UPDATE leads SET unsubscribed_at = NULL WHERE id = 'dad0671b-c992-47a7-bb52-100c019dcf63';`
+- Cron job to auto-trigger scheduled broadcasts (`vercel.json` cron entry calling `/api/send-broadcast` for any broadcast where `status='scheduled'` and `scheduled_for <= now`)
+- Test modal in `index.html` passes `bookingUrl`/`businessPhone` to AI personalizer — needs to be updated to pass these for full production parity in previews
+
+*Last updated: April 2026 — Session B (broadcast system + 11 templates).*
+
 

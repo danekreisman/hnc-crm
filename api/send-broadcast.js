@@ -416,12 +416,15 @@ export default async function handler(req, res) {
       }
     }
 
-    // ── Mark complete ──────────────────────────────────────────────────────
-    await db.from('broadcasts').update({
-      status: failed > 0 && sent === 0 ? 'failed' : 'sent',
-      sent_at: new Date().toISOString(),
-      sent_count: sent,
-    }).eq('id', broadcastId);
+    // ── Mark complete ────────────────────────────────────────────────────
+    // Test sends don't permanently mark the broadcast as sent — keep it as draft
+    if (!testEmail) {
+      await db.from('broadcasts').update({
+        status: failed > 0 && sent === 0 ? 'failed' : 'sent',
+        sent_at: new Date().toISOString(),
+        sent_count: sent,
+      }).eq('id', broadcastId);
+    }
 
     return res.status(200).json({ success: true, broadcastId, sent, skipped, failed, total: unique.length });
 

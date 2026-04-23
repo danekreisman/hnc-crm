@@ -35,8 +35,10 @@ export default async function handler(req, res) {
       .from('settings').select('value').eq('key', 'google_review_url').maybeSingle();
     const reviewUrl = reviewSetting?.value || 'https://g.page/r/CfqMUR341NgqEBM/review';
 
-    // Find appointments completed in the last 24 hours, not yet reviewed
-    const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    // Find appointments completed in the last 7 days, not yet reviewed
+    // (using date field since updated_at can't be relied on for existing rows)
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    const today = new Date().toISOString().split('T')[0];
     const { data: appointments, error } = await db
       .from('appointments')
       .select(`
@@ -44,7 +46,8 @@ export default async function handler(req, res) {
         clients ( id, name, phone )
       `)
       .eq('status', 'completed')
-      .gte('updated_at', since)
+      .gte('date', sevenDaysAgo)
+      .lte('date', today)
       .is('review_requested_at', null);
 
     if (error) throw error;

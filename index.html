@@ -10725,8 +10725,8 @@ async function generateClientSummary(){
   }).join('; ');
 
   var prompt = 'You are an assistant for Hawaii Natural Clean, a cleaning business in Hawaii.'
-    +' Generate a concise 3-4 sentence client intelligence briefing. Be specific and actionable.'
-    +' Mention payment behavior, relationship health, call history insights if available, and follow-up recommendations.\n\n'
+    +' Generate a concise 3-4 sentence client intelligence briefing.'
+    +' Rules: be factual and specific — only report what the data shows, do not speculate about causes or assume emotional states. Summarize: payment history, service cadence, and any concrete patterns from SMS/call history (quote specific dates or exchanges if relevant). End with one concrete recommended action based only on what is known.\n\n'
     +'Client: '+cdata.name+'\n'
     +'Type: '+(cdata.type||'Residential')+'\n'
     +'Status: '+(cdata.status||'Active')+'\n'
@@ -10858,7 +10858,8 @@ async function generateLeadSummary(){
   });
 
   var prompt = 'You are an assistant for Hawaii Natural Clean, a cleaning business in Hawaii.'
-    +' Generate a concise 3-4 sentence lead intelligence briefing. Be specific and actionable.'
+    +' Generate a concise 3-4 sentence lead intelligence briefing.'
+    +' Rules: be factual — only report what the data shows, do not speculate. Summarize quote details, lead stage, and any concrete SMS/call patterns. End with one specific recommended next action.'
     +' Assess deal likelihood, suggest next steps, and flag any urgency.\n\n'
     +'Lead: '+d.name+'\n'
     +'Stage: '+(d.stage||'New inquiry')+'\n'

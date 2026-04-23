@@ -48,7 +48,7 @@ const REGION       = 'Oahu & Maui, Hawaii';
  * @param {string} opts.ctaUrl     - Optional CTA button URL
  * @param {string} opts.footnote   - Optional small note above the footer
  */
-function renderBrandedEmail({ preheader = '', heading = '', intro = '', bodyHtml = '', ctaText = '', ctaUrl = '', footnote = '' }) {
+function renderBrandedEmail({ preheader = '', heading = '', intro = '', bodyHtml = '', ctaText = '', ctaUrl = '', footnote = '', unsubscribeUrl = '' }) {
   const ctaBlock = (ctaText && ctaUrl) ? `
     <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:28px 0;">
       <tr><td align="center">
@@ -129,6 +129,7 @@ function renderBrandedEmail({ preheader = '', heading = '', intro = '', bodyHtml
                   &nbsp;·&nbsp;
                   <a href="https://${WEBSITE}" style="color:${BRAND.primary};text-decoration:none;">${WEBSITE}</a>
                 </p>
+                ${unsubscribeUrl ? `<p style="margin:12px 0 0;font-size:11px;color:#94a3b8;"><a href="${unsubscribeUrl}" style="color:#94a3b8;text-decoration:underline;">Unsubscribe</a></p>` : ''}
               </div>
             </td>
           </tr>
@@ -182,7 +183,7 @@ export default async function handler(req, res) {
     ({ to, subject, type } = req.body);
     const {
       clientName, amount, service, date, time, cleaner,
-      invoiceUrl, terms, notes, bookingUrl,
+      invoiceUrl, terms, notes, bookingUrl, unsubscribeUrl,
     } = req.body;
 
     if (!to || !subject) {
@@ -292,6 +293,7 @@ export default async function handler(req, res) {
         ctaText: 'Book my next clean',
         ctaUrl:  `https://${WEBSITE}`,
         footnote: `Or simply reply to this email and we'll take care of the rest. Mahalo!`,
+        unsubscribeUrl: unsubscribeUrl || '',
       });
     }
 
@@ -361,6 +363,7 @@ export default async function handler(req, res) {
         ctaText: `Reply to book`,
         ctaUrl:  `mailto:dane@hawaiinaturalclean.com`,
         footnote: `Or call/text <a href="tel:${PHONE.replace(/\D/g,'')}" style="color:${BRAND.primary};text-decoration:none;">${PHONE}</a>. Mahalo!`,
+        unsubscribeUrl: unsubscribeUrl || '',
       });
     }
 
@@ -394,6 +397,7 @@ export default async function handler(req, res) {
         ctaText:  bookingUrl ? 'Book now' : '',
         ctaUrl:   bookingUrl || '',
         footnote: `Reply here or text <a href="tel:${PHONE.replace(/\D/g,'')}" style="color:${BRAND.primary};text-decoration:none;">${PHONE}</a> anytime. Mahalo!`,
+        unsubscribeUrl: unsubscribeUrl || '',
       });
     }
 

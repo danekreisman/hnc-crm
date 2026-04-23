@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { logError } from './utils/error-logger.js';
 
 const HNC_BUSINESS_PHONE = '(808) 468-5356';
 
@@ -193,7 +194,8 @@ export default async function handler(req, res) {
             .from('leads')
             .select('id')
             .in('id', ids)
-            .eq('do_not_contact', false);
+            .eq('do_not_contact', false)
+          .is('unsubscribed_at', null);
           const allowedSet = new Set((allowedRows || []).map(r => r.id));
           matchingLeads = matchingLeads.filter(l => allowedSet.has(l.id));
         }
@@ -297,6 +299,7 @@ export default async function handler(req, res) {
                         console.log(`[${executionId}] AI personalized SMS for ${leadData.name}`);
                       }
                     } catch (aiErr) {
+                      await logError('run-automations', aiErr, { stage: 'ai_personalize_sms', leadId: leadData.id });
                       console.warn(`[${executionId}] AI personalize failed, using template:`, aiErr.message);
                     }
                   }
@@ -345,6 +348,7 @@ export default async function handler(req, res) {
                         console.log(`[${executionId}] AI personalized email for ${leadData.name}`);
                       }
                     } catch (aiErr) {
+                      await logError('run-automations', aiErr, { stage: 'ai_personalize_email', leadId: leadData.id });
                       console.warn(`[${executionId}] AI personalize failed, using template:`, aiErr.message);
                     }
                   }
@@ -359,6 +363,7 @@ export default async function handler(req, res) {
                       clientName: leadData.contact_name || leadData.name,
                       notes: emailBody,
                       bookingUrl: bookingUrlForLead,
+                      unsubscribeUrl: `${BASE_URL}/api/unsubscribe?id=${leadData.id}&type=lead`,
                     })
                   });
 

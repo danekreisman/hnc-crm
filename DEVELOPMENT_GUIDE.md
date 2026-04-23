@@ -244,3 +244,48 @@ Run through this checklist:
 **Run the seed manually in Supabase SQL editor** to install the sequences.
 
 *Last updated: April 2026 — Session 4 (AI personalization + branded emails + sequences).*
+
+---
+
+## How to Push Code From This Chat (Not Claude Code)
+
+When making file edits from this claude.ai chat session, the correct method is **git clone over HTTPS with a PAT**. Do not waste time trying to use the GitHub web editor (CodeMirror is not scriptable) or `api.github.com` (blocked by the sandbox network allowlist).
+
+```bash
+# Clone
+git clone https://danekreisman:YOUR_PAT@github.com/danekreisman/hnc-crm.git /tmp/hnc-crm
+
+# Edit files using bash_tool / python in /tmp/hnc-crm/
+
+# Commit and push
+cd /tmp/hnc-crm
+git config user.email "crm@hawaiinaturalclean.com"
+git config user.name "HNC CRM"
+git add api/your-file.js
+git commit -m "your message"
+git push https://danekreisman:YOUR_PAT@github.com/danekreisman/hnc-crm.git main
+```
+
+**Notes:**
+- `api.github.com` is blocked by the sandbox egress policy — REST API calls will return `host_not_allowed`. Use git HTTPS instead.
+- GitHub web editor (github.com/edit/...) uses CodeMirror 6 which is not programmable via JavaScript injection — do not attempt.
+- Vercel auto-deploys on every push to `main`. No manual deploy step needed.
+- The PAT only needs `repo` scope.
+
+---
+
+### Session 6 — AI booking channel fix
+
+**Shipped:**
+- `api/ai-personalize.js`: Added `BOOKING CHANNELS` section to system prompt — AI now directs leads to call, text, or personalized booking link only. Never mentions a generic website. Accepts new `bookingUrl` and `businessPhone` inputs with validation. Context block surfaces both values verbatim for Claude. No-context guard updated to treat booking info as valid context.
+- `api/run-automations.js`: `bookingUrlForLead` moved to per-lead scope (was email-branch only). Both SMS and email AI personalize calls now pass `bookingUrl` and `businessPhone`. Added `HNC_BUSINESS_PHONE = '(808) 468-5356'` constant at module scope — dedups the hardcoded number from `substituteVars`.
+
+**Booking channel logic:**
+- Quoted lead (has `booking_token`): AI presents all three — call, text, personalized booking link
+- Unquoted lead (no `booking_token`): AI presents call + text only, no link or website
+
+**Still pending:**
+- Test modal in `index.html` calls `/api/ai-personalize` directly — needs `bookingUrl` and `businessPhone` passed in its fetch payload for test previews to match production behavior.
+- `run-automations.js` still not fully using `logError` — add when next touching that file.
+
+*Last updated: April 2026 — Session 6 (AI booking channel fix + git HTTPS deployment method documented).*

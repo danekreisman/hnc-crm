@@ -37,6 +37,10 @@
     {
       "path": "/api/run-review-requests",
       "schedule": "0 7 * * *"
+    },
+    {
+      "path": "/api/run-task-automations",
+      "schedule": "0 18 * * *"
     }
   ]
 }

@@ -10,6 +10,8 @@
 
 import { createClient } from '@supabase/supabase-js';
 import { logError } from './utils/error-logger.js';
+import { getOpenPhoneHistory } from './utils/openphone-history.js';
+import { fetchWithTimeout, TIMEOUTS } from './utils/with-timeout.js';
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -27,7 +29,7 @@ export default async function handler(req, res) {
     // Fetch all scheduled/assigned appointments that have a duration
     const { data: appointments, error } = await db
       .from('appointments')
-      .select('id, date, time, duration_hours, status')
+      .select('id, date, time, duration_hours, status, client_id')
       .in('status', ['scheduled', 'assigned'])
       .not('duration_hours', 'is', null)
       .lte('date', now.toISOString().split('T')[0]); // only today or past
@@ -68,7 +70,68 @@ export default async function handler(req, res) {
     if (updateErr) throw updateErr;
 
     console.log(`[run-job-completions] Marked ${toComplete.length} appointment(s) as completed`);
-    return res.status(200).json({ success: true, completed: toComplete.length, ids: toComplete });
+
+    // ── First-clean task: call client immediately after first appointment ──
+    const firstCleanTasks = [];
+    for (const apptId of toComplete) {
+      const appt = appointments.find(a => a.id === apptId);
+      if (!appt?.client_id) continue;
+
+      // Check if this is the client's first completed appointment
+      const { data: prevAppts } = await db
+        .from('appointments')
+        .select('id')
+        .eq('client_id', appt.client_id)
+        .eq('status', 'completed')
+        .neq('id', apptId)
+        .limit(1);
+
+      if (prevAppts && prevAppts.length > 0) continue; // not first clean
+
+      // Check no existing call_client task for this client
+      const { data: existingTask } = await db
+        .from('tasks')
+        .select('id')
+        .eq('type', 'call_client')
+        .eq('related_client_id', appt.client_id)
+        .eq('status', 'open')
+        .limit(1);
+
+      if (existingTask && existingTask.length > 0) continue;
+
+      // Fetch client info for the brief
+      const { data: client } = await db
+        .from('clients')
+        .select('name, phone')
+        .eq('id', appt.client_id)
+        .single();
+
+      if (!client) continue;
+
+      // Generate a brief AI call note (light — no OpenPhone history needed for first clean)
+      const today = new Date().toISOString().split('T')[0];
+      const { error: taskErr } = await db.from('tasks').insert([{
+        title: `Call ${client.name} — first clean complete`,
+        type: 'call_client',
+        priority: 'high',
+        due_date: today,
+        description: 'First clean just completed. Call to check in on quality, answer questions, and lock in a recurring schedule.',
+        related_client_id: appt.client_id,
+        status: 'open',
+      }]);
+
+      if (!taskErr) {
+        firstCleanTasks.push(client.name);
+        console.log(`[run-job-completions] Created first-clean follow-up task for ${client.name}`);
+      }
+    }
+
+    return res.status(200).json({
+      success: true,
+      completed: toComplete.length,
+      ids: toComplete,
+      firstCleanTasks,
+    });
 
   } catch (err) {
     await logError('run-job-completions', err, {});

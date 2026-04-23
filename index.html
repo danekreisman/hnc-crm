@@ -9650,13 +9650,20 @@ function insertTmplVar(v) {
   ta.selectionStart = ta.selectionEnd = pos + v.length;
 }
 
-function saveSettings() {
+async function saveSettings() {
   bizSettings.name = document.getElementById('set-biz-name').value;
   bizSettings.fromEmail = document.getElementById('set-from-email').value;
   bizSettings.phone = document.getElementById('set-phone').value;
   bizSettings.website = document.getElementById('set-website').value;
   bizSettings.logo = document.getElementById('set-logo').value;
   localStorage.setItem('hnc_biz_settings', JSON.stringify(bizSettings));
+
+  // Save review URL to Supabase so the API can read it
+  var reviewUrl = (document.getElementById('set-review-url') || {}).value || '';
+  if (reviewUrl) {
+    await db.from('settings').upsert({ key: 'google_review_url', value: reviewUrl, updated_at: new Date().toISOString() }, { onConflict: 'key' });
+  }
+
   showPaymentToast('Settings saved!', null, 'success');
 }
 
@@ -9691,6 +9698,13 @@ function loadSettings() {
       }
     } catch(e) {}
   }
+
+  // Load review URL from Supabase
+  try {
+    var { data: reviewSetting } = await db.from('settings').select('value').eq('key', 'google_review_url').maybeSingle();
+    var reviewEl = document.getElementById('set-review-url');
+    if (reviewEl && reviewSetting) reviewEl.value = reviewSetting.value || '';
+  } catch(e) {}
 }
 
 function previewLogo() {

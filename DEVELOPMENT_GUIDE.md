@@ -173,6 +173,7 @@ Run through this checklist:
 - **`places-autocomplete.js`** uses `module.exports` (CommonJS) while all other API files use `export default` (ES Modules). Don't mix these.
 - **`run-automations.js`** is not yet using `logError` — errors only go to console. Add it when touching that file.
 - **`lead-capture.js`** does not have an atomic transaction like `lead-book.js` does — if it fails midway you can end up with a lead but no email/SMS sent.
+- **Python heredoc apostrophe bug**: When writing JS template code from Python triple-quoted strings, Python consumes backslash escapes. So `''` in a Python `"""..."""` string becomes just `'` in the output JS — breaking single-quoted strings like `'Let's go'` → `'Let's go'` is invalid JS. Fix: use double quotes for any JS string containing apostrophes.
 - **Context drift** between chat sessions is a recurring problem. Always reference this document at the start of a session and update it when something significant changes.
 
 ---

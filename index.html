@@ -860,6 +860,14 @@ textarea{font-family:inherit;}
             <input type="hidden" id="bc-selected-template" value="" />
             <input type="hidden" id="bc-selected-audience" value="both" />
 
+            <!-- Test send -->
+            <div style="background:#f8fafc;border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:14px;">
+              <div style="font-size:12px;font-weight:600;color:var(--text-muted);margin-bottom:8px;">🧪 Send test email first</div>
+              <div style="display:flex;gap:8px;">
+                <input id="bc-test-email" type="email" placeholder="your@email.com" style="flex:1;padding:8px 10px;border:1px solid var(--border);border-radius:7px;font-size:13px;" />
+                <button onclick="sendTestBroadcast()" style="padding:8px 14px;background:var(--text);color:#fff;border:none;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;">Send test</button>
+              </div>
+            </div>
             <div style="display:flex;gap:10px;">
               <button onclick="saveBroadcast(false)" style="flex:1;padding:12px;border:2px solid var(--border);border-radius:10px;background:none;font-size:14px;font-weight:600;cursor:pointer;">Save draft</button>
               <button onclick="saveBroadcast(true)" id="bc-send-btn" style="flex:1;padding:12px;background:var(--brand-500);color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;">Save &amp; send now</button>
@@ -12007,6 +12015,52 @@ async function sendBroadcastNow(broadcastId) {
   } catch(e) {
     showToast('Send failed: ' + e.message, true);
     loadBroadcasts();
+  }
+}
+
+async function sendTestBroadcast() {
+  var templateKey = document.getElementById('bc-selected-template').value;
+  var subject     = document.getElementById('bc-subject').value.trim();
+  var testEmail   = document.getElementById('bc-test-email').value.trim();
+  var editingId   = document.getElementById('bc-editing-id').value;
+  var audience    = document.getElementById('bc-selected-audience').value || 'both';
+
+  if (!templateKey) { alert('Pick a holiday template first.'); return; }
+  if (!subject)     { alert('Enter a subject line first.'); return; }
+  if (!testEmail || !testEmail.includes('@')) { alert('Enter a valid email address.'); return; }
+
+  var btn = document.querySelector('[onclick="sendTestBroadcast()"]');
+  if (btn) { btn.textContent = 'Sending...'; btn.disabled = true; }
+
+  try {
+    // Save/update the broadcast first so we have an ID
+    var tpl = BC_HOLIDAYS[templateKey];
+    var payload = { name: tpl.label, holiday: templateKey, holiday_key: templateKey, subject, audience, status: 'draft' };
+    var broadcastId = editingId;
+
+    if (!broadcastId) {
+      var { data: rows, error: insErr } = await db.from('broadcasts').insert([payload]).select();
+      if (insErr) throw insErr;
+      broadcastId = rows && rows[0] && rows[0].id;
+      document.getElementById('bc-editing-id').value = broadcastId;
+    }
+
+    var resp = await fetch('/api/send-broadcast', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ broadcastId, testEmail }),
+    });
+    var data = await resp.json();
+
+    if (data.success) {
+      showToast('Test email sent to ' + testEmail + ' ✓');
+    } else {
+      showToast('Failed: ' + (data.error || 'Unknown error'), true);
+    }
+  } catch(e) {
+    showToast('Error: ' + e.message, true);
+  } finally {
+    if (btn) { btn.textContent = 'Send test'; btn.disabled = false; }
   }
 }
 

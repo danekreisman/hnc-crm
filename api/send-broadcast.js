@@ -166,8 +166,11 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const { broadcastId } = req.body || {};
+  const { broadcastId, testEmail } = req.body || {};
   if (!broadcastId) return res.status(400).json({ error: 'broadcastId is required' });
+  if (testEmail && (typeof testEmail !== 'string' || !testEmail.includes('@'))) {
+    return res.status(400).json({ error: 'testEmail must be a valid email address' });
+  }
 
   const db = createClient(
     process.env.SUPABASE_URL,
@@ -235,11 +238,17 @@ export default async function handler(req, res) {
 
     // Dedupe by email
     const seen = new Set();
-    const unique = recipients.filter(r => {
+    let unique = recipients.filter(r => {
       if (seen.has(r.email)) return false;
       seen.add(r.email);
       return true;
     });
+
+    // Test mode — override audience with a single test recipient
+    if (testEmail) {
+      unique = [{ email: testEmail.toLowerCase().trim(), name: 'Test', id: 'test', type: 'lead' }];
+      console.log(`[send-broadcast] TEST MODE — sending only to ${testEmail}`);
+    }
 
     // Update recipient count
     await db.from('broadcasts').update({ recipient_count: unique.length }).eq('id', broadcastId);

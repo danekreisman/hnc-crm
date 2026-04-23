@@ -43,7 +43,7 @@ export default async function handler(req, res) {
         id, date, time, service, address, duration_hours, notes,
         client_id, cleaner_id,
         clients ( name, phone, email ),
-        cleaners ( name, phone )
+        cleaners!cleaner_id ( name, phone )
       `)
       .eq('date', tomorrowStr)
       .in('status', ['scheduled', 'assigned'])

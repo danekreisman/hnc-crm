@@ -12861,7 +12861,14 @@ async function completeTaskById(id) {
   var undone = false;
   var toastEl = document.createElement('div');
   toastEl.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#1e293b;color:#fff;padding:10px 16px;border-radius:10px;font-size:13px;display:flex;align-items:center;gap:12px;z-index:9999;box-shadow:0 4px 20px rgba(0,0,0,.3);';
-  toastEl.innerHTML = 'Task completed ✓ <button onclick="this.closest('div')._undo()" style="background:#3b82f6;border:none;color:#fff;padding:4px 10px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;">Undo</button>';
+  var toastMsg = document.createElement('span');
+  toastMsg.textContent = 'Task completed \u2713';
+  var toastBtn = document.createElement('button');
+  toastBtn.textContent = 'Undo';
+  toastBtn.style.cssText = 'background:#3b82f6;border:none;color:#fff;padding:4px 10px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;';
+  toastBtn.onclick = function() { toastEl._undo(); };
+  toastEl.appendChild(toastMsg);
+  toastEl.appendChild(toastBtn);
   toastEl._undo = function() {
     undone = true;
     _tasks.done = _tasks.done.filter(function(t){ return t.id !== id; });

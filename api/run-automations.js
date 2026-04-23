@@ -293,6 +293,11 @@ export default async function handler(req, res) {
                     }
                   }
 
+                  // If lead was previously quoted, include a Book Now button that preserves the quote
+                  const bookingUrlForLead = leadData.booking_token
+                    ? `${BASE_URL}/book.html?bt=${leadData.booking_token}`
+                    : null;
+
                   const emailRes = await fetch(`${BASE_URL}/api/send-email`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -301,7 +306,8 @@ export default async function handler(req, res) {
                       subject: substituteVars(action.subject || 'A note from Hawaii Natural Clean', leadData),
                       type: 'generic',
                       clientName: leadData.contact_name || leadData.name,
-                      notes: emailBody
+                      notes: emailBody,
+                      bookingUrl: bookingUrlForLead,
                     })
                   });
 

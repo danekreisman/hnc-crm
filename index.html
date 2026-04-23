@@ -9581,7 +9581,7 @@ async function openAutoTest(id) {
     _testAuto = auto;
 
     // Load leads for picker
-    var { data: leads } = await db.from('leads').select('id,name,email,phone,service,address,quote_total').order('created_at', { ascending: false }).limit(50);
+    var { data: leads } = await db.from('leads').select('id,name,email,phone,service,address,quote_total,booking_token').order('created_at', { ascending: false }).limit(50);
     _testLeads = leads || [];
 
     // Set name header
@@ -9767,16 +9767,23 @@ async function sendAutoTest() {
           if (r.ok && j.success !== false) sent++; else { failed++; console.error('SMS failed:', j); }
         }
         if (testEmail) {
-          // Deliver SMS content to email — use business name as subject
+          // Deliver SMS content to email with a descriptive subject
+          // Use the first 50 chars of the message as the subject preview
+          var previewSubject = message.replace(/[\r\n]+/g,' ').slice(0,60).trim();
+          if (previewSubject.length >= 60) previewSubject = previewSubject.replace(/\s+\S*$/,'') + '…';
+          var bookingUrlSmsTest = lead && lead.booking_token
+            ? window.location.origin + '/book.html?bt=' + lead.booking_token
+            : null;
           var r2 = await fetch('/api/send-email', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               to: testEmail,
-              subject: 'Hawaii Natural Clean',
+              subject: previewSubject || 'A note from Hawaii Natural Clean',
               type: 'generic',
               clientName: (lead.name || 'Test').split(' ')[0],
-              notes: message
+              notes: message,
+              bookingUrl: bookingUrlSmsTest,
             })
           });
           var j2 = await r2.json();
@@ -9784,6 +9791,10 @@ async function sendAutoTest() {
         }
       } else if (action.type === 'email') {
         if (testEmail) {
+          // Include Book Now button if the test lead has a booking token
+          var bookingUrlForTest = lead && lead.booking_token
+            ? window.location.origin + '/book.html?bt=' + lead.booking_token
+            : null;
           var r = await fetch('/api/send-email', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -9792,7 +9803,8 @@ async function sendAutoTest() {
               subject: substituteTestVars(action.subject || 'Hawaii Natural Clean', lead),
               type: 'generic',
               clientName: (lead.name || 'Test').split(' ')[0],
-              notes: message
+              notes: message,
+              bookingUrl: bookingUrlForTest,
             })
           });
           var j = await r.json();

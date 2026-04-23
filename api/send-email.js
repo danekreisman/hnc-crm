@@ -182,7 +182,7 @@ export default async function handler(req, res) {
     ({ to, subject, type } = req.body);
     const {
       clientName, amount, service, date, time, cleaner,
-      invoiceUrl, terms, notes,
+      invoiceUrl, terms, notes, bookingUrl,
     } = req.body;
 
     if (!to || !subject) {
@@ -391,6 +391,8 @@ export default async function handler(req, res) {
         heading: '',
         intro: '',
         bodyHtml: body || `<p style="margin:0;color:${BRAND.text};font-size:15px;line-height:1.65;">${subject}</p>`,
+        ctaText:  bookingUrl ? 'Book now' : '',
+        ctaUrl:   bookingUrl || '',
         footnote: `Reply here or text <a href="tel:${PHONE.replace(/\D/g,'')}" style="color:${BRAND.primary};text-decoration:none;">${PHONE}</a> anytime. Mahalo!`,
       });
     }

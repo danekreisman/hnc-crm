@@ -5123,6 +5123,7 @@ function handleTopCta(){
   else if(currentView==='automations'){openNewAuto();}
   else if(currentView==='payments'){openCustomInvoice();}
   else if(currentView==='messaging'){openNewMsgOverlay();}
+  else if(currentView==='tasks'){openTaskModal();}
 }
 
 function sv(view,el){
@@ -12756,6 +12757,7 @@ function showToast(msg, isError) {
 var _tasks = { open: [], done: [] };
 
 async function loadTasks() {
+  closeTaskModal();
   try {
     const [openResp, doneResp] = await Promise.all([
       fetch('/api/tasks?status=open'),

@@ -224,4 +224,23 @@ Run through this checklist:
 - Policy editor in Settings: edit titles/text, add/remove items, saves as JSON to `settings` table key `policy_items`
 - **Cleaning checklist** noted as future feature — will live under Operations in Settings
 
-*Last updated: April 2026 — Session 3 (settings redesign + policy editor).*
+**Session 4 — AI personalization + branded emails + full sequences:**
+- `/api/ai-personalize` — takes a template + clientId/leadId, pulls context from
+  clients/leads/call_transcripts/messages tables, rewrites via Claude with Hawaii
+  voice (Aloha/Mahalo) and sensitive topic guardrails. Always returns a usable
+  message (personalized OR template fallback).
+- Email system rewritten: `renderBrandedEmail()` shell used by all 9 email types.
+  Logo header, brand accent rule, white card, consistent footer. Mobile-responsive.
+- `run-automations.js` now supports AI personalization per-action (opt-in via
+  `action.ai_personalize = true`). Falls back to template if AI fails.
+- New trigger type: `days_in_segment` — fires once when a lead has been in a
+  specific segment for exactly N days. Used by all nurture/one-time/canceled
+  sequences to avoid firing repeatedly.
+- UI: AI personalization checkbox in automation builder for SMS/email actions.
+- UI: `days_in_segment` option in trigger dropdown with `segment:days` format.
+- `supabase/seed_automations.sql` — idempotent seed installing 9 sequences:
+  New Lead Day 3 / Day 7 / Nurture Month 1-3-6 / One-time Day 30-60 / Canceled Day 14-60.
+
+**Run the seed manually in Supabase SQL editor** to install the sequences.
+
+*Last updated: April 2026 — Session 4 (AI personalization + branded emails + sequences).*

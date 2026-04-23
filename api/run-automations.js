@@ -126,6 +126,31 @@ export default async function handler(req, res) {
           if (!error) matchingLeads = data || [];
         }
 
+        // ────────────────────────────────────────────────────────────────────
+        // TRIGGER 5: days_in_segment (X days since lead was moved into segment)
+        // Used for: nurture sequences, one-time re-engagement, canceled win-back
+        // ────────────────────────────────────────────────────────────────────
+        if (trigger_type === 'days_in_segment') {
+          const targetSegment = trigger_config?.segment;
+          const days = trigger_config?.days;
+          if (targetSegment && typeof days === 'number') {
+            const lowerBound = new Date(now.getTime() - (days + 1) * 24 * 60 * 60 * 1000);
+            const upperBound = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
+
+            // Leads in target segment, moved into it between days-1 and days ago
+            // This creates a 1-day window so each lead matches exactly once.
+            const { data, error } = await db
+              .from('leads')
+              .select('id')
+              .eq('segment', targetSegment)
+              .gte('segment_moved_at', lowerBound.toISOString())
+              .lt('segment_moved_at',  upperBound.toISOString())
+              .limit(50);
+
+            if (!error) matchingLeads = data || [];
+          }
+        }
+
         console.log(`[${executionId}] Found ${matchingLeads.length} matching leads for trigger: ${trigger_type}`);
 
         // ============================================================================
@@ -197,7 +222,31 @@ export default async function handler(req, res) {
                 }
 
                 if (action.type === 'sms') {
-                  const message = substituteVars(action.message, leadData);
+                  let message = substituteVars(action.message, leadData);
+
+                  // Optionally personalize with AI using call/SMS history
+                  if (action.ai_personalize) {
+                    try {
+                      const aiRes = await fetch(`${BASE_URL}/api/ai-personalize`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          template: message,
+                          channel: 'sms',
+                          leadId: leadData.id,
+                          purpose: automation.name,
+                        })
+                      });
+                      const aiData = await aiRes.json();
+                      if (aiData?.message && aiData.personalized) {
+                        message = aiData.message;
+                        console.log(`[${executionId}] AI personalized SMS for ${leadData.name}`);
+                      }
+                    } catch (aiErr) {
+                      console.warn(`[${executionId}] AI personalize failed, using template:`, aiErr.message);
+                    }
+                  }
+
                   const phone = leadData.phone;
 
                   const smsRes = await fetch(`${BASE_URL}/api/send-sms`, {
@@ -219,15 +268,40 @@ export default async function handler(req, res) {
                 }
 
                 if (action.type === 'email') {
+                  let emailBody = substituteVars(action.message || '', leadData);
+
+                  // Optionally personalize with AI using call/SMS history
+                  if (action.ai_personalize) {
+                    try {
+                      const aiRes = await fetch(`${BASE_URL}/api/ai-personalize`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          template: emailBody,
+                          channel: 'email',
+                          leadId: leadData.id,
+                          purpose: automation.name,
+                        })
+                      });
+                      const aiData = await aiRes.json();
+                      if (aiData?.message && aiData.personalized) {
+                        emailBody = aiData.message;
+                        console.log(`[${executionId}] AI personalized email for ${leadData.name}`);
+                      }
+                    } catch (aiErr) {
+                      console.warn(`[${executionId}] AI personalize failed, using template:`, aiErr.message);
+                    }
+                  }
+
                   const emailRes = await fetch(`${BASE_URL}/api/send-email`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                       to: leadData.email,
-                      subject: action.subject || 'Follow-up from Hawaii Natural Clean',
+                      subject: substituteVars(action.subject || 'A note from Hawaii Natural Clean', leadData),
                       type: 'generic',
-                      clientName: leadData.contact_name,
-                      notes: substituteVars(action.message || '', leadData)
+                      clientName: leadData.contact_name || leadData.name,
+                      notes: emailBody
                     })
                   });
 

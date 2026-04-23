@@ -6462,7 +6462,7 @@ function autoRenderActionFields(row, type, preset){
   host.innerHTML = '';
   def.fields.forEach(function(fn){
     var wrap = document.createElement('div');
-    var isBody = (fn==='body');
+    var isBody = (fn==='body' || fn==='message');
     wrap.innerHTML = '<label style="font-size:11px;color:var(--muted);display:block;margin-bottom:2px;">'+fn+'</label>'+
       (isBody
         ? '<textarea class="aa-f" data-k="'+fn+'" rows="3" style="width:100%;"></textarea>'
@@ -6470,6 +6470,20 @@ function autoRenderActionFields(row, type, preset){
     host.appendChild(wrap);
     if(preset && preset[fn]!=null) wrap.querySelector('.aa-f').value = preset[fn];
   });
+
+  // AI personalization toggle — only for messaging action types
+  if (type === 'sms' || type === 'email') {
+    var aiWrap = document.createElement('label');
+    aiWrap.style.cssText = 'display:flex;align-items:center;gap:10px;margin-top:6px;padding:10px 12px;background:linear-gradient(135deg,#EFF9FC,#FDF7E0);border:1px solid #A5E6E9;border-radius:8px;cursor:pointer;user-select:none;';
+    var isChecked = preset && preset.ai_personalize ? 'checked' : '';
+    aiWrap.innerHTML =
+      '<input type="checkbox" class="aa-ai-personalize" '+isChecked+' style="margin:0;cursor:pointer;">'+
+      '<div style="flex:1;">'+
+        '<div style="font-size:12px;font-weight:600;color:#0F172A;">✨ Personalize with AI</div>'+
+        '<div style="font-size:11px;color:#64748B;margin-top:2px;line-height:1.4;">Rewrites this message using the client\'s call transcripts and SMS history for a personal touch.</div>'+
+      '</div>';
+    host.appendChild(aiWrap);
+  }
 }
 
 function autoCopyVar(v){
@@ -6535,15 +6549,17 @@ function autoDelete(id){
 
 function updateTriggerExtra(){
   var trigger = document.getElementById('auton-trigger').value;
-  var needsValue = ['days_since_response', 'scheduled', 'booking_completed'];
+  var needsValue = ['days_since_response', 'scheduled', 'booking_completed', 'days_in_segment'];
   var extraDiv = document.getElementById('auton-trigger-extra');
   var label = document.getElementById('auton-trigger-label');
-  
+  var input = document.getElementById('auton-trigger-value');
+
   if(needsValue.indexOf(trigger) >= 0){
     extraDiv.style.display = 'block';
-    if(trigger === 'days_since_response') label.textContent = 'Days since response';
-    else if(trigger === 'scheduled') label.textContent = 'Time of day (HH:MM, e.g. 09:00)';
-    else if(trigger === 'booking_completed') label.textContent = 'Hours after booking completed';
+    if(trigger === 'days_since_response') { label.textContent = 'Days since response'; if(input) input.placeholder = 'e.g. 7'; }
+    else if(trigger === 'scheduled') { label.textContent = 'Time of day (HH:MM, e.g. 09:00)'; if(input) input.placeholder = '09:00'; }
+    else if(trigger === 'booking_completed') { label.textContent = 'Hours after booking completed'; if(input) input.placeholder = 'e.g. 24'; }
+    else if(trigger === 'days_in_segment') { label.textContent = 'Segment and days (format: segment:days)'; if(input) input.placeholder = 'nurture:30  or  canceled:60  or  one_time:30'; }
   } else {
     extraDiv.style.display = 'none';
   }
@@ -6561,6 +6577,11 @@ async function leadAutoSave(){
   else if(triggerType === 'days_since_response') triggerConfig = { days: parseInt(triggerValue) || 7 };
   else if(triggerType === 'scheduled') triggerConfig = { time_of_day: triggerValue || '09:00', days: ['MO','TU','WE','TH','FR','SA','SU'] };
   else if(triggerType === 'booking_completed') triggerConfig = { hours_after: parseInt(triggerValue) || 24 };
+  else if(triggerType === 'days_in_segment') {
+    // Format: "nurture:30" or "canceled:60"
+    var parts = (triggerValue || '').split(':');
+    triggerConfig = { segment: (parts[0] || 'nurture').trim(), days: parseInt(parts[1]) || 30 };
+  }
 
   var actions = [];
   document.querySelectorAll('#auton-actions .auto-act').forEach(function(r){
@@ -6570,6 +6591,9 @@ async function leadAutoSave(){
     r.querySelectorAll('.aa-f').forEach(function(f){
       if(f.dataset.k !== 'delay_minutes') act[f.dataset.k] = f.value;
     });
+    // Save AI personalization flag if this is a messaging action
+    var aiCheckbox = r.querySelector('.aa-ai-personalize');
+    if (aiCheckbox) act.ai_personalize = aiCheckbox.checked;
     actions.push(act);
   });
 
@@ -6728,7 +6752,10 @@ async function editLeadAuto(id) {
     // Set trigger config value
     var triggerValue = '';
     var cfg = data.trigger_config || {};
-    if(typeof cfg.days === 'number') triggerValue = cfg.days;
+    if (data.trigger_type === 'days_in_segment') {
+      triggerValue = (cfg.segment || 'nurture') + ':' + (cfg.days || 30);
+    }
+    else if(typeof cfg.days === 'number') triggerValue = cfg.days;
     else if(cfg.hours_after) triggerValue = cfg.hours_after;
     else if(cfg.time_of_day) triggerValue = cfg.time_of_day;
     document.getElementById('auton-trigger-value').value = triggerValue;
@@ -6747,10 +6774,15 @@ async function editLeadAuto(id) {
       setTimeout(function() {
         var msgField = lastRow.querySelector('[data-k="message"]');
         if(msgField && action.message) msgField.value = action.message;
+        var subjField = lastRow.querySelector('[data-k="subject"]');
+        if(subjField && action.subject) subjField.value = action.subject;
         var delayField = lastRow.querySelector('[data-k="delay_minutes"]');
         if(delayField && action.delay_minutes != null) delayField.value = action.delay_minutes;
         var segField = lastRow.querySelector('[data-k="new_segment"]');
         if(segField && action.new_segment) segField.value = action.new_segment;
+        // Restore AI personalization checkbox
+        var aiCheckbox = lastRow.querySelector('.aa-ai-personalize');
+        if(aiCheckbox) aiCheckbox.checked = !!action.ai_personalize;
       }, 50);
     });
 
@@ -11138,6 +11170,7 @@ loadSettings();
           <option value="days_since_response">Lead hasn't responded for N days</option>
           <option value="scheduled">Scheduled (every day/week at specific time)</option>
           <option value="booking_completed">Booking/appointment completed</option>
+          <option value="days_in_segment">Days since moved to segment (nurture / one-time / canceled)</option>
         </select>
       </div>
 

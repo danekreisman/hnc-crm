@@ -315,6 +315,33 @@ body{font-family:'Josefin Sans',sans-serif;color:var(--text);overflow-x:hidden;}
   .svc-grid{grid-template-columns:1fr 1fr;}
 }
 </style>
+  <script>
+    function initLfPlaces() {
+      var input = document.getElementById('lf-address');
+      if (!input || !window.google) return;
+      var ac = new google.maps.places.Autocomplete(input, {
+        componentRestrictions: { country: 'us' },
+        fields: ['formatted_address'],
+        types: ['address'],
+      });
+      // Bias results toward Hawaii
+      ac.setBounds(new google.maps.LatLngBounds(
+        new google.maps.LatLng(18.9, -160.3),
+        new google.maps.LatLng(22.3, -154.7)
+      ));
+      ac.addListener('place_changed', function() {
+        var place = ac.getPlace();
+        if (place.formatted_address) {
+          input.value = place.formatted_address;
+        }
+      });
+      // Fix z-index so dropdown shows above form
+      var style = document.createElement('style');
+      style.textContent = '.pac-container { z-index: 2147483647 !important; }';
+      document.head.appendChild(style);
+    }
+  </script>
+  <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBWdNABNi3MkoknRFMmRxBP7BX8eCOEFcc&libraries=places&callback=initLfPlaces" async defer></script>
 </head>
 <body>
 <div class="page">
@@ -392,6 +419,11 @@ body{font-family:'Josefin Sans',sans-serif;color:var(--text);overflow-x:hidden;}
           <input type="tel" id="phone" placeholder="(808) 555-0000" autocomplete="tel">
           <div class="ferr" id="fe-phone"></div>
         </div>
+      </div>
+      <div class="field" style="margin-top:4px;">
+        <label>Service address <span style="color:var(--error)">*</span></label>
+        <input type="text" id="lf-address" placeholder="Start typing your address…" autocomplete="off" style="font-size:15px;">
+        <div class="ferr" id="fe-lf-address"></div>
       </div>
       <div class="btn-row">
         <button class="btn-next" onclick="next(1)">Continue <svg viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
@@ -580,6 +612,7 @@ function validate(s){
     if(document.getElementById('fullName').value.trim().length<2){se('fullName','Please enter your full name');ok=false;}else ce('fullName');
     if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(document.getElementById('email').value.trim())){se('email','Enter a valid email address');ok=false;}else ce('email');
     if(document.getElementById('phone').value.replace(/\D/g,'').length<10){se('phone','Enter a valid 10-digit number');ok=false;}else ce('phone');
+    if(document.getElementById('lf-address').value.trim().length<5){se('lf-address','Please enter your service address');ok=false;}else ce('lf-address');
     return ok;
   }
   if(s===2){
@@ -667,7 +700,7 @@ async function doSubmit(){
     name:document.getElementById('fullName').value.trim(),
     email:document.getElementById('email').value.trim(),
     phone:document.getElementById('phone').value.trim(),
-    address:'To be collected at booking',
+    address:document.getElementById('lf-address').value.trim(),
     beds:document.getElementById('beds').value||null,
     baths:document.getElementById('baths').value||null,
     sqft:document.getElementById('sqft').value||null,

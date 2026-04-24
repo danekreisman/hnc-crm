@@ -3,6 +3,24 @@ import { validateOrFail, SCHEMAS } from './utils/validate.js';
 import { fetchWithTimeout, TIMEOUTS } from './utils/with-timeout.js';
 import { logError } from './utils/error-logger.js';
 
+// ── Activity Logger ──────────────────────────────────────────────────────────
+async function logActivity(action, description, metadata = {}) {
+  try {
+    await fetch(process.env.SUPABASE_URL + '/rest/v1/activity_logs', {
+      method: 'POST',
+      headers: {
+        'apikey': process.env.SUPABASE_SERVICE_ROLE_KEY,
+        'Authorization': 'Bearer ' + process.env.SUPABASE_SERVICE_ROLE_KEY,
+        'Content-Type': 'application/json',
+        'Prefer': 'return=minimal'
+      },
+      body: JSON.stringify({ action, description, user_email: 'system', entity_type: action, metadata })
+    });
+  } catch (_e) { /* non-blocking */ }
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
+
 const db = () => createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY,
@@ -241,6 +259,7 @@ export default async function handler(req, res) {
       await logError('lead-book:policy-sms', err, { leadId: lead.id, clientId });
     }
 
+  await logActivity('lead_booked', 'Lead booked as client: ' + (body.name || body.clientName || 'Unknown'), { name: body.name, service: body.service, date: body.date });
     return res.status(200).json({
       success: true,
       appointmentId,

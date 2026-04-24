@@ -1,6 +1,17 @@
 import { createClient } from '@supabase/supabase-js';
 import { logError } from './utils/error-logger.js';
 
+async function logActivity(action, description, metadata={}) {
+  try {
+    await fetch(process.env.SUPABASE_URL+'/rest/v1/activity_logs',{
+      method:'POST',
+      headers:{'apikey':process.env.SUPABASE_SERVICE_ROLE_KEY,'Authorization':'Bearer '+process.env.SUPABASE_SERVICE_ROLE_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+      body:JSON.stringify({action,description,user_email:'system',entity_type:action,metadata})
+    });
+  } catch(_){}
+}
+
+
 const HNC_BUSINESS_PHONE = '(808) 468-5356';
 
 export default async function handler(req, res) {

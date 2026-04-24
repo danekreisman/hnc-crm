@@ -1,6 +1,10 @@
 {
   "rewrites": [
     {
+      "source": "/feedback",
+      "destination": "/feedback.html"
+    },
+    {
       "source": "/contact",
       "destination": "/lead-form.html"
     },

@@ -246,17 +246,28 @@ export default async function handler(req, res) {
       });
     }
 
-    // ─── JOB COMPLETE / THANK YOU + REVIEW ──────────────────────────────────
+    // ─── JOB COMPLETE / THANK YOU + FEEDBACK GATE ───────────────────────────
     else if (type === 'thankyou') {
+      const { feedbackUrl } = req.body;
+      const fUrl = feedbackUrl || 'https://hnc-crm.vercel.app/feedback';
+
       html = renderBrandedEmail({
-        preheader: `How did we do, ${firstName}?`,
+        preheader: `How was your clean today, ${firstName}?`,
         heading: `Mahalo, ${firstName}! 🌺`,
-        intro: `Your home has been freshly cleaned. We hope it feels wonderful to come home to.`,
+        intro: `Your home has been freshly cleaned. We hope it feels wonderful to walk into.`,
         bodyHtml:
-          `<p style="margin:0 0 24px;color:${BRAND.text};font-size:15px;line-height:1.65;">If you have a moment, we'd be so grateful for a quick Google review. It means the world to a local Hawaii business and helps us serve more families across the islands.</p>`,
-        ctaText: 'Leave a Google review',
-        ctaUrl:  'https://g.page/r/hawaiinaturalclean/review',
-        footnote: `Any feedback — good or otherwise — reply here and Dane will read it personally.`,
+          `<p style="margin:0 0 24px;color:${BRAND.text};font-size:15px;line-height:1.65;">We'd love to hear how it went — it only takes a second and means the world to our small team.</p>` +
+          `<table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:0 auto 28px;">
+            <tr>
+              <td style="padding-right:10px;">
+                <a href="${fUrl}?r=positive" style="display:inline-block;background:${BRAND.primary};color:#fff;text-decoration:none;font-weight:600;font-size:15px;padding:14px 26px;border-radius:999px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;">✨ It was great!</a>
+              </td>
+              <td>
+                <a href="${fUrl}?r=negative" style="display:inline-block;background:#fff;color:${BRAND.text};text-decoration:none;font-weight:600;font-size:15px;padding:13px 26px;border-radius:999px;border:2px solid ${BRAND.border};font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;">💬 Could be better</a>
+              </td>
+            </tr>
+          </table>`,
+        footnote: `Any questions or concerns, reply here and Dane will read it personally. Mahalo for choosing Hawaii Natural Clean!`,
       });
     }
 

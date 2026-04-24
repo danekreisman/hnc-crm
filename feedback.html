@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hawaii Natural Clean — How was your clean?</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Josefin+Sans:wght@300;400;600;700&family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+:root{
+  --blue:#3BB8E3;--blue2:#59C7E2;--gold:#F2E19B;--gold-dark:#d4c277;
+  --text:#1a2e38;--muted:#5a7a8a;--border:#d0eaf4;--bg:#f8fbfd;
+  --white:#fff;--error:#e05c5c;--green:#22c55e;
+}
+html,body{min-height:100vh;background:var(--bg);font-family:'Josefin Sans',-apple-system,BlinkMacSystemFont,sans-serif;color:var(--text);}
+.page{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px 16px;}
+.card{background:var(--white);border-radius:20px;box-shadow:0 4px 40px rgba(59,184,227,.10);padding:48px 40px;max-width:480px;width:100%;text-align:center;}
+.logo{width:140px;height:auto;margin:0 auto 28px;display:block;}
+.rule{width:40px;height:3px;background:var(--blue);border-radius:2px;margin:0 auto 28px;}
+h1{font-family:'Cormorant Garamond',serif;font-size:28px;font-weight:400;color:var(--text);margin-bottom:10px;line-height:1.25;}
+.sub{color:var(--muted);font-size:14px;line-height:1.6;margin-bottom:32px;}
+.btn-row{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;}
+.btn{display:inline-flex;align-items:center;gap:8px;padding:14px 28px;border-radius:999px;font-size:15px;font-weight:600;cursor:pointer;border:none;transition:all .15s;font-family:'Josefin Sans',sans-serif;text-decoration:none;}
+.btn-yes{background:var(--blue);color:#fff;}
+.btn-yes:hover{background:#2aa8d3;transform:translateY(-1px);}
+.btn-no{background:var(--white);color:var(--text);border:2px solid var(--border);}
+.btn-no:hover{border-color:var(--blue);color:var(--blue);}
+.section{display:none;}
+.section.active{display:block;}
+textarea{width:100%;min-height:120px;border:1.5px solid var(--border);border-radius:12px;padding:14px 16px;font-size:14px;font-family:'Josefin Sans',sans-serif;color:var(--text);resize:vertical;outline:none;transition:border .15s;margin-bottom:20px;}
+textarea:focus{border-color:var(--blue);}
+.btn-submit{background:var(--blue);color:#fff;padding:13px 32px;border-radius:999px;font-size:15px;font-weight:600;cursor:pointer;border:none;font-family:'Josefin Sans',sans-serif;transition:all .15s;width:100%;}
+.btn-submit:hover{background:#2aa8d3;}
+.btn-submit:disabled{opacity:.6;cursor:not-allowed;}
+.success-icon{font-size:48px;margin-bottom:16px;}
+.rebook{display:inline-block;margin-top:24px;padding:13px 28px;background:var(--gold);color:var(--text);border-radius:999px;font-size:14px;font-weight:600;text-decoration:none;font-family:'Josefin Sans',sans-serif;transition:all .15s;}
+.rebook:hover{background:var(--gold-dark);}
+.back{margin-top:20px;color:var(--muted);font-size:13px;cursor:pointer;}
+.back:hover{color:var(--blue);}
+@media(max-width:480px){.card{padding:36px 24px;}.btn-row{flex-direction:column;}.btn{justify-content:center;}}
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="card">
+    <img src="/hnc-logo.jpg" alt="Hawaii Natural Clean" class="logo">
+    <div class="rule"></div>
+
+    <!-- Section 1: The question -->
+    <div class="section active" id="s-question">
+      <h1>How was your clean today?</h1>
+      <p class="sub">Your honest feedback means everything to us and our small team.</p>
+      <div class="btn-row">
+        <button class="btn btn-yes" onclick="handleYes()">✨ It was great!</button>
+        <button class="btn btn-no" onclick="handleNo()">💬 Could be better</button>
+      </div>
+    </div>
+
+    <!-- Section 2a: Happy path — redirect to Google -->
+    <div class="section" id="s-happy">
+      <div class="success-icon">🌺</div>
+      <h1>Mahalo so much!</h1>
+      <p class="sub">We're so glad you loved it. If you have a moment, a Google review helps our small team more than you know.</p>
+      <a href="#" id="review-btn" class="btn btn-yes" style="display:inline-flex;margin-bottom:0;">⭐ Leave a review</a>
+      <p class="back" onclick="showSection('s-question')">← Go back</p>
+    </div>
+
+    <!-- Section 2b: Sad path — feedback form -->
+    <div class="section" id="s-feedback">
+      <div class="success-icon">💬</div>
+      <h1>We're sorry to hear that</h1>
+      <p class="sub" style="margin-bottom:20px;">Tell us what happened — Dane reads every message personally and will follow up with you.</p>
+      <textarea id="feedback-text" placeholder="What could we have done better?"></textarea>
+      <button class="btn-submit" id="submit-btn" onclick="submitFeedback()">Send feedback</button>
+      <p class="back" onclick="showSection('s-question')">← Go back</p>
+    </div>
+
+    <!-- Section 3: Feedback sent -->
+    <div class="section" id="s-sent">
+      <div class="success-icon">🤙</div>
+      <h1>Got it, mahalo!</h1>
+      <p class="sub">We'll be in touch soon to make it right. We really appreciate you letting us know.</p>
+      <a href="https://hnc-crm.vercel.app/contact" class="rebook">Book your next clean →</a>
+    </div>
+
+    <!-- Section 4: After review CTA -->
+    <div class="section" id="s-reviewed">
+      <div class="success-icon">⭐</div>
+      <h1>You're amazing, mahalo!</h1>
+      <p class="sub">Your review means the world to us. Ready to book your next clean?</p>
+      <a href="https://hnc-crm.vercel.app/contact" class="rebook">Book your next clean →</a>
+    </div>
+  </div>
+</div>
+
+<script>
+(function() {
+  // Parse URL params: ?c=clientId&a=appointmentId
+  var params = new URLSearchParams(location.search);
+  var clientId = params.get('c') || '';
+  var apptId   = params.get('a') || '';
+
+  // Set Google review URL from settings
+  var reviewUrl = 'https://g.page/r/CfqMUR341NgqEBM/review';
+
+  // Load review URL from API
+  fetch('/api/settings?key=google_review_url')
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (d.value) {
+        reviewUrl = d.value;
+        document.getElementById('review-btn').href = reviewUrl;
+      }
+    })
+    .catch(function() {});
+
+  document.getElementById('review-btn').href = reviewUrl;
+
+  // Track when they click the review link
+  document.getElementById('review-btn').addEventListener('click', function() {
+    // Log positive feedback
+    saveFeedback('positive', '', function() {});
+    // After a moment show the thank you section
+    setTimeout(function() { showSection('s-reviewed'); }, 500);
+  });
+
+  window.showSection = function(id) {
+    document.querySelectorAll('.section').forEach(function(s) { s.classList.remove('active'); });
+    document.getElementById(id).classList.add('active');
+  };
+
+  window.handleYes = function() {
+    document.getElementById('review-btn').href = reviewUrl;
+    showSection('s-happy');
+  };
+
+  window.handleNo = function() {
+    showSection('s-feedback');
+  };
+
+  window.submitFeedback = function() {
+    var msg = document.getElementById('feedback-text').value.trim();
+    if (!msg) { document.getElementById('feedback-text').focus(); return; }
+    var btn = document.getElementById('submit-btn');
+    btn.disabled = true;
+    btn.textContent = 'Sending...';
+    saveFeedback('negative', msg, function(ok) {
+      showSection('s-sent');
+    });
+  };
+
+  function saveFeedback(rating, message, cb) {
+    fetch('/api/feedback', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        clientId: clientId,
+        appointmentId: apptId || null,
+        rating: rating,
+        message: message || null,
+      }),
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(d) { cb(d.success); })
+    .catch(function() { cb(false); });
+  }
+})();
+</script>
+</body>
+</html>

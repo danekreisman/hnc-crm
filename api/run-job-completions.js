@@ -126,6 +126,34 @@ export default async function handler(req, res) {
       }
     }
 
+    // ── Post-clean thank-you email with feedback gate ─────────────────────
+    for (const apptId of toComplete) {
+      const appt = appointments.find(a => a.id === apptId);
+      if (!appt?.client_id) continue;
+      try {
+        const { data: client } = await db.from('clients')
+          .select('name, email')
+          .eq('id', appt.client_id)
+          .maybeSingle();
+        if (!client?.email) continue;
+        const feedbackUrl = `https://hnc-crm.vercel.app/feedback?c=${appt.client_id}&a=${apptId}`;
+        await fetch('https://hnc-crm.vercel.app/api/send-email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            to: client.email,
+            subject: 'How was your clean today? 🌺',
+            type: 'thankyou',
+            clientName: client.name,
+            feedbackUrl,
+          }),
+        });
+        console.log(`[run-job-completions] Post-clean email sent to ${client.email}`);
+      } catch (emailErr) {
+        console.error('[run-job-completions] Post-clean email failed:', emailErr.message);
+      }
+    }
+
     return res.status(200).json({
       success: true,
       completed: toComplete.length,

@@ -185,6 +185,18 @@ export default async function handler(req, res) {
       } catch(_emailErr) {
         await logError("tasks-email", _emailErr.message, { task: body });
       }
+      // SMS notification to VA
+      try {
+        const _title = body.title || body.task_title || "Untitled";
+        const _due = body.due_date ? " (Due: " + new Date(body.due_date).toLocaleDateString("en-US",{month:"short",day:"numeric"}) + ")" : "";
+        await fetchWithTimeout("/api/send-sms", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ to: "+18084685356", message: "New task: " + _title + _due + ". Check CRM." })
+        }, 10000);
+      } catch(_smsErr) {
+        await logError("tasks-sms", _smsErr.message, { task: body });
+      }
       return res.status(200).json({ success: true, task });
     }
 

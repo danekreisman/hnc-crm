@@ -13,6 +13,17 @@ import { createClient } from '@supabase/supabase-js';
 import { fetchWithTimeout, TIMEOUTS } from './utils/with-timeout.js';
 import { logError } from './utils/error-logger.js';
 
+async function logActivity(action, description, metadata={}) {
+  try {
+    await fetch(process.env.SUPABASE_URL+'/rest/v1/activity_logs',{
+      method:'POST',
+      headers:{'apikey':process.env.SUPABASE_SERVICE_ROLE_KEY,'Authorization':'Bearer '+process.env.SUPABASE_SERVICE_ROLE_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+      body:JSON.stringify({action,description,user_email:'system',entity_type:action,metadata})
+    });
+  } catch(_){}
+}
+
+
 const BASE_URL      = 'https://hnc-crm.vercel.app';
 const BUSINESS_NAME = 'Hawaii Natural Clean';
 const BUSINESS_PHONE = '(808) 468-5356';
@@ -138,6 +149,7 @@ export default async function handler(req, res) {
       }
     }
 
+  await logActivity('reminders_sent','Day-before appointment reminders sent',{count:results?.length||0});
     return res.status(200).json({
       success: true,
       appointments: appointments.length,

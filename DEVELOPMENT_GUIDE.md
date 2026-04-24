@@ -364,6 +364,112 @@ git push https://danekreisman:YOUR_PAT@github.com/danekreisman/hnc-crm.git main
 
 ---
 
+
+---
+
+## Session Log — April 23 2026 (Day 3)
+
+### Features shipped this session
+
+**Lead form address autocomplete** (`/contact` → `lead-form.html`)
+- Service address field added to step 1 (after email/phone)
+- Uses `/api/places-autocomplete` proxy (not direct Google Maps JS)
+- Proxy passes `Referer` header; API key restriction changed to "None" in Google Cloud Console so server-side calls work
+- Custom dropdown built in vanilla JS — no Maps SDK dependency
+- Keyboard nav: up/down arrows, Enter to select, Escape to close
+- Required field with validation before step 2
+
+**Vercel routing** (`vercel.json`)
+- `/contact` → `lead-form.html`
+- `/book` → `book.html`
+- `/portal` → `portal.html`
+- `/agree` → `agree.html`
+- `/feedback` → `feedback.html`
+
+**Booking confirmation email** (`send-email.js` type: `booking_confirmation`)
+- Fires on every booking via `lead-book.js`
+- Details card: date, time, service, frequency, address, total
+- Rush fee callout if applicable
+- "Before we arrive" tips box
+- Replaces old generic email type
+
+**Post-clean feedback gate** (`feedback.html`, `api/feedback.js`)
+- Flow: "How was your clean?" → two buttons
+  - "It was great!" → Google review opens in new tab → "You're amazing!" screen with "Book your next clean" CTA
+  - "Could be better" → text box → submits → "Got it mahalo!" + "Book your next clean" CTA
+- Negative feedback: saves to `client_feedback` table + auto-creates high-priority `call_client` VA task with message in description
+- Positive feedback: saves to `client_feedback` table
+- Rebooking CTA: fetches `booking_token` from client record → links to `/book.html?bt={token}` or falls back to `/contact`
+- Fires automatically from `run-job-completions.js` after each job is marked complete
+
+**Post-clean thank-you email** (`send-email.js` type: `thankyou` — updated)
+- Now has two side-by-side buttons instead of direct Google review link
+- Links to `/feedback?c={clientId}&a={apptId}`
+- Fires from `run-job-completions.js` after auto-mark complete
+
+**`api/settings.js`** (new)
+- Simple GET: `/api/settings?key=google_review_url`
+- Used by feedback page to load current review URL dynamically
+
+**`api/feedback.js`** (new)
+- POST: saves rating + message to `client_feedback`, creates VA task on negative
+- GET `?action=booking_token&clientId=`: returns client's booking_token for rebooking CTA
+
+**SQL migrations run this session**
+```sql
+CREATE TABLE IF NOT EXISTS client_feedback (
+  id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  created_at     TIMESTAMPTZ DEFAULT NOW(),
+  appointment_id UUID REFERENCES appointments(id) ON DELETE SET NULL,
+  client_id      UUID REFERENCES clients(id) ON DELETE CASCADE,
+  rating         TEXT NOT NULL CHECK (rating IN ('positive', 'negative')),
+  message        TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_feedback_client ON client_feedback (client_id);
+CREATE INDEX IF NOT EXISTS idx_feedback_rating ON client_feedback (rating);
+```
+
+**OpenPhone history utility** (`api/utils/openphone-history.js`)
+- Wired into all 3 AI features: ai-summary, ai-personalize, run-review-requests
+- Fetches up to 200 SMS + 25 call summaries per client by phone number
+- Caches phoneNumberId per cold start
+
+**AI summary prompt tightened**
+- "Factual only, no speculation about causes or emotional states"
+- max_tokens bumped 300→600
+
+**Task automations** (`api/run-task-automations.js`, cron: daily 6pm UTC / 8am HST)
+- Quote sent yesterday → creates "Call [Name] — quote follow-up" task (high, due today, AI brief)
+- Duplicate guard: skips if open call_lead task already exists for that lead
+
+**First-clean task** (in `run-job-completions.js`)
+- When job auto-marked complete: checks if first ever clean for client
+- Creates "Call [Name] — first clean complete" task (high, due today)
+
+**VA Tasks system** (fully wired)
+- `api/tasks.js`: GET list, POST create/complete/delete
+- AI brief auto-generated for call_lead and call_client tasks via OpenPhone history
+- Frontend: open/completed split, type badges, priority dots, overdue flags
+- Optimistic UI: delete instant, check-off instant with 5-second Undo toast
+- Loads via `db.from('tasks')` directly (no cold start delay)
+- `+ Add task` button wired via `handleTopCta()`
+
+**Google Review URL in Settings**
+- Stored in `settings` table key `google_review_url`
+- Editable in Settings → Business tab
+- Used by: run-review-requests.js, feedback.html (via /api/settings)
+
+### Key gotchas added this session
+- Google Places API key must have Application Restrictions = "None" for server-side proxy calls to work. Website restrictions block Vercel serverless functions.
+- `loading=async` in Maps JS URL conflicts with callback pattern — removed
+- `feedback.js` GET handler needs db initialized before method check (not inside POST block)
+- Automation typing doesn't trigger Google Places autocomplete listeners — use proxy approach, not browser-side Maps JS, for any server-side address lookup
+
+### Pending
+- `book_lead_atomic.sql` — re-run in Supabase SQL Editor to deploy segment fix
+- Wayne Johnson unsubscribe: `UPDATE leads SET unsubscribed_at = NULL WHERE id = 'dad0671b-c992-47a7-bb52-100c019dcf63';`
+- Test client (Dane Kreisman test@gmail.com, id: 30a1cdce): consider deleting
+
 ## V2 Roadmap
 
 Features deferred from v1 — build after launch and initial client feedback.
@@ -390,6 +496,10 @@ Features deferred from v1 — build after launch and initial client feedback.
 - Builds documentation and trust with clients
 
 **Moving season / real estate broadcast templates**
+
+**Client portal rebooking** — client portal (`/portal`) is currently cleaner-only. Add a client-facing portal with upcoming appointments, invoice history, and a "Request next clean" button (currently redirects to /book.html?bt= or /contact).
+
+**Feedback analytics** — `client_feedback` table is collecting data. Build a view in Reporting to show satisfaction rate, common complaints, trends over time.
 - Move-in/move-out cleans (May–July peak)
 - Open house staging cleans
 - Add to broadcast template library
@@ -481,6 +591,112 @@ ALTER TABLE appointments ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT
 
 ---
 
+
+---
+
+## Session Log — April 23 2026 (Day 3)
+
+### Features shipped this session
+
+**Lead form address autocomplete** (`/contact` → `lead-form.html`)
+- Service address field added to step 1 (after email/phone)
+- Uses `/api/places-autocomplete` proxy (not direct Google Maps JS)
+- Proxy passes `Referer` header; API key restriction changed to "None" in Google Cloud Console so server-side calls work
+- Custom dropdown built in vanilla JS — no Maps SDK dependency
+- Keyboard nav: up/down arrows, Enter to select, Escape to close
+- Required field with validation before step 2
+
+**Vercel routing** (`vercel.json`)
+- `/contact` → `lead-form.html`
+- `/book` → `book.html`
+- `/portal` → `portal.html`
+- `/agree` → `agree.html`
+- `/feedback` → `feedback.html`
+
+**Booking confirmation email** (`send-email.js` type: `booking_confirmation`)
+- Fires on every booking via `lead-book.js`
+- Details card: date, time, service, frequency, address, total
+- Rush fee callout if applicable
+- "Before we arrive" tips box
+- Replaces old generic email type
+
+**Post-clean feedback gate** (`feedback.html`, `api/feedback.js`)
+- Flow: "How was your clean?" → two buttons
+  - "It was great!" → Google review opens in new tab → "You're amazing!" screen with "Book your next clean" CTA
+  - "Could be better" → text box → submits → "Got it mahalo!" + "Book your next clean" CTA
+- Negative feedback: saves to `client_feedback` table + auto-creates high-priority `call_client` VA task with message in description
+- Positive feedback: saves to `client_feedback` table
+- Rebooking CTA: fetches `booking_token` from client record → links to `/book.html?bt={token}` or falls back to `/contact`
+- Fires automatically from `run-job-completions.js` after each job is marked complete
+
+**Post-clean thank-you email** (`send-email.js` type: `thankyou` — updated)
+- Now has two side-by-side buttons instead of direct Google review link
+- Links to `/feedback?c={clientId}&a={apptId}`
+- Fires from `run-job-completions.js` after auto-mark complete
+
+**`api/settings.js`** (new)
+- Simple GET: `/api/settings?key=google_review_url`
+- Used by feedback page to load current review URL dynamically
+
+**`api/feedback.js`** (new)
+- POST: saves rating + message to `client_feedback`, creates VA task on negative
+- GET `?action=booking_token&clientId=`: returns client's booking_token for rebooking CTA
+
+**SQL migrations run this session**
+```sql
+CREATE TABLE IF NOT EXISTS client_feedback (
+  id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  created_at     TIMESTAMPTZ DEFAULT NOW(),
+  appointment_id UUID REFERENCES appointments(id) ON DELETE SET NULL,
+  client_id      UUID REFERENCES clients(id) ON DELETE CASCADE,
+  rating         TEXT NOT NULL CHECK (rating IN ('positive', 'negative')),
+  message        TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_feedback_client ON client_feedback (client_id);
+CREATE INDEX IF NOT EXISTS idx_feedback_rating ON client_feedback (rating);
+```
+
+**OpenPhone history utility** (`api/utils/openphone-history.js`)
+- Wired into all 3 AI features: ai-summary, ai-personalize, run-review-requests
+- Fetches up to 200 SMS + 25 call summaries per client by phone number
+- Caches phoneNumberId per cold start
+
+**AI summary prompt tightened**
+- "Factual only, no speculation about causes or emotional states"
+- max_tokens bumped 300→600
+
+**Task automations** (`api/run-task-automations.js`, cron: daily 6pm UTC / 8am HST)
+- Quote sent yesterday → creates "Call [Name] — quote follow-up" task (high, due today, AI brief)
+- Duplicate guard: skips if open call_lead task already exists for that lead
+
+**First-clean task** (in `run-job-completions.js`)
+- When job auto-marked complete: checks if first ever clean for client
+- Creates "Call [Name] — first clean complete" task (high, due today)
+
+**VA Tasks system** (fully wired)
+- `api/tasks.js`: GET list, POST create/complete/delete
+- AI brief auto-generated for call_lead and call_client tasks via OpenPhone history
+- Frontend: open/completed split, type badges, priority dots, overdue flags
+- Optimistic UI: delete instant, check-off instant with 5-second Undo toast
+- Loads via `db.from('tasks')` directly (no cold start delay)
+- `+ Add task` button wired via `handleTopCta()`
+
+**Google Review URL in Settings**
+- Stored in `settings` table key `google_review_url`
+- Editable in Settings → Business tab
+- Used by: run-review-requests.js, feedback.html (via /api/settings)
+
+### Key gotchas added this session
+- Google Places API key must have Application Restrictions = "None" for server-side proxy calls to work. Website restrictions block Vercel serverless functions.
+- `loading=async` in Maps JS URL conflicts with callback pattern — removed
+- `feedback.js` GET handler needs db initialized before method check (not inside POST block)
+- Automation typing doesn't trigger Google Places autocomplete listeners — use proxy approach, not browser-side Maps JS, for any server-side address lookup
+
+### Pending
+- `book_lead_atomic.sql` — re-run in Supabase SQL Editor to deploy segment fix
+- Wayne Johnson unsubscribe: `UPDATE leads SET unsubscribed_at = NULL WHERE id = 'dad0671b-c992-47a7-bb52-100c019dcf63';`
+- Test client (Dane Kreisman test@gmail.com, id: 30a1cdce): consider deleting
+
 ## V2 Roadmap
 
 Features deferred from v1 — build after launch and initial client feedback.
@@ -507,6 +723,10 @@ Features deferred from v1 — build after launch and initial client feedback.
 - Builds documentation and trust with clients
 
 **Moving season / real estate broadcast templates**
+
+**Client portal rebooking** — client portal (`/portal`) is currently cleaner-only. Add a client-facing portal with upcoming appointments, invoice history, and a "Request next clean" button (currently redirects to /book.html?bt= or /contact).
+
+**Feedback analytics** — `client_feedback` table is collecting data. Build a view in Reporting to show satisfaction rate, common complaints, trends over time.
 - Move-in/move-out cleans (May–July peak)
 - Open house staging cleans
 - Add to broadcast template library
@@ -569,6 +789,112 @@ Features deferred from v1 — build after launch and initial client feedback.
 
 ---
 
+
+---
+
+## Session Log — April 23 2026 (Day 3)
+
+### Features shipped this session
+
+**Lead form address autocomplete** (`/contact` → `lead-form.html`)
+- Service address field added to step 1 (after email/phone)
+- Uses `/api/places-autocomplete` proxy (not direct Google Maps JS)
+- Proxy passes `Referer` header; API key restriction changed to "None" in Google Cloud Console so server-side calls work
+- Custom dropdown built in vanilla JS — no Maps SDK dependency
+- Keyboard nav: up/down arrows, Enter to select, Escape to close
+- Required field with validation before step 2
+
+**Vercel routing** (`vercel.json`)
+- `/contact` → `lead-form.html`
+- `/book` → `book.html`
+- `/portal` → `portal.html`
+- `/agree` → `agree.html`
+- `/feedback` → `feedback.html`
+
+**Booking confirmation email** (`send-email.js` type: `booking_confirmation`)
+- Fires on every booking via `lead-book.js`
+- Details card: date, time, service, frequency, address, total
+- Rush fee callout if applicable
+- "Before we arrive" tips box
+- Replaces old generic email type
+
+**Post-clean feedback gate** (`feedback.html`, `api/feedback.js`)
+- Flow: "How was your clean?" → two buttons
+  - "It was great!" → Google review opens in new tab → "You're amazing!" screen with "Book your next clean" CTA
+  - "Could be better" → text box → submits → "Got it mahalo!" + "Book your next clean" CTA
+- Negative feedback: saves to `client_feedback` table + auto-creates high-priority `call_client` VA task with message in description
+- Positive feedback: saves to `client_feedback` table
+- Rebooking CTA: fetches `booking_token` from client record → links to `/book.html?bt={token}` or falls back to `/contact`
+- Fires automatically from `run-job-completions.js` after each job is marked complete
+
+**Post-clean thank-you email** (`send-email.js` type: `thankyou` — updated)
+- Now has two side-by-side buttons instead of direct Google review link
+- Links to `/feedback?c={clientId}&a={apptId}`
+- Fires from `run-job-completions.js` after auto-mark complete
+
+**`api/settings.js`** (new)
+- Simple GET: `/api/settings?key=google_review_url`
+- Used by feedback page to load current review URL dynamically
+
+**`api/feedback.js`** (new)
+- POST: saves rating + message to `client_feedback`, creates VA task on negative
+- GET `?action=booking_token&clientId=`: returns client's booking_token for rebooking CTA
+
+**SQL migrations run this session**
+```sql
+CREATE TABLE IF NOT EXISTS client_feedback (
+  id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  created_at     TIMESTAMPTZ DEFAULT NOW(),
+  appointment_id UUID REFERENCES appointments(id) ON DELETE SET NULL,
+  client_id      UUID REFERENCES clients(id) ON DELETE CASCADE,
+  rating         TEXT NOT NULL CHECK (rating IN ('positive', 'negative')),
+  message        TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_feedback_client ON client_feedback (client_id);
+CREATE INDEX IF NOT EXISTS idx_feedback_rating ON client_feedback (rating);
+```
+
+**OpenPhone history utility** (`api/utils/openphone-history.js`)
+- Wired into all 3 AI features: ai-summary, ai-personalize, run-review-requests
+- Fetches up to 200 SMS + 25 call summaries per client by phone number
+- Caches phoneNumberId per cold start
+
+**AI summary prompt tightened**
+- "Factual only, no speculation about causes or emotional states"
+- max_tokens bumped 300→600
+
+**Task automations** (`api/run-task-automations.js`, cron: daily 6pm UTC / 8am HST)
+- Quote sent yesterday → creates "Call [Name] — quote follow-up" task (high, due today, AI brief)
+- Duplicate guard: skips if open call_lead task already exists for that lead
+
+**First-clean task** (in `run-job-completions.js`)
+- When job auto-marked complete: checks if first ever clean for client
+- Creates "Call [Name] — first clean complete" task (high, due today)
+
+**VA Tasks system** (fully wired)
+- `api/tasks.js`: GET list, POST create/complete/delete
+- AI brief auto-generated for call_lead and call_client tasks via OpenPhone history
+- Frontend: open/completed split, type badges, priority dots, overdue flags
+- Optimistic UI: delete instant, check-off instant with 5-second Undo toast
+- Loads via `db.from('tasks')` directly (no cold start delay)
+- `+ Add task` button wired via `handleTopCta()`
+
+**Google Review URL in Settings**
+- Stored in `settings` table key `google_review_url`
+- Editable in Settings → Business tab
+- Used by: run-review-requests.js, feedback.html (via /api/settings)
+
+### Key gotchas added this session
+- Google Places API key must have Application Restrictions = "None" for server-side proxy calls to work. Website restrictions block Vercel serverless functions.
+- `loading=async` in Maps JS URL conflicts with callback pattern — removed
+- `feedback.js` GET handler needs db initialized before method check (not inside POST block)
+- Automation typing doesn't trigger Google Places autocomplete listeners — use proxy approach, not browser-side Maps JS, for any server-side address lookup
+
+### Pending
+- `book_lead_atomic.sql` — re-run in Supabase SQL Editor to deploy segment fix
+- Wayne Johnson unsubscribe: `UPDATE leads SET unsubscribed_at = NULL WHERE id = 'dad0671b-c992-47a7-bb52-100c019dcf63';`
+- Test client (Dane Kreisman test@gmail.com, id: 30a1cdce): consider deleting
+
 ## V2 Roadmap
 
 Features deferred from v1 — build after launch and initial client feedback.
@@ -595,6 +921,10 @@ Features deferred from v1 — build after launch and initial client feedback.
 - Builds documentation and trust with clients
 
 **Moving season / real estate broadcast templates**
+
+**Client portal rebooking** — client portal (`/portal`) is currently cleaner-only. Add a client-facing portal with upcoming appointments, invoice history, and a "Request next clean" button (currently redirects to /book.html?bt= or /contact).
+
+**Feedback analytics** — `client_feedback` table is collecting data. Build a view in Reporting to show satisfaction rate, common complaints, trends over time.
 - Move-in/move-out cleans (May–July peak)
 - Open house staging cleans
 - Add to broadcast template library
@@ -686,6 +1016,112 @@ ALTER TABLE appointments ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT
 
 ---
 
+
+---
+
+## Session Log — April 23 2026 (Day 3)
+
+### Features shipped this session
+
+**Lead form address autocomplete** (`/contact` → `lead-form.html`)
+- Service address field added to step 1 (after email/phone)
+- Uses `/api/places-autocomplete` proxy (not direct Google Maps JS)
+- Proxy passes `Referer` header; API key restriction changed to "None" in Google Cloud Console so server-side calls work
+- Custom dropdown built in vanilla JS — no Maps SDK dependency
+- Keyboard nav: up/down arrows, Enter to select, Escape to close
+- Required field with validation before step 2
+
+**Vercel routing** (`vercel.json`)
+- `/contact` → `lead-form.html`
+- `/book` → `book.html`
+- `/portal` → `portal.html`
+- `/agree` → `agree.html`
+- `/feedback` → `feedback.html`
+
+**Booking confirmation email** (`send-email.js` type: `booking_confirmation`)
+- Fires on every booking via `lead-book.js`
+- Details card: date, time, service, frequency, address, total
+- Rush fee callout if applicable
+- "Before we arrive" tips box
+- Replaces old generic email type
+
+**Post-clean feedback gate** (`feedback.html`, `api/feedback.js`)
+- Flow: "How was your clean?" → two buttons
+  - "It was great!" → Google review opens in new tab → "You're amazing!" screen with "Book your next clean" CTA
+  - "Could be better" → text box → submits → "Got it mahalo!" + "Book your next clean" CTA
+- Negative feedback: saves to `client_feedback` table + auto-creates high-priority `call_client` VA task with message in description
+- Positive feedback: saves to `client_feedback` table
+- Rebooking CTA: fetches `booking_token` from client record → links to `/book.html?bt={token}` or falls back to `/contact`
+- Fires automatically from `run-job-completions.js` after each job is marked complete
+
+**Post-clean thank-you email** (`send-email.js` type: `thankyou` — updated)
+- Now has two side-by-side buttons instead of direct Google review link
+- Links to `/feedback?c={clientId}&a={apptId}`
+- Fires from `run-job-completions.js` after auto-mark complete
+
+**`api/settings.js`** (new)
+- Simple GET: `/api/settings?key=google_review_url`
+- Used by feedback page to load current review URL dynamically
+
+**`api/feedback.js`** (new)
+- POST: saves rating + message to `client_feedback`, creates VA task on negative
+- GET `?action=booking_token&clientId=`: returns client's booking_token for rebooking CTA
+
+**SQL migrations run this session**
+```sql
+CREATE TABLE IF NOT EXISTS client_feedback (
+  id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  created_at     TIMESTAMPTZ DEFAULT NOW(),
+  appointment_id UUID REFERENCES appointments(id) ON DELETE SET NULL,
+  client_id      UUID REFERENCES clients(id) ON DELETE CASCADE,
+  rating         TEXT NOT NULL CHECK (rating IN ('positive', 'negative')),
+  message        TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_feedback_client ON client_feedback (client_id);
+CREATE INDEX IF NOT EXISTS idx_feedback_rating ON client_feedback (rating);
+```
+
+**OpenPhone history utility** (`api/utils/openphone-history.js`)
+- Wired into all 3 AI features: ai-summary, ai-personalize, run-review-requests
+- Fetches up to 200 SMS + 25 call summaries per client by phone number
+- Caches phoneNumberId per cold start
+
+**AI summary prompt tightened**
+- "Factual only, no speculation about causes or emotional states"
+- max_tokens bumped 300→600
+
+**Task automations** (`api/run-task-automations.js`, cron: daily 6pm UTC / 8am HST)
+- Quote sent yesterday → creates "Call [Name] — quote follow-up" task (high, due today, AI brief)
+- Duplicate guard: skips if open call_lead task already exists for that lead
+
+**First-clean task** (in `run-job-completions.js`)
+- When job auto-marked complete: checks if first ever clean for client
+- Creates "Call [Name] — first clean complete" task (high, due today)
+
+**VA Tasks system** (fully wired)
+- `api/tasks.js`: GET list, POST create/complete/delete
+- AI brief auto-generated for call_lead and call_client tasks via OpenPhone history
+- Frontend: open/completed split, type badges, priority dots, overdue flags
+- Optimistic UI: delete instant, check-off instant with 5-second Undo toast
+- Loads via `db.from('tasks')` directly (no cold start delay)
+- `+ Add task` button wired via `handleTopCta()`
+
+**Google Review URL in Settings**
+- Stored in `settings` table key `google_review_url`
+- Editable in Settings → Business tab
+- Used by: run-review-requests.js, feedback.html (via /api/settings)
+
+### Key gotchas added this session
+- Google Places API key must have Application Restrictions = "None" for server-side proxy calls to work. Website restrictions block Vercel serverless functions.
+- `loading=async` in Maps JS URL conflicts with callback pattern — removed
+- `feedback.js` GET handler needs db initialized before method check (not inside POST block)
+- Automation typing doesn't trigger Google Places autocomplete listeners — use proxy approach, not browser-side Maps JS, for any server-side address lookup
+
+### Pending
+- `book_lead_atomic.sql` — re-run in Supabase SQL Editor to deploy segment fix
+- Wayne Johnson unsubscribe: `UPDATE leads SET unsubscribed_at = NULL WHERE id = 'dad0671b-c992-47a7-bb52-100c019dcf63';`
+- Test client (Dane Kreisman test@gmail.com, id: 30a1cdce): consider deleting
+
 ## V2 Roadmap
 
 Features deferred from v1 — build after launch and initial client feedback.
@@ -712,6 +1148,10 @@ Features deferred from v1 — build after launch and initial client feedback.
 - Builds documentation and trust with clients
 
 **Moving season / real estate broadcast templates**
+
+**Client portal rebooking** — client portal (`/portal`) is currently cleaner-only. Add a client-facing portal with upcoming appointments, invoice history, and a "Request next clean" button (currently redirects to /book.html?bt= or /contact).
+
+**Feedback analytics** — `client_feedback` table is collecting data. Build a view in Reporting to show satisfaction rate, common complaints, trends over time.
 - Move-in/move-out cleans (May–July peak)
 - Open house staging cleans
 - Add to broadcast template library

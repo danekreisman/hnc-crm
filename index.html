@@ -13170,7 +13170,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
 async function toggleReminderAuto(enabled) {
   try {
-    await db.from('ai_booking_settings').update({ reminders_enabled: enabled }).neq('id','00000000-0000-0000-0000-000000000000');
+    await db.from('ai_booking_settings').update({ reminders_enabled: enabled }).eq('id', 1);
+    const el = document.getElementById('toggle-reminders');
+    if (el) el.checked = enabled;
   } catch(e) { console.error('toggleReminderAuto',e); }
 }
 async function loadReminderToggleState() {

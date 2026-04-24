@@ -222,7 +222,16 @@ export default async function handler(req, res) {
         return res.status(200).json({ success: false, customerId: null, cards: [], error: e.message });
       }
     }
-    return res.status(400).json({ error: 'Unknown action' });
+    
+  // Void invoice
+  if (action === 'void_invoice') {
+    const { invoiceId } = body;
+    if (!invoiceId) return res.status(400).json({ error: 'invoiceId required' });
+    const voidRes = await stripe.invoices.voidInvoice(invoiceId);
+    return res.status(200).json({ success: true, status: voidRes.status });
+  }
+
+  return res.status(400).json({ error: 'Unknown action' });
   } catch (err) {
             console.error('[stripe-invoice] Error:', err);
             return res.status(500).json({ error: err.message });

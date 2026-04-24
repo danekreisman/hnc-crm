@@ -13167,7 +13167,7 @@ document.addEventListener('DOMContentLoaded', () => {
   wrap('saveNewClient', 'client_added', () => 'New client added');
   const origFetch = window.fetch;
   window.fetch = async function(url, opts) { const res = await origFetch.apply(this, arguments); if (typeof url === 'string' && url.includes('stripe-invoice') && res.ok) { try { logActivity('invoice_sent', 'Invoice sent via Stripe'); } catch(e) {} } return res; };
-  db.auth.onAuthStateChange((event, session) => { if (event === 'SIGNED_IN' && session) { try { logActivity('user_login', 'User signed in: ' + session.user.email, 'auth'); } catch(e) {} } });
+  let _lastLoginLog = ''; db.auth.onAuthStateChange((event, session) => { if (event === 'SIGNED_IN' && session && session.user.email !== _lastLoginLog) { _lastLoginLog = session.user.email; try { logActivity('user_login', 'User signed in: ' + session.user.email, 'auth'); } catch(e) {} } });
 });
 // === END AUTO LOG WRAPPERS ===
 

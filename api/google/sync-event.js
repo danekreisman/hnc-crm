@@ -1,3 +1,5 @@
+import { fetchWithTimeout } from '../utils/with-timeout.js';
+import { logError } from '../utils/error-logger.js';
 const { createClient } = require('@supabase/supabase-js');
 var GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token';
 var CAL_EVENTS_URL = 'https://www.googleapis.com/calendar/v3/calendars/primary/events';
@@ -13,7 +15,7 @@ async function readBody(req) {
 }
 async function refreshAccessToken(integration) {
   var body = new URLSearchParams({ client_id: process.env.GOOGLE_CLIENT_ID, client_secret: process.env.GOOGLE_CLIENT_SECRET, refresh_token: integration.refresh_token, grant_type: 'refresh_token' });
-  var r = await fetch(GOOGLE_TOKEN_URL, { method: 'POST', headers: { 'content-type':'application/x-www-form-urlencoded' }, body: body.toString() });
+  var r = await fetchWithTimeout(GOOGLE_TOKEN_URL, { method: 'POST', headers: { 'content-type':'application/x-www-form-urlencoded' }, 10000), body: body.toString() });
   var j = await r.json();
   if (!r.ok) throw new Error('Refresh failed: ' + JSON.stringify(j));
   return { access_token: j.access_token, expires_at: new Date(Date.now() + Math.max(0, (j.expires_in || 0) - 60) * 1000).toISOString() };
@@ -93,7 +95,7 @@ module.exports = async (req, res) => {
       if (ownerInteg) {
         try {
           var tokOwner = await getValidAccessToken(supabase, ownerInteg);
-          await fetch(CAL_EVENTS_URL + '/' + encodeURIComponent(existingEventId), { method: 'DELETE', headers: { Authorization: 'Bearer ' + tokOwner } });
+          await fetchWithTimeout(CAL_EVENTS_URL + '/' + encodeURIComponent(existingEventId), { method: 'DELETE', headers: { Authorization: 'Bearer ' + tokOwner }, 10000) });
         } catch (e) {}
       }
     }
@@ -109,7 +111,7 @@ module.exports = async (req, res) => {
     if (oldOwnerInteg) {
       try {
         var tokOld = await getValidAccessToken(supabase, oldOwnerInteg);
-        await fetch(CAL_EVENTS_URL + '/' + encodeURIComponent(existingEventId), { method: 'DELETE', headers: { Authorization: 'Bearer ' + tokOld } });
+        await fetchWithTimeout(CAL_EVENTS_URL + '/' + encodeURIComponent(existingEventId), { method: 'DELETE', headers: { Authorization: 'Bearer ' + tokOld }, 10000) });
       } catch (e) {}
     }
     existingEventId = null;
@@ -127,10 +129,10 @@ module.exports = async (req, res) => {
     var method = 'POST';
     var url = CAL_EVENTS_URL;
     if (existingEventId) { method = 'PATCH'; url = CAL_EVENTS_URL + '/' + encodeURIComponent(existingEventId); }
-    var r = await fetch(url, { method: method, headers: { Authorization: 'Bearer ' + token, 'content-type': 'application/json' }, body: JSON.stringify(payload) });
+    var r = await fetchWithTimeout(url, { method: method, headers: { Authorization: 'Bearer ' + token, 'content-type': 'application/json' }, 10000), body: JSON.stringify(payload) });
     var j = await r.json();
     if (!r.ok && existingEventId && r.status === 404) {
-      var r2 = await fetch(CAL_EVENTS_URL, { method: 'POST', headers: { Authorization: 'Bearer ' + token, 'content-type': 'application/json' }, body: JSON.stringify(payload) });
+      var r2 = await fetchWithTimeout(CAL_EVENTS_URL, { method: 'POST', headers: { Authorization: 'Bearer ' + token, 'content-type': 'application/json' }, 10000), body: JSON.stringify(payload) });
       var j2 = await r2.json();
       if (!r2.ok) return jsonRes(res, 502, { ok: false, error: 'Google error', detail: j2 });
       await supabase.from('appointments').update({ google_event_id: j2.id, google_event_cleaner_id: cleanerId }).eq('id', appointmentId);

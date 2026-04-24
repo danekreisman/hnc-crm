@@ -371,3 +371,36 @@ A login gate was added to index.html:
 - id="nav-reporting" on Reporting nav item (line ~401)
 - To add more admins: find ADMIN_EMAILS array near bottom of index.html
 - Supabase Auth settings already configured: Email enabled, Site URL and Redirect URL both set to hnc-crm.vercel.app
+
+
+---
+
+## CRITICAL: HTML File Encoding (Must Read Before Every Edit)
+
+**ALWAYS use TextDecoder/TextEncoder — NEVER use atob/btoa alone on HTML files.**
+
+### Correct way to READ index.html from GitHub API:
+```javascript
+const d = await res.json(); // GitHub API response
+const bytes = Uint8Array.from(atob(d.content.replace(/\n/g,'')), c => c.charCodeAt(0));
+const html = new TextDecoder().decode(bytes); // Preserves UTF-8 (em dashes, special chars)
+```
+
+### Correct way to WRITE index.html back to GitHub API:
+```javascript
+const bytes = new TextEncoder().encode(html);
+let binary = '';
+for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+const encoded = btoa(binary);
+// Then PUT to GitHub API with encoded as content
+```
+
+### What happens if you use atob() alone:
+- Multi-byte UTF-8 characters (em dashes, curly quotes, arrows) get double-encoded
+- Results in garbled characters like ÃÂÃÂ¢ appearing throughout the CRM
+- Very visible to the user and breaks the UI
+- Fix: revert to clean pre-corruption commit and re-apply changes with TextDecoder
+
+### tasks.js auth pattern (no ES module imports):
+- Do NOT use `import { requireAuth } from './utils/auth-check.js'` — causes ES module load failure
+- Instead inline auth check using Supabase REST API via fetchWithTimeout directly in the handler

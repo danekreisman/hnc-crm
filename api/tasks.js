@@ -1,12 +1,13 @@
 /**
  * /api/tasks
  *
- * GET  ?status=open|completed   — list tasks
- * POST { action: 'create', ... } — create task (+ optionally generate AI brief)
- * POST { action: 'complete', id } — mark complete
- * POST { action: 'delete', id }   — delete task
+ * GET  ?status=open|completed   â list tasks
+ * POST { action: 'create', ... } â create task (+ optionally generate AI brief)
+ * POST { action: 'complete', id } â mark complete
+ * POST { action: 'delete', id }   â delete task
  */
 
+import { requireAuth } from './utils/auth-check.js';
 import { createClient } from '@supabase/supabase-js';
 import { fetchWithTimeout, TIMEOUTS } from './utils/with-timeout.js';
 import { logError } from './utils/error-logger.js';
@@ -80,6 +81,8 @@ async function generateAiBrief(db, task) {
 }
 
 export default async function handler(req, res) {
+  const user = await requireAuth(req, res);
+  if (!user) return;
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') return res.status(200).end();
@@ -91,7 +94,7 @@ export default async function handler(req, res) {
   );
 
   try {
-    // ── GET: list tasks ───────────────────────────────────────────────────
+    // ââ GET: list tasks âââââââââââââââââââââââââââââââââââââââââââââââââââ
     if (req.method === 'GET') {
       const status = req.query.status || 'open';
       let query = db.from('tasks')
@@ -108,7 +111,7 @@ export default async function handler(req, res) {
 
     const { action, id, ...body } = req.body || {};
 
-    // ── complete ──────────────────────────────────────────────────────────
+    // ââ complete ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
     if (action === 'complete') {
       if (!id) return res.status(400).json({ error: 'id required' });
       const { error } = await db.from('tasks').update({
@@ -119,7 +122,7 @@ export default async function handler(req, res) {
       return res.status(200).json({ success: true });
     }
 
-    // ── delete ────────────────────────────────────────────────────────────
+    // ââ delete ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
     if (action === 'delete') {
       if (!id) return res.status(400).json({ error: 'id required' });
       const { error } = await db.from('tasks').delete().eq('id', id);
@@ -127,7 +130,7 @@ export default async function handler(req, res) {
       return res.status(200).json({ success: true });
     }
 
-    // ── create ────────────────────────────────────────────────────────────
+    // ââ create ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
     if (action === 'create') {
       const { title, description, type, priority, due_date,
               related_lead_id, related_client_id } = body;
@@ -157,7 +160,21 @@ export default async function handler(req, res) {
         }
       }
 
-      return res.status(200).json({ success: true, task });
+      
+    // Notify VA via SMS
+    try {
+      await fetchWithTimeout('/api/send-sms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          to: '+18084685356',
+          message: 'New task assigned: ' + (body.title || body.task_title || 'Untitled') + (body.due_date ? ' (Due: ' + body.due_date + ')' : '') + '. Check the CRM for details.'
+        })
+      }, 10000);
+    } catch(smsErr) {
+      await logError('tasks-sms', smsErr.message, { task: body });
+    }
+    return res.status(200).json({ success: true, task });
     }
 
     return res.status(400).json({ error: 'Unknown action' });

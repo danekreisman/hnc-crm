@@ -3308,6 +3308,7 @@ async function saveApptEdit(mode){
   if(!mode)mode='single';
   var a=currentAppt;
   if(!a||!currentApptKey){console.error('[saveApptEdit] no currentAppt');return;}
+  logActivity('appointment_updated','Appointment edited: '+(a?.n||a?.client_name||'Unknown'),{mode,apptId:a?.id});
   console.log('[saveApptEdit] mode='+mode+' recurring='+!!a.recurring+' client='+a.n);
   var editClient=document.getElementById('edit-client').value||a.n;
   // Service, freq, beds, baths, sqft, condition are property-level — read from current appointment
@@ -3618,6 +3619,7 @@ async function cancelAppointment(){
       dbRes=await db.from('appointments').update({status:'cancelled'})
         .eq('client_name',currentAppt.n)
         .eq('date',dateStr);
+      logActivity('appointment_cancelled','Appointment cancelled: '+(currentAppt?.n||currentAppt?.client_name||'Unknown'),{date:dateStr});
       console.log('[cancelAppointment] Supabase update by client_name+date (fallback) ('+currentAppt.n+', '+dateStr+') | response:', dbRes);
     }
   }
@@ -5567,6 +5569,7 @@ function setPeriod(btn){
         }
         try{
           await dbUpsertPayPeriod(row);
+          logActivity('cleaner_paid','Payroll updated for: '+cnameSafe,{cleaner:cnameSafe});
           await loadPayPeriodRows();
           renderPayroll();
         } catch(e){

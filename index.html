@@ -13166,7 +13166,30 @@ document.addEventListener('DOMContentLoaded', () => {
   wrap('saveClientEdit', 'client_updated', () => 'Client profile updated');
   wrap('saveNewClient', 'client_added', () => 'New client added');
   const origFetch = window.fetch;
-  window.fetch = async function(url, opts) { const res = await origFetch.apply(this, arguments); if (typeof url === 'string' && url.includes('stripe-invoice') && res.ok) { try { logActivity('invoice_sent', 'Invoice sent via Stripe'); } catch(e) {} } return res; };
+  window.fetch = async function(url, opts) { const res = await origFetch.apply(this, arguments); if (typeof url === 'string' && url.includes('stripe-invoice') && res.ok) { try { const bod = opts?.body ? JSON.parse(opts.body) : {}; logActivity('invoice_sent', 'Invoice sent to ' + (bod.clientName||bod.client_name||'client') + ' —  return res; };
+  let _lastLoginLog = ''; db.auth.onAuthStateChange((event, session) => { if (event === 'SIGNED_IN' && session && session.user.email !== _lastLoginLog) { _lastLoginLog = session.user.email; try { logActivity('user_login', 'User signed in: ' + session.user.email, 'auth'); } catch(e) {} } });
+});
+// === END AUTO LOG WRAPPERS ===
+
+
+async function toggleReminderAuto(enabled) {
+  try {
+    await db.from('ai_booking_settings').update({ reminders_enabled: enabled }).eq('id', 1);
+    const el = document.getElementById('toggle-reminders');
+    if (el) el.checked = enabled;
+  } catch(e) { console.error('toggleReminderAuto',e); }
+}
+async function loadReminderToggleState() {
+  try {
+    const { data } = await db.from('ai_booking_settings').select('reminders_enabled').limit(1).single();
+    const el = document.getElementById('toggle-reminders');
+    if (el && data) el.checked = data.reminders_enabled !== false;
+  } catch(e) {}
+}
+</script>
+</body>
+</html>
+ + (bod.amount||''), { clientName: bod.clientName, amount: bod.amount }); } catch(e) {} } return res; };
   let _lastLoginLog = ''; db.auth.onAuthStateChange((event, session) => { if (event === 'SIGNED_IN' && session && session.user.email !== _lastLoginLog) { _lastLoginLog = session.user.email; try { logActivity('user_login', 'User signed in: ' + session.user.email, 'auth'); } catch(e) {} } });
 });
 // === END AUTO LOG WRAPPERS ===

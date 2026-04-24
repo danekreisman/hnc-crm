@@ -13121,6 +13121,7 @@ async function hncSendMagicLink() {
   else { msgEl.textContent = 'Check your email for the login link!'; btn.textContent = 'Sent!'; }
 }
 document.addEventListener('DOMContentLoaded', initAuth);
+document.addEventListener('DOMContentLoaded', () => setTimeout(loadReminderToggleState, 800));
 // === END HNC AUTH ===
 
 // === ACTIVITY LOGGING ===

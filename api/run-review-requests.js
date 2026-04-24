@@ -20,6 +20,14 @@ const BASE_URL       = 'https://hnc-crm.vercel.app';
 const BUSINESS_NAME  = 'Hawaii Natural Clean';
 const ANTHROPIC_API  = 'https://api.anthropic.com/v1/messages';
 
+
+async function isNotifEnabled(db, clientId, key) {
+  if (!clientId) return true;
+  const { data } = await db.from('clients').select('notification_prefs').eq('id', clientId).maybeSingle();
+  const prefs = { booking_confirmation:true, day_before_reminder:true, invoice_reminder:true, policy_reminder:true, post_clean_email:true, review_request:true, ...(data?.notification_prefs || {}) };
+  return prefs[key] !== false;
+}
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
@@ -135,7 +143,10 @@ Never send a review request to a dissatisfied or upset customer.`,
         }
       }
 
-      // ── 3. Send review request if satisfied ───────────────────────────
+      // ── 3. Check prefs + send review request if satisfied ────────────
+      const reviewNotifOn = await isNotifEnabled(db, clientId, 'review_request');
+      if (!reviewNotifOn) { skipped++; console.log('[run-review-requests] review_request disabled for', client.name); continue; }
+      // ── Send review request if satisfied ────────────────────────────────
       if (satisfied && confidence >= 0.7) {
         const message = `Aloha ${firstName}! 🌺 Thank you so much for choosing ${BUSINESS_NAME}. We hope your home is feeling fresh and clean! If you have a moment, we'd love it if you left us a Google review — it means the world to our small team: ${reviewUrl} Mahalo! 🌺`;
 

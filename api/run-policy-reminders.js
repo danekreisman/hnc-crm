@@ -16,6 +16,14 @@ const BASE_URL       = 'https://hnc-crm.vercel.app';
 const BUSINESS_NAME  = 'Hawaii Natural Clean';
 const BUSINESS_PHONE = '(808) 468-5356';
 
+
+async function isNotifEnabled(db, clientId, key) {
+  if (!clientId) return true;
+  const { data } = await db.from('clients').select('notification_prefs').eq('id', clientId).maybeSingle();
+  const prefs = { booking_confirmation:true, day_before_reminder:true, invoice_reminder:true, policy_reminder:true, post_clean_email:true, review_request:true, ...(data?.notification_prefs || {}) };
+  return prefs[key] !== false;
+}
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
@@ -66,6 +74,10 @@ export default async function handler(req, res) {
       const agreeLink = `${BASE_URL}/agree.html?c=${client.id}`;
 
       const message = `Aloha ${firstName}! Before your upcoming cleaning with ${BUSINESS_NAME}, please take a moment to review and agree to our service policies: ${agreeLink} Questions? Call or text us at ${BUSINESS_PHONE}. Mahalo 🌺`;
+
+      // Check notification prefs
+      const policyNotifOn = await isNotifEnabled(db, client.id, 'policy_reminder');
+      if (!policyNotifOn) { skipped++; continue; }
 
       try {
         const resp = await fetchWithTimeout(`${BASE_URL}/api/send-sms`, {

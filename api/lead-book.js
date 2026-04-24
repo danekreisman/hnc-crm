@@ -11,6 +11,14 @@ const db = () => createClient(
 
 const BASE_URL = 'https://hnc-crm.vercel.app';
 
+
+async function isNotifEnabled(db, clientId, key) {
+  if (!clientId) return true;
+  const { data } = await db.from('clients').select('notification_prefs').eq('id', clientId).maybeSingle();
+  const prefs = { booking_confirmation:true, day_before_reminder:true, invoice_reminder:true, policy_reminder:true, post_clean_email:true, review_request:true, ...(data?.notification_prefs || {}) };
+  return prefs[key] !== false;
+}
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
@@ -167,8 +175,10 @@ export default async function handler(req, res) {
       ? ` A ${rushFee === 200 ? 'same-day' : rushFee === 100 ? 'next-day' : '2-day'} booking fee of $${rushFee} applies.`
       : '';
 
-    // ── 6. Confirmation email (non-critical — booking already saved) ────────
-    try {
+    // ── 6. Confirmation email — check prefs first (non-critical) ────────────
+    const bookingNotifOn = await isNotifEnabled(db, result.client_id, 'booking_confirmation');
+    if (!bookingNotifOn) console.log('[lead-book] booking_confirmation disabled for client', result.client_id);
+    if (bookingNotifOn) try {
       await fetchWithTimeout(`${BASE_URL}/api/send-email`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

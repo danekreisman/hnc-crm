@@ -13,6 +13,14 @@ import { logError } from './utils/error-logger.js';
 import { getOpenPhoneHistory } from './utils/openphone-history.js';
 import { fetchWithTimeout, TIMEOUTS } from './utils/with-timeout.js';
 
+
+async function isNotifEnabled(db, clientId, key) {
+  if (!clientId) return true;
+  const { data } = await db.from('clients').select('notification_prefs').eq('id', clientId).maybeSingle();
+  const prefs = { booking_confirmation:true, day_before_reminder:true, invoice_reminder:true, policy_reminder:true, post_clean_email:true, review_request:true, ...(data?.notification_prefs || {}) };
+  return prefs[key] !== false;
+}
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
@@ -136,6 +144,8 @@ export default async function handler(req, res) {
           .eq('id', appt.client_id)
           .maybeSingle();
         if (!client?.email) continue;
+        const postCleanOn = await isNotifEnabled(db, appt.client_id, 'post_clean_email');
+        if (!postCleanOn) continue;
         const feedbackUrl = `https://hnc-crm.vercel.app/feedback?c=${appt.client_id}&a=${apptId}`;
         await fetch('https://hnc-crm.vercel.app/api/send-email', {
           method: 'POST',

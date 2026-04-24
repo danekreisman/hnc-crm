@@ -1464,6 +1464,13 @@ Mahalo 🌺</textarea>
           <div class="info-row"><span class="info-label">Tax (4.712%)</span><span class="info-val" id="ai-tax">—</span></div>
           <div class="info-row"><span class="info-label" style="font-weight:600;">Total</span><span class="info-val" id="ai-total" style="font-size:15px;color:var(--brand-500);">—</span></div>
         </div>
+        <div class="panel-section" style="display:flex;align-items:center;justify-content:space-between;">
+          <span>Notifications</span>
+        </div>
+        <div id="cl-notif-prefs" style="margin-bottom:12px;">
+          <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px;">Control which automated messages this client receives.</div>
+          <div style="display:flex;flex-direction:column;gap:6px;" id="cl-notif-toggles"></div>
+        </div>
         <div class="panel-section">Notes</div>
         <div class="info-block">
           <div class="info-row"><span class="info-val" id="ai-notes" style="white-space:pre-wrap;color:#444;">—</span></div>
@@ -3811,6 +3818,7 @@ function openClient(id){
   ['phone','email','address','payment','since','ltv','mrr','jobs','avg','service','freq','sqft','bedbath','cleaner','lastjob','nextjob','notes'].forEach(function(f){
     var el=document.getElementById('cl-'+f);if(el)el.textContent=d[f]||'—';
   });
+  loadNotifPrefs(id);
   // Policies agreed
   var polEl = document.getElementById('cl-policies');
   if(polEl){
@@ -13000,6 +13008,86 @@ async function submitTask() {
     btn.disabled = false;
     btn.textContent = 'Create task';
   }
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CLIENT NOTIFICATION PREFERENCES
+// ─────────────────────────────────────────────────────────────────────────────
+
+var NOTIF_LABELS = {
+  booking_confirmation: { label: 'Booking confirmation email', desc: 'Sent when a booking is created' },
+  day_before_reminder:  { label: 'Day-before reminder SMS',    desc: 'Sent the evening before each appointment' },
+  invoice_reminder:     { label: 'Invoice overdue reminder SMS', desc: 'Sent when invoice unpaid 7+ days' },
+  policy_reminder:      { label: 'Policy agreement reminder SMS', desc: 'One-time SMS to sign policies (if unsigned)' },
+  post_clean_email:     { label: 'Post-clean feedback email',  desc: 'Sent after each completed job' },
+  review_request:       { label: 'Review request SMS',         desc: 'Sent after completed job if satisfied' },
+};
+
+var DEFAULT_NOTIF_PREFS = {
+  booking_confirmation: true,
+  day_before_reminder:  true,
+  invoice_reminder:     true,
+  policy_reminder:      true,
+  post_clean_email:     true,
+  review_request:       true,
+};
+
+function renderNotifToggles(clientId, prefs) {
+  var container = document.getElementById('cl-notif-toggles');
+  if (!container) return;
+  container.innerHTML = '';
+  Object.keys(NOTIF_LABELS).forEach(function(key) {
+    var info = NOTIF_LABELS[key];
+    var enabled = prefs && prefs[key] !== undefined ? prefs[key] : true;
+    var row = document.createElement('div');
+    row.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:7px 10px;background:var(--bg-soft);border-radius:8px;';
+    row.innerHTML =
+      '<div style="flex:1;min-width:0;">'
+        + '<div style="font-size:12px;font-weight:500;color:var(--text);">' + info.label + '</div>'
+        + '<div style="font-size:11px;color:var(--text-muted);">' + info.desc + '</div>'
+      + '</div>'
+      + '<label style="position:relative;display:inline-block;width:36px;height:20px;flex-shrink:0;margin-left:10px;">'
+        + '<input type="checkbox" data-key="' + key + '" ' + (enabled ? 'checked' : '') + ' style="opacity:0;width:0;height:0;position:absolute;">'
+        + '<span style="position:absolute;cursor:pointer;inset:0;background:' + (enabled ? 'var(--brand-500)' : '#cbd5e1') + ';border-radius:20px;transition:.2s;">'
+          + '<span style="position:absolute;height:14px;width:14px;left:3px;bottom:3px;background:white;border-radius:50%;transition:.2s;transform:' + (enabled ? 'translateX(16px)' : 'translateX(0)') + ';"></span>'
+        + '</span>'
+      + '</label>';
+
+    var checkbox = row.querySelector('input[type=checkbox]');
+    var track = row.querySelector('span');
+    var thumb = track.querySelector('span');
+    checkbox.addEventListener('change', function() {
+      var val = checkbox.checked;
+      track.style.background = val ? 'var(--brand-500)' : '#cbd5e1';
+      thumb.style.transform = val ? 'translateX(16px)' : 'translateX(0)';
+      saveNotifPref(clientId, key, val);
+    });
+    container.appendChild(row);
+  });
+}
+
+async function saveNotifPref(clientId, key, value) {
+  // Read current prefs, update one key, save back
+  var { data: client } = await db.from('clients').select('notification_prefs').eq('id', clientId).maybeSingle();
+  var prefs = Object.assign({}, DEFAULT_NOTIF_PREFS, client?.notification_prefs || {});
+  prefs[key] = value;
+  await db.from('clients').update({ notification_prefs: prefs }).eq('id', clientId);
+}
+
+async function loadNotifPrefs(clientId) {
+  var { data: client } = await db.from('clients').select('notification_prefs').eq('id', clientId).maybeSingle();
+  var prefs = Object.assign({}, DEFAULT_NOTIF_PREFS, client?.notification_prefs || {});
+  renderNotifToggles(clientId, prefs);
+}
+
+// Helper used by notification endpoints to check if a client has a pref enabled
+// Usage: await clientNotifEnabled(db, clientId, 'day_before_reminder')
+async function clientNotifEnabled(dbClient, clientId, key) {
+  if (!clientId) return true;
+  var { data } = await dbClient.from('clients').select('notification_prefs').eq('id', clientId).maybeSingle();
+  var prefs = Object.assign({}, DEFAULT_NOTIF_PREFS, data?.notification_prefs || {});
+  return prefs[key] !== false;
 }
 
 </script>

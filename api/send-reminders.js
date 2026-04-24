@@ -18,6 +18,14 @@ const BUSINESS_NAME = 'Hawaii Natural Clean';
 const BUSINESS_PHONE = '(808) 468-5356';
 const ADMIN_PHONE   = '+18083484888';
 
+
+async function isNotifEnabled(db, clientId, key) {
+  if (!clientId) return true;
+  const { data } = await db.from('clients').select('notification_prefs').eq('id', clientId).maybeSingle();
+  const prefs = { booking_confirmation:true, day_before_reminder:true, invoice_reminder:true, policy_reminder:true, post_clean_email:true, review_request:true, ...(data?.notification_prefs || {}) };
+  return prefs[key] !== false;
+}
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });

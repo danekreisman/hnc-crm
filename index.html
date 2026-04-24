@@ -412,7 +412,7 @@ textarea{font-family:inherit;}
     <div class="nav-item" onclick="sv('settings',this)"><svg class="nav-icon" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="2.5" stroke="currentColor" stroke-width="1.3"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2M3.05 3.05l1.41 1.41M11.54 11.54l1.41 1.41M3.05 12.95l1.41-1.41M11.54 4.46l1.41-1.41" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>Settings</div>
     
       <div class="nav-section">Monitor</div>
-      <div class="nav-item" id="nav-logs" onclick="sv('logs',this);document.getElementById('view-logs').style.display='block';setTimeout(()=>loadLogs(_logsCurrentTab||'activity'),100)"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg><span>Logs</span></div>
+      <div class="nav-item" id="nav-logs" onclick="sv('logs',this);setTimeout(()=>loadLogs(_logsCurrentTab),50)"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg><span>Logs</span></div>
       <div class="nav-section">AI</div>
     <div class="nav-item" onclick="sv('agent',this)" style="color:#553c9a;"><svg class="nav-icon" viewBox="0 0 16 16" fill="none" style="opacity:1;"><circle cx="8" cy="8" r="6" stroke="#553c9a" stroke-width="1.3"/><path d="M5.5 9.5s.8 1.5 2.5 1.5 2.5-1.5 2.5-1.5" stroke="#553c9a" stroke-width="1.2" stroke-linecap="round"/><circle cx="6" cy="7" r="1" fill="#553c9a"/><circle cx="10" cy="7" r="1" fill="#553c9a"/></svg>AI Agent</div>
   </div>
@@ -3308,7 +3308,7 @@ async function saveApptEdit(mode){
   if(!mode)mode='single';
   var a=currentAppt;
   if(!a||!currentApptKey){console.error('[saveApptEdit] no currentAppt');return;}
-  logActivity('appointment_updated','Appointment edited: '+(a?.n||a?.client_name||'Unknown'),{mode,apptId:a?.id});
+  logActivity('appointment_updated','Appt edited: '+((a&&a.n)||'Unknown'),{mode:mode,apptId:a&&a.id});
   console.log('[saveApptEdit] mode='+mode+' recurring='+!!a.recurring+' client='+a.n);
   var editClient=document.getElementById('edit-client').value||a.n;
   // Service, freq, beds, baths, sqft, condition are property-level — read from current appointment
@@ -3619,7 +3619,7 @@ async function cancelAppointment(){
       dbRes=await db.from('appointments').update({status:'cancelled'})
         .eq('client_name',currentAppt.n)
         .eq('date',dateStr);
-      logActivity('appointment_cancelled','Appointment cancelled: '+(currentAppt?.n||currentAppt?.client_name||'Unknown'),{date:dateStr});
+      logActivity('appointment_cancelled','Appt cancelled: '+((currentAppt&&currentAppt.n)||'Unknown'),{date:dateStr});
       console.log('[cancelAppointment] Supabase update by client_name+date (fallback) ('+currentAppt.n+', '+dateStr+') | response:', dbRes);
     }
   }
@@ -6843,6 +6843,7 @@ async function confirmCancelClient() {
       .update(clientUpdate)
       .eq('id', currentClientId);
     if (clientErr) throw clientErr;
+    logActivity('client_cancelled','Client account cancelled',{clientId:currentClient&&currentClient.id});
 
     // Also find and update the matching lead (by phone, then email)
     var client = clientDB[currentClientId];
@@ -13166,31 +13167,8 @@ document.addEventListener('DOMContentLoaded', () => {
   wrap('saveClientEdit', 'client_updated', () => 'Client profile updated');
   wrap('saveNewClient', 'client_added', () => 'New client added');
   const origFetch = window.fetch;
-  window.fetch = async function(url, opts) { const res = await origFetch.apply(this, arguments); if (typeof url === 'string' && url.includes('stripe-invoice') && res.ok) { try { const bod = opts?.body ? JSON.parse(opts.body) : {}; logActivity('invoice_sent', 'Invoice sent to ' + (bod.clientName||bod.client_name||'client') + ' —  return res; };
-  let _lastLoginLog = ''; db.auth.onAuthStateChange((event, session) => { if (event === 'SIGNED_IN' && session && session.user.email !== _lastLoginLog) { _lastLoginLog = session.user.email; try { logActivity('user_login', 'User signed in: ' + session.user.email, 'auth'); } catch(e) {} } });
-});
-// === END AUTO LOG WRAPPERS ===
-
-
-async function toggleReminderAuto(enabled) {
-  try {
-    await db.from('ai_booking_settings').update({ reminders_enabled: enabled }).eq('id', 1);
-    const el = document.getElementById('toggle-reminders');
-    if (el) el.checked = enabled;
-  } catch(e) { console.error('toggleReminderAuto',e); }
-}
-async function loadReminderToggleState() {
-  try {
-    const { data } = await db.from('ai_booking_settings').select('reminders_enabled').limit(1).single();
-    const el = document.getElementById('toggle-reminders');
-    if (el && data) el.checked = data.reminders_enabled !== false;
-  } catch(e) {}
-}
-</script>
-</body>
-</html>
- + (bod.amount||''), { clientName: bod.clientName, amount: bod.amount }); } catch(e) {} } return res; };
-  let _lastLoginLog = ''; db.auth.onAuthStateChange((event, session) => { if (event === 'SIGNED_IN' && session && session.user.email !== _lastLoginLog) { _lastLoginLog = session.user.email; try { logActivity('user_login', 'User signed in: ' + session.user.email, 'auth'); } catch(e) {} } });
+  window.fetch = async function(url, opts) { const res = await origFetch.apply(this, arguments); if (typeof url === 'string' && url.includes('stripe-invoice') && res.ok) { try { var _b=opts&&opts.body?JSON.parse(opts.body):{};logActivity('invoice_sent','Invoice sent to '+(_b.clientName||_b.client_name||'client'),{clientName:_b.clientName,amount:_b.amount}); } catch(e) {} } return res; };
+  db.auth.onAuthStateChange((event, session) => { if (event === 'SIGNED_IN' && session) { try { logActivity('user_login', 'User signed in: ' + session.user.email, 'auth'); } catch(e) {} } });
 });
 // === END AUTO LOG WRAPPERS ===
 

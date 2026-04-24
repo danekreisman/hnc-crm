@@ -27,6 +27,14 @@ async function isNotifEnabled(db, clientId, key) {
 }
 
 export default async function handler(req, res) {
+  // Check reminders_enabled flag
+  try {
+    const settingsRes = await supabase.from('ai_booking_settings').select('reminders_enabled').limit(1).single();
+    if (settingsRes.data && settingsRes.data.reminders_enabled === false) {
+      return res.status(200).json({ skipped: true, reason: 'reminders disabled' });
+    }
+  } catch(e) { }
+
   res.setHeader('Access-Control-Allow-Origin', '*');
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 

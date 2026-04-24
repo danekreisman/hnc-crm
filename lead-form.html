@@ -318,6 +318,10 @@ body{font-family:'Josefin Sans',sans-serif;color:var(--text);overflow-x:hidden;}
   <style>.pac-container{z-index:2147483647!important;}</style>
   <script>
   (function(){
+    // Guard: only load Maps once per page
+    if (window.__lfMapsLoading) return;
+    window.__lfMapsLoading = true;
+
     var MAPS_KEY = 'AIzaSyCkn8UeVuv5iek_Rm3jqdozF1HGMhSuGNk';
     var attached = false;
 
@@ -345,6 +349,7 @@ body{font-family:'Josefin Sans',sans-serif;color:var(--text);overflow-x:hidden;}
             input.dispatchEvent(new Event('input', { bubbles: true }));
           }
         });
+        // Prevent form submit on enter when dropdown visible
         input.addEventListener('keydown', function(e) {
           if (e.key === 'Enter') {
             var pac = document.querySelector('.pac-container');
@@ -352,10 +357,14 @@ body{font-family:'Josefin Sans',sans-serif;color:var(--text);overflow-x:hidden;}
           }
         });
         attached = true;
-      } catch(err) { console.warn('Maps attach failed', err); }
+        console.log('[HNC] Places autocomplete attached to lf-address');
+      } catch(err) { console.warn('[HNC] Maps attach failed', err); }
     }
 
-    window.lfInitMaps = function() { attachAutocomplete(); };
+    window.lfInitMaps = function() {
+      console.log('[HNC] lfInitMaps callback fired');
+      attachAutocomplete();
+    };
 
     // Also try on focus in case Maps loads after page
     document.addEventListener('focusin', function(e) {
@@ -364,12 +373,20 @@ body{font-family:'Josefin Sans',sans-serif;color:var(--text);overflow-x:hidden;}
       }
     });
 
-    // Load Maps JS dynamically (same pattern as CRM)
-    var script = document.createElement('script');
-    script.src = 'https://maps.googleapis.com/maps/api/js?key=' + encodeURIComponent(MAPS_KEY) + '&libraries=places&callback=lfInitMaps';
-    script.async = true;
-    script.defer = true;
-    document.head.appendChild(script);
+    // Only inject script if Maps not already present
+    if (!document.querySelector('script[src*="maps.googleapis.com/maps/api/js"]')) {
+      var script = document.createElement('script');
+      script.src = 'https://maps.googleapis.com/maps/api/js?key=' + MAPS_KEY + '&libraries=places&callback=lfInitMaps';
+      script.async = true;
+      script.defer = true;
+      document.head.appendChild(script);
+      console.log('[HNC] Maps script injected');
+    } else {
+      // Maps already loaded, attach directly
+      if (window.google && google.maps && google.maps.places) {
+        attachAutocomplete();
+      }
+    }
   })();
   </script>
 </head>

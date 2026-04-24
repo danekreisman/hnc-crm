@@ -404,3 +404,66 @@ const encoded = btoa(binary);
 ### tasks.js auth pattern (no ES module imports):
 - Do NOT use `import { requireAuth } from './utils/auth-check.js'` — causes ES module load failure
 - Instead inline auth check using Supabase REST API via fetchWithTimeout directly in the handler
+
+
+---
+
+## Session: Apr 24 2026 — Logging, Reminders Toggle, Tasks Fix, VA Notifications
+
+### Activity Logging System
+- `activity_logs` table in Supabase (cols: id, created_at, action, description, user_email, entity_type, entity_id, metadata)
+- `logActivity(action, description, metadata)` available globally in index.html (frontend) and as an inline helper in each API file
+- **Do NOT use SDK logActivity in API files** — each API file has its own inline `async function logActivity()` that calls Supabase REST directly via `fetch()`
+
+#### Actions logged:
+| Action | Source |
+|---|---|
+| `invoice_sent` | api/stripe-invoice.js |
+| `invoice_paid` | api/stripe-webhook.js (charge.succeeded) |
+| `charge_failed` | api/stripe-webhook.js |
+| `lead_created` | api/lead-capture.js |
+| `lead_booked` | api/lead-book.js |
+| `appointment_created` | index.html frontend wrapper |
+| `appointment_updated` | index.html saveApptEdit() |
+| `appointment_cancelled` | index.html cancelAppointment() |
+| `client_cancelled` | index.html confirmCancelClient() |
+| `cleaner_paid` | index.html savePayrollBonus() — fires on dbUpsertPayPeriod() |
+| `automation_sms` | api/run-automations.js |
+| `automation_email` | api/run-automations.js |
+| `reminders_sent` | api/send-reminders.js |
+| `invoice_reminder_sent` | api/run-invoice-reminders.js |
+| `broadcast_sent` | api/run-broadcasts.js |
+
+#### Logs UI
+- Monitor → Logs in sidebar (id="nav-logs")
+- Nav onclick: `sv('logs',this);document.getElementById('view-logs').style.display='block';setTimeout(()=>loadLogs(_logsCurrentTab||'activity'),100)`
+- **IMPORTANT**: Must force `display:block` on view-logs in addition to sv() — sv() hides all .vc divs, view-logs needs explicit show
+- Two tabs: Activity (activity_logs) and Errors (error_logs, ordered by occurred_at not created_at)
+- `loadLogs(tab)` and `showLogsTab(tab)` functions in index.html
+
+### Day-Before Reminders Toggle
+- `reminders_enabled` boolean column on `ai_booking_settings` table (id=1, integer not UUID)
+- Toggle in Automations page on "Day-Before Appointment Reminders" system card
+- `toggleReminderAuto(enabled)`: `db.from('ai_booking_settings').update({reminders_enabled:enabled}).eq('id',1)`
+- `loadReminderToggleState()`: reads DB and sets toggle checkbox state
+- Fires on: DOMContentLoaded (800ms delay) + automations nav click
+- `send-reminders.js` checks flag at top — returns early with `{skipped:true}` if false
+
+### tasks.js Fix (CRITICAL HISTORY)
+- Had ES module load failure from: `import { createClient } from '@supabase/supabase-js'`
+- Fix: kept createClient import (it works fine), removed orphaned syntax errors from botched string replacements
+- Root cause was corrupt bytes from multiple atob() passes without TextDecoder — always use TextDecoder
+- Auth check uses inline Supabase REST: `fetchWithTimeout(SUPABASE_URL+'/auth/v1/user', {headers:{Authorization:'Bearer '+token,apikey:ANON_KEY}}, 5000)`
+- VA email notification on task create: calls Resend directly with `from: 'noreply@hawaiinaturalclean.com'`
+
+### VA Notifications
+- Task created → email to dane@hawaiinaturalclean.net via Resend (direct fetch in tasks.js)
+- Task created → SMS to +18084685356 via /api/send-sms
+
+### send-sms.js logging
+- Manual texts (from Messaging tab) do NOT log — send-sms.js has no logActivity
+- Automated SMS (reminders, automations, invoice reminders, broadcasts) log from their respective API files
+
+### Quo / OpenPhone status
+- "Quo: check API key" warning appears in sidebar when QUO_API_KEY env var is invalid or OpenPhone API is unreachable
+- Not a blocker — SMS still sends via Vercel function (different code path)

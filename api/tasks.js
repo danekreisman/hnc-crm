@@ -1,10 +1,10 @@
 /**
  * /api/tasks
  *
- * GET  ?status=open|completed   â list tasks
- * POST { action: 'create', ... } â create task (+ optionally generate AI brief)
- * POST { action: 'complete', id } â mark complete
- * POST { action: 'delete', id }   â delete task
+ * GET  ?status=open|completed   Ã¢ÂÂ list tasks
+ * POST { action: 'create', ... } Ã¢ÂÂ create task (+ optionally generate AI brief)
+ * POST { action: 'complete', id } Ã¢ÂÂ mark complete
+ * POST { action: 'delete', id }   Ã¢ÂÂ delete task
  */
 
 import { requireAuth } from './utils/auth-check.js';
@@ -94,7 +94,7 @@ export default async function handler(req, res) {
   );
 
   try {
-    // ââ GET: list tasks âââââââââââââââââââââââââââââââââââââââââââââââââââ
+    // Ã¢ÂÂÃ¢ÂÂ GET: list tasks Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
     if (req.method === 'GET') {
       const status = req.query.status || 'open';
       let query = db.from('tasks')
@@ -111,7 +111,7 @@ export default async function handler(req, res) {
 
     const { action, id, ...body } = req.body || {};
 
-    // ââ complete ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+    // Ã¢ÂÂÃ¢ÂÂ complete Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
     if (action === 'complete') {
       if (!id) return res.status(400).json({ error: 'id required' });
       const { error } = await db.from('tasks').update({
@@ -122,7 +122,7 @@ export default async function handler(req, res) {
       return res.status(200).json({ success: true });
     }
 
-    // ââ delete ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+    // Ã¢ÂÂÃ¢ÂÂ delete Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
     if (action === 'delete') {
       if (!id) return res.status(400).json({ error: 'id required' });
       const { error } = await db.from('tasks').delete().eq('id', id);
@@ -130,7 +130,7 @@ export default async function handler(req, res) {
       return res.status(200).json({ success: true });
     }
 
-    // ââ create ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+    // Ã¢ÂÂÃ¢ÂÂ create Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
     if (action === 'create') {
       const { title, description, type, priority, due_date,
               related_lead_id, related_client_id } = body;
@@ -161,16 +161,34 @@ export default async function handler(req, res) {
       }
 
       
-    // Notify VA via SMS
+    // Notify VA via email
     try {
-      await fetchWithTimeout('/api/send-sms', {
+      const taskTitle = body.title || body.task_title || 'Untitled';
+      const dueDate = body.due_date ? new Date(body.due_date).toLocaleDateString('en-US', {month:'long',day:'numeric',year:'numeric'}) : null;
+      await fetchWithTimeout('https://api.resend.com/emails', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + process.env.RESEND_API_KEY
+        },
         body: JSON.stringify({
-          to: '+18084685356',
-          message: 'New task assigned: ' + (body.title || body.task_title || 'Untitled') + (body.due_date ? ' (Due: ' + body.due_date + ')' : '') + '. Check the CRM for details.'
+          from: 'HNC CRM <noreply@hawaiinaturalclean.net>',
+          to: 'dane@hawaiinaturalclean.net',
+          subject: 'New Task Assigned: ' + taskTitle,
+          html: '<div style="font-family:Inter,sans-serif;max-width:520px;margin:0 auto;padding:2rem;">' +
+            '<h2 style="color:#1e293b;margin-bottom:.5rem;">📋 New Task Assigned</h2>' +
+            '<p style="color:#64748b;margin-bottom:1.5rem;">A new task has been added to your list.</p>' +
+            '<div style="background:#f8fafc;border-radius:8px;padding:1.25rem;margin-bottom:1.5rem;">' +
+            '<p style="margin:0 0 .5rem;"><strong>Task:</strong> ' + taskTitle + '</p>' +
+            (dueDate ? '<p style="margin:0 0 .5rem;"><strong>Due:</strong> ' + dueDate + '</p>' : '') +
+            (body.notes ? '<p style="margin:0;"><strong>Notes:</strong> ' + body.notes + '</p>' : '') +
+            '</div>' +
+            '<a href="https://hnc-crm.vercel.app" style="display:inline-block;background:#3BB8E3;color:#fff;padding:.75rem 1.5rem;border-radius:8px;text-decoration:none;font-weight:600;">View in CRM</a>' +
+            '</div>'
         })
       }, 10000);
+    } catch(emailErr) {
+      await logError('tasks-email', emailErr.message, { task: body });
     } catch(smsErr) {
       await logError('tasks-sms', smsErr.message, { task: body });
     }

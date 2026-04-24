@@ -6,6 +6,17 @@
 import { isWebhookProcessed, recordWebhook } from './utils/webhook-idempotency.js';
 import Stripe from 'stripe';
 
+async function logActivity(action, description, metadata={}) {
+  try {
+    await fetch(process.env.SUPABASE_URL+'/rest/v1/activity_logs',{
+      method:'POST',
+      headers:{'apikey':process.env.SUPABASE_SERVICE_ROLE_KEY,'Authorization':'Bearer '+process.env.SUPABASE_SERVICE_ROLE_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+      body:JSON.stringify({action,description,user_email:'system',entity_type:action,metadata})
+    });
+  } catch(_){}
+}
+
+
 // ── Activity Logger ──────────────────────────────────────────────────────────
 async function logActivity(action, description, metadata = {}) {
   try {
@@ -103,6 +114,7 @@ export default async function handler(req, res) {
           payment_status: 'paid',
           paid_at: new Date(data.created * 1000).toISOString()
         }, 'stripe_invoice_id');
+        await logActivity('invoice_paid','Invoice paid via Stripe',{chargeId:data.id,invoiceId:data.invoice,amount:data.amount?(data.amount/100).toFixed(2):null});
         console.log('[stripe-webhook] Updated invoice status for charge:', data.id);
       }
     }
@@ -116,6 +128,7 @@ export default async function handler(req, res) {
           payment_status: 'failed',
           payment_error: data.failure_message || 'Charge failed'
         }, 'stripe_invoice_id');
+        await logActivity('charge_failed','Stripe charge failed',{chargeId:data.id,invoiceId:data.invoice});
         console.log('[stripe-webhook] Marked invoice as failed for charge:', data.id);
       }
     }

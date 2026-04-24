@@ -366,7 +366,7 @@ body{font-family:'Josefin Sans',sans-serif;color:var(--text);overflow-x:hidden;}
 
     // Load Maps JS dynamically (same pattern as CRM)
     var script = document.createElement('script');
-    script.src = 'https://maps.googleapis.com/maps/api/js?key=' + encodeURIComponent(MAPS_KEY) + '&libraries=places&callback=lfInitMaps&loading=async';
+    script.src = 'https://maps.googleapis.com/maps/api/js?key=' + encodeURIComponent(MAPS_KEY) + '&libraries=places&callback=lfInitMaps';
     script.async = true;
     script.defer = true;
     document.head.appendChild(script);

@@ -175,13 +175,15 @@ export default async function handler(req, res) {
         body: JSON.stringify({
           to:         lead.email.trim(),
           subject:    `Booking confirmed — ${prettyDate}`,
-          type:       'generic',
-          clientName: firstName,
-          notes: `Your cleaning has been booked for <strong>${prettyDate} at ${time}</strong>. `
-            + `Service: ${lead.service || 'Cleaning'}.${frequency ? ` Frequency: ${frequency}.` : ''}`
-            + (totalWithTax ? ` Total: $${totalWithTax}.` : '')
-            + rushNote
-            + `<br><br>If you need to reschedule or have questions, call or text us at <strong>(808) 468-5356</strong>. We look forward to seeing you! 🌺`,
+          type:       'booking_confirmation',
+          clientName: lead.name,
+          date:       prettyDate,
+          time:       time,
+          service:    lead.service || 'Cleaning',
+          frequency:  frequency || null,
+          address:    lead.address || null,
+          total:      totalWithTax ? `$${totalWithTax}` : null,
+          rushNote:   rushFee > 0 ? `A ${rushFee === 200 ? 'same-day' : rushFee === 100 ? 'next-day' : '2-day'} booking fee of $${rushFee} is included in your total.` : null,
         })
       }, TIMEOUTS.RESEND);
       console.log('[lead-book] Confirmation email sent to', lead.email);

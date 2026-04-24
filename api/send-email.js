@@ -380,6 +380,43 @@ export default async function handler(req, res) {
       });
     }
 
+    // ─── BOOKING CONFIRMATION ───────────────────────────────────────────────
+    else if (type === 'booking_confirmation') {
+      const { date, time, service, frequency, address, total, cleaner, rushNote } = req.body;
+
+      const detailRows = [
+        detailRow('Date', date || ''),
+        detailRow('Time', time || ''),
+        detailRow('Service', service || 'Cleaning'),
+        frequency ? detailRow('Frequency', frequency) : '',
+        address   ? detailRow('Address', address)     : '',
+        cleaner   ? detailRow('Cleaner', cleaner)     : '',
+        total     ? `<tr><td colspan="2" style="padding:8px 0;border-top:1px solid ${BRAND.border};"></td></tr>
+          <tr>
+            <td style="padding:10px 0;font-size:16px;font-weight:700;color:${BRAND.text};">Total</td>
+            <td style="padding:10px 0;font-size:20px;font-weight:800;color:${BRAND.primary};text-align:right;font-family:Georgia,serif;">${total}</td>
+          </tr>` : '',
+      ].filter(Boolean).join('');
+
+      const detailTable = `<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">${detailRows}</table>`;
+
+      html = renderBrandedEmail({
+        preheader: `Your cleaning is booked — see you ${date ? 'on ' + date : 'soon'}!`,
+        heading: `You're all set, ${firstName}! 🌺`,
+        intro: `Aloha — your cleaning has been confirmed. Here are the details:`,
+        bodyHtml:
+          card('Appointment details', detailTable) +
+          (rushNote ? `<div style="background:${BRAND.tintGold};border:1px solid ${BRAND.gold};border-radius:10px;padding:14px 18px;margin:0 0 20px;font-size:13px;color:${BRAND.text};">${rushNote}</div>` : '') +
+          `<div style="background:${BRAND.tintBlue};border-radius:10px;padding:16px 18px;margin:0 0 20px;">
+            <p style="margin:0 0 6px;color:${BRAND.text};font-size:13px;font-weight:600;">Before we arrive</p>
+            <p style="margin:0;color:${BRAND.muted};font-size:13px;line-height:1.6;">
+              Please tidy clutter from surfaces, do or put away dishes, and secure any pets. This helps us spend more time cleaning and less time navigating!
+            </p>
+          </div>`,
+        footnote: `Need to reschedule or have questions? Call or text us at <a href="tel:8084685356" style="color:${BRAND.primary};text-decoration:none;">${PHONE}</a>. We're always happy to help.`,
+      });
+    }
+
     // ─── GENERIC (used by automation test emails and ad-hoc sends) ──────────
     else {
       // The "notes" field holds the message content. We render it cleanly with

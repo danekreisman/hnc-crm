@@ -23,7 +23,6 @@ export default async function handler(req, res) {
         TIMEOUTS.OPENPHONE
       );
       const data = await response.json();
-      if (response.ok) await logActivity('sms_sent', 'SMS sent to ' + (phone || to), { to: phone || to });
     return res.status(200).json({ success: response.ok, status: response.status, data });
     }
 

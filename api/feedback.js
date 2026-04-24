@@ -10,6 +10,19 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') return res.status(200).end();
+  // GET: return booking token for a client
+  if (req.method === 'GET') {
+    const { clientId, action } = req.query;
+    if (action === 'booking_token' && clientId) {
+      const { data: client } = await db.from('clients')
+        .select('booking_token')
+        .eq('id', clientId)
+        .maybeSingle();
+      return res.status(200).json({ bookingToken: client?.booking_token || null });
+    }
+    return res.status(400).json({ error: 'Invalid request' });
+  }
+
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   const db = createClient(

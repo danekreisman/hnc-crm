@@ -104,7 +104,7 @@ textarea:focus{border-color:var(--blue);}
   // Set Google review URL from settings
   var reviewUrl = 'https://g.page/r/CfqMUR341NgqEBM/review';
 
-  // Load review URL from API
+  // Load review URL and booking token in parallel
   fetch('/api/settings?key=google_review_url')
     .then(function(r) { return r.json(); })
     .then(function(d) {
@@ -117,12 +117,28 @@ textarea:focus{border-color:var(--blue);}
 
   document.getElementById('review-btn').href = reviewUrl;
 
+  // Load booking token for rebooking CTA
+  if (clientId) {
+    fetch('/api/feedback?action=booking_token&clientId=' + encodeURIComponent(clientId))
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        var bookUrl = d.bookingToken
+          ? 'https://hnc-crm.vercel.app/book.html?bt=' + d.bookingToken
+          : 'https://hnc-crm.vercel.app/contact';
+        document.querySelectorAll('.rebook').forEach(function(el) {
+          el.href = bookUrl;
+        });
+      })
+      .catch(function() {});
+  }
+
   // Track when they click the review link
+  document.getElementById('review-btn').setAttribute('target', '_blank');
   document.getElementById('review-btn').addEventListener('click', function() {
     // Log positive feedback
     saveFeedback('positive', '', function() {});
-    // After a moment show the thank you section
-    setTimeout(function() { showSection('s-reviewed'); }, 500);
+    // Show the thank you section after a short delay (new tab opens, they stay here)
+    setTimeout(function() { showSection('s-reviewed'); }, 800);
   });
 
   window.showSection = function(id) {

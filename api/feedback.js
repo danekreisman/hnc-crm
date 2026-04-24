@@ -31,12 +31,6 @@ export default async function handler(req, res) {
 
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const db = createClient(
-    process.env.SUPABASE_URL,
-    process.env.SUPABASE_SERVICE_ROLE_KEY,
-    { auth: { persistSession: false } }
-  );
-
   try {
     const { appointmentId, clientId, rating, message } = req.body || {};
     if (!clientId || !rating) return res.status(400).json({ error: 'clientId and rating required' });

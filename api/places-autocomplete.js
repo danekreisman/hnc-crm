@@ -14,7 +14,12 @@ module.exports = async (req, res) => {
   const url = `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(input)}&components=country:us&types=address&key=${key}`;
 
   try {
-    const r = await fetch(url);
+    const r = await fetch(url, {
+      headers: {
+        'Referer': 'https://hnc-crm.vercel.app/',
+        'Origin': 'https://hnc-crm.vercel.app'
+      }
+    });
     const data = await r.json();
     const predictions = (data.predictions || []).map(p => ({
       description: p.description,

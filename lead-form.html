@@ -315,33 +315,128 @@ body{font-family:'Josefin Sans',sans-serif;color:var(--text);overflow-x:hidden;}
   .svc-grid{grid-template-columns:1fr 1fr;}
 }
 </style>
-  <script>
-    function initLfPlaces() {
-      var input = document.getElementById('lf-address');
-      if (!input || !window.google) return;
-      var ac = new google.maps.places.Autocomplete(input, {
-        componentRestrictions: { country: 'us' },
-        fields: ['formatted_address'],
-        types: ['address'],
-      });
-      // Bias results toward Hawaii
-      ac.setBounds(new google.maps.LatLngBounds(
-        new google.maps.LatLng(18.9, -160.3),
-        new google.maps.LatLng(22.3, -154.7)
-      ));
-      ac.addListener('place_changed', function() {
-        var place = ac.getPlace();
-        if (place.formatted_address) {
-          input.value = place.formatted_address;
-        }
-      });
-      // Fix z-index so dropdown shows above form
-      var style = document.createElement('style');
-      style.textContent = '.pac-container { z-index: 2147483647 !important; }';
-      document.head.appendChild(style);
+  <style>
+    #lf-address-dropdown {
+      position: absolute;
+      background: #fff;
+      border: 1px solid #d1d5db;
+      border-radius: 8px;
+      box-shadow: 0 4px 16px rgba(0,0,0,.12);
+      z-index: 9999;
+      max-height: 220px;
+      overflow-y: auto;
+      width: 100%;
+      left: 0;
+      top: calc(100% + 4px);
+      display: none;
     }
+    #lf-address-dropdown .pac-item {
+      padding: 10px 14px;
+      font-size: 13px;
+      color: #374151;
+      cursor: pointer;
+      border-bottom: 1px solid #f3f4f6;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    #lf-address-dropdown .pac-item:last-child { border-bottom: none; }
+    #lf-address-dropdown .pac-item:hover, #lf-address-dropdown .pac-item.selected { background: #f0f9ff; color: #0369a1; }
+    #lf-address-dropdown .pac-icon { color: #9ca3af; font-size: 14px; flex-shrink: 0; }
+    .lf-address-wrap { position: relative; }
+  </style>
+  <script>
+    // Custom Places autocomplete using server-side proxy (bypasses domain restrictions)
+    (function() {
+      var timer = null;
+      var selectedIndex = -1;
+
+      function initAddressAutocomplete() {
+        var input = document.getElementById('lf-address');
+        if (!input) return;
+
+        // Wrap in relative container for dropdown positioning
+        var wrap = document.createElement('div');
+        wrap.className = 'lf-address-wrap';
+        input.parentNode.insertBefore(wrap, input);
+        wrap.appendChild(input);
+
+        // Create dropdown
+        var dropdown = document.createElement('div');
+        dropdown.id = 'lf-address-dropdown';
+        wrap.appendChild(dropdown);
+
+        input.addEventListener('input', function() {
+          clearTimeout(timer);
+          var val = input.value.trim();
+          if (val.length < 2) { closeDropdown(); return; }
+          timer = setTimeout(function() { fetchSuggestions(val); }, 250);
+        });
+
+        input.addEventListener('keydown', function(e) {
+          var items = dropdown.querySelectorAll('.pac-item');
+          if (!items.length) return;
+          if (e.key === 'ArrowDown') { e.preventDefault(); selectedIndex = Math.min(selectedIndex + 1, items.length - 1); highlight(items); }
+          else if (e.key === 'ArrowUp') { e.preventDefault(); selectedIndex = Math.max(selectedIndex - 1, 0); highlight(items); }
+          else if (e.key === 'Enter' && selectedIndex >= 0) { e.preventDefault(); items[selectedIndex].click(); }
+          else if (e.key === 'Escape') { closeDropdown(); }
+        });
+
+        document.addEventListener('click', function(e) {
+          if (!wrap.contains(e.target)) closeDropdown();
+        });
+      }
+
+      function highlight(items) {
+        items.forEach(function(it, i) {
+          it.classList.toggle('selected', i === selectedIndex);
+        });
+      }
+
+      function fetchSuggestions(query) {
+        fetch('/api/places-autocomplete?input=' + encodeURIComponent(query))
+          .then(function(r) { return r.json(); })
+          .then(function(data) { renderDropdown(data.predictions || []); })
+          .catch(function() { closeDropdown(); });
+      }
+
+      function renderDropdown(predictions) {
+        var dropdown = document.getElementById('lf-address-dropdown');
+        var input = document.getElementById('lf-address');
+        if (!dropdown) return;
+        selectedIndex = -1;
+        if (!predictions.length) { closeDropdown(); return; }
+        dropdown.innerHTML = predictions.map(function(p) {
+          return '<div class="pac-item"><span class="pac-icon">&#9679;</span>' + escHtml(p.description) + '</div>';
+        }).join('');
+        dropdown.querySelectorAll('.pac-item').forEach(function(el, i) {
+          el.addEventListener('mousedown', function(e) {
+            e.preventDefault();
+            input.value = predictions[i].description;
+            closeDropdown();
+            input.dispatchEvent(new Event('change', { bubbles: true }));
+          });
+        });
+        dropdown.style.display = 'block';
+      }
+
+      function closeDropdown() {
+        var d = document.getElementById('lf-address-dropdown');
+        if (d) { d.style.display = 'none'; d.innerHTML = ''; }
+        selectedIndex = -1;
+      }
+
+      function escHtml(s) {
+        return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      }
+
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initAddressAutocomplete);
+      } else {
+        initAddressAutocomplete();
+      }
+    })();
   </script>
-  <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCkn8UeVuv5iek_Rm3jqdozF1HGMhSuGNk&libraries=places&callback=initLfPlaces" async defer></script>
 </head>
 <body>
 <div class="page">

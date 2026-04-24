@@ -405,7 +405,7 @@ textarea{font-family:inherit;}
     <div class="nav-section" id="nav-reports-section">Reports</div>
     <div class="nav-item" id="nav-reporting" onclick="sv('reporting',this)"><svg class="nav-icon" viewBox="0 0 16 16" fill="none"><rect x="2" y="9" width="3" height="5" rx="1" fill="currentColor" opacity=".5"/><rect x="6.5" y="6" width="3" height="8" rx="1" fill="currentColor" opacity=".7"/><rect x="11" y="3" width="3" height="11" rx="1" fill="currentColor"/></svg>Reporting</div>
     <div class="nav-section">Automate</div>
-    <div class="nav-item" onclick="sv('automations',this)"><svg class="nav-icon" viewBox="0 0 16 16" fill="none"><path d="M3 8a5 5 0 0 1 5-5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M13 8a5 5 0 0 1-5 5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M11 3l2 0 0 2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M5 13l-2 0 0-2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>Automations</div>
+    <div class="nav-item" onclick="sv('automations',this);setTimeout(loadReminderToggleState,100)"><svg class="nav-icon" viewBox="0 0 16 16" fill="none"><path d="M3 8a5 5 0 0 1 5-5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M13 8a5 5 0 0 1-5 5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M11 3l2 0 0 2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M5 13l-2 0 0-2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>Automations</div>
     <div class="nav-item" onclick="sv('broadcasts',this)"><svg class="nav-icon" viewBox="0 0 16 16" fill="none"><path d="M2 5h12v7a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5z" stroke="currentColor" stroke-width="1.3"/><path d="M2 5l6-4 6 4" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M6 16V9h4v7" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>Broadcasts</div>
     <div class="nav-item" onclick="sv('payments',this)"><svg class="nav-icon" viewBox="0 0 16 16" fill="none"><rect x="1" y="3" width="14" height="10" rx="2" stroke="currentColor" stroke-width="1.3"/><path d="M1 7h14" stroke="currentColor" stroke-width="1.3"/><rect x="3" y="10" width="3" height="1.5" rx=".5" fill="currentColor" opacity=".6"/></svg>Payments</div>
     <div class="nav-section">Config</div>
@@ -6508,7 +6508,7 @@ function renderAutoList(){
     + '</div>'
     + '</div>';
 
-  var reminderCard = '<div class="card" style="padding:14px 16px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:12px;border-left:3px solid #10b981;">'    + '<div style="flex:1;min-width:0;">'    +   '<div style="display:flex;align-items:center;gap:8px;"><b style="font-size:14px;">Day-Before Appointment Reminders</b>'    +     '<span class="pill pill-ok" style="font-size:10px;">ACTIVE</span>'    +     '<span style="font-size:10px;background:#f0f9ff;color:#1d4ed8;padding:2px 7px;border-radius:99px;border:1px solid #bfdbfe;">System</span>'    +     '<span style="font-size:10px;background:#f0fdf4;color:#166534;padding:2px 7px;border-radius:99px;border:1px solid #bbf7d0;">Cron · 6pm HST</span>'    +   '</div>'    +   '<div style="font-size:12px;color:var(--muted);margin-top:4px;">Daily at <b>6:00 PM HST</b> &middot; appointment is tomorrow &middot; do send_sms to customer + assigned cleaner</div>'    + '</div>'    + '</div>';
+  var reminderCard = '<div class="card" style="padding:14px 16px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:12px;border-left:3px solid #10b981;"<label class="auto-toggle" title="Enable automation" style="margin-left:auto"><input type="checkbox" id="toggle-reminders" checked onchange="toggleReminderAuto(this.checked)"><div class="auto-toggle-track"><div class="auto-toggle-thumb"></div></div></label>>'    + '<div style="flex:1;min-width:0;">'    +   '<div style="display:flex;align-items:center;gap:8px;"><b style="font-size:14px;">Day-Before Appointment Reminders</b>'    +     '<span class="pill pill-ok" style="font-size:10px;">ACTIVE</span>'    +     '<span style="font-size:10px;background:#f0f9ff;color:#1d4ed8;padding:2px 7px;border-radius:99px;border:1px solid #bfdbfe;">System</span>'    +     '<span style="font-size:10px;background:#f0fdf4;color:#166534;padding:2px 7px;border-radius:99px;border:1px solid #bbf7d0;">Cron · 6pm HST</span>'    +   '</div>'    +   '<div style="font-size:12px;color:var(--muted);margin-top:4px;">Daily at <b>6:00 PM HST</b> &middot; appointment is tomorrow &middot; do send_sms to customer + assigned cleaner</div>'    + '</div>'    + '</div>';
   if(!automations.length){
     host.innerHTML = systemCard + janitorialCard + reminderCard + '<div class="empty-state" style="padding:28px;text-align:center;color:var(--muted);background:var(--panel);border:1px dashed var(--border);border-radius:var(--radius);">No custom automations yet. Click <b>+ New automation</b> to build your first rule.</div>';
     var ac = document.getElementById('auto-active-count'); if(ac) ac.textContent='3';
@@ -13167,6 +13167,19 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 // === END AUTO LOG WRAPPERS ===
 
+
+async function toggleReminderAuto(enabled) {
+  try {
+    await db.from('ai_booking_settings').update({ reminders_enabled: enabled }).neq('id','00000000-0000-0000-0000-000000000000');
+  } catch(e) { console.error('toggleReminderAuto',e); }
+}
+async function loadReminderToggleState() {
+  try {
+    const { data } = await db.from('ai_booking_settings').select('reminders_enabled').limit(1).single();
+    const el = document.getElementById('toggle-reminders');
+    if (el && data) el.checked = data.reminders_enabled !== false;
+  } catch(e) {}
+}
 </script>
 </body>
 </html>

@@ -315,77 +315,87 @@ body{font-family:'Josefin Sans',sans-serif;color:var(--text);overflow-x:hidden;}
   .svc-grid{grid-template-columns:1fr 1fr;}
 }
 </style>
-  <style>.pac-container{z-index:2147483647!important;}</style>
+  <style>
+  .lf-pac-dropdown{position:absolute;background:#fff;border:1px solid #d0eaf4;border-radius:10px;box-shadow:0 4px 20px rgba(0,0,0,.12);z-index:9999;width:100%;max-height:220px;overflow-y:auto;margin-top:2px;}
+  .lf-pac-item{padding:10px 14px;cursor:pointer;font-size:14px;color:#1a2e38;border-bottom:1px solid #f0f7fa;display:flex;align-items:center;gap:8px;}
+  .lf-pac-item:last-child{border-bottom:none;}
+  .lf-pac-item:hover,.lf-pac-item.active{background:#f0f9ff;}
+  .lf-pac-pin{color:#3BB8E3;flex-shrink:0;}
+  .lf-pac-wrap{position:relative;}
+  </style>
   <script>
   (function(){
-    // Guard: only load Maps once per page
-    if (window.__lfMapsLoading) return;
-    window.__lfMapsLoading = true;
+    var dropdown, timer, activeIdx = -1;
 
-    var MAPS_KEY = 'AIzaSyCkn8UeVuv5iek_Rm3jqdozF1HGMhSuGNk';
-    var attached = false;
-
-    function attachAutocomplete() {
-      if (attached) return;
-      var input = document.getElementById('lf-address');
-      if (!input) return;
-      if (!(window.google && google.maps && google.maps.places)) return;
-      try {
-        var hawaiiBounds = new google.maps.LatLngBounds(
-          new google.maps.LatLng(18.9, -160.3),
-          new google.maps.LatLng(22.3, -154.7)
-        );
-        var ac = new google.maps.places.Autocomplete(input, {
-          fields: ['formatted_address'],
-          types: ['address'],
-          componentRestrictions: { country: 'us' },
-          bounds: hawaiiBounds,
-          strictBounds: false
+    function buildDropdown(input, predictions) {
+      removeDropdown();
+      if (!predictions.length) return;
+      dropdown = document.createElement('div');
+      dropdown.className = 'lf-pac-dropdown';
+      predictions.forEach(function(p, i) {
+        var item = document.createElement('div');
+        item.className = 'lf-pac-item';
+        item.innerHTML = '<svg class="lf-pac-pin" width="14" height="14" viewBox="0 0 16 16"><path d="M8 1a5 5 0 0 1 5 5c0 3.5-5 9-5 9S3 9.5 3 6a5 5 0 0 1 5-5zm0 3a2 2 0 1 0 0 4A2 2 0 0 0 8 4z" fill="currentColor"/></svg>' + p.description;
+        item.addEventListener('mousedown', function(e) {
+          e.preventDefault();
+          input.value = p.description;
+          removeDropdown();
+          input.dispatchEvent(new Event('input', { bubbles: true }));
         });
-        ac.addListener('place_changed', function() {
-          var p = ac.getPlace();
-          if (p && p.formatted_address) {
-            input.value = p.formatted_address;
-            input.dispatchEvent(new Event('input', { bubbles: true }));
-          }
-        });
-        // Prevent form submit on enter when dropdown visible
-        input.addEventListener('keydown', function(e) {
-          if (e.key === 'Enter') {
-            var pac = document.querySelector('.pac-container');
-            if (pac && pac.offsetParent !== null) e.preventDefault();
-          }
-        });
-        attached = true;
-        console.log('[HNC] Places autocomplete attached to lf-address');
-      } catch(err) { console.warn('[HNC] Maps attach failed', err); }
+        dropdown.appendChild(item);
+      });
+      input.parentNode.style.position = 'relative';
+      input.parentNode.appendChild(dropdown);
+      activeIdx = -1;
     }
 
-    window.lfInitMaps = function() {
-      console.log('[HNC] lfInitMaps callback fired');
-      attachAutocomplete();
-    };
+    function removeDropdown() {
+      if (dropdown && dropdown.parentNode) dropdown.parentNode.removeChild(dropdown);
+      dropdown = null; activeIdx = -1;
+    }
 
-    // Also try on focus in case Maps loads after page
-    document.addEventListener('focusin', function(e) {
-      if (e.target && e.target.id === 'lf-address') {
-        attachAutocomplete();
-      }
-    });
+    function setActive(idx, items) {
+      items.forEach(function(el, i) { el.classList.toggle('active', i === idx); });
+    }
 
-    // Only inject script if Maps not already present
-    if (!document.querySelector('script[src*="maps.googleapis.com/maps/api/js"]')) {
-      var script = document.createElement('script');
-      script.src = 'https://maps.googleapis.com/maps/api/js?key=' + MAPS_KEY + '&libraries=places&callback=lfInitMaps';
-      script.async = true;
-      script.defer = true;
-      document.head.appendChild(script);
-      console.log('[HNC] Maps script injected');
+    function initAddressField() {
+      var input = document.getElementById('lf-address');
+      if (!input || input._lfInit) return;
+      input._lfInit = true;
+
+      input.addEventListener('input', function() {
+        clearTimeout(timer);
+        var val = input.value.trim();
+        if (val.length < 2) { removeDropdown(); return; }
+        timer = setTimeout(function() {
+          fetch('/api/places-autocomplete?input=' + encodeURIComponent(val))
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+              buildDropdown(input, data.predictions || []);
+            })
+            .catch(function() { removeDropdown(); });
+        }, 200);
+      });
+
+      input.addEventListener('keydown', function(e) {
+        if (!dropdown) return;
+        var items = dropdown.querySelectorAll('.lf-pac-item');
+        if (e.key === 'ArrowDown') { e.preventDefault(); activeIdx = Math.min(activeIdx+1, items.length-1); setActive(activeIdx, items); }
+        else if (e.key === 'ArrowUp') { e.preventDefault(); activeIdx = Math.max(activeIdx-1, 0); setActive(activeIdx, items); }
+        else if (e.key === 'Enter' && activeIdx >= 0) { e.preventDefault(); items[activeIdx].dispatchEvent(new MouseEvent('mousedown')); }
+        else if (e.key === 'Escape') { removeDropdown(); }
+      });
+
+      document.addEventListener('click', function(e) {
+        if (!dropdown) return;
+        if (!input.contains(e.target) && !dropdown.contains(e.target)) removeDropdown();
+      });
+    }
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initAddressField);
     } else {
-      // Maps already loaded, attach directly
-      if (window.google && google.maps && google.maps.places) {
-        attachAutocomplete();
-      }
+      initAddressField();
     }
   })();
   </script>

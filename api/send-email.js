@@ -393,8 +393,8 @@ export default async function handler(req, res) {
 
     // ─── BOOKING CONFIRMATION ───────────────────────────────────────────────
     else if (type === 'cancellation') {
-      emailSubject = 'Your Hawaii Natural Clean appointment has been cancelled';
-      emailHtml = `
+      subject = 'Your Hawaii Natural Clean appointment has been cancelled';
+      html = `
         <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px;color:#333">
           <div style="text-align:center;margin-bottom:24px">
             <h1 style="color:#1a9fb0;font-size:22px;margin:0">Hawaii Natural Clean</h1>

@@ -13220,6 +13220,38 @@ document.addEventListener('DOMContentLoaded', function() {
           });
         }
       } catch(_ce) {}
+      // Send cancellation SMS to assigned cleaner and client
+      try {
+        var _apptId = window.currentAppt && (window.currentAppt.dbId || window.currentAppt.id);
+        if (_apptId) {
+          db.from('appointments').select('cleaner_id').eq('id', _apptId).single().then(function(apptRes) {
+            var _cleanerId = apptRes.data && apptRes.data.cleaner_id;
+            db.auth.getSession().then(function(s) {
+              var _tok = s.data.session ? s.data.session.access_token : '';
+              var _headers = { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + _tok };
+              var _date = apptDate || 'your scheduled date';
+              var _svc = (window.currentAppt && window.currentAppt.service) || 'cleaning';
+              // SMS cleaner if assigned
+              if (_cleanerId) {
+                db.from('cleaners').select('name, phone').eq('id', _cleanerId).single().then(function(clRes) {
+                  if (clRes.data && clRes.data.phone) {
+                    fetch('/api/send-sms', { method: 'POST', headers: _headers, body: JSON.stringify({ to: clRes.data.phone, message: 'Hi ' + (clRes.data.name || 'there') + ', heads up: the appointment for ' + apptName + ' on ' + _date + ' has been cancelled. No action needed.' }) });
+                  }
+                });
+              }
+              // SMS client
+              var _clientId2 = window.currentAppt && window.currentAppt.client_id;
+              if (_clientId2) {
+                db.from('clients').select('phone').eq('id', _clientId2).single().then(function(clRes2) {
+                  if (clRes2.data && clRes2.data.phone) {
+                    fetch('/api/send-sms', { method: 'POST', headers: _headers, body: JSON.stringify({ to: clRes2.data.phone, message: 'Hi ' + apptName + ', your Hawaii Natural Clean appointment (' + _svc + ') on ' + _date + ' has been cancelled. Questions? Call/text (808) 468-5356.' }) });
+                  }
+                });
+              }
+            });
+          });
+        }
+      } catch(_cs) {}
       return result;
     };
 

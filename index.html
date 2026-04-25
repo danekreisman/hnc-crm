@@ -5164,7 +5164,7 @@ function sv(view,el){
   document.getElementById('top-cta').textContent=ctas[view]||'+ New';
   document.getElementById('top-cta').style.display=(view==='agent'||view==='settings')?'none':'block';
   document.getElementById('sec-btn').style.display=(view==='agent'||view==='settings')?'none':'block';
-  var searchViews=['clients','cleaners','pipeline','dashboard','payments','calendar'];
+  var searchViews=['clients','cleaners','pipeline','dashboard','payments','calendar','logs'];
   document.getElementById('global-search-wrap').style.display=searchViews.indexOf(view)>=0?'block':'none';
   document.getElementById('global-search').value='';
   document.getElementById('search-results').style.display='none';

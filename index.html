@@ -13209,7 +13209,37 @@ document.addEventListener('DOMContentLoaded', function() {
       return result;
     };
 
-    // Patch confirmCancelClient
+    
+    // Intercept stripe-invoice API calls to save to invoices table on success
+    var _origFetch = window.fetch;
+    window.fetch = async function() {
+      var args = arguments;
+      var url = args[0] || '';
+      var opts = args[1] || {};
+      var res = await _origFetch.apply(this, args);
+      if (typeof url === 'string' && url.includes('stripe-invoice') && opts.body) {
+        try {
+          var clone = res.clone();
+          clone.json().then(function(d) {
+            if (d && d.success && d.invoiceId) {
+              var body = JSON.parse(opts.body);
+              db.from('invoices').insert({
+                client_name: body.customerName || null,
+                description: body.service || body.description || null,
+                amount: body.amount || 0,
+                total: body.amount || 0,
+                stripe_invoice_id: d.invoiceId,
+                payment_terms: body.terms || 'NET 30',
+                notes: body.notes || null,
+                status: 'open'
+              }).then(function() {}).catch(function() {});
+            }
+          }).catch(function() {});
+        } catch(_e) {}
+      }
+      return res;
+    };
+// Patch confirmCancelClient
     var _origCancelClient = confirmCancelClient;
     confirmCancelClient = async function() {
       var result = await _origCancelClient.apply(this, arguments);

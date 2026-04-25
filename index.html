@@ -13225,7 +13225,7 @@ document.addEventListener('DOMContentLoaded', function() {
               var body = JSON.parse(opts.body);
               db.from('invoices').insert({
                 client_name: body.customerName || null,
-                description: body.service || body.description || null,
+                service: body.service || body.description || null,
                 amount: body.amount || 0,
                 total: body.amount || 0,
                 stripe_invoice_id: d.invoiceId,

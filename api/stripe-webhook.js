@@ -17,7 +17,7 @@ async function logActivity(action, description, metadata={}) {
 }
 
 
-// ── Activity Logger ──────────────────────────────────────────────────────────
+// -- Activity Logger ----------------------------------------------------------
 async function logActivity(action, description, metadata = {}) {
   try {
     await fetch(process.env.SUPABASE_URL + '/rest/v1/activity_logs', {
@@ -32,7 +32,7 @@ async function logActivity(action, description, metadata = {}) {
     });
   } catch (_e) { /* non-blocking */ }
 }
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);

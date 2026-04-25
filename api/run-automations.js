@@ -63,9 +63,9 @@ export default async function handler(req, res) {
 
         let matchingLeads = [];
 
-        // ────────────────────────────────────────────────────────────────────
+        // --------------------------------------------------------------------
         // TRIGGER 1: form_submission (newly submitted leads from specific source)
-        // ────────────────────────────────────────────────────────────────────
+        // --------------------------------------------------------------------
         if (trigger_type === 'form_submission') {
           const sourceId = trigger_config?.source_id;
           if (sourceId) {
@@ -81,9 +81,9 @@ export default async function handler(req, res) {
           }
         }
 
-        // ────────────────────────────────────────────────────────────────────
+        // --------------------------------------------------------------------
         // TRIGGER 2: lead_created (any new lead)
-        // ────────────────────────────────────────────────────────────────────
+        // --------------------------------------------------------------------
         if (trigger_type === 'lead_created') {
           const { data, error } = await db
             .from('leads')
@@ -95,9 +95,9 @@ export default async function handler(req, res) {
           if (!error) matchingLeads = data || [];
         }
 
-        // ────────────────────────────────────────────────────────────────────
+        // --------------------------------------------------------------------
         // TRIGGER 3: scheduled (runs at specific time)
-        // ────────────────────────────────────────────────────────────────────
+        // --------------------------------------------------------------------
         if (trigger_type === 'scheduled') {
           const timeOfDay = trigger_config?.time_of_day; // "09:00"
           const days = trigger_config?.days || ['MO', 'TU', 'WE', 'TH', 'FR', 'SA', 'SU'];
@@ -123,9 +123,9 @@ export default async function handler(req, res) {
           }
         }
 
-        // ────────────────────────────────────────────────────────────────────
+        // --------------------------------------------------------------------
         // TRIGGER 4: days_since_response (X days with no response)
-        // ────────────────────────────────────────────────────────────────────
+        // --------------------------------------------------------------------
         if (trigger_type === 'days_since_response') {
           const days = trigger_config?.days || 7;
           const thresholdDate = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
@@ -140,13 +140,13 @@ export default async function handler(req, res) {
           if (!error) matchingLeads = data || [];
         }
 
-        // ────────────────────────────────────────────────────────────────────
+        // --------------------------------------------------------------------
         // TRIGGER 5: days_in_segment (X days since moved into segment)
         // Used for: nurture sequences, one-time re-engagement, canceled win-back.
         // Checks BOTH the leads and clients tables, so canceled clients fire the
         // canceled sequence just like canceled leads would.
         // Blacklisted records (do_not_contact = true) are always skipped.
-        // ────────────────────────────────────────────────────────────────────
+        // --------------------------------------------------------------------
         if (trigger_type === 'days_in_segment') {
           const targetSegment = trigger_config?.segment;
           const days = trigger_config?.days;
@@ -267,9 +267,9 @@ export default async function handler(req, res) {
             const runId = runRecord?.id;
             let actionsExecuted = [];
 
-            // ────────────────────────────────────────────────────────────────────
+            // --------------------------------------------------------------------
             // EXECUTE EACH ACTION IN SEQUENCE
-            // ────────────────────────────────────────────────────────────────────
+            // --------------------------------------------------------------------
             for (let i = 0; i < (actions?.length || 0); i++) {
               const action = actions[i];
               const actionStartTime = new Date();

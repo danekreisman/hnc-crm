@@ -1,24 +1,6 @@
 import { fetchWithTimeout, TIMEOUTS } from './utils/with-timeout.js';
 import { logError } from './utils/error-logger.js';
 
-// ── Activity Logger ──────────────────────────────────────────────────────────
-async function logActivity(action, description, metadata = {}) {
-  try {
-    await fetch(process.env.SUPABASE_URL + '/rest/v1/activity_logs', {
-      method: 'POST',
-      headers: {
-        'apikey': process.env.SUPABASE_SERVICE_ROLE_KEY,
-        'Authorization': 'Bearer ' + process.env.SUPABASE_SERVICE_ROLE_KEY,
-        'Content-Type': 'application/json',
-        'Prefer': 'return=minimal'
-      },
-      body: JSON.stringify({ action, description, user_email: 'system', entity_type: action, metadata })
-    });
-  } catch (_e) { /* non-blocking */ }
-}
-// ─────────────────────────────────────────────────────────────────────────────
-
-
 /**
  * Branded Email Shell for Hawaii Natural Clean
  *
@@ -483,7 +465,6 @@ export default async function handler(req, res) {
     const data = await response.json();
 
     if (response.ok) {
-    await logActivity('email_sent', 'Email sent: ' + (subject || req.body?.subject || 'unknown'), { to: req.body?.to || req.body?.clientEmail });
       return res.status(200).json({ success: true, id: data.id });
     } else {
       await logError('send-email', `Resend API error: ${response.status}`, { to, subject, error: data });

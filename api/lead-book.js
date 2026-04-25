@@ -3,7 +3,7 @@ import { validateOrFail, SCHEMAS } from './utils/validate.js';
 import { fetchWithTimeout, TIMEOUTS } from './utils/with-timeout.js';
 import { logError } from './utils/error-logger.js';
 
-// ── Activity Logger ──────────────────────────────────────────────────────────
+// -- Activity Logger ----------------------------------------------------------
 async function logActivity(action, description, metadata = {}) {
   try {
     await fetch(process.env.SUPABASE_URL + '/rest/v1/activity_logs', {
@@ -18,7 +18,7 @@ async function logActivity(action, description, metadata = {}) {
     });
   } catch (_e) { /* non-blocking */ }
 }
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 
 const db = () => createClient(
@@ -43,7 +43,7 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') { res.status(200).end(); return; }
 
-  // ── GET: validate token → return lead + quote data ────────────────────
+  // -- GET: validate token → return lead + quote data --------------------
   if (req.method === 'GET') {
     const token = req.query.token;
     if (!token) return res.status(400).json({ error: 'Missing token' });
@@ -84,7 +84,7 @@ export default async function handler(req, res) {
     });
   }
 
-  // ── POST: book ─────────────────────────────────────────────────────────
+  // -- POST: book ---------------------------------------------------------
   if (req.method === 'POST') {
     const { token, date, time, notes, service, rushFee } = req.body;
     const invalid = validateOrFail(req.body, SCHEMAS.booking);
@@ -135,7 +135,7 @@ export default async function handler(req, res) {
       notes || null,
     ].filter(Boolean).join('\n');
 
-    // ── 2-4. ATOMIC: find/create client + appointment + close lead ────────
+    // -- 2-4. ATOMIC: find/create client + appointment + close lead --------
     // Uses a PostgreSQL stored procedure so all 3 steps succeed or all roll back.
     // No more "client created but no appointment" state.
     const { data: bookingResult, error: bookingErr } = await supabase.rpc('book_lead_atomic', {
@@ -185,7 +185,7 @@ export default async function handler(req, res) {
     const { client_id: clientId, appointment_id: appointmentId } = bookingResult;
     console.log('[lead-book] Booking committed atomically — client:', clientId, 'appointment:', appointmentId);
 
-    // ── 5. Format date ─────────────────────────────────────────────────────
+    // -- 5. Format date -----------------------------------------------------
     const prettyDate = new Date(date + 'T12:00:00').toLocaleDateString('en-US', {
       weekday: 'long', month: 'long', day: 'numeric', year: 'numeric'
     });
@@ -193,7 +193,7 @@ export default async function handler(req, res) {
       ? ` A ${rushFee === 200 ? 'same-day' : rushFee === 100 ? 'next-day' : '2-day'} booking fee of $${rushFee} applies.`
       : '';
 
-    // ── 6. Confirmation email — check prefs first (non-critical) ────────────
+    // -- 6. Confirmation email — check prefs first (non-critical) ------------
     const bookingNotifOn = await isNotifEnabled(db, result.client_id, 'booking_confirmation');
     if (!bookingNotifOn) console.log('[lead-book] booking_confirmation disabled for client', result.client_id);
     if (bookingNotifOn) try {
@@ -220,7 +220,7 @@ export default async function handler(req, res) {
       await logError('lead-book:confirmation-email', err, { leadId: lead.id, email: lead.email });
     }
 
-    // ── 7. Admin SMS notification (non-critical) ───────────────────────────
+    // -- 7. Admin SMS notification (non-critical) ---------------------------
     try {
       const adminSms = `✅ Auto-booked!\n${lead.name} · ${lead.service || 'Cleaning'}\n${prettyDate} at ${time}${totalWithTax ? '\nTotal: $' + totalWithTax : ''}${rushFee > 0 ? ' (incl. $' + rushFee + ' rush fee)' : ''}`;
       await fetchWithTimeout(`${BASE_URL}/api/send-sms`, {
@@ -232,7 +232,7 @@ export default async function handler(req, res) {
       await logError('lead-book:admin-sms', err, { leadId: lead.id });
     }
 
-    // ── 8. Policy agreement SMS — only if client hasn't already agreed ─────
+    // -- 8. Policy agreement SMS — only if client hasn't already agreed -----
     // New clients have policies_agreed_at = null. Existing clients who already
     // agreed are skipped automatically so they don't get a repeat message.
     try {

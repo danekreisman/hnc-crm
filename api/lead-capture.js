@@ -1,10 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { validateOrFail, SCHEMAS } from './utils/validate.js';
 
-}
-// ─────────────────────────────────────────────────────────────────────────────
-
-
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST,OPTIONS');
@@ -205,7 +201,6 @@ export default async function handler(req, res) {
     if (updateErr) console.error('[lead-capture] update quote fields error:', JSON.stringify(updateErr));
     else console.log('[lead-capture] quote stored on lead', leadId);
   }
-
 
   return res.status(200).json({ success: true, leadId });
 }

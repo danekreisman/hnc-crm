@@ -448,6 +448,7 @@ export default async function handler(req, res) {
               .eq('id', leadId);
 
             totalExecuted++;
+            try { await logActivity('automation_fired', (automation.name || 'Automation') + ' -> ' + (lead.name || lead.contact_name || 'Lead'), { automationId: automation.id, leadId: lead.id }); } catch (_le) {}
           } catch (leadError) {
             console.error(`[${executionId}] Error executing automation for lead:`, leadError.message);
           }

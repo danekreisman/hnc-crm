@@ -176,3 +176,39 @@ This caused `FUNCTION_INVOCATION_FAILED` crashes on lead-capture.js. The unicode
 ---
 
 *Last updated: April 2026 — after full testing session (lead form, client portal, invoice flow, activity logging).*
+
+---
+
+## Automation Inventory (updated April 2026)
+
+### System Automations (fire immediately on trigger)
+| Automation | Trigger | What it does |
+|---|---|---|
+| New Lead — Auto Quote | lead.created | Email + SMS with quote price to client |
+| Janitorial Lead — Walkthrough Request | lead.created (Janitorial) | Email + SMS requesting walkthrough |
+| Appointment Cancelled — Client Email | appointment cancelled (frontend) | Branded cancellation email via send-email.js |
+| Appointment Cancelled — Client SMS | appointment cancelled (frontend) | SMS to client confirming cancellation |
+| Appointment Cancelled — Cleaner SMS | appointment cancelled (frontend) | SMS to assigned cleaner notifying of cancel |
+| Booking Confirmation | lead books via book.html | Email confirmation via lead-book.js |
+
+### Cron Automations (run on schedule)
+| Automation | Schedule | What it does |
+|---|---|---|
+| Day-Before Reminders | Daily 6pm HST | SMS to client + assigned cleaner |
+| Post-Clean Review Request | Via run-automations.js | SMS to client after appointment completed; sets review_requested_at |
+| Lead Follow-up Sequences | Via run-automations.js | Day 3, Day 7, Month 1/3/6 nurture |
+| Cancelled Win-back | Via run-automations.js | Day 14 gracious, Day 60 offer |
+
+### Automation Logging
+Every automation fired by run-automations.js now logs `action: 'automation_fired'` to `activity_logs` with the automation name and lead name. Visible in Logs → Activity tab.
+
+### Post-clean review SMS
+- Triggered by: run-automations.js cron check
+- Finds: appointments with status='completed', date=today or yesterday, review_requested_at IS NULL
+- Sends: SMS to client phone with Google review link
+- Marks: sets review_requested_at on the appointment to prevent duplicates
+- Google review URL used: https://g.page/r/hawaiinaturalclean (update if changed)
+
+### Known gaps (not yet built)
+- Welcome email to new active client
+- Manual invoice overdue reminders are in run-invoice-reminders.js but not shown in Automations UI

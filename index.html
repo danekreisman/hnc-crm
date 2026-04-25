@@ -13206,6 +13206,20 @@ document.addEventListener('DOMContentLoaded', function() {
       var apptDate = currentAppt && currentAppt.date;
       var result = await _origCancel.apply(this, arguments);
       try { logActivity('appointment_cancelled', 'Appt cancelled: ' + apptName, { date: apptDate }); } catch(e) {}
+      // Send cancellation email to client
+      try {
+        var _apptClientId = window.currentAppt && window.currentAppt.client_id;
+        if (_apptClientId) {
+          db.from('clients').select('email, name').eq('id', _apptClientId).single().then(function(r) {
+            if (r.data && r.data.email) {
+              var _sess; db.auth.getSession().then(function(s) {
+                _sess = s.data.session;
+                fetch('/api/send-email', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (_sess ? _sess.access_token : '') }, body: JSON.stringify({ type: 'cancellation', to: r.data.email, clientName: r.data.name || apptName, service: window.currentAppt.service || 'Cleaning', date: apptDate }) });
+              });
+            }
+          });
+        }
+      } catch(_ce) {}
       return result;
     };
 

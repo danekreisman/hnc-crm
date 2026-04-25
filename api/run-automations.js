@@ -44,7 +44,47 @@ export default async function handler(req, res) {
     if (autoError) throw new Error(`Failed to fetch automations: ${autoError.message}`);
     if (!automations || automations.length === 0) {
       console.log(`[${executionId}] No enabled automations found`);
-      return res.status(200).json({ success: true, executedCount: 0, message: 'No automations to run' });
+      
+  // Post-clean review request SMS
+  try {
+    const today = new Date().toISOString().slice(0, 10);
+    const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+    const reviewAppts = await fetch(`${process.env.SUPABASE_URL}/rest/v1/appointments?select=id,client_id,service,date&status=eq.completed&review_requested_at=is.null&date=gte.${yesterday}&date=lte.${today}&order=date.desc`, {
+      headers: { apikey: process.env.SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}` }
+    }).then(r => r.json());
+
+    let reviewsSent = 0;
+    for (const appt of (reviewAppts || [])) {
+      if (!appt.client_id) continue;
+      const clientData = await fetch(`${process.env.SUPABASE_URL}/rest/v1/clients?select=name,phone&id=eq.${appt.client_id}`, {
+        headers: { apikey: process.env.SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}` }
+      }).then(r => r.json());
+      const client = clientData?.[0];
+      if (!client?.phone) continue;
+
+      const firstName = (client.name || '').split(' ')[0] || 'there';
+      const msg = `Hi ${firstName}! We hope your Hawaii Natural Clean visit went great. If you have a moment, we would love a review: https://g.page/r/hawaiinaturalclean 🌺 Reply STOP to opt out.`;
+
+      await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || 'https://hnc-crm.vercel.app'}/api/send-sms`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ to: client.phone, message: msg })
+      });
+
+      // Mark review as requested
+      await fetch(`${process.env.SUPABASE_URL}/rest/v1/appointments?id=eq.${appt.id}`, {
+        method: 'PATCH',
+        headers: { apikey: process.env.SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+        body: JSON.stringify({ review_requested_at: new Date().toISOString() })
+      });
+      reviewsSent++;
+    }
+    console.log(`[post-clean] Sent ${reviewsSent} review request SMS(es)`);
+  } catch (reviewErr) {
+    console.error('[post-clean] Review SMS error:', reviewErr.message);
+  }
+
+  return res.status(200).json({ success: true, executedCount: 0, message: 'No automations to run' });
     }
 
     console.log(`[${executionId}] Found ${automations.length} enabled automations`);
@@ -462,44 +502,7 @@ export default async function handler(req, res) {
       }
     }
 
-    // Post-clean review request SMS
-  try {
-    const today = new Date().toISOString().slice(0, 10);
-    const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
-    const reviewAppts = await fetch(`${process.env.SUPABASE_URL}/rest/v1/appointments?select=id,client_id,service,date&status=eq.completed&review_requested_at=is.null&date=gte.${yesterday}&date=lte.${today}&order=date.desc`, {
-      headers: { apikey: process.env.SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}` }
-    }).then(r => r.json());
-
-    let reviewsSent = 0;
-    for (const appt of (reviewAppts || [])) {
-      if (!appt.client_id) continue;
-      const clientData = await fetch(`${process.env.SUPABASE_URL}/rest/v1/clients?select=name,phone&id=eq.${appt.client_id}`, {
-        headers: { apikey: process.env.SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}` }
-      }).then(r => r.json());
-      const client = clientData?.[0];
-      if (!client?.phone) continue;
-
-      const firstName = (client.name || '').split(' ')[0] || 'there';
-      const msg = `Hi ${firstName}! We hope your Hawaii Natural Clean visit went great. If you have a moment, we would love a review: https://g.page/r/hawaiinaturalclean 🌺 Reply STOP to opt out.`;
-
-      await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || 'https://hnc-crm.vercel.app'}/api/send-sms`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ to: client.phone, message: msg })
-      });
-
-      // Mark review as requested
-      await fetch(`${process.env.SUPABASE_URL}/rest/v1/appointments?id=eq.${appt.id}`, {
-        method: 'PATCH',
-        headers: { apikey: process.env.SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
-        body: JSON.stringify({ review_requested_at: new Date().toISOString() })
-      });
-      reviewsSent++;
-    }
-    console.log(`[post-clean] Sent ${reviewsSent} review request SMS(es)`);
-  } catch (reviewErr) {
-    console.error('[post-clean] Review SMS error:', reviewErr.message);
-  }
+    
 
   console.log(`[${executionId}] Completed. Executed ${totalExecuted} lead automations`);
 

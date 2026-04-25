@@ -1873,8 +1873,17 @@ Mahalo 🌺</textarea>
     <div class="panel-header"><div class="panel-title" id="sae-title">Edit template</div><button class="close-btn" onclick="closeOverlay('system-auto-edit-overlay')">×</button></div>
     <div class="panel-body">
       <div id="sae-fields"></div>
-      <div class="form-row" style="margin-top:16px;display:flex;align-items:center;gap:10px;">
+      <div style="margin-top:14px;padding:12px;background:#f8fafc;border-radius:8px;border:1px solid #e2e8f0;">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;font-weight:600;">
+          <input type="checkbox" id="sae-ai-personalize" style="width:16px;height:16px;">
+          <span>✨ AI personalization</span>
+        </label>
+        <div style="font-size:11px;color:#6b7280;margin-top:4px;margin-left:24px;">When enabled, AI will personalize this message for each client before sending.</div>
+      </div>
+      <div class="form-row" style="margin-top:16px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
         <button class="btn btn-primary" onclick="saveSystemAutoTemplate()">Save changes</button>
+        <button class="btn" style="background:#f0fdf4;color:#16a34a;border:1px solid #bbf7d0;" onclick="testSystemAutoTemplate()">&#9654; Test (sends to Dane)</button>
+        <button class="btn" style="background:#fff7f7;color:#dc2626;border:1px solid #fecaca;" onclick="resetSystemAutoTemplate()">Reset to default</button>
         <span id="sae-saved" style="font-size:12px;color:#10b981;display:none;">Saved!</span>
       </div>
     </div>
@@ -6526,7 +6535,7 @@ function renderAutoList(){
     + '<label class="auto-toggle" title="Enable automation" style="margin-left:auto"><input type="checkbox" id="toggle-janitorial"><div class="auto-toggle-track"><div class="auto-toggle-thumb"></div></div></label>'
     + '</div>';
 
-  var reminderCard = '<div class="card" style="padding:14px 16px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:12px;border-left:3px solid #10b981;">'    + '<div style="flex:1;min-width:0;">'    +   '<div style="display:flex;align-items:center;gap:8px;"><b style="font-size:14px;">Day-Before Appointment Reminders</b>'    +     '<span class="pill pill-ok" style="font-size:10px;">ACTIVE</span>'    +     '<span style="font-size:10px;background:#f0f9ff;color:#1d4ed8;padding:2px 7px;border-radius:99px;border:1px solid #bfdbfe;">System</span>'    +     '<span style="font-size:10px;background:#f0fdf4;color:#166534;padding:2px 7px;border-radius:99px;border:1px solid #bbf7d0;">Cron · 6pm HST</span>'    +   '</div>'    +   '<div style="font-size:12px;color:var(--muted);margin-top:4px;">Daily at <b>6:00 PM HST</b> &middot; appointment is tomorrow &middot; do send_sms to customer + assigned cleaner</div>'    + '</div>'    + '<label class="auto-toggle" title="Enable automation" style="margin-left:auto"><input type="checkbox" id="toggle-reminders" checked onchange="toggleReminderAuto(this.checked)"><div class="auto-toggle-track"><div class="auto-toggle-thumb"></div></div></label></div>';
+  var reminderCard = '<div class="card" style="padding:14px 16px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:12px;border-left:3px solid #10b981;">'    + '<div style="flex:1;min-width:0;">'    +   '<div style="display:flex;align-items:center;gap:8px;"><b style="font-size:14px;">Day-Before Appointment Reminders</b>'    +     '<span class="pill pill-ok" style="font-size:10px;">ACTIVE</span>'    +     '<span style="font-size:10px;background:#f0f9ff;color:#1d4ed8;padding:2px 7px;border-radius:99px;border:1px solid #bfdbfe;">System</span>'    +     '<span style="font-size:10px;background:#f0fdf4;color:#166534;padding:2px 7px;border-radius:99px;border:1px solid #bbf7d0;">Cron · 6pm HST</span>'    +   '</div>'    +   '<div style="font-size:12px;color:var(--muted);margin-top:4px;">Daily at <b>6:00 PM HST</b> &middot; appointment is tomorrow &middot; do send_sms to customer + assigned cleaner</div>'    + '</div>'    + '<button class=\"btn\" style=\"font-size:12px;padding:4px 10px;margin-left:auto;margin-right:8px;\" onclick=\"openDayBeforeAutoEdit()\">Edit templates</button><label class=\"auto-toggle\" title=\"Enable automation\"><input type=\"checkbox\" id=\"toggle-reminders\" checked onchange="toggleReminderAuto(this.checked)"><div class="auto-toggle-track"><div class="auto-toggle-thumb"></div></div></label></div>';
   if(!automations.length){
     var cancelEmailCard = '<div class="card" style="padding:14px 16px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:12px;border-left:3px solid #d1d5db;"><div style="flex:1;min-width:0;"><div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;"><b style="font-size:14px;">Appointment Cancelled — Client Email</b><span class="badge" style="background:#f3f4f6;color:#6b7280;border:1px solid #d1d5db;font-size:11px;padding:2px 7px;border-radius:999px;">Off</span><span class="badge" style="background:#eff6ff;color:#3b82f6;border:1px solid #bfdbfe;font-size:11px;padding:2px 7px;border-radius:999px;">System</span></div><div style="font-size:12px;color:#6b7280;">When appointment is cancelled · send cancellation email to client</div></div><button class=\"btn\" style=\"font-size:12px;padding:4px 10px;margin-left:auto;margin-right:8px;\" onclick=\"openCancelEmailAutoEdit()\">Edit templates</button><label class=\"auto-toggle\" title=\"Enable automation\"><input type=\"checkbox\" id="toggle-cancel-email"><div class="auto-toggle-track"><div class="auto-toggle-thumb"></div></div></label></div>';
   var cancelClientSmsCard = '<div class="card" style="padding:14px 16px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:12px;border-left:3px solid #d1d5db;"><div style="flex:1;min-width:0;"><div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;"><b style="font-size:14px;">Appointment Cancelled — Client SMS</b><span class="badge" style="background:#f3f4f6;color:#6b7280;border:1px solid #d1d5db;font-size:11px;padding:2px 7px;border-radius:999px;">Off</span><span class="badge" style="background:#eff6ff;color:#3b82f6;border:1px solid #bfdbfe;font-size:11px;padding:2px 7px;border-radius:999px;">System</span></div><div style="font-size:12px;color:#6b7280;">When appointment is cancelled · send SMS to client</div></div><button class=\"btn\" style=\"font-size:12px;padding:4px 10px;margin-left:auto;margin-right:8px;\" onclick=\"openCancelClientSmsAutoEdit()\">Edit templates</button><label class=\"auto-toggle\" title=\"Enable automation\"><input type=\"checkbox\" id="toggle-cancel-client-sms"><div class="auto-toggle-track"><div class="auto-toggle-thumb"></div></div></label></div>';
@@ -6635,11 +6644,12 @@ async function saveJanitorialTemplates(){
 }
 async function openSystemAutoEdit(type) {
   var configs = {
-    ce: { title: 'Cancellation Email', fields: [{ id:'sae-f1', key:'cancel_email_subject', label:'Email Subject', area:false }, { id:'sae-f2', key:'cancel_email_body', label:'Email Body', area:true }] },
-    cs: { title: 'Client Cancellation SMS', fields: [{ id:'sae-f1', key:'cancel_client_sms', label:'SMS Message', area:true }] },
-    cc: { title: 'Cleaner Cancellation SMS', fields: [{ id:'sae-f1', key:'cancel_cleaner_sms', label:'SMS Message', area:true }] },
-    rs: { title: 'Review Request SMS', fields: [{ id:'sae-f1', key:'review_sms', label:'SMS Message', area:true }, { id:'sae-f2', key:'google_review_url', label:'Google Review URL', area:false }] },
-    bc: { title: 'Booking Confirmation Email', fields: [{ id:'sae-f1', key:'booking_confirm_email_subject', label:'Email Subject', area:false }, { id:'sae-f2', key:'booking_confirm_email_body', label:'Email Body', area:true }] }
+    ce: { title: 'Cancellation Email', fields: [{ id:'sae-f1', key:'cancel_email_subject', label:'Email Subject', area:false }, { id:'sae-f2', key:'cancel_email_body', label:'Email Body', area:true }], aiKey:'cancel_email_ai', testType:'email', testTo:'dane.kreisman@gmail.com' },
+    cs: { title: 'Client Cancellation SMS', fields: [{ id:'sae-f1', key:'cancel_client_sms', label:'SMS Message', area:true }], aiKey:'cancel_client_sms_ai', testType:'sms', testTo:'8082697636' },
+    cc: { title: 'Cleaner Cancellation SMS', fields: [{ id:'sae-f1', key:'cancel_cleaner_sms', label:'SMS Message', area:true }], aiKey:'cancel_cleaner_sms_ai', testType:'sms', testTo:'8082697636' },
+    rs: { title: 'Review Request SMS', fields: [{ id:'sae-f1', key:'review_sms', label:'SMS Message', area:true }, { id:'sae-f2', key:'google_review_url', label:'Google Review URL', area:false }], aiKey:'review_sms_ai', testType:'sms', testTo:'8082697636' },
+    bc: { title: 'Booking Confirmation Email', fields: [{ id:'sae-f1', key:'booking_confirm_email_subject', label:'Email Subject', area:false }, { id:'sae-f2', key:'booking_confirm_email_body', label:'Email Body', area:true }], aiKey:'booking_confirm_ai', testType:'email', testTo:'dane.kreisman@gmail.com' },
+    db: { title: 'Day-Before Reminder', fields: [{ id:'sae-f1', key:'reminder_client_sms', label:'Client SMS', area:true }, { id:'sae-f2', key:'reminder_cleaner_sms', label:'Cleaner SMS', area:true }], aiKey:'reminder_ai', testType:'sms', testTo:'8082697636' }
   };
   var cfg = configs[type];
   if (!cfg) return;
@@ -6664,20 +6674,74 @@ async function openSystemAutoEdit(type) {
     fh += '</div>';
     fieldsEl.innerHTML += fh;
   }
+  // Load AI personalization setting
+  var aiEl = document.getElementById('sae-ai-personalize');
+  if (aiEl && cfg.aiKey) {
+    var aiR = await db.from('settings').select('value').eq('key', cfg.aiKey).maybeSingle();
+    aiEl.checked = (aiR.data && aiR.data.value === 'true');
+  }
   openOverlay('system-auto-edit-overlay');
 }
 async function saveSystemAutoTemplate() {
   var cfg = window._editingAutoConfig;
   if (!cfg) return;
   var savedEl = document.getElementById('sae-saved');
-  for (var i = 0; i < cfg.fields.length; i++) {
-    var f = cfg.fields[i];
-    var el = document.getElementById(f.id);
-    if (!el) continue;
-    await db.from('settings').upsert({ key: f.key, value: el.value });
+  try {
+    for (var i = 0; i < cfg.fields.length; i++) {
+      var f = cfg.fields[i];
+      var el = document.getElementById(f.id);
+      if (!el) continue;
+      await db.from('settings').upsert({ key: f.key, value: el.value });
+    }
+    // Save AI personalization
+    var aiEl = document.getElementById('sae-ai-personalize');
+    if (aiEl && cfg.aiKey) {
+      await db.from('settings').upsert({ key: cfg.aiKey, value: String(aiEl.checked) });
+    }
+    if (savedEl) { savedEl.textContent = 'Saved!'; savedEl.style.display = 'inline'; setTimeout(function(){ if(savedEl) savedEl.style.display = 'none'; }, 2000); }
+  } catch(e) {
+    if (savedEl) { savedEl.textContent = 'Error saving'; savedEl.style.display = 'inline'; }
   }
-  if (savedEl) { savedEl.textContent = 'Saved!'; savedEl.style.display = 'inline'; setTimeout(function(){ if(savedEl) savedEl.style.display = 'none'; }, 2000); }
 }
+async function testSystemAutoTemplate() {
+  var cfg = window._editingAutoConfig;
+  if (!cfg) return;
+  var savedEl = document.getElementById('sae-saved');
+  var f1 = document.getElementById('sae-f1');
+  var msg = f1 ? f1.value : '';
+  if (!msg) { if(savedEl){ savedEl.textContent='Add a template to test'; savedEl.style.display='inline'; setTimeout(function(){ savedEl.style.display='none'; },3000); } return; }
+  try {
+    var sess = await db.auth.getSession();
+    var tok = sess.data.session ? sess.data.session.access_token : '';
+    var headers = { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + tok };
+    var previewMsg = msg.replace(/{firstName}/g,'Dane').replace(/{clientName}/g,'Dane Kreisman').replace(/{service}/g,'Regular Cleaning').replace(/{date}/g,'tomorrow');
+    if (cfg.testType === 'sms') {
+      await fetch('/api/send-sms', { method:'POST', headers:headers, body: JSON.stringify({ to: cfg.testTo, message: '[TEST] ' + previewMsg }) });
+    } else {
+      var subEl = document.getElementById('sae-f1');
+      var bodyEl = document.getElementById('sae-f2');
+      await fetch('/api/send-email', { method:'POST', headers:headers, body: JSON.stringify({ type:'cancellation', to: cfg.testTo, subject: subEl ? '[TEST] ' + subEl.value : '[TEST]', clientName:'Dane Kreisman', service:'Regular Cleaning', date:'tomorrow', customBody: bodyEl ? bodyEl.value : '' }) });
+    }
+    if(savedEl){ savedEl.textContent='Test sent to Dane'; savedEl.style.display='inline'; setTimeout(function(){ savedEl.style.display='none'; },3000); }
+  } catch(e) {
+    if(savedEl){ savedEl.textContent='Test failed'; savedEl.style.display='inline'; }
+  }
+}
+async function resetSystemAutoTemplate() {
+  var cfg = window._editingAutoConfig;
+  if (!cfg) return;
+  if (!confirm('Reset to default template? This will clear your custom template.')) return;
+  for (var i = 0; i < cfg.fields.length; i++) {
+    await db.from('settings').delete().eq('key', cfg.fields[i].key);
+    var el = document.getElementById(cfg.fields[i].id);
+    if (el) el.value = '';
+  }
+  var aiEl = document.getElementById('sae-ai-personalize');
+  if (aiEl) aiEl.checked = false;
+  var savedEl = document.getElementById('sae-saved');
+  if(savedEl){ savedEl.textContent='Reset to default'; savedEl.style.display='inline'; setTimeout(function(){ savedEl.style.display='none'; },2000); }
+}
+function openDayBeforeAutoEdit() { openSystemAutoEdit('db'); }
 function openCancelEmailAutoEdit() { openSystemAutoEdit('ce'); }
 function openCancelClientSmsAutoEdit() { openSystemAutoEdit('cs'); }
 function openCancelCleanerSmsAutoEdit() { openSystemAutoEdit('cc'); }

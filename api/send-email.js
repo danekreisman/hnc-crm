@@ -186,8 +186,8 @@ export default async function handler(req, res) {
       invoiceUrl, terms, notes, bookingUrl, unsubscribeUrl,
     } = req.body;
 
-    if (!to || !subject) {
-      return res.status(400).json({ success: false, error: 'to and subject are required' });
+    if (!to || (!subject && !type)) {
+      return res.status(400).json({ success: false, error: 'to and either subject or type are required' });
     }
 
     const firstName = (clientName || '').split(' ')[0] || 'there';

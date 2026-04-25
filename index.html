@@ -13436,5 +13436,174 @@ document.addEventListener('DOMContentLoaded', function() {
   }, 1500);
 });
 </script>
+
+<script>
+// ═══ SYSTEM AUTOMATION CARD PATCH ═══════════════════════════════════════════
+// Makes system auto cards match lead auto layout: Toggle→Test→Edit→Delete + AI badge
+// Test functions ONLY send to Dane Kreisman — never to real clients
+
+var _SYSAUTO_MAP = {
+  'toggle-auto-quote':       { edit:'openQuoteAutoEdit',            testKey:'aq', deleteKey:'aq' },
+  'toggle-janitorial':       { edit:'openJanitorialAutoEdit',       testKey:'jw', deleteKey:'jw' },
+  'toggle-reminders':        { edit:'openDayBeforeAutoEdit',        testKey:'db', deleteKey:'db' },
+  'toggle-cancel-email':     { edit:'openCancelEmailAutoEdit',      testKey:'ce', deleteKey:'ce' },
+  'toggle-cancel-client-sms':{ edit:'openCancelClientSmsAutoEdit',  testKey:'cs', deleteKey:'cs' },
+  'toggle-cancel-cleaner-sms':{ edit:'openCancelCleanerSmsAutoEdit',testKey:'cc', deleteKey:'cc' },
+  'toggle-review-sms':       { edit:'openReviewSmsAutoEdit',        testKey:'rs', deleteKey:'rs' },
+  'toggle-booking-confirm':  { edit:'openBookingConfirmAutoEdit',   testKey:'bc', deleteKey:'bc' }
+};
+
+var _SYSAUTO_AIKEYS = {
+  aq:'cancel_email_ai', jw:'cancel_email_ai', db:'reminder_ai',
+  ce:'cancel_email_ai', cs:'cancel_client_sms_ai', cc:'cancel_cleaner_sms_ai',
+  rs:'review_sms_ai',   bc:'booking_confirm_ai'
+};
+
+var _SYSAUTO_SMSKEYS = {
+  aq:'quote_sms_template', jw:'janitorial_sms_template', db:'reminder_client_sms',
+  ce:'cancel_email_body',  cs:'cancel_client_sms',       cc:'cancel_cleaner_sms',
+  rs:'review_sms',         bc:'booking_confirm_email_body'
+};
+
+var _SYSAUTO_EMAILKEYS = { ce:'cancel_email_subject', bc:'booking_confirm_email_subject' };
+
+async function _sysAutoTest(key) {
+  if (!confirm('Send test to Dane Kreisman only? No real clients will be contacted.')) return;
+  try {
+    var s = await db.auth.getSession();
+    var tok = s.data.session ? s.data.session.access_token : '';
+    var h = { 'Content-Type':'application/json','Authorization':'Bearer '+tok };
+    var r = await db.from('settings').select('value').eq('key',_SYSAUTO_SMSKEYS[key]).maybeSingle();
+    var msg = (r.data&&r.data.value) ? r.data.value : 'Test from Hawaii Natural Clean.';
+    var preview = msg.replace(/{firstName}/g,'Dane').replace(/{service}/g,'Regular Cleaning').replace(/{date}/g,'tomorrow').replace(/{total}/g,'190');
+    var isEmail = _SYSAUTO_EMAILKEYS[key];
+    if (isEmail) {
+      var sr = await db.from('settings').select('value').eq('key',isEmail).maybeSingle();
+      var subj = (sr.data&&sr.data.value) ? sr.data.value : 'Test Email';
+      await fetch('/api/send-email',{method:'POST',headers:h,body:JSON.stringify({type:'cancellation',to:'dane.kreisman@gmail.com',clientName:'Dane Kreisman',service:'Regular Cleaning',date:'tomorrow',subject:'[TEST] '+subj})});
+      alert('Test email sent to dane.kreisman@gmail.com (Dane Kreisman only)');
+    } else {
+      await fetch('/api/send-sms',{method:'POST',headers:h,body:JSON.stringify({to:'8082697636',message:'[TEST] '+preview})});
+      alert('Test SMS sent to (808) 269-7636 (Dane Kreisman only)');
+    }
+  } catch(e) { alert('Test failed: '+e.message); }
+}
+
+async function _sysAutoDelete(key, card) {
+  if (!confirm('Remove this automation from the list?')) return;
+  try { await db.from('settings').upsert({key:'sysauto_hidden_'+key,value:'true'}); } catch(e) {}
+  if (card) card.style.display = 'none';
+}
+
+async function _sysAutoAIBadge(card, key) {
+  try {
+    var r = await db.from('settings').select('value').eq('key',_SYSAUTO_AIKEYS[key]).maybeSingle();
+    if (r.data&&r.data.value==='true') {
+      var existing = card.querySelector('.sysai-badge');
+      if (existing) existing.style.display = 'inline';
+    }
+  } catch(e) {}
+}
+
+function patchSystemAutoCards() {
+  var autoList = document.getElementById('auto-list');
+  if (!autoList) return;
+  Array.from(autoList.querySelectorAll('.card')).forEach(function(card) {
+    // Skip if already patched
+    if (card.dataset.sysPatched) return;
+    card.dataset.sysPatched = '1';
+
+    // Find toggle
+    var toggle = card.querySelector('input[type="checkbox"]');
+    if (!toggle) return;
+    var cfg = _SYSAUTO_MAP[toggle.id];
+    if (!cfg) return;
+
+    // Ensure toggle is inside a label.auto-toggle
+    var toggleLabel = toggle.closest('label.auto-toggle') || toggle.parentElement;
+
+    // Find or identify the Edit templates button
+    var editBtn = Array.from(card.querySelectorAll('button')).find(function(b){ return b.textContent.includes('Edit'); });
+
+    // Build the right-side action container matching lead auto layout
+    var rightDiv = document.createElement('div');
+    rightDiv.style.cssText = 'display:flex;align-items:center;gap:6px;flex-shrink:0;';
+
+    // 1. Toggle (move it in)
+    if (toggleLabel && toggleLabel.parentElement) toggleLabel.parentElement.removeChild(toggleLabel);
+    rightDiv.appendChild(toggleLabel);
+
+    // 2. AI badge in left side
+    var leftDiv = card.querySelector('[style*="flex:1"]') || card.firstElementChild;
+    var titleRow = leftDiv ? leftDiv.querySelector('[style*="display:flex"]') : null;
+    if (titleRow) {
+      var aiBadge = document.createElement('span');
+      aiBadge.className = 'badge sysai-badge';
+      aiBadge.style.cssText = 'display:none;background:#fef9c3;color:#854d0e;border:1px solid #fde68a;font-size:11px;padding:2px 7px;border-radius:999px;';
+      aiBadge.textContent = '\u2728 AI-personalized';
+      var nameEl = titleRow.querySelector('b');
+      if (nameEl && nameEl.nextSibling) titleRow.insertBefore(aiBadge, nameEl.nextSibling);
+      else if (titleRow.firstChild) titleRow.insertBefore(aiBadge, titleRow.firstChild.nextSibling);
+    }
+
+    // 3. ▶ Test button
+    var testBtn = document.createElement('button');
+    testBtn.className = 'btn';
+    testBtn.style.cssText = 'font-size:12px;padding:4px 10px;color:#16a34a;background:#f0fdf4;border:1px solid #bbf7d0;';
+    testBtn.innerHTML = '&#9654; Test';
+    (function(k, c){ testBtn.onclick = function(){ _sysAutoTest(k); }; })(cfg.testKey, card);
+    rightDiv.appendChild(testBtn);
+
+    // 4. Edit templates button (re-use existing or create)
+    if (editBtn && editBtn.parentElement) editBtn.parentElement.removeChild(editBtn);
+    if (!editBtn) {
+      editBtn = document.createElement('button');
+      editBtn.className = 'btn';
+      editBtn.textContent = 'Edit templates';
+      var editFnName = cfg.edit;
+      editBtn.onclick = function(){ if(typeof window[editFnName]==='function') window[editFnName](); };
+    }
+    editBtn.style.cssText = (editBtn.style.cssText||'') + ';font-size:12px;padding:4px 10px;';
+    rightDiv.appendChild(editBtn);
+
+    // 5. Delete button
+    var delBtn = document.createElement('button');
+    delBtn.className = 'btn';
+    delBtn.style.cssText = 'font-size:12px;padding:4px 10px;color:#dc2626;background:#fff7f7;border:1px solid #fecaca;';
+    delBtn.textContent = 'Delete';
+    (function(k, c){ delBtn.onclick = function(){ _sysAutoDelete(k, c); }; })(cfg.deleteKey, card);
+    rightDiv.appendChild(delBtn);
+
+    // Remove old Edit templates button if it was left outside
+    var oldBtns = Array.from(card.children).filter(function(ch){ return ch.tagName==='BUTTON'; });
+    oldBtns.forEach(function(b){ b.parentElement.removeChild(b); });
+
+    // Replace the last child (old toggle label or whatever) with rightDiv
+    // First remove any remaining auto-toggle labels at card level
+    Array.from(card.children).forEach(function(ch){
+      if (ch.tagName==='LABEL') ch.parentElement.removeChild(ch);
+    });
+    card.appendChild(rightDiv);
+
+    // Load AI badge async
+    _sysAutoAIBadge(card, cfg.testKey);
+  });
+}
+
+// Wrap renderAutoList to auto-patch after render
+var _origRenderAutoList = typeof renderAutoList === 'function' ? renderAutoList : null;
+if (_origRenderAutoList) {
+  renderAutoList = function() {
+    var result = _origRenderAutoList.apply(this, arguments);
+    setTimeout(patchSystemAutoCards, 50);
+    return result;
+  };
+}
+
+// Run immediately for current render
+document.addEventListener('DOMContentLoaded', function(){ setTimeout(patchSystemAutoCards, 200); });
+setTimeout(patchSystemAutoCards, 1500);
+</script>
+
 </body>
 </html>

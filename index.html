@@ -13191,6 +13191,14 @@ async function loadReminderToggleState() {
 <script>
 document.addEventListener('DOMContentLoaded', function() {
   setTimeout(function() {
+    // Patch saveNewAppt
+    var _origNewAppt = saveNewAppt;
+    saveNewAppt = async function() {
+      var result = await _origNewAppt.apply(this, arguments);
+      try { logActivity('appointment_created', 'New appointment booked', {}); } catch(e) {}
+      return result;
+    };
+
     // Patch cancelAppointment
     var _origCancel = cancelAppointment;
     cancelAppointment = async function() {

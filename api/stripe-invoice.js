@@ -154,7 +154,6 @@ export default async function handler(req, res) {
               }
 
               await stripe.invoices.sendInvoice(invoice.id);
-              try { var _b2=req.body||{}; var _inv_total=finalized.total?finalized.total/100:(_b2.amount||0); await fetch(process.env.SUPABASE_URL+'/rest/v1/invoices',{method:'POST',headers:{'apikey':process.env.SUPABASE_SERVICE_ROLE_KEY,'Authorization':'Bearer '+process.env.SUPABASE_SERVICE_ROLE_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({client_name:_b2.customerName||_b2.clientName||null,description:_b2.service||_b2.description||null,amount:finalized.subtotal?finalized.subtotal/100:(_b2.amount||0),tax:finalized.tax?finalized.tax/100:0,total:_inv_total,stripe_invoice_id:finalized.id,payment_terms:_b2.terms||_b2.paymentTerms||'NET 30',notes:_b2.notes||null,status:'open'})}); } catch(_e){ console.error('[invoice] db save err:',_e.message,_e.stack); }
                       return res.status(200).json({ success: true, invoiceId: finalized.id, invoiceUrl: finalized.hosted_invoice_url, customerId: customerId2, total: finalized.total, status: finalized.status });
           }
 

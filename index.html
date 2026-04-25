@@ -13210,35 +13210,33 @@ document.addEventListener('DOMContentLoaded', function() {
     };
 
     
-    // Intercept stripe-invoice API calls to save to invoices table on success
-    var _origFetch = window.fetch;
-    window.fetch = async function() {
-      var args = arguments;
-      var url = args[0] || '';
-      var opts = args[1] || {};
-      var res = await _origFetch.apply(this, args);
-      if (typeof url === 'string' && url.includes('stripe-invoice') && opts.body) {
-        try {
-          var clone = res.clone();
-          clone.json().then(function(d) {
-            if (d && d.success && d.invoiceId) {
-              var body = JSON.parse(opts.body);
-              db.from('invoices').insert({
-                client_name: body.customerName || null,
-                service: body.service || body.description || null,
-                amount: body.amount || 0,
-                total: body.amount || 0,
-                stripe_invoice_id: d.invoiceId,
-                payment_terms: body.terms || 'NET 30',
-                notes: body.notes || null,
-                status: 'open'
-              }).then(function() {}).catch(function() {});
+    // Wrap sendCustomInvoice to save invoice to DB on success
+    setTimeout(function() {
+      if (typeof sendCustomInvoice === 'function') {
+        var _origSCI = sendCustomInvoice;
+        sendCustomInvoice = async function() {
+          var _sciArgs = arguments;
+          var _sciResult = await _origSCI.apply(this, _sciArgs);
+          try {
+            var _invs = await db.from('invoices').select('stripe_invoice_id').order('created_at',{ascending:false}).limit(1);
+            var _latestId = _invs.data && _invs.data[0] && _invs.data[0].stripe_invoice_id;
+            if (!_latestId || (Date.now() - new Date((_invs.data[0]||{}).created_at||0)) > 10000) {
+              var _cSel = document.querySelector('select');
+              var _sels = Array.from(document.querySelectorAll('select'));
+              var _cSel2 = _sels.find(function(s){return Array.from(s.options).some(function(o){return o.text.includes('@');});});
+              var _selOpt = _cSel2 && _cSel2.options[_cSel2.selectedIndex];
+              var _clientName = _selOpt ? _selOpt.text.split(' —')[0] : null;
+              var _descIn = document.querySelector('input[placeholder*="Monthly"]') || document.querySelector('input[placeholder*="contract"]');
+              var _desc = _descIn ? _descIn.value : null;
+              var _amtIn = document.querySelector('input[type="number"]');
+              var _amt = _amtIn ? parseFloat(_amtIn.value) || 0 : 0;
+              db.from('invoices').insert({client_name:_clientName,service:_desc,amount:_amt,total:_amt,payment_terms:'NET 30',status:'open'}).then(function(){}).catch(function(){});
             }
-          }).catch(function() {});
-        } catch(_e) {}
+          } catch(_e2) {}
+          return _sciResult;
+        };
       }
-      return res;
-    };
+    }, 2000);
 // Patch confirmCancelClient
     var _origCancelClient = confirmCancelClient;
     confirmCancelClient = async function() {

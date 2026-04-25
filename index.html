@@ -13188,5 +13188,36 @@ async function loadReminderToggleState() {
   } catch(e) {}
 }
 </script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  setTimeout(function() {
+    // Patch cancelAppointment
+    var _origCancel = cancelAppointment;
+    cancelAppointment = async function() {
+      var apptName = (currentAppt && (currentAppt.n || currentAppt.client_name)) || 'Unknown';
+      var apptDate = currentAppt && currentAppt.date;
+      var result = await _origCancel.apply(this, arguments);
+      try { logActivity('appointment_cancelled', 'Appt cancelled: ' + apptName, { date: apptDate }); } catch(e) {}
+      return result;
+    };
+
+    // Patch saveApptEdit
+    var _origSave = saveApptEdit;
+    saveApptEdit = async function(mode) {
+      var result = await _origSave.apply(this, arguments);
+      try { logActivity('appointment_updated', 'Appt edited (mode: ' + mode + ')', { mode: mode }); } catch(e) {}
+      return result;
+    };
+
+    // Patch confirmCancelClient
+    var _origCancelClient = confirmCancelClient;
+    confirmCancelClient = async function() {
+      var result = await _origCancelClient.apply(this, arguments);
+      try { logActivity('client_cancelled', 'Client account cancelled', {}); } catch(e) {}
+      return result;
+    };
+  }, 1500);
+});
+</script>
 </body>
 </html>

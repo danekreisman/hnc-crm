@@ -392,6 +392,25 @@ export default async function handler(req, res) {
     }
 
     // ─── BOOKING CONFIRMATION ───────────────────────────────────────────────
+    else if (type === 'cancellation') {
+      emailSubject = 'Your Hawaii Natural Clean appointment has been cancelled';
+      emailHtml = `
+        <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px;color:#333">
+          <div style="text-align:center;margin-bottom:24px">
+            <h1 style="color:#1a9fb0;font-size:22px;margin:0">Hawaii Natural Clean</h1>
+          </div>
+          <h2 style="font-size:18px;margin-bottom:8px">Appointment Cancelled</h2>
+          <p style="margin:0 0 16px">Hi ${clientName || 'there'},</p>
+          <p style="margin:0 0 16px">Your cleaning appointment has been cancelled. Here are the details:</p>
+          <div style="background:#f5f5f5;border-radius:8px;padding:16px;margin-bottom:24px">
+            <p style="margin:4px 0"><strong>Service:</strong> ${service || 'Cleaning'}</p>
+            <p style="margin:4px 0"><strong>Date:</strong> ${date || 'As scheduled'}</p>
+          </div>
+          <p style="margin:0 0 16px">If you have any questions or would like to rebook, please call or text us at <strong>(808) 468-5356</strong>.</p>
+          <p style="margin:0">Mahalo,<br>Hawaii Natural Clean</p>
+        </div>
+      `;
+    } 
     else if (type === 'booking_confirmation') {
       const { date, time, service, frequency, address, total, cleaner, rushNote } = req.body;
 

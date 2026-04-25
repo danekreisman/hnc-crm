@@ -1867,6 +1867,19 @@ Mahalo 🌺</textarea>
     </div>
   </div>
 </div>
+<!-- SYSTEM AUTO EDIT OVERLAY -->
+<div class="overlay hidden" id="system-auto-edit-overlay" onclick="closeOverlay('system-auto-edit-overlay')">
+  <div class="panel" onclick="event.stopPropagation()">
+    <div class="panel-header"><div class="panel-title" id="sae-title">Edit template</div><button class="close-btn" onclick="closeOverlay('system-auto-edit-overlay')">×</button></div>
+    <div class="panel-body">
+      <div id="sae-fields"></div>
+      <div class="form-row" style="margin-top:16px;display:flex;align-items:center;gap:10px;">
+        <button class="btn btn-primary" onclick="saveSystemAutoTemplate()">Save changes</button>
+        <span id="sae-saved" style="font-size:12px;color:#10b981;display:none;">Saved!</span>
+      </div>
+    </div>
+  </div>
+</div>
 
 <!-- CLEANER PROFILE PANEL -->
 <div class="overlay hidden" id="cleaner-overlay" onclick="closeOverlay('cleaner-overlay')">
@@ -6515,11 +6528,11 @@ function renderAutoList(){
 
   var reminderCard = '<div class="card" style="padding:14px 16px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:12px;border-left:3px solid #10b981;">'    + '<div style="flex:1;min-width:0;">'    +   '<div style="display:flex;align-items:center;gap:8px;"><b style="font-size:14px;">Day-Before Appointment Reminders</b>'    +     '<span class="pill pill-ok" style="font-size:10px;">ACTIVE</span>'    +     '<span style="font-size:10px;background:#f0f9ff;color:#1d4ed8;padding:2px 7px;border-radius:99px;border:1px solid #bfdbfe;">System</span>'    +     '<span style="font-size:10px;background:#f0fdf4;color:#166534;padding:2px 7px;border-radius:99px;border:1px solid #bbf7d0;">Cron · 6pm HST</span>'    +   '</div>'    +   '<div style="font-size:12px;color:var(--muted);margin-top:4px;">Daily at <b>6:00 PM HST</b> &middot; appointment is tomorrow &middot; do send_sms to customer + assigned cleaner</div>'    + '</div>'    + '<label class="auto-toggle" title="Enable automation" style="margin-left:auto"><input type="checkbox" id="toggle-reminders" checked onchange="toggleReminderAuto(this.checked)"><div class="auto-toggle-track"><div class="auto-toggle-thumb"></div></div></label></div>';
   if(!automations.length){
-    var cancelEmailCard = '<div class="card" style="padding:14px 16px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:12px;border-left:3px solid #d1d5db;"><div style="flex:1;min-width:0;"><div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;"><b style="font-size:14px;">Appointment Cancelled — Client Email</b><span class="badge" style="background:#f3f4f6;color:#6b7280;border:1px solid #d1d5db;font-size:11px;padding:2px 7px;border-radius:999px;">Off</span><span class="badge" style="background:#eff6ff;color:#3b82f6;border:1px solid #bfdbfe;font-size:11px;padding:2px 7px;border-radius:999px;">System</span></div><div style="font-size:12px;color:#6b7280;">When appointment is cancelled · send cancellation email to client</div></div><label class="auto-toggle" title="Enable automation" style="margin-left:auto"><input type="checkbox" id="toggle-cancel-email"><div class="auto-toggle-track"><div class="auto-toggle-thumb"></div></div></label></div>';
-  var cancelClientSmsCard = '<div class="card" style="padding:14px 16px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:12px;border-left:3px solid #d1d5db;"><div style="flex:1;min-width:0;"><div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;"><b style="font-size:14px;">Appointment Cancelled — Client SMS</b><span class="badge" style="background:#f3f4f6;color:#6b7280;border:1px solid #d1d5db;font-size:11px;padding:2px 7px;border-radius:999px;">Off</span><span class="badge" style="background:#eff6ff;color:#3b82f6;border:1px solid #bfdbfe;font-size:11px;padding:2px 7px;border-radius:999px;">System</span></div><div style="font-size:12px;color:#6b7280;">When appointment is cancelled · send SMS to client</div></div><label class="auto-toggle" title="Enable automation" style="margin-left:auto"><input type="checkbox" id="toggle-cancel-client-sms"><div class="auto-toggle-track"><div class="auto-toggle-thumb"></div></div></label></div>';
-  var cancelCleanerSmsCard = '<div class="card" style="padding:14px 16px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:12px;border-left:3px solid #d1d5db;"><div style="flex:1;min-width:0;"><div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;"><b style="font-size:14px;">Appointment Cancelled — Cleaner SMS</b><span class="badge" style="background:#f3f4f6;color:#6b7280;border:1px solid #d1d5db;font-size:11px;padding:2px 7px;border-radius:999px;">Off</span><span class="badge" style="background:#eff6ff;color:#3b82f6;border:1px solid #bfdbfe;font-size:11px;padding:2px 7px;border-radius:999px;">System</span></div><div style="font-size:12px;color:#6b7280;">When appointment is cancelled · send SMS to assigned cleaner</div></div><label class="auto-toggle" title="Enable automation" style="margin-left:auto"><input type="checkbox" id="toggle-cancel-cleaner-sms"><div class="auto-toggle-track"><div class="auto-toggle-thumb"></div></div></label></div>';
-  var reviewSmsCard = '<div class="card" style="padding:14px 16px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:12px;border-left:3px solid #d1d5db;"><div style="flex:1;min-width:0;"><div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;"><b style="font-size:14px;">Post-Clean Review Request</b><span class="badge" style="background:#f3f4f6;color:#6b7280;border:1px solid #d1d5db;font-size:11px;padding:2px 7px;border-radius:999px;">Off</span><span class="badge" style="background:#eff6ff;color:#3b82f6;border:1px solid #bfdbfe;font-size:11px;padding:2px 7px;border-radius:999px;">System</span></div><div style="font-size:12px;color:#6b7280;">After appointment completed · Cron: Daily · send Google review SMS to client</div></div><label class="auto-toggle" title="Enable automation" style="margin-left:auto"><input type="checkbox" id="toggle-review-sms"><div class="auto-toggle-track"><div class="auto-toggle-thumb"></div></div></label></div>';
-  var bookingConfirmCard = '<div class="card" style="padding:14px 16px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:12px;border-left:3px solid #d1d5db;"><div style="flex:1;min-width:0;"><div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;"><b style="font-size:14px;">Booking Confirmation Email</b><span class="badge" style="background:#f3f4f6;color:#6b7280;border:1px solid #d1d5db;font-size:11px;padding:2px 7px;border-radius:999px;">Off</span><span class="badge" style="background:#eff6ff;color:#3b82f6;border:1px solid #bfdbfe;font-size:11px;padding:2px 7px;border-radius:999px;">System</span></div><div style="font-size:12px;color:#6b7280;">When client books via quote link · send confirmation email to client</div></div><label class="auto-toggle" title="Enable automation" style="margin-left:auto"><input type="checkbox" id="toggle-booking-confirm"><div class="auto-toggle-track"><div class="auto-toggle-thumb"></div></div></label></div>';
+    var cancelEmailCard = '<div class="card" style="padding:14px 16px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:12px;border-left:3px solid #d1d5db;"><div style="flex:1;min-width:0;"><div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;"><b style="font-size:14px;">Appointment Cancelled — Client Email</b><span class="badge" style="background:#f3f4f6;color:#6b7280;border:1px solid #d1d5db;font-size:11px;padding:2px 7px;border-radius:999px;">Off</span><span class="badge" style="background:#eff6ff;color:#3b82f6;border:1px solid #bfdbfe;font-size:11px;padding:2px 7px;border-radius:999px;">System</span></div><div style="font-size:12px;color:#6b7280;">When appointment is cancelled · send cancellation email to client</div></div><button class=\"btn\" style=\"font-size:12px;padding:4px 10px;margin-left:auto;margin-right:8px;\" onclick=\"openCancelEmailAutoEdit()\">Edit templates</button><label class=\"auto-toggle\" title=\"Enable automation\"><input type=\"checkbox\" id="toggle-cancel-email"><div class="auto-toggle-track"><div class="auto-toggle-thumb"></div></div></label></div>';
+  var cancelClientSmsCard = '<div class="card" style="padding:14px 16px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:12px;border-left:3px solid #d1d5db;"><div style="flex:1;min-width:0;"><div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;"><b style="font-size:14px;">Appointment Cancelled — Client SMS</b><span class="badge" style="background:#f3f4f6;color:#6b7280;border:1px solid #d1d5db;font-size:11px;padding:2px 7px;border-radius:999px;">Off</span><span class="badge" style="background:#eff6ff;color:#3b82f6;border:1px solid #bfdbfe;font-size:11px;padding:2px 7px;border-radius:999px;">System</span></div><div style="font-size:12px;color:#6b7280;">When appointment is cancelled · send SMS to client</div></div><button class=\"btn\" style=\"font-size:12px;padding:4px 10px;margin-left:auto;margin-right:8px;\" onclick=\"openCancelClientSmsAutoEdit()\">Edit templates</button><label class=\"auto-toggle\" title=\"Enable automation\"><input type=\"checkbox\" id="toggle-cancel-client-sms"><div class="auto-toggle-track"><div class="auto-toggle-thumb"></div></div></label></div>';
+  var cancelCleanerSmsCard = '<div class="card" style="padding:14px 16px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:12px;border-left:3px solid #d1d5db;"><div style="flex:1;min-width:0;"><div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;"><b style="font-size:14px;">Appointment Cancelled — Cleaner SMS</b><span class="badge" style="background:#f3f4f6;color:#6b7280;border:1px solid #d1d5db;font-size:11px;padding:2px 7px;border-radius:999px;">Off</span><span class="badge" style="background:#eff6ff;color:#3b82f6;border:1px solid #bfdbfe;font-size:11px;padding:2px 7px;border-radius:999px;">System</span></div><div style="font-size:12px;color:#6b7280;">When appointment is cancelled · send SMS to assigned cleaner</div></div><button class=\"btn\" style=\"font-size:12px;padding:4px 10px;margin-left:auto;margin-right:8px;\" onclick=\"openCancelCleanerSmsAutoEdit()\">Edit templates</button><label class=\"auto-toggle\" title=\"Enable automation\"><input type=\"checkbox\" id="toggle-cancel-cleaner-sms"><div class="auto-toggle-track"><div class="auto-toggle-thumb"></div></div></label></div>';
+  var reviewSmsCard = '<div class="card" style="padding:14px 16px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:12px;border-left:3px solid #d1d5db;"><div style="flex:1;min-width:0;"><div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;"><b style="font-size:14px;">Post-Clean Review Request</b><span class="badge" style="background:#f3f4f6;color:#6b7280;border:1px solid #d1d5db;font-size:11px;padding:2px 7px;border-radius:999px;">Off</span><span class="badge" style="background:#eff6ff;color:#3b82f6;border:1px solid #bfdbfe;font-size:11px;padding:2px 7px;border-radius:999px;">System</span></div><div style="font-size:12px;color:#6b7280;">After appointment completed · Cron: Daily · send Google review SMS to client</div></div><button class=\"btn\" style=\"font-size:12px;padding:4px 10px;margin-left:auto;margin-right:8px;\" onclick=\"openReviewSmsAutoEdit()\">Edit templates</button><label class=\"auto-toggle\" title=\"Enable automation\"><input type=\"checkbox\" id="toggle-review-sms"><div class="auto-toggle-track"><div class="auto-toggle-thumb"></div></div></label></div>';
+  var bookingConfirmCard = '<div class="card" style="padding:14px 16px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:12px;border-left:3px solid #d1d5db;"><div style="flex:1;min-width:0;"><div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;"><b style="font-size:14px;">Booking Confirmation Email</b><span class="badge" style="background:#f3f4f6;color:#6b7280;border:1px solid #d1d5db;font-size:11px;padding:2px 7px;border-radius:999px;">Off</span><span class="badge" style="background:#eff6ff;color:#3b82f6;border:1px solid #bfdbfe;font-size:11px;padding:2px 7px;border-radius:999px;">System</span></div><div style="font-size:12px;color:#6b7280;">When client books via quote link · send confirmation email to client</div></div><button class=\"btn\" style=\"font-size:12px;padding:4px 10px;margin-left:auto;margin-right:8px;\" onclick=\"openBookingConfirmAutoEdit()\">Edit templates</button><label class=\"auto-toggle\" title=\"Enable automation\"><input type=\"checkbox\" id="toggle-booking-confirm"><div class="auto-toggle-track"><div class="auto-toggle-thumb"></div></div></label></div>';
     host.innerHTML = systemCard + janitorialCard + reminderCard + cancelEmailCard + cancelClientSmsCard + cancelCleanerSmsCard + reviewSmsCard + bookingConfirmCard + '<div class="empty-state" style="padding:28px;text-align:center;color:var(--muted);background:var(--panel);border:1px dashed var(--border);border-radius:var(--radius);">No custom automations yet. Click <b>+ New automation</b> to build your first rule.</div>';
     var ac = document.getElementById('auto-active-count'); if(ac) ac.textContent='3';
     var atot = document.getElementById('auto-total-count'); if(atot) atot.textContent='3';
@@ -6620,6 +6633,57 @@ async function saveJanitorialTemplates(){
     if(savedEl){ savedEl.textContent='Error saving: '+(e.message||e); savedEl.classList.add('show'); }
   }
 }
+async function openSystemAutoEdit(type) {
+  var configs = {
+    ce: { title: 'Cancellation Email', fields: [{ id:'sae-f1', key:'cancel_email_subject', label:'Email Subject', area:false }, { id:'sae-f2', key:'cancel_email_body', label:'Email Body', area:true }] },
+    cs: { title: 'Client Cancellation SMS', fields: [{ id:'sae-f1', key:'cancel_client_sms', label:'SMS Message', area:true }] },
+    cc: { title: 'Cleaner Cancellation SMS', fields: [{ id:'sae-f1', key:'cancel_cleaner_sms', label:'SMS Message', area:true }] },
+    rs: { title: 'Review Request SMS', fields: [{ id:'sae-f1', key:'review_sms', label:'SMS Message', area:true }, { id:'sae-f2', key:'google_review_url', label:'Google Review URL', area:false }] },
+    bc: { title: 'Booking Confirmation Email', fields: [{ id:'sae-f1', key:'booking_confirm_email_subject', label:'Email Subject', area:false }, { id:'sae-f2', key:'booking_confirm_email_body', label:'Email Body', area:true }] }
+  };
+  var cfg = configs[type];
+  if (!cfg) return;
+  window._editingAutoConfig = cfg;
+  var titleEl = document.getElementById('sae-title');
+  if (titleEl) titleEl.textContent = 'Edit ' + cfg.title + ' template';
+  var savedEl = document.getElementById('sae-saved');
+  if (savedEl) savedEl.style.display = 'none';
+  var fieldsEl = document.getElementById('sae-fields');
+  if (!fieldsEl) return;
+  fieldsEl.innerHTML = '';
+  for (var i = 0; i < cfg.fields.length; i++) {
+    var f = cfg.fields[i];
+    var r = await db.from('settings').select('value').eq('key', f.key).maybeSingle();
+    var val = (r.data && r.data.value) ? r.data.value : '';
+    var fh = '<div style="margin-bottom:12px;"><label style="font-size:12px;font-weight:600;margin-bottom:4px;display:block;">' + f.label + '</label>';
+    if (f.area) {
+      fh += '<textarea id="' + f.id + '" style="width:100%;min-height:80px;font-size:13px;padding:8px;border:1px solid #d1d5db;border-radius:6px;box-sizing:border-box;" placeholder="Leave blank for default">' + val + '</textarea>';
+    } else {
+      fh += '<input type="text" id="' + f.id + '" style="width:100%;font-size:13px;padding:8px;border:1px solid #d1d5db;border-radius:6px;box-sizing:border-box;" placeholder="Leave blank for default" value="' + val.replace(/"/g, '&quot;') + '">';
+    }
+    fh += '</div>';
+    fieldsEl.innerHTML += fh;
+  }
+  openOverlay('system-auto-edit-overlay');
+}
+async function saveSystemAutoTemplate() {
+  var cfg = window._editingAutoConfig;
+  if (!cfg) return;
+  var savedEl = document.getElementById('sae-saved');
+  for (var i = 0; i < cfg.fields.length; i++) {
+    var f = cfg.fields[i];
+    var el = document.getElementById(f.id);
+    if (!el) continue;
+    await db.from('settings').upsert({ key: f.key, value: el.value });
+  }
+  if (savedEl) { savedEl.textContent = 'Saved!'; savedEl.style.display = 'inline'; setTimeout(function(){ if(savedEl) savedEl.style.display = 'none'; }, 2000); }
+}
+function openCancelEmailAutoEdit() { openSystemAutoEdit('ce'); }
+function openCancelClientSmsAutoEdit() { openSystemAutoEdit('cs'); }
+function openCancelCleanerSmsAutoEdit() { openSystemAutoEdit('cc'); }
+function openReviewSmsAutoEdit() { openSystemAutoEdit('rs'); }
+function openBookingConfirmAutoEdit() { openSystemAutoEdit('bc'); }
+
 
 
 /* -------- builder UI -------- */

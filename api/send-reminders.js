@@ -94,7 +94,7 @@ export default async function handler(req, res) {
       const address  = appt.address || '';
       const duration = appt.duration_hours ? `~${Math.round(appt.duration_hours)} hrs` : '';
 
-      // ── 1. Customer reminder ───────────────────────────────────────────
+      // -- 1. Customer reminder -------------------------------------------
       if (client?.phone) {
         const firstName = (client.name || 'there').split(' ')[0];
         const rawPhone  = client.phone.replace(/\D/g, '');
@@ -121,7 +121,7 @@ export default async function handler(req, res) {
         }
       }
 
-      // ── 2. Cleaner reminder ────────────────────────────────────────────
+      // -- 2. Cleaner reminder --------------------------------------------
       if (cleaner?.phone) {
         const cleanerPhone = cleaner.phone.replace(/\D/g, '');
         const cleanerE164  = cleaner.phone.startsWith('+') ? cleaner.phone : `+1${cleanerPhone}`;

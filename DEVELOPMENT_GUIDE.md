@@ -5,34 +5,32 @@ Read it at the start of every session before touching any code.
 
 ---
 
-## CRITICAL: Preventing Regressions in index.html
+## Token-Efficient Editing Rules
 
-index.html is a single-file ~738KB app. Any tool (Claude Code or otherwise) MUST follow this sequence every time:
+The single-file `index.html` is large (6500+ lines). To prevent token exhaustion and resume cycles:
 
-```bash
-# 1. ALWAYS pull latest before any edit — non-negotiable
-git -C ~/Documents/hnc-crm pull origin main
+1. **Never view the full `index.html`.** Always use `grep -n` to locate the relevant section, then `sed -n 'X,Yp'` to extract only what you're editing.
 
-# 2. Make the surgical, scoped edit
+2. **Read only what you're touching.** If editing the booking form, read just the booking form section (~100 lines), not the whole file.
 
-# 3. Syntax check embedded scripts
-node -e "const fs=require('fs');const h=fs.readFileSync('index.html','utf8');const re=/<script[^>]*>([\s\S]*?)<\/script>/gi;let m;while((m=re.exec(h))!==null){try{new Function(m[1]);}catch(e){console.error('SYNTAX ERROR:',e.message);process.exit(1);}}" index.html
+3. **Make surgical edits.** Use `str_replace` with an exact match. Never rewrite large sections.
 
-# 4. Commit and push
-cd ~/Documents/hnc-crm && git add index.html && git commit -m "description" && git push origin main
-```
+4. **Verify syntax after edits.** Run `node --check` on extracted JS to confirm no syntax errors before deploying.
 
-**Never edit from a stale local copy. Never push without pulling first. Never use git push --force.**
+5. **One problem per session.** Don't bundle multiple unrelated fixes — it increases the chance of regressions.
+
+6. **Don't ask Dane clarifying questions about code.** He's not a developer. Use `grep` to find the answer yourself.
+
+7. **Don't propose multiple options.** Pick the right fix and execute it. One diagnosis, one fix, one deploy.
 
 ---
 
 ## Current Architecture
 
 **Hosting:** Vercel (auto-deploys from GitHub `danekreisman/hnc-crm`)
-**Database:** Supabase (PostgreSQL) — project ID: `hehfecnjmgsthxjxlvpz`
-**Frontend:** Single HTML file (`index.html` ~738KB) with inline JS and CSS
+**Database:** Supabase (PostgreSQL)
+**Frontend:** Single HTML file (`index.html`) with inline JS and CSS
 **Backend:** Vercel serverless functions in `/api/`
-**Live URL:** https://hnc-crm.vercel.app
 
 **Active integrations:**
 - Supabase — core database (all data lives here)
@@ -40,147 +38,189 @@ cd ~/Documents/hnc-crm && git add index.html && git commit -m "description" && g
 - OpenPhone/Quo — SMS sending and webhook receiver (`/api/send-sms.js`, `/api/openphone-webhook.js`)
 - Resend — transactional email (`/api/send-email.js`)
 - Anthropic — AI summaries (`/api/ai-summary.js`)
+- Google Calendar — appointment sync (`gcal-sync.js`)
 
 ---
 
-## Index.html — Key Functions & Sections
+## The Foundation (DO NOT SKIP THESE)
 
-### Pipeline
-- `renderLeadsPipeline()` — renders pipeline cards. Price display uses `l.quoteTotal` if set, else `'$'+l.value`. Both correctly prefixed with `$`.
-- `openLead()` — opens lead detail panel. Price display uses `d.quoteTotal` if set, else `'$'+d.value`.
+These four things were built specifically so new features don't corrupt data or fail silently.
+Every new feature must use them.
 
-### New Lead Form (overlay id="new-lead-overlay")
-Fields: name, contact, phone, email, address, service type, est. monthly value (nl-value), property size (nl-sqft), bedrooms (nl-beds), bathrooms (nl-baths), condition (nl-condition), est. price (nl-est), lead source, stage, assigned to, next action, due date, notes.
+### 1. Validation — `api/utils/validate.js`
+**Always validate incoming data before touching the database.**
 
-- `nlCalcPrice()` — live pricing calculator. Fires on service/beds/baths/sqft/condition change.
-  - Standard clean / Airbnb: beds + baths → hours = 0.75 + (beds×0.75) + (baths×0.5) → price = hours × $65 × 1.04712
-  - Deep clean / Move-out: sqft + condition → hours = max(2, sqft/500 × condMult) → same rate
-  - Janitorial / Commercial / Government: shows "Custom - based on walkthrough"
-  - Condition multipliers: ≥9=1.0, ≥7=1.2, ≥5=1.4, else 1.8
-- `nlServiceChange()` — resets nl-value and calls nlCalcPrice()
-- `saveNewLead()` — reads nl-beds, nl-baths, nl-condition and saves to leads table
-
-**KNOWN BUG (not fixed yet):** Pricing formula incorrect for deep clean. 1200sqft + condition 10 shows ~$163 but should be ~$513. Formula needs revisiting.
-**KNOWN ISSUE:** Service type list has too many options. Should only be: Regular Cleaning, Deep Cleaning, Move Out Cleaning.
-
-### Automations Section
-
-#### System Automation Cards (renderAutoList)
-8 hardcoded system automation cards defined as JS variables: systemCard, janitorialCard, reminderCard, cancelEmailCard, cancelClientSmsCard, cancelCleanerSmsCard, reviewSmsCard, bookingConfirmCard.
-
-After renderAutoList runs, `patchSystemAutoCards()` (in patch script near </body>) restructures each card's DOM to match lead auto layout: **Toggle → ▶Test → Edit templates → Delete + AI personalization badge**.
-
-Key config: `_SYSAUTO_MAP` object maps toggle IDs to edit/test/delete functions.
-
-**If you touch renderAutoList, you MUST preserve the patchSystemAutoCards wrapper:**
 ```js
-var _origRenderAutoList = renderAutoList;
-renderAutoList = function() {
-  var result = _origRenderAutoList.apply(this, arguments);
-  setTimeout(patchSystemAutoCards, 50);
-  return result;
-};
+import { validateOrFail, SCHEMAS } from './utils/validate.js';
+
+const invalid = validateOrFail(req.body, SCHEMAS.leadCapture);
+if (invalid) return res.status(400).json(invalid);
 ```
 
-#### System Automation Functions (in main script)
-- `openSystemAutoEdit(type)` — opens the system-auto-edit-overlay with fields loaded from settings table. Types: ce, cs, cc, rs, bc, db
-- `saveSystemAutoTemplate()` — saves template fields + AI personalization setting to settings table
-- `testSystemAutoTemplate()` — sends test ONLY to Dane Kreisman (8082697636 / dane.kreisman@gmail.com). NEVER to real clients.
-- `resetSystemAutoTemplate()` — clears custom template, restores default
-- `openQuoteAutoEdit()`, `openJanitorialAutoEdit()` — separate overlays for auto quote and janitorial
-- `openDayBeforeAutoEdit()`, `openCancelEmailAutoEdit()`, etc. — wrapper functions calling openSystemAutoEdit
+- Use an existing schema from `SCHEMAS` if one fits
+- If your endpoint takes new data shapes, **add a new schema to `SCHEMAS`** rather than skipping validation
+- Never trust data from `req.body` without validating it first — this includes data generated by AI
 
-#### System Automation Overlay
-Element ID: `system-auto-edit-overlay` — generic panel used for all system automation template edits. Contains: sae-title, sae-fields, sae-ai-personalize, Save changes, Test (Dane only), Reset to default.
+### 2. Error Logging — `api/utils/error-logger.js`
+**All errors must be logged to Supabase, not just console.error.**
 
-#### Lead Automations (renderLeadAutoList)
-Loaded from `lead_automations` table. Each card has: Toggle → ▶Test → Edit → Delete + AI-personalized badge. Functions: `editLeadAuto(id)`, `deleteLeadAuto(id)`, `openAutoTest(id)`, `toggleLeadAuto(id, enabled)`.
+```js
+import { logError } from './utils/error-logger.js';
 
-#### Full Automation Inventory
+try {
+  // your code
+} catch (err) {
+  await logError('your-filename', err, { any: 'context', that: 'helps' });
+  return res.status(500).json({ error: err.message });
+}
+```
 
-**System (fire on event):**
-| Automation | Trigger | Functions used |
+- First argument is the source label — use the filename (e.g. `'lead-capture'`)
+- Third argument is context — include any IDs or inputs that would help you debug
+- `logError` never throws, so it's safe to call anywhere
+- Check `error_logs` table in Supabase when something breaks
+
+### 3. Timeouts — `api/utils/with-timeout.js`
+**Every call to an external API must have a timeout.**
+
+```js
+import { fetchWithTimeout, TIMEOUTS } from './utils/with-timeout.js';
+
+const response = await fetchWithTimeout(url, options, TIMEOUTS.RESEND);
+```
+
+Preset timeouts:
+| Service | Constant | Duration |
 |---|---|---|
-| New Lead Auto Quote | lead.created | openQuoteAutoEdit, send-email + send-sms |
-| Janitorial Walkthrough Request | lead.created (Janitorial) | openJanitorialAutoEdit, send-email + send-sms |
-| Day-Before Reminders | Cron 6pm HST | openDayBeforeAutoEdit, send-sms client + cleaner |
-| Appointment Cancelled — Client Email | appt cancelled | openCancelEmailAutoEdit, send-email |
-| Appointment Cancelled — Client SMS | appt cancelled | openCancelClientSmsAutoEdit, send-sms |
-| Appointment Cancelled — Cleaner SMS | appt cancelled | openCancelCleanerSmsAutoEdit, send-sms |
-| Post-Clean Review Request | Cron daily (run-automations.js) | openReviewSmsAutoEdit, send-sms |
-| Booking Confirmation Email | client books (lead-book.js) | openBookingConfirmAutoEdit, send-email |
+| Supabase | `TIMEOUTS.SUPABASE` | 5s |
+| Anthropic | `TIMEOUTS.ANTHROPIC` | 15s |
+| Stripe | `TIMEOUTS.STRIPE` | 10s |
+| OpenPhone | `TIMEOUTS.OPENPHONE` | 8s |
+| Resend | `TIMEOUTS.RESEND` | 8s |
 
-**Lead (run-automations.js cron):**
-Day 3 follow-up, Day 7 final, Nurture Month 1/3/6, One-time Day 30/60, Cancelled Day 14/60.
+Never use raw `fetch()` for external services. Always use `fetchWithTimeout()`.
+
+### 4. Atomic DB Operations — `api/utils/webhook-idempotency.js` + Supabase RPC
+**Multi-step database operations must be atomic.**
+
+If your feature writes to more than one table in sequence, use a Supabase stored procedure (RPC) so all steps succeed or all roll back. See `supabase/book_lead_atomic.sql` for an example.
+
+If your feature handles webhooks, use the idempotency utility:
+```js
+import { isWebhookProcessed, recordWebhook } from './utils/webhook-idempotency.js';
+```
 
 ---
 
-## API Files
+## Adding a New API Endpoint
 
-### send-email.js
-- Accepts `type` OR `subject` (not both required). Type-based emails set their own subject.
-- Types: `booking_confirmation`, `cancellation`, plus custom subject/body.
-- Validation: `if (!to || (!subject && !type))` — requires to + either subject or type.
+Copy this template every time:
 
-### run-automations.js
-- Runs lead automation sequences (follow-ups, nurture, win-back).
-- Post-clean review SMS runs BEFORE the early return (so it always fires even with no lead automations).
-- Logs `automation_fired` to activity_logs after each execution via `logActivity()`.
-- Post-clean review: finds completed appointments from today/yesterday with review_requested_at IS NULL, sends SMS, sets review_requested_at.
+```js
+import { validateOrFail, SCHEMAS } from './utils/validate.js';
+import { fetchWithTimeout, TIMEOUTS } from './utils/with-timeout.js';
+import { logError } from './utils/error-logger.js';
 
-### lead-capture.js
-- Captures inbound leads from website form. Sends auto-quote SMS + email.
-- Does NOT have atomic transaction (unlike lead-book.js). If it fails midway, lead exists but no SMS/email sent.
+export default async function handler(req, res) {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  if (req.method === 'OPTIONS') return res.status(200).end();
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-### lead-book.js
-- Client booking confirmation. Uses `book_lead_atomic` RPC for atomic client + appointment creation.
-- Sends booking confirmation email via send-email.js (type: booking_confirmation).
+  // 1. Validate
+  const invalid = validateOrFail(req.body, SCHEMAS.yourSchema);
+  if (invalid) return res.status(400).json(invalid);
 
----
+  try {
+    // 2. Do your work (use fetchWithTimeout for any external calls)
 
-## The Foundation Utilities (use on every new API endpoint)
-
-| File | What it does | When to use |
-|---|---|---|
-| `api/utils/validate.js` | Schema-based request validation | All endpoints — validate before touching DB |
-| `api/utils/error-logger.js` | Log errors to Supabase error_logs | All catch blocks |
-| `api/utils/with-timeout.js` | fetchWithTimeout() wrapper | All external API calls |
-| `api/utils/webhook-idempotency.js` | Prevent duplicate webhook processing | All webhook handlers |
-
-**Never use raw fetch() for external services. Always use fetchWithTimeout().**
+    return res.status(200).json({ success: true });
+  } catch (err) {
+    await logError('your-endpoint', err, { ...req.body });
+    return res.status(500).json({ error: err.message });
+  }
+}
+```
 
 ---
 
-## Supabase Tables
+## Adding a New Automation Action Type
 
-| Table | Key columns | Notes |
-|---|---|---|
-| leads | id, name, email, phone, service, beds, baths, sqft, condition, quote_total, stage, segment | beds/baths/condition added for pricing calculator |
-| clients | id, name, email, phone | |
-| appointments | id, client_id, date, status, review_requested_at | review_requested_at prevents duplicate review SMS |
-| lead_automations | id, name, is_enabled, trigger_config, actions (JSONB) | actions[].ai_personalize = true for AI personalization |
-| settings | key, value | Stores system auto templates, AI flags, hidden autos |
-| activity_logs | action, description, metadata, created_at | automation_fired, appointment_cancelled, invoice_sent, etc. |
-| error_logs | source, message, context | All API errors |
-| webhook_events | | Idempotency for webhooks |
+1. Add the new type to the whitelist in `api/utils/validate.js` → `validateActions()` → `validTypes` array
+2. Add handling for it in `api/run-automations.js` under the action execution loop
+3. Test that invalid structures for the new type are properly rejected
+
+---
+
+## Adding a New AI Feature
+
+AI features have extra rules because AI-generated data is often unprompted and can be malformed:
+
+- **Always validate AI output** before writing it to the database — use `validate()` just like you would for user input
+- **Always set a prompt length limit** — add it to `SCHEMAS.aiSummary` or create a new schema
+- **Never let AI write directly to the DB** — AI output should go through the same API endpoints as everything else, so validation runs on it
+- **Log AI errors separately** — use `logError('ai-feature-name', err, { prompt: prompt.slice(0, 200) })`
+- **Add timeouts** — use `TIMEOUTS.ANTHROPIC` (15s) for all Anthropic calls
+
+---
+
+## Supabase Rules
+
+- **Never use `SUPABASE_ANON_KEY` for server-side writes** — use `SUPABASE_SERVICE_ROLE_KEY` in API functions
+- **Keep RLS disabled** until going to production — when you're ready, enable it and lock down policies per table
+- **For multi-table operations**, write a stored procedure in `supabase/` and call it with `.rpc()`
+- **New tables** should have an index on any column you filter or sort by
+
+---
+
+## Before Pushing Any Code
+
+Run through this checklist:
+
+- [ ] Does the new endpoint validate its inputs?
+- [ ] Are all external API calls using `fetchWithTimeout()`?
+- [ ] Are all errors caught and logged with `logError()`?
+- [ ] If it writes to multiple tables, is it wrapped in a transaction?
+- [ ] If it processes webhooks, is it checking for duplicates?
+- [ ] Did you test the happy path (valid data works)?
+- [ ] Did you test the failure path (bad data returns a clear error, not a crash)?
 
 ---
 
 ## Known Gotchas
 
-- **Non-ASCII chars in JS** (unicode dashes ─, em dashes) crash Vercel serverless functions with FUNCTION_INVOCATION_FAILED. ASCII only in JS strings.
-- **No ES module imports in Vercel functions** — use require() style or the existing import pattern already in each file.
-- **nl-sqft field** appears multiple times in index.html (in form HTML and in JS strings). Replacements must target the correct occurrence.
-- **renderAutoList is wrapped** by patchSystemAutoCards — preserve the wrapper on any edit.
-- **Test only on Dane Kreisman** (phone: 8082697636, email: dane.kreisman@gmail.com). Never trigger sends to real clients during testing.
-- **Google Places autocomplete** was added and removed — broke address input. Don't reintroduce.
+- **Google Places autocomplete** was added and removed — it broke the address input. Don't reintroduce it without careful testing on the address fields first.
+- **`places-autocomplete.js`** uses `module.exports` (CommonJS) while all other API files use `export default` (ES Modules). Don't mix these.
+- **`run-automations.js`** is not yet using `logError` — errors only go to console. Add it when touching that file.
+- **`lead-capture.js`** does not have an atomic transaction like `lead-book.js` does — if it fails midway you can end up with a lead but no email/SMS sent.
+- **Context drift** between chat sessions is a recurring problem. Always reference this document at the start of a session and update it when something significant changes.
 
 ---
 
-## Known Bugs (do not fix yet — just be aware)
+## Utilities Reference
 
-3. **Pipeline raw JS in deal-val** — one card renders `'+(lead.value||'TBD')+'` as literal text (likely a TBD lead with no value set).
+| File | What it does |
+|---|---|
+| `api/utils/validate.js` | Schema-based request validation |
+| `api/utils/error-logger.js` | Log errors to Supabase `error_logs` table |
+| `api/utils/with-timeout.js` | Wrap fetch() calls with timeouts |
+| `api/utils/webhook-idempotency.js` | Prevent duplicate webhook processing |
 
 ---
 
-*Last updated: April 2026 — after automations UI consistency rebuild, pricing calculator, and pipeline $ fix.*
+## Supabase Tables Added During Foundation Work
+
+| Table | Purpose |
+|---|---|
+| `webhook_events` | Tracks processed webhooks to prevent duplicates |
+| `error_logs` | Central log of all API errors |
+
+## Supabase Functions Added During Foundation Work
+
+| Function | Purpose |
+|---|---|
+| `book_lead_atomic` | Atomically creates client + appointment + closes lead |
+
+---
+
+*Last updated: April 2026 — added token-efficient editing rules to prevent resume cycles.*

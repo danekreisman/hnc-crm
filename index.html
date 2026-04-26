@@ -6840,23 +6840,34 @@ function _buildNLQuote() {
   if (!hrs || hrs <= 0) return null;
   var rate = (svc === 'deep' || svc === 'moveout') ? 70 : 65;
   var base = Math.round(hrs * rate * 100) / 100;
-  var discRate = freq === 'Weekly' ? 0.20 : freq === 'Biweekly' ? 0.15 :
-                 freq === 'Every 3 Weeks' ? 0.125 : freq === 'Monthly' ? 0.10 :
-                 freq === 'Every 6 Weeks' ? 0.10 : 0;
-  var discAmt = Math.round(base * discRate * 100) / 100;
-  var afterDisc = Math.round((base - discAmt) * 100) / 100;
-  var tax = Math.round(afterDisc * 0.04712 * 100) / 100;
-  var total = Math.round((afterDisc + tax) * 100) / 100;
+  var discPct = freq === 'Weekly' ? 20 : freq === 'Biweekly' ? 15 :
+                freq === 'Every 3 Weeks' ? 12.5 : freq === 'Monthly' ? 10 :
+                freq === 'Every 6 Weeks' ? 10 : 0;
+  var discount = Math.round(base * (discPct/100) * 100) / 100;
+  var subtotal = Math.round((base - discount) * 100) / 100;
+  var tax = Math.round(subtotal * 0.04712 * 100) / 100;
+  var total = Math.round((subtotal + tax) * 100) / 100;
   return {
     total: total,
     data: {
-      hours: hrs, rate: rate, service: svc,
-      beds: beds || null, baths: baths || null, sqft: sqft || null, condition: cond,
-      base_price: base, frequency: freq || 'One-time',
-      discount_rate: discRate, discount_amount: discAmt,
-      subtotal_after_discount: afterDisc,
-      tax_rate: 0.04712, tax_amount: tax, total: total,
-      generated_at: new Date().toISOString(), source: 'manual_lead_form'
+      service: svc,
+      subtotal: subtotal,
+      discount: discount,
+      discount_pct: discPct,
+      total: total,
+      tier: cond <= 4 ? 'tough' : cond <= 6 ? 'moderate' : 'standard',
+      frequency: freq || 'one-time',
+      duration_minutes: Math.round(hrs * 60),
+      hours: hrs,
+      rate: rate,
+      beds: beds || null,
+      baths: baths || null,
+      sqft: sqft || null,
+      condition: cond,
+      base_price: base,
+      tax: tax,
+      generated_at: new Date().toISOString(),
+      source: 'manual_lead_form'
     }
   };
 }

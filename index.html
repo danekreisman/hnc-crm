@@ -216,6 +216,16 @@ tr.clickable:hover td{background:var(--brand-50);cursor:pointer;}
 .info-label{font-size:11px;color:var(--text-muted);flex-shrink:0;width:130px;}
 .info-val{font-size:12px;color:var(--text);text-align:right;font-weight:500;}
 .panel-section{font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;margin:14px 0 8px;}
+.booking-section{margin:14px 0 0;border-top:1px solid var(--border);padding-top:10px;}
+.booking-section:first-of-type{border-top:none;padding-top:0;margin-top:0;}
+.booking-section>summary{font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;cursor:pointer;list-style:none;padding:6px 0;display:flex;align-items:center;gap:6px;user-select:none;}
+.booking-section>summary::-webkit-details-marker{display:none;}
+.booking-section>summary::before{content:"\25B8";display:inline-block;font-size:9px;color:var(--text-muted);transition:transform .15s;}
+.booking-section[open]>summary::before{transform:rotate(90deg);}
+.booking-section[open]>summary{color:var(--brand-600);}
+.booking-section-body{padding:4px 0 6px;}
+.booking-section.booking-quote>summary{cursor:default;color:var(--brand-600);}
+.booking-section.booking-quote>summary::before{transform:rotate(90deg);}
 .action-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:4px;}
 .action-btn{font-size:12px;padding:9px 10px;border-radius:8px;border:1px solid var(--border-strong);background:#fff;color:var(--text);cursor:pointer;font-family:inherit;text-align:center;}
 .action-btn:hover{background:var(--bg-soft);}
@@ -1311,125 +1321,141 @@ Mahalo 🌺</textarea>
   <div class="panel panel-wide" onclick="event.stopPropagation()">
     <div class="panel-header"><div class="panel-title">New appointment</div><button class="close-btn" onclick="closeOverlay('new-appt-overlay')">&#x2715;</button></div>
     <div class="panel-body">
-      <div class="panel-section">Client</div>
-      <div class="form-row"><label>Full name</label>
-        <div style="position:relative;">
-          <input type="text" id="na-name" placeholder="Search existing client or enter new name..." style="width:100%;" autocomplete="off">
-          <div id="na-name-dropdown" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid var(--border-strong);border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.12);z-index:200;max-height:220px;overflow-y:auto;margin-top:2px;"></div>
+      <details class="booking-section" open>
+        <summary>Contact</summary>
+        <div class="booking-section-body">
+          <div class="form-row"><label>Full name</label>
+            <div style="position:relative;">
+              <input type="text" id="na-name" placeholder="Search existing client or enter new name..." style="width:100%;" autocomplete="off">
+              <div id="na-name-dropdown" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid var(--border-strong);border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.12);z-index:200;max-height:220px;overflow-y:auto;margin-top:2px;"></div>
+            </div>
+          </div>
+          <div class="form-two">
+            <div class="form-row"><label>Phone</label><input type="tel" id="na-phone" placeholder="(808) 555-0000" oninput="fmtPhone(this)"></div>
+            <div class="form-row"><label>Email</label><input type="email" id="na-email" placeholder="client@email.com"></div>
+          </div>
         </div>
-      </div>
-      <div class="form-two">
-        <div class="form-row"><label>Phone</label><input type="tel" id="na-phone" placeholder="(808) 555-0000" oninput="fmtPhone(this)"></div>
-        <div class="form-row"><label>Email</label><input type="email" id="na-email" placeholder="client@email.com"></div>
-      </div>
-      <div class="panel-section">Property</div>
-      <div class="form-row">
-        <label>Property</label>
-        <select id="na-property-select" onchange="applyPropertyToBooking()" style="width:100%;">
-          <option value="new">+ Create New Property</option>
-        </select>
-      </div>
-      <div id="na-address-row" class="form-row">
-        <label>Address</label>
-        <input type="text" id="na-address" placeholder="Street address">
-      </div>
-      <div id="na-residential-fields">
-        <div class="form-two">
-          <div class="form-row" id="na-beds-row"><label>Bedrooms</label>
-            <select id="na-beds" onchange="calcPrice()">
-              <option value="1">1</option><option value="2">2</option><option value="3" selected>3</option><option value="4">4</option><option value="5">5</option><option value="6">6+</option>
+      </details>
+      <details class="booking-section" open>
+        <summary>Property</summary>
+        <div class="booking-section-body">
+          <div class="form-row">
+            <label>Property</label>
+            <select id="na-property-select" onchange="applyPropertyToBooking()" style="width:100%;">
+              <option value="new">+ Create New Property</option>
             </select>
           </div>
-          <div class="form-row" id="na-baths-row"><label>Bathrooms</label>
-            <select id="na-baths" onchange="calcPrice()">
-              <option value="1">1</option><option value="1.5">1.5</option><option value="2" selected>2</option><option value="2.5">2.5</option><option value="3">3</option><option value="4">4+</option>
+          <div id="na-address-row" class="form-row">
+            <label>Address</label>
+            <input type="text" id="na-address" placeholder="Street address">
+          </div>
+          <div id="na-residential-fields">
+            <div class="form-two">
+              <div class="form-row" id="na-beds-row"><label>Bedrooms</label>
+                <select id="na-beds" onchange="calcPrice()">
+                  <option value="1">1</option><option value="2">2</option><option value="3" selected>3</option><option value="4">4</option><option value="5">5</option><option value="6">6+</option>
+                </select>
+              </div>
+              <div class="form-row" id="na-baths-row"><label>Bathrooms</label>
+                <select id="na-baths" onchange="calcPrice()">
+                  <option value="1">1</option><option value="1.5">1.5</option><option value="2" selected>2</option><option value="2.5">2.5</option><option value="3">3</option><option value="4">4+</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-two">
+              <div class="form-row" id="na-sqft-row"><label>Sq ft</label>
+                <input type="number" id="na-sqft" placeholder="e.g. 1200" min="100" step="50" oninput="calcPrice()">
+              </div>
+              <div class="form-row" id="na-cond-row"><label>Condition (1-10)</label>
+                <select id="na-cond" onchange="calcPrice()">
+                  <option value="9">9-10 — Excellent</option>
+                  <option value="7" selected>7-8 — Good</option>
+                  <option value="5">5-6 — Average</option>
+                  <option value="3">3-4 — Below avg</option>
+                  <option value="1">1-2 — Poor</option>
+                </select>
+              </div>
+            </div>
+          </div>
+          <div id="na-save-prop-row" class="form-row" style="display:none;">
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:normal;font-size:13px;color:var(--text-muted);">
+              <input type="checkbox" id="na-save-property"> Save as property for this client
+            </label>
+          </div>
+        </div>
+      </details>
+      <details class="booking-section" open>
+        <summary>Service</summary>
+        <div class="booking-section-body">
+          <div class="form-two">
+            <div class="form-row"><label>Service type</label>
+              <select id="na-service" onchange="calcPrice()">
+                <option value="standard">Regular Cleaning</option>
+                <option value="deep">Deep Cleaning</option>
+                <option value="moveout">Move Out Cleaning</option>
+                <option value="airbnb">Airbnb Turnover</option>
+                <option value="commercial">Commercial Cleaning</option>
+              </select>
+            </div>
+            <div class="form-row" id="na-freq-row"><label>Frequency</label>
+              <select id="na-freq" onchange="calcPrice();showClientPricingRules(_findClientByName&&_findClientByName((document.getElementById('na-name')||{}).value||'')?clientDB[_findClientByName((document.getElementById('na-name')||{}).value||'').id]:null)">
+                <option value="Every Day">Every Day</option>
+                <option value="Weekly">Weekly</option>
+                <option value="Biweekly" selected>Biweekly (every 2 weeks)</option>
+                <option value="Every 3 Weeks">Every 3 Weeks</option>
+                <option value="Monthly">Monthly (every 4 weeks)</option>
+                <option value="Every 6 Weeks">Every 6 Weeks</option>
+                <option value="One-time">One-time</option>
+              </select>
+            </div>
+          </div>
+          <div id="na-commercial-fields" style="display:none;">
+            <div class="form-row"><label>Total hours</label>
+              <input type="number" id="na-commercial-hrs" placeholder="e.g. 4" min="1" step="0.5" oninput="calcPrice()">
+            </div>
+          </div>
+          <div class="form-two">
+            <div class="form-row"><label>Date</label><input type="date" id="na-date"></div>
+            <div class="form-row"><label>Time</label><input type="time" id="na-time" value="08:00"></div>
+          </div>
+          <div class="form-row"><label>Assign cleaner</label>
+            <select id="na-cleaner" onchange="calcPrice()">
+              <option value="unassigned">Leave unassigned</option>
             </select>
           </div>
+          <div class="form-row"><label>Notes</label><textarea id="na-notes" style="min-height:60px;" placeholder="Any special instructions or notes..."></textarea></div>
         </div>
-        <div class="form-two">
-          <div class="form-row" id="na-sqft-row"><label>Sq ft</label>
-            <input type="number" id="na-sqft" placeholder="e.g. 1200" min="100" step="50" oninput="calcPrice()">
+      </details>
+      <details class="booking-section booking-quote" open ontoggle="if(!this.open) this.open=true">
+        <summary>Quote</summary>
+        <div class="booking-section-body">
+          <div class="price-preview" id="price-preview">
+            <div class="price-preview-label">Estimated price</div>
+            <div class="price-preview-val" id="price-val">$238.22</div>
+            <div class="price-preview-breakdown" id="price-breakdown">— enter property details —</div>
+            <div id="na-pricing-rules-display" style="display:none;background:var(--brand-50);border:1px solid #9ae6b4;border-radius:8px;padding:8px 11px;margin-top:8px;font-size:11px;color:#276749;"></div>
+            <div id="na-cleaner-pay-line" style="font-size:11px;color:var(--text-muted);margin-top:2px;display:none;">Cleaner pay: <span id="na-cleaner-pay-val">—</span></div>
+            <div style="margin-top:10px;display:flex;align-items:center;gap:10px;">
+              <label style="font-size:13px;color:var(--text-muted);font-weight:normal;display:flex;align-items:center;gap:6px;cursor:pointer;">
+                <input type="checkbox" id="na-price-override-chk" onchange="calcPrice()"> Override price
+              </label>
+              <input type="number" id="na-price-override-val" placeholder="Custom $" min="0" step="0.01" style="width:120px;display:none;" oninput="calcPrice()">
+            </div>
+            <div style="margin-top:6px;display:flex;align-items:center;gap:10px;">
+              <label style="font-size:13px;color:var(--text-muted);font-weight:normal;display:flex;align-items:center;gap:6px;cursor:pointer;">
+                <input type="checkbox" id="na-cleaner-pay-override-chk" onchange="calcPrice()"> Override cleaner pay
+              </label>
+              <input type="number" id="na-cleaner-pay-override-val" placeholder="Custom pay $" min="0" step="0.01" style="width:130px;display:none;" oninput="calcPrice()">
+            </div>
+            <div style="margin-top:6px;display:flex;align-items:center;gap:10px;">
+              <label style="font-size:13px;color:var(--text-muted);font-weight:normal;display:flex;align-items:center;gap:6px;cursor:pointer;">
+                <input type="checkbox" id="na-hours-override-chk" onchange="calcPrice()"> Override estimated hours
+              </label>
+              <input type="number" id="na-hours-override-val" placeholder="e.g. 4.5" min="0.5" step="0.5" style="width:100px;display:none;" oninput="calcPrice()">
+            </div>
           </div>
-          <div class="form-row" id="na-cond-row"><label>Condition (1-10)</label>
-            <select id="na-cond" onchange="calcPrice()">
-              <option value="9">9-10 — Excellent</option>
-              <option value="7" selected>7-8 — Good</option>
-              <option value="5">5-6 — Average</option>
-              <option value="3">3-4 — Below avg</option>
-              <option value="1">1-2 — Poor</option>
-            </select>
-          </div>
         </div>
-      </div>
-      <div id="na-save-prop-row" class="form-row" style="display:none;">
-        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:normal;font-size:13px;color:var(--text-muted);">
-          <input type="checkbox" id="na-save-property"> Save as property for this client
-        </label>
-      </div>
-      <div class="panel-section">Service details</div>
-      <div class="form-two">
-        <div class="form-row"><label>Service type</label>
-          <select id="na-service" onchange="calcPrice()">
-            <option value="standard">Regular Cleaning</option>
-            <option value="deep">Deep Cleaning</option>
-            <option value="moveout">Move Out Cleaning</option>
-            <option value="airbnb">Airbnb Turnover</option>
-            <option value="commercial">Commercial Cleaning</option>
-          </select>
-        </div>
-        <div class="form-row" id="na-freq-row"><label>Frequency</label>
-          <select id="na-freq" onchange="calcPrice();showClientPricingRules(_findClientByName&&_findClientByName((document.getElementById('na-name')||{}).value||'')?clientDB[_findClientByName((document.getElementById('na-name')||{}).value||'').id]:null)">
-            <option value="Every Day">Every Day</option>
-            <option value="Weekly">Weekly</option>
-            <option value="Biweekly" selected>Biweekly (every 2 weeks)</option>
-            <option value="Every 3 Weeks">Every 3 Weeks</option>
-            <option value="Monthly">Monthly (every 4 weeks)</option>
-            <option value="Every 6 Weeks">Every 6 Weeks</option>
-            <option value="One-time">One-time</option>
-          </select>
-        </div>
-      </div>
-      <div id="na-commercial-fields" style="display:none;">
-        <div class="form-row"><label>Total hours</label>
-          <input type="number" id="na-commercial-hrs" placeholder="e.g. 4" min="1" step="0.5" oninput="calcPrice()">
-        </div>
-      </div>
-      <div class="price-preview" id="price-preview">
-        <div class="price-preview-label">Estimated price</div>
-        <div class="price-preview-val" id="price-val">$238.22</div>
-        <div class="price-preview-breakdown" id="price-breakdown">— enter property details —</div>
-        <div id="na-pricing-rules-display" style="display:none;background:var(--brand-50);border:1px solid #9ae6b4;border-radius:8px;padding:8px 11px;margin-top:8px;font-size:11px;color:#276749;"></div>
-        <div id="na-cleaner-pay-line" style="font-size:11px;color:var(--text-muted);margin-top:2px;display:none;">Cleaner pay: <span id="na-cleaner-pay-val">—</span></div>
-        <div style="margin-top:10px;display:flex;align-items:center;gap:10px;">
-          <label style="font-size:13px;color:var(--text-muted);font-weight:normal;display:flex;align-items:center;gap:6px;cursor:pointer;">
-            <input type="checkbox" id="na-price-override-chk" onchange="calcPrice()"> Override price
-          </label>
-          <input type="number" id="na-price-override-val" placeholder="Custom $" min="0" step="0.01" style="width:120px;display:none;" oninput="calcPrice()">
-        </div>
-        <div style="margin-top:6px;display:flex;align-items:center;gap:10px;">
-          <label style="font-size:13px;color:var(--text-muted);font-weight:normal;display:flex;align-items:center;gap:6px;cursor:pointer;">
-            <input type="checkbox" id="na-cleaner-pay-override-chk" onchange="calcPrice()"> Override cleaner pay
-          </label>
-          <input type="number" id="na-cleaner-pay-override-val" placeholder="Custom pay $" min="0" step="0.01" style="width:130px;display:none;" oninput="calcPrice()">
-        </div>
-        <div style="margin-top:6px;display:flex;align-items:center;gap:10px;">
-          <label style="font-size:13px;color:var(--text-muted);font-weight:normal;display:flex;align-items:center;gap:6px;cursor:pointer;">
-            <input type="checkbox" id="na-hours-override-chk" onchange="calcPrice()"> Override estimated hours
-          </label>
-          <input type="number" id="na-hours-override-val" placeholder="e.g. 4.5" min="0.5" step="0.5" style="width:100px;display:none;" oninput="calcPrice()">
-        </div>
-      </div>
-      <div class="panel-section">Scheduling</div>
-      <div class="form-two">
-        <div class="form-row"><label>Date</label><input type="date" id="na-date"></div>
-        <div class="form-row"><label>Time</label><input type="time" id="na-time" value="08:00"></div>
-      </div>
-      <div class="form-row"><label>Assign cleaner</label>
-        <select id="na-cleaner" onchange="calcPrice()">
-          <option value="unassigned">Leave unassigned</option>
-        </select>
-      </div>
-      <div class="form-row"><label>Notes</label><textarea id="na-notes" style="min-height:60px;" placeholder="Any special instructions or notes..."></textarea></div>
+      </details>
       <div class="save-bar">
         <button class="btn btn-primary" onclick="saveNewAppt()">Book appointment</button>
         <button class="btn" onclick="closeOverlay('new-appt-overlay')">Cancel</button>

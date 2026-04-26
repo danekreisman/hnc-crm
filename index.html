@@ -5150,6 +5150,16 @@ async function saveNewAppt(){
   var apptLabel=freq==='One-time'?'Appointment booked!':occDates.length+' '+freq.toLowerCase()+' appointments booked!';
   showToast(apptLabel);
 
+  // ── STEP 2.5: Auto-link to matching open lead (by name / phone / email) and mark won ──
+  try{
+    var _bookPhone = (document.getElementById('na-phone')||{}).value || '';
+    var _bookEmail = (document.getElementById('na-email')||{}).value || '';
+    var _matchedLead = _findLeadForBooking(name, _bookPhone, _bookEmail);
+    if(_matchedLead){
+      _markLeadWonOnBook(_matchedLead.id, _matchedLead.data, name);
+    }
+  }catch(_leadLinkErr){ console.warn('[saveNewAppt] lead auto-link error:', _leadLinkErr); }
+
   // ── STEP 3: Persist to Supabase in background (UI already updated) ──
   if(freq==='One-time'){
     dbSaveAppointment({
@@ -10813,7 +10823,26 @@ function scheduleLeadAppointment(){
     var addrEl=document.getElementById('na-address');
     if(nameEl) nameEl.value=lead.name;
     if(addrEl) addrEl.value=lead.address||'';
+    // Pre-fill contact + structured booking fields from lead data
+    var _phEl=document.getElementById('na-phone'); if(_phEl) _phEl.value=(lead.phone&&lead.phone!=='—')?lead.phone:'';
+    var _emEl=document.getElementById('na-email'); if(_emEl) _emEl.value=(lead.email&&lead.email!=='—')?lead.email:'';
+    var _svcSel=document.getElementById('na-service');
+    if(_svcSel){ _svcSel.value = _serviceTextToBookingValue(lead.service); _svcSel.dispatchEvent(new Event('change')); }
+    var _frqSel=document.getElementById('na-freq');
+    if(_frqSel && lead.frequency){
+      var _wantFreq = String(lead.frequency).trim();
+      var _opts = _frqSel.options;
+      for(var _fi=0; _fi<_opts.length; _fi++){
+        if(_opts[_fi].value.toLowerCase() === _wantFreq.toLowerCase()){ _frqSel.value = _opts[_fi].value; break; }
+      }
+    }
+    var _bedsEl=document.getElementById('na-beds'); if(_bedsEl && lead.beds){ _bedsEl.value = String(lead.beds); }
+    var _bathsEl=document.getElementById('na-baths'); if(_bathsEl && lead.baths){ _bathsEl.value = String(lead.baths); }
+    var _sqftEl=document.getElementById('na-sqft'); if(_sqftEl && lead.sqft && lead.sqft!=='—'){ _sqftEl.value = String(lead.sqft).replace(/[^0-9]/g,''); }
+    var _condEl=document.getElementById('na-cond'); if(_condEl && lead.condition){ _condEl.value = String(lead.condition); }
+    var _notesEl=document.getElementById('na-notes'); if(_notesEl && lead.notes && lead.notes!=='—'){ _notesEl.value = lead.notes; }
     populatePropertySelector(lead.name);
+    calcPrice();
     showPaymentToast(lead.name+' converted to client! Fill in the booking details below.', null, 'success');
   }, 300);
 }
@@ -11593,6 +11622,58 @@ function _findClientByName(name){
     if(e[1].name === name) result = {id: e[0], data: e[1]};
   });
   return result;
+}
+
+/* Find an open (not Closed won/lost) lead matching the booking by name, phone, or email.
+   Used to auto-link a new appointment back to the lead it came from. */
+function _findLeadForBooking(name, phone, email){
+  if(!leadDB) return null;
+  var nNorm = (name||'').trim().toLowerCase();
+  var pNorm = (phone||'').replace(/\D/g,'');
+  var eNorm = (email||'').trim().toLowerCase();
+  var keys = Object.keys(leadDB);
+  for(var i=0;i<keys.length;i++){
+    var l = leadDB[keys[i]];
+    if(!l) continue;
+    var stage = (l.stage||'').toLowerCase();
+    if(stage.indexOf('won') >= 0 || stage.indexOf('lost') >= 0) continue;
+    var lname = (l.name||'').trim().toLowerCase();
+    var lphone = (l.phone||'').replace(/\D/g,'');
+    var lemail = (l.email||'').trim().toLowerCase();
+    if(nNorm && lname && lname === nNorm) return {id: keys[i], data: l};
+    if(pNorm && pNorm.length >= 7 && lphone && lphone === pNorm) return {id: keys[i], data: l};
+    if(eNorm && lemail && eNorm === lemail) return {id: keys[i], data: l};
+  }
+  return null;
+}
+
+/* Flip a matched lead's stage to Closed won when its booking is created.
+   Updates leadDB, removes pipeline cards, persists to Supabase, logs activity. */
+function _markLeadWonOnBook(lid, leadObj, clientName){
+  if(!leadObj) return;
+  if((leadObj.stage||'').toLowerCase().indexOf('won') >= 0) return; // already won
+  leadObj.stage = 'Closed won';
+  if(lid && lid.length > 20 && typeof db !== 'undefined' && db){
+    try{ db.from('leads').update({stage:'Closed won'}).eq('id', lid); }catch(e){console.warn('[markLeadWon] supabase update error:',e);}
+  }
+  document.querySelectorAll('.deal-card').forEach(function(card){
+    var el = card.querySelector('.deal-name');
+    if(el && el.textContent.trim() === (leadObj.name||'').trim()) card.remove();
+  });
+  try{ if(typeof renderLeadsPipeline === 'function') renderLeadsPipeline(); }catch(e){}
+  try{ if(typeof logActivity === 'function') logActivity('lead_won', {leadName: leadObj.name, viaBooking: true, clientName: clientName||leadObj.name}); }catch(e){}
+  try{ if(typeof showToast === 'function') showToast('Lead "' + leadObj.name + '" marked as won'); }catch(e){}
+}
+
+/* Map free-text lead.service to booking-form na-service value. */
+function _serviceTextToBookingValue(svcText){
+  if(!svcText) return 'standard';
+  var s = svcText.toLowerCase();
+  if(s.indexOf('commercial') >= 0 || s.indexOf('janitorial') >= 0) return 'commercial';
+  if(s.indexOf('deep') >= 0) return 'deep';
+  if(s.indexOf('move') >= 0) return 'moveout';
+  if(s.indexOf('airbnb') >= 0 || s.indexOf('turnover') >= 0) return 'airbnb';
+  return 'standard';
 }
 
 function _clearNewApptPropertyFields(){

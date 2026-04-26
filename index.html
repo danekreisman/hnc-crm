@@ -2426,10 +2426,10 @@ async function loadAllData(){
         quoteTotal: l.quote_total||null,
         quoteSentAt: l.quote_sent_at||null,
         // Parse beds/baths/frequency/condition from notes for manual leads
-        beds:      (l.notes&&/Beds:\s*(\S+)/.exec(l.notes))?/Beds:\s*(\S+)/.exec(l.notes)[1]:null,
-        baths:     (l.notes&&/Baths:\s*(\S+)/.exec(l.notes))?/Baths:\s*(\S+)/.exec(l.notes)[1]:null,
-        frequency: (l.notes&&/Frequency:\s*([^\n]+)/.exec(l.notes))?/Frequency:\s*([^\n]+)/.exec(l.notes)[1].trim():null,
-        condition: (l.notes&&/Condition:\s*(\d+)/.exec(l.notes))?/Condition:\s*(\d+)/.exec(l.notes)[1]:null,
+        beds:      l.beds!=null?l.beds:((l.notes&&/Beds:\s*(\S+)/.exec(l.notes))?/Beds:\s*(\S+)/.exec(l.notes)[1]:null),
+        baths:     l.baths!=null?l.baths:((l.notes&&/Baths:\s*(\S+)/.exec(l.notes))?/Baths:\s*(\S+)/.exec(l.notes)[1]:null),
+        frequency: l.frequency||((l.notes&&/Frequency:\s*([^\n]+)/.exec(l.notes))?/Frequency:\s*([^\n]+)/.exec(l.notes)[1].trim():null),
+        condition: l.condition!=null?l.condition:((l.notes&&/Condition:\s*(\d+)/.exec(l.notes))?/Condition:\s*(\d+)/.exec(l.notes)[1]:null),
       };
     });
 

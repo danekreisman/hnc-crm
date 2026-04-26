@@ -5946,6 +5946,7 @@ function saveNewLead(){
     }
   });
   // Save to Supabase
+  var _nlQ = _buildNLQuote();
   dbSaveLead({
     name:name, contact:document.getElementById('nl-contact').value,
     phone:document.getElementById('nl-phone').value,
@@ -5958,7 +5959,9 @@ function saveNewLead(){
     stage:stage, action:document.getElementById('nl-action').value,
     due:document.getElementById('nl-due').value,
     assigned:document.getElementById('nl-assigned').value,
-    notes:document.getElementById('nl-notes').value
+    notes:document.getElementById('nl-notes').value,
+    quote_total: _nlQ ? _nlQ.total : null,
+    quote_data: _nlQ ? _nlQ.data : null
   });
   var s=document.getElementById('nl-success');s.textContent='Lead "'+name+'" added to pipeline!';s.classList.add('show');
   setTimeout(function(){s.classList.remove('show');closeOverlay('new-lead-overlay');
@@ -6823,6 +6826,40 @@ function nlCalcPrice() {
     estEl.innerHTML = out;
   }
 }
+function _buildNLQuote() {
+  var svc = (document.getElementById('nl-service')||{}).value || '';
+  if (!svc || svc === 'janitorial') return null;
+  var beds = parseInt((document.getElementById('nl-beds')||{}).value) || 0;
+  var baths = parseFloat((document.getElementById('nl-baths')||{}).value) || 0;
+  var sqft = parseFloat(((document.getElementById('nl-sqft')||{}).value||'').replace(/[^0-9.]/g,'')) || 0;
+  var cond = parseInt((document.getElementById('nl-condition')||{}).value) || 7;
+  var freq = (document.getElementById('nl-freq')||{}).value || '';
+  if (typeof _deriveHours !== 'function') return null;
+  var hrs = _deriveHours(beds, baths, svc, cond, null);
+  if (!hrs || hrs <= 0) return null;
+  var rate = (svc === 'deep' || svc === 'moveout') ? 70 : 65;
+  var base = Math.round(hrs * rate * 100) / 100;
+  var discRate = freq === 'Weekly' ? 0.20 : freq === 'Biweekly' ? 0.15 :
+                 freq === 'Every 3 Weeks' ? 0.125 : freq === 'Monthly' ? 0.10 :
+                 freq === 'Every 6 Weeks' ? 0.10 : 0;
+  var discAmt = Math.round(base * discRate * 100) / 100;
+  var afterDisc = Math.round((base - discAmt) * 100) / 100;
+  var tax = Math.round(afterDisc * 0.04712 * 100) / 100;
+  var total = Math.round((afterDisc + tax) * 100) / 100;
+  return {
+    total: total,
+    data: {
+      hours: hrs, rate: rate, service: svc,
+      beds: beds || null, baths: baths || null, sqft: sqft || null, condition: cond,
+      base_price: base, frequency: freq || 'One-time',
+      discount_rate: discRate, discount_amount: discAmt,
+      subtotal_after_discount: afterDisc,
+      tax_rate: 0.04712, tax_amount: tax, total: total,
+      generated_at: new Date().toISOString(), source: 'manual_lead_form'
+    }
+  };
+}
+
 function nlServiceChange(){var v=document.getElementById('nl-value');if(v)v.value='';nlCalcPrice();}
 function openCancelEmailAutoEdit() { openSystemAutoEdit('ce'); }
 function openCancelClientSmsAutoEdit() { openSystemAutoEdit('cs'); }

@@ -7,47 +7,39 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  var leadId = (req.body || {}).leadId;
-  var customPrompt = (req.body || {}).prompt;
-  var authHeader = req.headers['authorization'] || ('Bearer ' + process.env.SUPABASE_SERVICE_ROLE_KEY);
+  var body = req.body || {};
+  var leadId = body.leadId;
+  var leadData = body.leadData;
+  var customPrompt = body.prompt;
 
-  if (!leadId && !customPrompt) {
-    return res.status(400).json({ success: false, error: 'leadId or prompt is required' });
+  if (!leadId && !leadData && !customPrompt) {
+    return res.status(400).json({ success: false, error: 'leadId, leadData, or prompt is required' });
   }
 
   try {
     var prompt = customPrompt || '';
 
-    if (!prompt && leadId) {
-      var supaUrl = process.env.SUPABASE_URL + '/rest/v1/leads?id=eq.' + leadId + '&select=name,contact_name,service,beds,baths,sqft,condition,notes,stage,address,value,quote_total&limit=1';
-      var leadRes = await fetchWithTimeout(supaUrl, {
-        headers: {
-          apikey: process.env.SUPABASE_ANON_KEY,
-          Authorization: authHeader
-        }
-      }, TIMEOUTS.SUPABASE);
-      var leads = await leadRes.json();
-      var lead = leads && leads[0];
-      if (!lead) return res.status(404).json({ success: false, error: 'Lead not found', debug: { leadId: leadId } });
-
-      var name = lead.name || lead.contact_name || 'Unknown';
-      var svc = lead.service || 'Unknown';
+    if (!prompt && leadData) {
+      var name = leadData.name || 'Unknown';
+      var svc = leadData.service || 'Unknown';
       var propParts = [];
-      if (lead.beds) propParts.push(lead.beds + 'br');
-      if (lead.baths) propParts.push(lead.baths + 'ba');
-      if (lead.sqft) propParts.push(lead.sqft + ' sqft');
+      if (leadData.beds) propParts.push(leadData.beds + 'br');
+      if (leadData.baths) propParts.push(leadData.baths + 'ba');
+      if (leadData.sqft) propParts.push(leadData.sqft + ' sqft');
       var property = propParts.length ? propParts.join('/') : 'Unknown';
-      var price = lead.quote_total ? '$' + Number(lead.quote_total).toFixed(2) : (lead.value || 'TBD');
+      var price = leadData.quote_total ? '$' + Number(leadData.quote_total).toFixed(2) : (leadData.value || 'TBD');
 
-      prompt = 'Summarize this cleaning lead for a Hawaii Natural Clean sales rep in 2-3 sentences. Be concise. Focus on what they want and the best next action.';
+      prompt = 'Summarize this cleaning lead for a Hawaii Natural Clean sales rep in 2-3 sentences. Be concise and practical. Focus on what they want and the recommended next action.';
       prompt += ' Name: ' + name + '.';
       prompt += ' Service: ' + svc + '.';
       prompt += ' Property: ' + property + '.';
-      if (lead.condition) prompt += ' Condition: ' + lead.condition + '/10.';
-      prompt += ' Stage: ' + (lead.stage || 'Unknown') + '.';
+      if (leadData.condition) prompt += ' Condition: ' + leadData.condition + '/10.';
+      prompt += ' Stage: ' + (leadData.stage || 'Unknown') + '.';
       prompt += ' Quoted: ' + price + '.';
-      if (lead.notes) prompt += ' Notes: ' + lead.notes + '.';
+      if (leadData.notes) prompt += ' Notes: ' + leadData.notes + '.';
     }
+
+    if (!prompt) return res.status(400).json({ success: false, error: 'Could not build prompt from lead data' });
 
     var aiRes = await fetchWithTimeout('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -65,7 +57,7 @@ export default async function handler(req, res) {
 
     var aiData = await aiRes.json();
     var summary = aiData.content && aiData.content[0] && aiData.content[0].text;
-    if (!summary) throw new Error('No summary: ' + JSON.stringify(aiData).slice(0, 200));
+    if (!summary) throw new Error('No summary returned: ' + JSON.stringify(aiData).slice(0, 200));
 
     return res.status(200).json({ success: true, summary: summary });
   } catch (err) {

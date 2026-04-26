@@ -1335,22 +1335,22 @@ Mahalo 🌺</textarea>
       </div>
       <div id="na-residential-fields">
         <div class="form-two">
-          <div class="form-row"><label>Bedrooms</label>
+          <div class="form-row" id="na-beds-row"><label>Bedrooms</label>
             <select id="na-beds" onchange="calcPrice()">
               <option value="1">1</option><option value="2">2</option><option value="3" selected>3</option><option value="4">4</option><option value="5">5</option><option value="6">6+</option>
             </select>
           </div>
-          <div class="form-row"><label>Bathrooms</label>
+          <div class="form-row" id="na-baths-row"><label>Bathrooms</label>
             <select id="na-baths" onchange="calcPrice()">
               <option value="1">1</option><option value="1.5">1.5</option><option value="2" selected>2</option><option value="2.5">2.5</option><option value="3">3</option><option value="4">4+</option>
             </select>
           </div>
         </div>
         <div class="form-two">
-          <div class="form-row"><label>Sq ft</label>
+          <div class="form-row" id="na-sqft-row"><label>Sq ft</label>
             <input type="number" id="na-sqft" placeholder="e.g. 1200" min="100" step="50" oninput="calcPrice()">
           </div>
-          <div class="form-row"><label>Condition (1-10)</label>
+          <div class="form-row" id="na-cond-row"><label>Condition (1-10)</label>
             <select id="na-cond" onchange="calcPrice()">
               <option value="9">9-10 — Excellent</option>
               <option value="7" selected>7-8 — Good</option>
@@ -1377,7 +1377,7 @@ Mahalo 🌺</textarea>
             <option value="commercial">Commercial Cleaning</option>
           </select>
         </div>
-        <div class="form-row"><label>Frequency</label>
+        <div class="form-row" id="na-freq-row"><label>Frequency</label>
           <select id="na-freq" onchange="calcPrice();showClientPricingRules(_findClientByName&&_findClientByName((document.getElementById('na-name')||{}).value||'')?clientDB[_findClientByName((document.getElementById('na-name')||{}).value||'').id]:null)">
             <option value="Every Day">Every Day</option>
             <option value="Weekly">Weekly</option>
@@ -4687,6 +4687,29 @@ function fmtPhone(el){
   console.log('[fmtPhone] formatted: '+el.value);
 }
 
+/* Show/hide booking-form rows by service type. Rules:
+   - standard:  hide condition + sqft (price = beds + baths only)
+   - deep:      hide frequency, force One-time (deep cleans don't recur)
+   - moveout:   hide frequency, force One-time
+   - airbnb:    show condition + sqft; frequency stays
+   - commercial: hide beds + baths + condition; show sqft + hours field
+*/
+function _updateBookingFormVisibility(svcType){
+  var isCommercial = svcType === 'commercial';
+  var isStandard = svcType === 'standard';
+  var oneTimeOnly = (svcType === 'deep' || svcType === 'moveout');
+  function show(id, on){ var el = document.getElementById(id); if(el) el.style.display = on ? '' : 'none'; }
+  show('na-beds-row', !isCommercial);
+  show('na-baths-row', !isCommercial);
+  show('na-cond-row', !isCommercial && !isStandard);
+  show('na-sqft-row', !isStandard); // sqft used by deep, moveout, airbnb, commercial
+  show('na-freq-row', !oneTimeOnly);
+  if(oneTimeOnly){
+    var freq = document.getElementById('na-freq');
+    if(freq && freq.value !== 'One-time') freq.value = 'One-time';
+  }
+}
+
 function calcPrice(){
   // Check for property/client flat rate overrides first
   var _propSelForFlat=document.getElementById('na-property-select');
@@ -4734,13 +4757,16 @@ function calcPrice(){
 
   var svcType=document.getElementById('na-service').value;
   var isCommercial=(svcType==='commercial');
-  // Toggle residential vs commercial fields
+  // Toggle residential vs commercial fields. Note: residential block stays visible even for commercial,
+  // because sqft (housed inside it) is required for commercial too. Row-level visibility (handled by
+  // _updateBookingFormVisibility below) hides beds/baths/cond for commercial individually.
   var resFields=document.getElementById('na-residential-fields');
   var comFields=document.getElementById('na-commercial-fields');
   var _propSelVal=(document.getElementById('na-property-select')||{}).value;
   var _savedPropSelected=_propSelVal!==undefined&&_propSelVal!=='new'&&_propSelVal!==''&&!isNaN(parseInt(_propSelVal));
-  if(resFields) resFields.style.display=(isCommercial||_savedPropSelected)?'none':'';
+  if(resFields) resFields.style.display=_savedPropSelected?'none':'';
   if(comFields) comFields.style.display=isCommercial?'':'none';
+  _updateBookingFormVisibility(svcType);
   // Compute price + hours from BookingKoala lookup tables (single source of truth)
   var _q;
   if(isCommercial){

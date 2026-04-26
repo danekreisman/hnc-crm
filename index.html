@@ -4523,20 +4523,31 @@ function populateCleanerDropdown(selectId, currentValue){
 }
 
 /* Single source of truth for hour derivation — used by calcPrice(), calcEditPrice(), and any future recalc */
-function _deriveHours(beds, baths, svcType, cond, commercialHrs){
+function _deriveHours(beds, baths, svcType, cond, commercialHrs, sqft){
   if(svcType==='commercial') return parseFloat(commercialHrs)||4;
   var b=parseInt(beds)||3;
   var ba=parseFloat(baths)||2;
   var c=parseInt(cond)||7;
+  var sf=parseFloat(String(sqft||'').replace(/[^0-9.]/g,''))||0;
   var baseHrs=1.0+(b*0.5)+(ba*0.4);
   if(svcType==='deep') baseHrs*=1.5;
   else if(svcType==='moveout') baseHrs*=1.7;
   else if(svcType==='airbnb') baseHrs*=0.9;
+  // Condition modifier: only applies to deep/moveout/airbnb. Standard recurring cleans
+  // are not priced higher for "dirty" homes — recurring clients shouldn't pay 25-70% more.
   var condMod=1.0;
-  if(c<=2) condMod=1.70;
-  else if(c<=4) condMod=1.40;
-  else if(c<=6) condMod=1.25;
-  return Math.round(baseHrs*condMod*10)/10;
+  if(svcType==='deep'||svcType==='moveout'||svcType==='airbnb'){
+    if(c<=2) condMod=1.70;
+    else if(c<=4) condMod=1.40;
+    else if(c<=6) condMod=1.25;
+  }
+  var hrs=baseHrs*condMod;
+  // Sqft adjustment: only for very large deep/moveout jobs (additive bonus on top of base).
+  if(svcType==='deep'||svcType==='moveout'){
+    if(sf>4000) hrs+=1.0;
+    else if(sf>2500) hrs+=0.5;
+  }
+  return Math.round(hrs*10)/10;
 }
 
 function serviceRateKey(service){
@@ -4637,12 +4648,13 @@ function calcPrice(){
   // Compute hours via shared formula
   var hrs;
   if(isCommercial){
-    hrs=_deriveHours(null,null,'commercial',null,(document.getElementById('na-commercial-hrs')||{}).value);
+    hrs=_deriveHours(null,null,'commercial',null,(document.getElementById('na-commercial-hrs')||{}).value,null);
   } else {
     var beds=document.getElementById('na-beds').value;
     var baths=document.getElementById('na-baths').value;
     var cond=document.getElementById('na-cond').value;
-    hrs=_deriveHours(beds,baths,svcType,cond,null);
+    var sqft=(document.getElementById('na-sqft')||{}).value||null;
+    hrs=_deriveHours(beds,baths,svcType,cond,null,sqft);
   }
   // Hours override
   var hoursOverrideChk=document.getElementById('na-hours-override-chk');
@@ -4771,7 +4783,7 @@ function calcEditPrice(){
   if(isCommercial){
     hrs=parseFloat(appt.duration)||4;
   } else {
-    hrs=_deriveHours(appt.beds,appt.baths,svcType,appt.condition,null);
+    hrs=_deriveHours(appt.beds,appt.baths,svcType,appt.condition,null,appt.sqft);
   }
   // Hours override takes precedence
   var hoursOverrideChk=document.getElementById('edit-hours-override-chk');
@@ -6791,8 +6803,8 @@ function nlCalcPrice() {
   var estEl = document.getElementById('nl-est');
 
   var isSqftSvc = (svc === 'deep' || svc === 'moveout');
-  if (bedsRow) bedsRow.style.display = isSqftSvc ? 'none' : '';
-  if (bathsRow) bathsRow.style.display = isSqftSvc ? 'none' : '';
+  if (bedsRow) bedsRow.style.display = '';
+  if (bathsRow) bathsRow.style.display = '';
   if (condRow) condRow.style.display = '';
 
   if (svc === 'janitorial') {
@@ -6804,13 +6816,7 @@ function nlCalcPrice() {
 
   // Use same _deriveHours function as the appointment form
   if (typeof _deriveHours !== 'function') return;
-  var hrs = _deriveHours(
-    isSqftSvc ? Math.round(sqft / 200) : beds,
-    isSqftSvc ? 0 : baths,
-    svc,
-    cond,
-    null
-  );
+  var hrs = _deriveHours(beds, baths, svc, cond, null, sqft);
   if (!hrs) { if (estRow) estRow.style.display = 'none'; return; }
 
   var rate = (svc === 'deep' || svc === 'moveout') ? 70 : 65;
@@ -6845,7 +6851,7 @@ function _buildNLQuote() {
   var cond = parseInt((document.getElementById('nl-condition')||{}).value) || 7;
   var freq = (document.getElementById('nl-freq')||{}).value || '';
   if (typeof _deriveHours !== 'function') return null;
-  var hrs = _deriveHours(beds, baths, svc, cond, null);
+  var hrs = _deriveHours(beds, baths, svc, cond, null, sqft);
   if (!hrs || hrs <= 0) return null;
   var rate = (svc === 'deep' || svc === 'moveout') ? 70 : 65;
   var base = Math.round(hrs * rate * 100) / 100;

@@ -7,8 +7,9 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const leadId = (req.body || {}).leadId;
-  const customPrompt = (req.body || {}).prompt;
+  var leadId = (req.body || {}).leadId;
+  var customPrompt = (req.body || {}).prompt;
+  var authHeader = req.headers['authorization'] || ('Bearer ' + process.env.SUPABASE_SERVICE_ROLE_KEY);
 
   if (!leadId && !customPrompt) {
     return res.status(400).json({ success: false, error: 'leadId or prompt is required' });
@@ -21,13 +22,13 @@ export default async function handler(req, res) {
       var supaUrl = process.env.SUPABASE_URL + '/rest/v1/leads?id=eq.' + leadId + '&select=name,contact_name,service,beds,baths,sqft,condition,notes,stage,address,value,quote_total&limit=1';
       var leadRes = await fetchWithTimeout(supaUrl, {
         headers: {
-          apikey: process.env.SUPABASE_SERVICE_ROLE_KEY,
-          Authorization: 'Bearer ' + process.env.SUPABASE_SERVICE_ROLE_KEY
+          apikey: process.env.SUPABASE_ANON_KEY,
+          Authorization: authHeader
         }
       }, TIMEOUTS.SUPABASE);
       var leads = await leadRes.json();
       var lead = leads && leads[0];
-      if (!lead) return res.status(404).json({ success: false, error: 'Lead not found' });
+      if (!lead) return res.status(404).json({ success: false, error: 'Lead not found', debug: { leadId: leadId } });
 
       var name = lead.name || lead.contact_name || 'Unknown';
       var svc = lead.service || 'Unknown';
@@ -64,7 +65,7 @@ export default async function handler(req, res) {
 
     var aiData = await aiRes.json();
     var summary = aiData.content && aiData.content[0] && aiData.content[0].text;
-    if (!summary) throw new Error('No summary returned from Anthropic');
+    if (!summary) throw new Error('No summary: ' + JSON.stringify(aiData).slice(0, 200));
 
     return res.status(200).json({ success: true, summary: summary });
   } catch (err) {

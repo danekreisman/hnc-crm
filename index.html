@@ -10738,76 +10738,15 @@ function scheduleLeadAppointment(){
     }
 
   }
-  if(!lead){ 
+  if(!lead){
     console.error('Lead not found! ID:', currentLeadId, 'Name:', currentLeadName);
-    alert('Could not find lead data. currentLeadId: ' + currentLeadId + ', currentLeadName: ' + currentLeadName); 
-    return; 
+    alert('Could not find lead data. currentLeadId: ' + currentLeadId + ', currentLeadName: ' + currentLeadName);
+    return;
   }
 
-  var isCommercial = lead.service && lead.service.toLowerCase().indexOf('commercial') >= 0;
-  var clientId = 'client-' + Date.now();
-
-  // Create client record
-  clientDB[clientId] = {
-    name:lead.name, type:isCommercial?'Commercial':'Residential',
-    phone:lead.phone||'—', email:lead.email||'—', address:lead.address||'—',
-    payment:'—',
-    since:new Date().toLocaleDateString('en-US',{month:'long',year:'numeric'}),
-    ltv:'$0', mrr:lead.value||'—', jobs:'0', avg:'—',
-    service:lead.service||'Standard clean', freq:'TBD', sqft:lead.sqft||'—',
-    bedbath:'— bed / — bath', cleaner:'No preference',
-    lastjob:'None yet', nextjob:'Not scheduled', status:'New',
-    notes:'Converted from lead. '+(lead.notes||''), history:[]
-  };
-
-  // Save to Supabase
-  dbSaveClient({
-    name:lead.name, type:clientDB[clientId].type,
-    phone:lead.phone, email:lead.email, address:lead.address,
-    service:lead.service, notes:clientDB[clientId].notes
-  });
-
-  // Mark lead as won
-  lead.stage = 'Closed won';
-  if(lid && lid.length > 20){
-    db.from('leads').update({stage:'Closed won'}).eq('id', lid);
-  }
-
-  // Remove pipeline cards
-  document.querySelectorAll('.deal-card').forEach(function(card){
-    var el=card.querySelector('.deal-name');
-    if(el && el.textContent.trim()===lead.name.trim()) card.remove();
-  });
-
-  // Add to won table
-  var wonTbody = document.getElementById('won-leads-tbody');
-  if(wonTbody){
-    var today=new Date().toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
-    var wtr=document.createElement('tr');
-    wtr.style.borderTop='1px solid var(--border)';
-    wtr.innerHTML='<td style="padding:9px 14px;font-size:12px;font-weight:600;">'+lead.name+'</td>'
-      +'<td style="padding:9px 14px;font-size:12px;color:var(--text-muted);">'+(lead.service||'—')+'</td>'
-      +'<td style="padding:9px 14px;font-size:12px;color:var(--brand-500);font-weight:600;">'+(lead.value||'—')+'</td>'
-      +'<td style="padding:9px 14px;font-size:12px;color:var(--text-muted);">'+(lead.source||'—')+'</td>'
-      +'<td style="padding:9px 14px;font-size:12px;color:var(--text-muted);">'+today+'</td>'
-      +'<td style="padding:9px 14px;"><button class="btn" style="font-size:11px;padding:3px 9px;" data-id="'+clientId+'" onclick="openClient(this.dataset.id)">View client</button></td>';
-    wonTbody.insertBefore(wtr, wonTbody.firstChild);
-  }
-
-  // Add to clients table
-  var ctbody=document.querySelector('#view-clients tbody');
-  if(ctbody){
-    var ctr=document.createElement('tr');
-    ctr.className='clickable db-row';
-    ctr.innerHTML='<td>'+lead.name+'</td>'
-      +'<td><span class="badge '+(isCommercial?'bc':'br')+'">'+(isCommercial?'Commercial':'Residential')+'</span></td>'
-      +'<td>—</td><td>'+(lead.value||'—')+'</td><td>TBD</td>'
-      +'<td><span class="sd sn"></span>New</td>';
-    (function(cid){ctr.addEventListener('click',function(){openClient(cid);});})(clientId);
-    ctbody.insertBefore(ctr, ctbody.firstChild);
-  }
-
-  // Navigate to calendar with booking form open and pre-filled
+  // Open booking form pre-filled with lead data. NO side effects here — won-marking,
+  // client creation, pipeline removal all happen in saveNewAppt's auto-match (Pass 3),
+  // so cancelling the booking leaves the lead untouched.
   closeOverlay('lead-overlay');
   var calNav=null;
   document.querySelectorAll('.nav-item').forEach(function(n){
@@ -10843,7 +10782,6 @@ function scheduleLeadAppointment(){
     var _notesEl=document.getElementById('na-notes'); if(_notesEl && lead.notes && lead.notes!=='—'){ _notesEl.value = lead.notes; }
     populatePropertySelector(lead.name);
     calcPrice();
-    showPaymentToast(lead.name+' converted to client! Fill in the booking details below.', null, 'success');
   }, 300);
 }
 
@@ -11712,14 +11650,22 @@ function initNewApptClientAutocomplete(){
     });
     if(!exactMatch){ _clearNewApptPropertyFields(); }
 
-    var matches = Object.entries(clientDB).filter(function(e){
+    var clientMatches = Object.entries(clientDB).filter(function(e){
       return e[1].name.toLowerCase().indexOf(q) >= 0;
     });
 
-    if(matches.length === 0 && !q){ dropdown.style.display='none'; return; }
+    // Open leads (not won/lost) that match the query — surfaced alongside clients
+    var leadMatches = Object.entries(leadDB||{}).filter(function(e){
+      var l = e[1]; if(!l || !l.name) return false;
+      var stage = (l.stage||'').toLowerCase();
+      if(stage.indexOf('won') >= 0 || stage.indexOf('lost') >= 0) return false;
+      return l.name.toLowerCase().indexOf(q) >= 0;
+    });
+
+    if(clientMatches.length === 0 && leadMatches.length === 0 && !q){ dropdown.style.display='none'; return; }
 
     // Existing client matches
-    matches.slice(0,8).forEach(function(e){
+    clientMatches.slice(0,8).forEach(function(e){
       var id = e[0], c = e[1];
       var item = document.createElement('div');
       item.style.cssText = 'padding:9px 12px;cursor:pointer;font-size:12px;border-bottom:1px solid var(--bg-soft);';
@@ -11740,6 +11686,47 @@ function initNewApptClientAutocomplete(){
       });
       item.addEventListener('mouseover', function(){ this.style.background='var(--bg-soft)'; });
       item.addEventListener('mouseout',  function(){ this.style.background=''; });
+      dropdown.appendChild(item);
+    });
+
+    // Open lead matches — picking one pre-fills all booking fields from lead data.
+    // The actual won-flip happens in saveNewAppt's auto-match (Pass 3) on save.
+    leadMatches.slice(0,5).forEach(function(e){
+      var lid = e[0], l = e[1];
+      var item = document.createElement('div');
+      item.style.cssText = 'padding:9px 12px;cursor:pointer;font-size:12px;border-bottom:1px solid var(--bg-soft);background:#fffaf0;';
+      var sublabel = (l.stage||'Lead') + ' · ' + (l.phone&&l.phone!=='—'?l.phone:(l.email&&l.email!=='—'?l.email:(l.service||'—')));
+      item.innerHTML = '<div style="font-weight:600;color:var(--text);"><span style="color:#b7791f;font-size:10px;text-transform:uppercase;letter-spacing:.04em;margin-right:6px;">Lead</span>'+l.name+'</div>'
+        +'<div style="font-size:11px;color:var(--text-muted);margin-top:1px;">'+sublabel+'</div>';
+      item.addEventListener('mousedown', function(ev){ ev.preventDefault(); });
+      item.addEventListener('click', function(){
+        input.value = l.name;
+        var ph = document.getElementById('na-phone');
+        var em = document.getElementById('na-email');
+        var ad = document.getElementById('na-address');
+        if(ph) ph.value = (l.phone&&l.phone!=='—') ? l.phone : '';
+        if(em) em.value = (l.email&&l.email!=='—') ? l.email : '';
+        if(ad) ad.value = (l.address&&l.address!=='—') ? l.address : '';
+        var svcSel=document.getElementById('na-service');
+        if(svcSel){ svcSel.value = _serviceTextToBookingValue(l.service); svcSel.dispatchEvent(new Event('change')); }
+        var frqSel=document.getElementById('na-freq');
+        if(frqSel && l.frequency){
+          var want = String(l.frequency).trim().toLowerCase();
+          for(var fi=0; fi<frqSel.options.length; fi++){
+            if(frqSel.options[fi].value.toLowerCase() === want){ frqSel.value = frqSel.options[fi].value; break; }
+          }
+        }
+        var bedsEl=document.getElementById('na-beds'); if(bedsEl && l.beds){ bedsEl.value = String(l.beds); }
+        var bathsEl=document.getElementById('na-baths'); if(bathsEl && l.baths){ bathsEl.value = String(l.baths); }
+        var sqftEl=document.getElementById('na-sqft'); if(sqftEl && l.sqft && l.sqft!=='—'){ sqftEl.value = String(l.sqft).replace(/[^0-9]/g,''); }
+        var condEl=document.getElementById('na-cond'); if(condEl && l.condition){ condEl.value = String(l.condition); }
+        var notesEl=document.getElementById('na-notes'); if(notesEl && l.notes && l.notes!=='—'){ notesEl.value = l.notes; }
+        dropdown.style.display = 'none';
+        populatePropertySelector(l.name);
+        if(typeof calcPrice==='function') calcPrice();
+      });
+      item.addEventListener('mouseover', function(){ this.style.background='#fef3d7'; });
+      item.addEventListener('mouseout',  function(){ this.style.background='#fffaf0'; });
       dropdown.appendChild(item);
     });
 

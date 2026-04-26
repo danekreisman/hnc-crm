@@ -13529,7 +13529,25 @@ document.addEventListener('DOMContentLoaded', () => {
   wrap('saveClientEdit', 'client_updated', () => 'Client profile updated');
   wrap('saveNewClient', 'client_added', () => 'New client added');
   const origFetch = window.fetch;
-  window.fetch = async function(url, opts) { const res = await origFetch.apply(this, arguments); if (typeof url === 'string' && url.includes('stripe-invoice') && res.ok) { try { var _b=opts&&opts.body?JSON.parse(opts.body):{};logActivity('invoice_sent','Invoice sent to '+(_b.clientName||_b.client_name||'client'),{clientName:_b.clientName,amount:_b.amount}); } catch(e) {} } return res; };
+  window.fetch = async function(url, opts) {
+    const res = await origFetch.apply(this, arguments);
+    try {
+      if (typeof url === 'string' && url.includes('stripe-invoice') && res.ok && opts && opts.body) {
+        var _b = JSON.parse(opts.body);
+        var _act = _b.action;
+        var _name = _b.clientName || _b.client_name || _b.customerName || 'client';
+        if (_act === 'send_invoice') {
+          logActivity('invoice_sent', 'Invoice sent to ' + _name, 'invoice', '', { action: _act, clientName: _name, amount: _b.amount, email: _b.customerEmail });
+        } else if (_act === 'charge_card' || _act === 'charge_specific_card') {
+          logActivity('card_charged', 'Card charged for ' + _name, 'invoice', '', { action: _act, clientName: _name, amount: _b.amount });
+        } else if (_act === 'void_invoice') {
+          logActivity('invoice_voided', 'Invoice voided for ' + _name, 'invoice', '', { action: _act, clientName: _name });
+        }
+        // Read-only actions (list_cards, get_payment_methods, retrieve_invoice, stripe_status_check, find_or_create_customer, debug_customer, find_customer_cards, create_setup_intent) are NOT logged.
+      }
+    } catch(e) {}
+    return res;
+  };
   db.auth.onAuthStateChange((event, session) => { if (event === 'SIGNED_IN' && session) { try { logActivity('user_login', 'User signed in: ' + session.user.email, 'auth'); } catch(e) {} } });
 });
 // === END AUTO LOG WRAPPERS ===
@@ -15460,17 +15478,6 @@ async function loadLogs(tab) {
 }
 // === END ACTIVITY LOGGING ===
 
-// === AUTO LOG WRAPPERS ===
-document.addEventListener('DOMContentLoaded', () => {
-  const wrap = (fnName, action, getDesc) => { if (typeof window[fnName] !== 'function') return; const orig = window[fnName]; window[fnName] = async function(...args) { try { const result = await orig.apply(this, args); try { logActivity(action, getDesc(...args)); } catch(e) {} return result; } catch(e) { throw e; } }; };
-  wrap('saveNewAppt', 'appointment_created', () => 'New appointment booked');
-  wrap('saveClientEdit', 'client_updated', () => 'Client profile updated');
-  wrap('saveNewClient', 'client_added', () => 'New client added');
-  const origFetch = window.fetch;
-  window.fetch = async function(url, opts) { const res = await origFetch.apply(this, arguments); if (typeof url === 'string' && url.includes('stripe-invoice') && res.ok) { try { var _b=opts&&opts.body?JSON.parse(opts.body):{};logActivity('invoice_sent','Invoice sent to '+(_b.clientName||_b.client_name||'client'),{clientName:_b.clientName,amount:_b.amount}); } catch(e) {} } return res; };
-  db.auth.onAuthStateChange((event, session) => { if (event === 'SIGNED_IN' && session) { try { logActivity('user_login', 'User signed in: ' + session.user.email, 'auth'); } catch(e) {} } });
-});
-// === END AUTO LOG WRAPPERS ===
 
 
 async function toggleReminderAuto(enabled) {

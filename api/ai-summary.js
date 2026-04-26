@@ -10,12 +10,45 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const { prompt, clientId, clientPhone } = req.body;
+  const { prompt: rawPrompt, leadId, clientId, clientPhone } = req.body;
 
   const invalid = validateOrFail(req.body, SCHEMAS.aiSummary);
   if (invalid) return res.status(400).json(invalid);
 
+  if (!rawPrompt && !leadId) {
+    return res.status(400).json({ success: false, error: 'Either prompt or leadId is required' });
+  }
+
+  let prompt = rawPrompt;
+
   try {
+    if (!prompt && leadId) {
+      const supaRes = await fetchWithTimeout(
+        `${process.env.SUPABASE_URL}/rest/v1/leads?id=eq.${leadId}&select=name,service,beds,baths,sqft,condition,notes,stage,address,created_at&limit=1`,
+        {
+          headers: {
+            'apikey': process.env.SUPABASE_SERVICE_ROLE_KEY,
+            'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
+          }
+        },
+        TIMEOUTS.SUPABASE
+      );
+
+      if (!supaRes.ok) {
+        await logError('ai-summary', `Supabase fetch error: ${supaRes.status}`, { leadId });
+        return res.status(502).json({ error: 'Failed to fetch lead data' });
+      }
+
+      const leads = await supaRes.json();
+      const lead = leads[0];
+
+      if (!lead) {
+        return res.status(404).json({ error: 'Lead not found' });
+      }
+
+      prompt = `Summarize this cleaning lead for a Hawaii Natural Clean sales rep in 2-3 sentences. Focus on what they want, their property details, and the recommended next action. Lead name: ${lead.name}. Service: ${lead.service}. Property: ${lead.beds}br/${lead.baths}ba, ${lead.sqft} sqft, condition ${lead.condition}/10. Stage: ${lead.stage}. Address: ${lead.address}. Notes: ${lead.notes}.`;
+    }
+
     // Enrich the prompt with live OpenPhone conversation history
     let enrichedPrompt = prompt;
     if (clientPhone) {
@@ -62,7 +95,7 @@ export default async function handler(req, res) {
     return res.status(200).json({ summary });
 
   } catch (err) {
-    await logError('ai-summary', err, { clientId, promptLength: prompt?.length });
+    await logError('ai-summary', err, { clientId, leadId, promptLength: prompt?.length });
     return res.status(500).json({ error: err.message });
   }
 }

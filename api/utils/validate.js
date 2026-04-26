@@ -107,7 +107,8 @@ export const SCHEMAS = {
   },
 
   aiSummary: {
-    prompt: { required: true, rules: [is.nonEmpty, is.maxLength(8000)], message: 'Prompt is required (max 8000 chars)' },
+    prompt: { required: false, rules: [is.nonEmpty, is.maxLength(8000)], message: 'Prompt must be a non-empty string (max 8000 chars)' },
+    leadId: { required: false, rules: [is.uuid], message: 'leadId must be a valid UUID' },
   },
 
   saveAutomation: {

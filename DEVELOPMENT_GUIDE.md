@@ -7,6 +7,17 @@ Read it at the start of every session before touching any code.
 
 ## Token-Efficient Editing Rules
 
+### Do the work, don't write Claude Code prompts.
+
+Dane uses Claude in two modes: chat (Claude in Chrome) and Claude Code (terminal). When Dane asks for a fix, default to executing it yourself via the Chrome extension — fetch index.html via the GitHub blob API, do surgical `str_replace`-style edits, sanity-check syntax, push via the Contents API, then test against the live site after the ~60s Vercel deploy. Loop until it works.
+
+Only write a Claude Code prompt when Dane explicitly asks for one (because he wants to run it in his terminal). Don't generate prompts as a substitute for doing the work.
+
+### One problem, one fix, one deploy, one test — then loop.
+
+Don't propose multiple options or ask clarifying questions about code. Pick the right fix, deploy it, test it against the live site, and iterate until it works. After it works, give a brief summary. No long postambles.
+
+
 The single-file `index.html` is large (6500+ lines). To prevent token exhaustion and resume cycles:
 
 1. **Never view the full `index.html`.** Always use `grep -n` to locate the relevant section, then `sed -n 'X,Yp'` to extract only what you're editing.
@@ -41,6 +52,35 @@ The single-file `index.html` is large (6500+ lines). To prevent token exhaustion
 - Google Calendar — appointment sync (`gcal-sync.js`)
 
 ---
+
+## Lead Form Data Flow (5-Layer Whitelist Trap)
+
+The lead form has FIVE places that each have their own field whitelist. Adding a new lead field requires updating ALL of them or the field gets silently dropped at one of the layers.
+
+The chain, in order:
+
+1. **Form HTML** — `#nl-name`, `#nl-beds`, `#nl-baths`, `#nl-condition`, `#nl-freq`, etc. (in the New Lead modal)
+2. **`_buildNLQuote()`** — reads form values and computes `{ total, data: {...} }`. Lives near `nlServiceChange`. The `data` object MUST use these field names or the Quote subsection won't render: `service`, `subtotal`, `discount`, `discount_pct`, `total`. Other fields are fine but those five are required by `loadSuggestedQuote`.
+3. **`saveNewLead()` in-memory cache** — `leadDB[id]={...}` block populates the in-memory object IMMEDIATELY so the card renders before the Supabase round-trip. Must include: `value`, `quoteTotal`, `quoteData`, `frequency`, `condition`, `beds`, `baths`. `var _nlQ = _buildNLQuote()` MUST be declared BEFORE this block so the values are available.
+4. **`dbSaveLead(data)`** — tiny wrapper (~750 chars) that does `db.from('leads').insert([{...}])` with a HARDCODED field map. Silently drops any field not in its whitelist. As of commit 849f6a5 it includes: name, contact_name, phone, email, address, service, sqft, estimated_value (mapped from `data.value`), beds, baths, condition, quote_total, quote_data, source, stage, next_action, due_date, assigned_to, notes. **If you add a new column to the leads table you MUST add it here too.**
+5. **`dbLoadLeads()` → leadDB mapping** — page-load mapping that turns Supabase rows into `leadDB[id]` objects. Lives near `async function dbLoadLeads`. As of commit 016341f, beds/baths/condition/frequency are read from actual columns (`l.beds`, etc.), with fallback to regex-parsing them out of the notes field for backwards-compat with old leads. Map fields with snake_case → camelCase: `l.quote_data → quoteData`, `l.quote_total → quoteTotal`, `l.estimated_value → value`.
+6. **`openLead(id)` panel renderer** — sets the lead detail panel fields. Generic fields use a `['contact','phone','email',...].forEach` loop that maps `d[f] → #lead-${f}.textContent`. Special-case fields (frequency, bedbath, condition, value) have their own setter blocks. **Adding a new visible field requires both an HTML `<div class="info-row">` and a setter in openLead.**
+
+### Lead panel HTML row pattern
+
+To add a new readonly row in the OPPORTUNITY section of the lead detail panel:
+
+```html
+<div class="info-row"><span class="info-label">My Field</span><span class="info-val" id="lead-myfield">—</span></div>
+```
+
+Insert between existing rows (search for "Property size" as a stable anchor). Then add to openLead:
+
+```js
+var myEl=document.getElementById('lead-myfield');
+if(myEl) myEl.textContent = d.myField || '—';
+```
+
 
 ## The Foundation (DO NOT SKIP THESE)
 
@@ -196,6 +236,13 @@ Run through this checklist:
 - **Context drift** between chat sessions is a recurring problem. Always reference this document at the start of a session and update it when something significant changes.
 
 ---
+- **The 5-layer lead form whitelist trap** (see "Lead Form Data Flow" section above). When a new lead field "isn't saving" or "shows TBD", check all 5 layers: `_buildNLQuote` data shape, `saveNewLead` in-memory cache, `dbSaveLead` insert whitelist, `dbLoadLeads` mapping, `openLead` setter.
+- **Quote subsection (loadSuggestedQuote) requires specific field names** in `quote_data`: `subtotal`, `discount`, `discount_pct`, `total`, `service`. If you write `subtotal_after_discount` or `discount_amount` instead, the renderer crashes on `result.subtotal.toFixed` and the subsection appears empty/black.
+- **Supabase REST API needs the project key as `apikey` header**, NOT the user's JWT. The user's session.access_token goes in `Authorization: Bearer ...`. Server-side fetches should use `apikey: SUPABASE_SERVICE_ROLE_KEY` and `Authorization: Bearer SUPABASE_SERVICE_ROLE_KEY` (or pass through the user's auth header for RLS-aware queries).
+- **HTML script-tag balance after big edits.** If raw JS code starts appearing as text on the page, the script open/close count is unbalanced. Use `(html.match(/<script[^>]*>/g)||[]).length` and `(html.match(/<\/script>/g)||[]).length` to verify equal count. Premature `</body></html>` tags in the middle of the file are a common cause — search for multiple occurrences with `[...html.matchAll(/<\/html>/g)]`.
+- **`generateLeadSummary` failure mode.** If "Error generating summary" appears with no fetch call to `/api/ai-summary`, an exception is being thrown OUTSIDE the try block (during prompt building). The function should build the prompt synchronously from `leadDB[currentLeadId]` fields with no async calls before the fetch.
+- **AI summary API accepts EITHER `{ prompt }` or `{ leadData }`** but not just `{ leadId }` — it has no Supabase fetch in its current form. Frontend builds the prompt and sends it.
+- **In-memory leadDB after `saveNewLead`.** Even after Supabase save succeeds, the card renders from `leadDB[id]` BEFORE the next `dbLoadLeads()`. So the in-memory object built in `saveNewLead` must include quoteTotal, quoteData, frequency, condition, beds, baths — otherwise the card shows TBD until a hard refresh.
 
 ## Utilities Reference
 

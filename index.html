@@ -1708,6 +1708,7 @@ Mahalo 🌺</textarea>
           <div class="info-row"><span class="info-label">Frequency</span><span class="info-val" id="lead-frequency">—</span></div>
           <div class="info-row"><span class="info-label">Beds / Baths</span><span class="info-val" id="lead-bedbath">—</span></div>
           <div class="info-row"><span class="info-label">Property size</span><span class="info-val" id="lead-sqft">—</span></div>
+          <div class="info-row"><span class="info-label">Condition</span><span class="info-val" id="lead-condition">—</span></div>
           <div class="info-row"><span class="info-label">Lead source</span><span class="info-val" id="lead-source">—</span></div>
           <div class="info-row"><span class="info-label">Inquiry date</span><span class="info-val" id="lead-date">—</span></div>
         </div>
@@ -4027,6 +4028,9 @@ function openLead(id){
   // Beds / Baths
   var bbEl=document.getElementById('lead-bedbath');
   if(bbEl) bbEl.textContent = (d.beds||d.baths) ? (d.beds||'—')+' bed / '+(d.baths||'—')+' bath' : '—';
+  // Condition
+  var condEl=document.getElementById('lead-condition');
+  if(condEl) condEl.textContent = (d.condition!=null && d.condition!=='') ? (d.condition+'/10') : '—';
   document.getElementById('quote-price') && (document.getElementById('quote-price').value = d.value||'');
   document.getElementById('quote-success') && document.getElementById('quote-success').classList.remove('show');
   hideLeadEdit();

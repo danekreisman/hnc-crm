@@ -412,7 +412,7 @@ textarea{font-family:inherit;}
     <div class="nav-item" onclick="sv('settings',this)"><svg class="nav-icon" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="2.5" stroke="currentColor" stroke-width="1.3"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2M3.05 3.05l1.41 1.41M11.54 11.54l1.41 1.41M3.05 12.95l1.41-1.41M11.54 4.46l1.41-1.41" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>Settings</div>
     
       <div class="nav-section">Monitor</div>
-      <div class="nav-item" id="nav-logs" onclick="sv('logs',this);document.getElementById('view-logs').style.display='block';setTimeout(()=>loadLogs(_logsCurrentTab||'activity'),100)"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg><span>Logs</span></div>
+      <div class="nav-item" id="nav-logs" onclick="sv('logs',this);document.getElementById('view-logs').style.display='block';loadLogs(_logsCurrentTab||'activity');setTimeout(()=>loadLogs(_logsCurrentTab||'activity'),800)"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg><span>Logs</span></div>
       <div class="nav-section">AI</div>
     <div class="nav-item" onclick="sv('agent',this)" style="color:#553c9a;"><svg class="nav-icon" viewBox="0 0 16 16" fill="none" style="opacity:1;"><circle cx="8" cy="8" r="6" stroke="#553c9a" stroke-width="1.3"/><path d="M5.5 9.5s.8 1.5 2.5 1.5 2.5-1.5 2.5-1.5" stroke="#553c9a" stroke-width="1.2" stroke-linecap="round"/><circle cx="6" cy="7" r="1" fill="#553c9a"/><circle cx="10" cy="7" r="1" fill="#553c9a"/></svg>AI Agent</div>
   </div>
@@ -3785,7 +3785,7 @@ function deleteEntireSeries(){
   var targetTime = currentAppt.t || '';
   var targetAddress = currentAppt.address || '';
   var targetSeriesId = currentAppt.seriesId || null;
-  if(!confirm('HALT the entire recurring series for '+targetName+'?\n\nThis will permanently delete ALL future appointments in this series from the CRM, the client portal, and Google Calendar. Past appointments are kept. This cannot be undone.\n\nUse "Cancel entire series (grey out)" if you want to keep a record.')) return;
+  if(!confirm('HALT the entire recurring series for '+targetName+'?\n\nThis will permanently delete this appointment and ALL future appointments in this series from the CRM, the client portal, and Google Calendar. Other past completed appointments in the series stay as records. This cannot be undone.\n\nUse "Cancel entire series (grey out)" if you want to keep a record.')) return;
 
   var todayKey = new Date();
   todayKey.setHours(0,0,0,0);
@@ -3793,21 +3793,32 @@ function deleteEntireSeries(){
   // Collect dbIds of future occurrences so we can gcal-delete each
   var futureDbIds = [];
   var clickedDbId = (currentAppt && currentAppt.dbId) || null;
-  // Normalize time strings ("8am" vs "8:00am" vs "08:00") for robust comparison
-  function _normTime(s){ return String(s||'').replace(/\s+/g,'').toLowerCase().replace(/^0+(\d)/,'$1'); }
+  // Canonical 24h "HH:MM" so "8am", "08:00", "9:00 AM" all compare equal
+  function _normTime(s){
+    s = String(s||'').replace(/\s+/g,'').toLowerCase();
+    var m = s.match(/^(\d{1,2})(?::(\d{1,2}))?(am|pm)?$/);
+    if(!m) return s;
+    var h = parseInt(m[1],10);
+    var mi = m[2] ? parseInt(m[2],10) : 0;
+    var mer = m[3];
+    if(mer==='am' && h===12) h=0;
+    else if(mer==='pm' && h!==12) h+=12;
+    return String(h).padStart(2,'0')+':'+String(mi).padStart(2,'0');
+  }
   var targetTimeNorm = _normTime(targetTime);
   Object.keys(apptData).forEach(function(k){
     var parts = k.split('-').map(Number);
     var keyDate = new Date(parts[0], parts[1]-1, parts[2]);
-    if(keyDate < todayKey) return; // only future
+    var isFutureOrToday = keyDate >= todayKey;
     apptData[k] = apptData[k].filter(function(e){
-      // Match if ANY condition is true. We deliberately drop the address requirement
-      // because address strings can drift (trailing space, "Honolulu, HI" vs "Honolulu, HI 96815"),
-      // which previously left orphaned occurrences on the calendar after a series halt.
+      // The clicked appt is ALWAYS removed regardless of past/future — user expects the
+      // appt they were looking at to disappear after halting its series.
+      var isClicked = !!(clickedDbId && e.dbId === clickedDbId);
+      // Other occurrences are only removed if future (past completed appts stay as records).
+      if(!isFutureOrToday && !isClicked) return true;
       var bySeries = !!(targetSeriesId && e.seriesId === targetSeriesId);
-      var byDbId = !!(clickedDbId && e.dbId === clickedDbId);
       var byNameTime = (e.n === targetName && _normTime(e.t) === targetTimeNorm);
-      var matches = bySeries || byDbId || byNameTime;
+      var matches = isClicked || bySeries || byNameTime;
       if(matches && e.dbId) futureDbIds.push(e.dbId);
       return !matches;
     });
@@ -3843,6 +3854,15 @@ function deleteEntireSeries(){
     if(res.error) console.error('[deleteEntireSeries] Supabase delete error:', res.error);
     else console.log('[deleteEntireSeries] SUCCESS — '+futureDbIds.length+' future rows deleted from Supabase');
   });
+  // Also hard-delete the clicked appt's row even if it's in the past — user clicked it,
+  // user halted the series, user expects this specific appt gone.
+  if(clickedDbId){
+    db.from('appointments').delete().eq('id', clickedDbId).then(function(res){
+      if(res.error) console.error('[deleteEntireSeries] clicked-appt delete error:', res.error);
+      else console.log('[deleteEntireSeries] clicked appt '+clickedDbId+' deleted');
+    });
+    try { if(typeof window.hncSyncGcal === 'function') window.hncSyncGcal(clickedDbId, 'delete'); } catch(e){}
+  }
 
   var bar = document.getElementById('appt-action-success');
   if(bar){ bar.textContent=''; }
@@ -13533,8 +13553,6 @@ async function loadLogs(tab) {
         if (m.action) push('action', m.action);
         if (m.count != null) push('count', m.count);
         if (m.date) push('date', m.date);
-        if (m.dbId) push('apptId', m.dbId);
-        if (m.seriesId) push('seriesId', m.seriesId);
         if (m.mode) push('mode', m.mode);
         return parts.length ? '<div style="font-size:.75rem;color:var(--text-secondary);margin-top:.25rem;opacity:.85;">' + parts.join(' · ') + '</div>' : '';
       };

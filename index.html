@@ -5759,7 +5759,10 @@ try{var _sv=sessionStorage.getItem('hnc_currentView'); if(_sv && _sv!=='calendar
       <div class="form-two">
         <div class="form-row"><label>Service type</label>
           <select id="nl-service" onchange="nlServiceChange()">
-            <option value="regular">Regular Clean</option><option value="deep">Deep Clean</option><option value="moveout">Move Out Clean</option><option value="janitorial">Janitorial Clean</option>
+            <option value="standard">Regular Clean</option>
+            <option value="deep">Deep Clean</option>
+            <option value="moveout">Move Out Clean</option>
+            <option value="janitorial">Janitorial Clean</option>
           </select>
         </div>
         <div class="form-row"><label>Est. monthly value</label><input type="text" id="nl-value" placeholder="e.g. $950/mo"></div>
@@ -6761,49 +6764,43 @@ async function resetSystemAutoTemplate() {
 }
 function openDayBeforeAutoEdit() { openSystemAutoEdit('db'); }
 function nlCalcPrice() {
-  var svc = (document.getElementById('nl-service')||{}).value || '';
-  var beds = parseInt((document.getElementById('nl-beds')||{}).value) || 0;
-  var baths = parseFloat((document.getElementById('nl-baths')||{}).value) || 0;
-  var sqft = parseFloat(((document.getElementById('nl-sqft')||{}).value||'').replace(/[^0-9.]/g,'')) || 0;
-  var cond = parseInt((document.getElementById('nl-condition')||{}).value) || 7;
-  var freq = (document.getElementById('nl-freq')||{}).value || '';
+  var svc = (document.getElementById('nl-service') || {}).value || '';
+  var beds = parseInt((document.getElementById('nl-beds') || {}).value) || 0;
+  var baths = parseFloat((document.getElementById('nl-baths') || {}).value) || 0;
+  var cond = parseInt((document.getElementById('nl-condition') || {}).value) || 7;
+  var sqft = parseFloat(((document.getElementById('nl-sqft') || {}).value || '').replace(/[^0-9.]/g, '')) || 0;
+  var freq = (document.getElementById('nl-freq') || {}).value || '';
 
   var bedsRow = document.getElementById('nl-beds-row');
   var bathsRow = document.getElementById('nl-baths-row');
   var condRow = document.getElementById('nl-condition-row');
-  var sqftRow = document.querySelector('#new-lead-overlay .form-row:has(#nl-sqft)');
   var estRow = document.getElementById('nl-est-row');
   var estEl = document.getElementById('nl-est');
 
-  var isRegular = svc === 'regular';
-  var isDeep = svc === 'deep';
-  var isMoveout = svc === 'moveout';
-  var isJan = svc === 'janitorial';
-  var isSqftBased = isDeep || isMoveout;
-
-  if (bedsRow) bedsRow.style.display = '';
-  if (bathsRow) bathsRow.style.display = '';
-  if (sqftRow) sqftRow.style.display = isSqftBased ? '' : 'none';
+  var isSqftSvc = (svc === 'deep' || svc === 'moveout');
+  if (bedsRow) bedsRow.style.display = isSqftSvc ? 'none' : '';
+  if (bathsRow) bathsRow.style.display = isSqftSvc ? 'none' : '';
   if (condRow) condRow.style.display = '';
 
-  if (isJan) {
+  if (svc === 'janitorial') {
     if (estRow) estRow.style.display = '';
-    if (estEl) { estEl.innerHTML = '<span style="color:#6b7280">Custom - based on walkthrough</span>'; }
+    if (estEl) estEl.innerHTML = '<span style="color:#6b7280">Custom - based on walkthrough</span>';
     return;
   }
   if (!svc) { if (estRow) estRow.style.display = 'none'; return; }
 
-  var baseHrs = 1.0 + (beds * 0.5) + (baths * 0.4);
-  if (isDeep) baseHrs *= 1.5;
-  else if (isMoveout) baseHrs *= 1.7;
-  var condMod = 1.0;
-  if (cond <= 2) condMod = 1.70;
-  else if (cond <= 4) condMod = 1.40;
-  else if (cond <= 6) condMod = 1.25;
-  var hrs = Math.round(baseHrs * condMod * 10) / 10;
+  // Use same _deriveHours function as the appointment form
+  if (typeof _deriveHours !== 'function') return;
+  var hrs = _deriveHours(
+    isSqftSvc ? Math.round(sqft / 200) : beds,
+    isSqftSvc ? 0 : baths,
+    svc,
+    cond,
+    null
+  );
   if (!hrs) { if (estRow) estRow.style.display = 'none'; return; }
 
-  var rate = (isDeep || isMoveout) ? 70 : 65;
+  var rate = (svc === 'deep' || svc === 'moveout') ? 70 : 65;
   var base = Math.round(hrs * rate * 100) / 100;
 
   var discRate = freq === 'Weekly' ? 0.20 : freq === 'Biweekly' ? 0.15 :
@@ -6811,21 +6808,19 @@ function nlCalcPrice() {
                  freq === 'Every 6 Weeks' ? 0.10 : 0;
   var discAmt = Math.round(base * discRate * 100) / 100;
   var afterDisc = Math.round((base - discAmt) * 100) / 100;
-
   var tax = Math.round(afterDisc * 0.04712 * 100) / 100;
   var total = Math.round((afterDisc + tax) * 100) / 100;
 
   if (estRow) estRow.style.display = '';
   if (estEl) {
-    var html = '<div style="font-size:12px;line-height:1.8;">';
-    html += '<div>Est. hours: <b>' + hrs + ' hrs</b></div>';
-    html += '<div>Rate: <b>$' + rate + '/hr</b></div>';
-    html += '<div>Base price: <b>$' + base.toFixed(2) + '</b></div>';
-    if (discAmt > 0) html += '<div style="color:#16a34a">Discount (' + Math.round(discRate*100) + '%): <b>-$' + discAmt.toFixed(2) + '</b></div>';
-    html += '<div>GET Tax (4.712%): <b>$' + tax.toFixed(2) + '</b></div>';
-    html += '<div style="font-size:14px;font-weight:700;color:#0284c7;margin-top:4px">Total: $' + total.toFixed(2) + '</div>';
-    html += '</div>';
-    estEl.innerHTML = html;
+    var out = '<div style="font-size:12px;line-height:1.9;">';
+    out += '<div>Est. hours: <b>' + hrs + ' hrs</b> &nbsp; Rate: <b>$' + rate + '/hr</b></div>';
+    out += '<div>Base price: <b>$' + base.toFixed(2) + '</b></div>';
+    if (discAmt > 0) out += '<div style="color:#16a34a">Discount (' + Math.round(discRate * 100) + '%): <b>-$' + discAmt.toFixed(2) + '</b></div>';
+    out += '<div>GET Tax (4.712%): <b>$' + tax.toFixed(2) + '</b></div>';
+    out += '<div style="margin-top:4px;font-size:14px;font-weight:700;color:#0284c7">Total: $' + total.toFixed(2) + '</div>';
+    out += '</div>';
+    estEl.innerHTML = out;
   }
 }
 function nlServiceChange(){var v=document.getElementById('nl-value');if(v)v.value='';nlCalcPrice();}

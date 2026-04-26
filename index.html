@@ -5920,6 +5920,8 @@ function saveNewLead(){
   var stage=document.getElementById('nl-stage').value;
   var value=document.getElementById('nl-value').value||'TBD';
   var service=document.getElementById('nl-service').value;
+  var _nlQ = _buildNLQuote();
+  if (_nlQ && _nlQ.total) value = _nlQ.total.toFixed(2);
   leadDB[id]={
     name:name,contact:document.getElementById('nl-contact').value||name,
     phone:document.getElementById('nl-phone').value||'—',email:document.getElementById('nl-email').value||'—',
@@ -5933,7 +5935,11 @@ function saveNewLead(){
     stage:stage,action:document.getElementById('nl-action').value||'Follow up',
     due:document.getElementById('nl-due').value||'TBD',
     assigned:document.getElementById('nl-assigned').value,
-    notes:document.getElementById('nl-notes').value||'—'
+    notes:document.getElementById('nl-notes').value||'—',
+    frequency:(document.getElementById('nl-freq')||{}).value||null,
+    quoteTotal:_nlQ?_nlQ.total:null,
+    quoteData:_nlQ?_nlQ.data:null,
+    quoteSentAt:null
   };
   // Add card to correct pipeline column in both dashboard and pipeline views
   var stageMap={'New inquiry':0,'Quoted':1,'Follow-up':2};
@@ -5951,7 +5957,6 @@ function saveNewLead(){
     }
   });
   // Save to Supabase
-  var _nlQ = _buildNLQuote();
   dbSaveLead({
     name:name, contact:document.getElementById('nl-contact').value,
     phone:document.getElementById('nl-phone').value,

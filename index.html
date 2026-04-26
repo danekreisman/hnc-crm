@@ -1396,7 +1396,7 @@ Mahalo 🌺</textarea>
       <div class="price-preview" id="price-preview">
         <div class="price-preview-label">Estimated price</div>
         <div class="price-preview-val" id="price-val">$238.22</div>
-        <div class="price-preview-breakdown" id="price-breakdown">3.5 hrs × $65 = $227.50 + tax $10.72</div>
+        <div class="price-preview-breakdown" id="price-breakdown">— enter property details —</div>
         <div id="na-pricing-rules-display" style="display:none;background:var(--brand-50);border:1px solid #9ae6b4;border-radius:8px;padding:8px 11px;margin-top:8px;font-size:11px;color:#276749;"></div>
         <div id="na-cleaner-pay-line" style="font-size:11px;color:var(--text-muted);margin-top:2px;display:none;">Cleaner pay: <span id="na-cleaner-pay-val">—</span></div>
         <div style="margin-top:10px;display:flex;align-items:center;gap:10px;">
@@ -4522,32 +4522,90 @@ function populateCleanerDropdown(selectId, currentValue){
   }
 }
 
-/* Single source of truth for hour derivation — used by calcPrice(), calcEditPrice(), and any future recalc */
+/* === HNC Pricing — synced with BookingKoala "Pricing Parameters" page ===
+   Regular cleaning: ADDITIVE bath_lookup + bedroom_lookup. $65/hr implied.
+   Deep / Move-out:  ADDITIVE sqft_lookup + condition_adder. $70/hr implied.
+   Each lookup row is {price, hours} — we use the table price directly,
+   not hours × hourly_rate. */
+function _bkBathRegular(baths){
+  var ba=parseFloat(baths);
+  if(isNaN(ba)||ba<=0) return {price:0,hours:0};
+  if(ba<=1)   return {price:113.75, hours:1.75};
+  if(ba<=1.5) return {price:146.25, hours:2.25};
+  if(ba<=2)   return {price:162.50, hours:2.5};
+  if(ba<=3)   return {price:211.25, hours:3.25};
+  if(ba<=4)   return {price:260.00, hours:4.0};
+  return {price:292.50, hours:4.5};
+}
+function _bkBedRegular(beds){
+  var b=parseInt(beds);
+  if(isNaN(b)||b<=0) return {price:0,hours:0};
+  if(b<=1) return {price:16.25, hours:0.25};
+  if(b<=3) return {price:48.75, hours:0.75};
+  return {price:81.25, hours:1.25};
+}
+function _bkSqftDeep(sqft){
+  var sf=parseFloat(String(sqft||'').replace(/[^0-9.]/g,''));
+  if(isNaN(sf)||sf<=0) return null;
+  if(sf<=600)  return {price:210.00,  hours:3};
+  if(sf<=1000) return {price:350.00,  hours:5};
+  if(sf<=1500) return {price:490.00,  hours:7};
+  if(sf<=2000) return {price:630.00,  hours:9};
+  if(sf<=2500) return {price:770.00,  hours:11};
+  if(sf<=3000) return {price:910.00,  hours:13};
+  if(sf<=3500) return {price:1050.00, hours:15};
+  if(sf<=4000) return {price:1190.00, hours:17};
+  if(sf<=4500) return {price:1330.00, hours:19};
+  return {price:1470.00, hours:21};
+}
+function _bkCondDeep(cond){
+  var c=parseInt(cond);
+  if(isNaN(c)||c>=9) return {price:0, hours:0};
+  if(c>=7) return {price:140, hours:2};
+  if(c>=5) return {price:280, hours:4};
+  if(c>=3) return {price:420, hours:6};
+  return {price:560, hours:8};
+}
+/* Single source of truth — returns {price, hours, source, parts} */
+function _quotePrice(opts){
+  opts=opts||{};
+  var svc=opts.service||'standard';
+  if(svc==='commercial'){
+    var ch=parseFloat(opts.commercialHrs)||4;
+    return {price:Math.round(ch*65*100)/100, hours:ch, source:'commercial', parts:[{label:'Commercial',price:Math.round(ch*65*100)/100,hours:ch}]};
+  }
+  if(svc==='deep'||svc==='moveout'){
+    var sq=_bkSqftDeep(opts.sqft);
+    var ca=_bkCondDeep(opts.condition);
+    var price=(sq?sq.price:0)+ca.price;
+    var hours=(sq?sq.hours:0)+ca.hours;
+    var parts=[];
+    if(sq) parts.push({label:'Sqft tier',price:sq.price,hours:sq.hours});
+    if(ca.price>0) parts.push({label:'Condition',price:ca.price,hours:ca.hours});
+    return {price:Math.round(price*100)/100, hours:Math.round(hours*10)/10, source:'sqft+cond', parts:parts};
+  }
+  // standard, airbnb, and any other residential type → bath + bedroom additive
+  var br=_bkBathRegular(opts.baths);
+  var bd=_bkBedRegular(opts.beds);
+  var rprice=br.price+bd.price;
+  var rhours=br.hours+bd.hours;
+  var rparts=[];
+  if(br.price>0) rparts.push({label:'Bathrooms',price:br.price,hours:br.hours});
+  if(bd.price>0) rparts.push({label:'Bedrooms',price:bd.price,hours:bd.hours});
+  return {price:Math.round(rprice*100)/100, hours:Math.round(rhours*10)/10, source:'baths+beds', parts:rparts};
+}
+/* Backward-compat: returns hours only. Some legacy callers use this. */
 function _deriveHours(beds, baths, svcType, cond, commercialHrs, sqft){
-  if(svcType==='commercial') return parseFloat(commercialHrs)||4;
-  var b=parseInt(beds)||3;
-  var ba=parseFloat(baths)||2;
-  var c=parseInt(cond)||7;
-  var sf=parseFloat(String(sqft||'').replace(/[^0-9.]/g,''))||0;
-  var baseHrs=1.0+(b*0.5)+(ba*0.4);
-  if(svcType==='deep') baseHrs*=1.5;
-  else if(svcType==='moveout') baseHrs*=1.7;
-  else if(svcType==='airbnb') baseHrs*=0.9;
-  // Condition modifier: only applies to deep/moveout/airbnb. Standard recurring cleans
-  // are not priced higher for "dirty" homes — recurring clients shouldn't pay 25-70% more.
-  var condMod=1.0;
-  if(svcType==='deep'||svcType==='moveout'||svcType==='airbnb'){
-    if(c<=2) condMod=1.70;
-    else if(c<=4) condMod=1.40;
-    else if(c<=6) condMod=1.25;
-  }
-  var hrs=baseHrs*condMod;
-  // Sqft adjustment: only for very large deep/moveout jobs (additive bonus on top of base).
-  if(svcType==='deep'||svcType==='moveout'){
-    if(sf>4000) hrs+=1.0;
-    else if(sf>2500) hrs+=0.5;
-  }
-  return Math.round(hrs*10)/10;
+  return _quotePrice({service:svcType,beds:beds,baths:baths,sqft:sqft,condition:cond,commercialHrs:commercialHrs}).hours;
+}
+/* Frequency discount lookup */
+function _freqDiscPct(freq){
+  if(freq==='Weekly') return 0.20;
+  if(freq==='Biweekly') return 0.15;
+  if(freq==='Every 3 Weeks') return 0.125;
+  if(freq==='Monthly') return 0.10;
+  if(freq==='Every 6 Weeks') return 0.10;
+  return 0;
 }
 
 function serviceRateKey(service){
@@ -4645,24 +4703,28 @@ function calcPrice(){
   var _savedPropSelected=_propSelVal!==undefined&&_propSelVal!=='new'&&_propSelVal!==''&&!isNaN(parseInt(_propSelVal));
   if(resFields) resFields.style.display=(isCommercial||_savedPropSelected)?'none':'';
   if(comFields) comFields.style.display=isCommercial?'':'none';
-  // Compute hours via shared formula
-  var hrs;
+  // Compute price + hours from BookingKoala lookup tables (single source of truth)
+  var _q;
   if(isCommercial){
-    hrs=_deriveHours(null,null,'commercial',null,(document.getElementById('na-commercial-hrs')||{}).value,null);
+    _q=_quotePrice({service:'commercial',commercialHrs:(document.getElementById('na-commercial-hrs')||{}).value});
   } else {
     var beds=document.getElementById('na-beds').value;
     var baths=document.getElementById('na-baths').value;
     var cond=document.getElementById('na-cond').value;
     var sqft=(document.getElementById('na-sqft')||{}).value||null;
-    hrs=_deriveHours(beds,baths,svcType,cond,null,sqft);
+    _q=_quotePrice({service:svcType,beds:beds,baths:baths,sqft:sqft,condition:cond});
   }
+  var hrs=_q.hours;
+  var tableBase=_q.price;
   // Hours override
   var hoursOverrideChk=document.getElementById('na-hours-override-chk');
   var hoursOverrideVal=document.getElementById('na-hours-override-val');
   var hoursOverride=hoursOverrideChk&&hoursOverrideChk.checked;
   if(hoursOverrideVal) hoursOverrideVal.style.display=hoursOverride?'':'none';
+  var hrsManuallySet=false;
   if(hoursOverride&&hoursOverrideVal&&hoursOverrideVal.value){
     hrs=parseFloat(hoursOverrideVal.value)||hrs;
+    hrsManuallySet=true;
     console.log('[calcPrice] hours override applied: '+hrs+' hrs');
   }
   // Price override
@@ -4671,13 +4733,12 @@ function calcPrice(){
   var isOverride=overrideChk&&overrideChk.checked;
   if(overrideValEl) overrideValEl.style.display=isOverride?'':'none';
   _lastCalcHrs=hrs;
-  var base=Math.round(hrs*65*100)/100;
+  // Base price: from lookup table, OR hrs × hourly rate when user overrode hours
+  var _hourlyRate=(svcType==='deep'||svcType==='moveout')?70:65;
+  var base=hrsManuallySet?Math.round(hrs*_hourlyRate*100)/100:tableBase;
   var freqEl=document.getElementById('na-freq');
   var freqVal=freqEl?freqEl.value:'One-time';
-  var freqDiscount=0;
-  if(freqVal==='Weekly') freqDiscount=0.20;
-  else if(freqVal==='Biweekly') freqDiscount=0.15;
-  else if(freqVal==='Monthly') freqDiscount=0.10;
+  var freqDiscount=_freqDiscPct(freqVal);
   var discountAmt=Math.round(base*freqDiscount*100)/100;
   var discountedBase=Math.round((base-discountAmt)*100)/100;
   var tax=Math.round(discountedBase*0.04*100)/100;
@@ -4693,8 +4754,9 @@ function calcPrice(){
     total=Math.round((discountedBase+tax)*100)/100;
     document.getElementById('price-val').textContent='$'+total.toFixed(2);
     var discountText=freqDiscount>0?' − '+(freqDiscount*100)+'% '+freqVal.toLowerCase()+' discount ($'+discountAmt.toFixed(2)+')':'';
-    document.getElementById('price-breakdown').textContent=hrs+' est hrs × $65 = $'+base.toFixed(2)+discountText+' + tax $'+tax.toFixed(2);
-    console.log('[calcPrice] total=$'+total+' hrs='+hrs+' svc='+svcType+(isCommercial?' (commercial)':'')+(freqDiscount>0?' freq='+freqVal+' disc='+freqDiscount:''));
+    var _baseLabel=hrsManuallySet?(hrs+' hrs × $'+_hourlyRate+' = $'+base.toFixed(2)):(hrs+' est hrs · $'+base.toFixed(2)+' base');
+    document.getElementById('price-breakdown').textContent=_baseLabel+discountText+' + tax $'+tax.toFixed(2);
+    console.log('[calcPrice] total=$'+total+' hrs='+hrs+' base=$'+base+' svc='+svcType+(isCommercial?' (commercial)':'')+(freqDiscount>0?' freq='+freqVal+' disc='+freqDiscount:''));
   }
   // Cleaner pay display — use .value (cleaner name) so getCleanerRate can match cleanerDB
   var cleanerEl=document.getElementById('na-cleaner');
@@ -4779,19 +4841,23 @@ function calcEditPrice(){
   var svcText=(_calcSvcEl&&_calcSvcEl.value)||appt.service||'Regular Cleaning';
   var svcType=svcTextMap[svcText]||'standard';
   var isCommercial=(svcType==='commercial');
-  var hrs;
+  var _eq;
   if(isCommercial){
-    hrs=parseFloat(appt.duration)||4;
+    _eq={hours:parseFloat(appt.duration)||4, price:Math.round((parseFloat(appt.duration)||4)*65*100)/100};
   } else {
-    hrs=_deriveHours(appt.beds,appt.baths,svcType,appt.condition,null,appt.sqft);
+    _eq=_quotePrice({service:svcType,beds:appt.beds,baths:appt.baths,sqft:appt.sqft,condition:appt.condition});
   }
+  var hrs=_eq.hours;
+  var tableBaseE=_eq.price;
   // Hours override takes precedence
   var hoursOverrideChk=document.getElementById('edit-hours-override-chk');
   var hoursOverrideVal=document.getElementById('edit-hours-override-val');
   var hoursOverride=hoursOverrideChk&&hoursOverrideChk.checked;
   if(hoursOverrideVal) hoursOverrideVal.style.display=hoursOverride?'':'none';
+  var ehrsManuallySet=false;
   if(hoursOverride&&hoursOverrideVal&&hoursOverrideVal.value){
     hrs=parseFloat(hoursOverrideVal.value)||hrs;
+    ehrsManuallySet=true;
     console.log('[calcEditPrice] hours override applied: '+hrs+' hrs');
   }
   _lastEditCalcHrs=hrs;
@@ -4799,13 +4865,11 @@ function calcEditPrice(){
   var overrideValEl=document.getElementById('edit-price-override-val');
   var isOverride=overrideChk&&overrideChk.checked;
   if(overrideValEl) overrideValEl.style.display=isOverride?'':'none';
-  var base=Math.round(hrs*65*100)/100;
+  var _eHourlyRate=(svcType==='deep'||svcType==='moveout')?70:65;
+  var base=ehrsManuallySet?Math.round(hrs*_eHourlyRate*100)/100:tableBaseE;
   var editFreqEl=document.getElementById('edit-freq');
   var editFreqVal=editFreqEl?editFreqEl.value:(currentAppt&&currentAppt.freq?currentAppt.freq:'One-time');
-  var editFreqDiscount=0;
-  if(editFreqVal==='Weekly') editFreqDiscount=0.20;
-  else if(editFreqVal==='Biweekly') editFreqDiscount=0.15;
-  else if(editFreqVal==='Monthly') editFreqDiscount=0.10;
+  var editFreqDiscount=_freqDiscPct(editFreqVal);
   var editDiscountAmt=Math.round(base*editFreqDiscount*100)/100;
   var editDiscountedBase=Math.round((base-editDiscountAmt)*100)/100;
   var tax=Math.round(editDiscountedBase*0.04*100)/100;
@@ -4821,8 +4885,9 @@ function calcEditPrice(){
     total=Math.round((editDiscountedBase+tax)*100)/100;
     document.getElementById('edit-price-val').textContent='$'+total.toFixed(2);
     var editDiscountText=editFreqDiscount>0?' − '+(editFreqDiscount*100)+'% '+editFreqVal.toLowerCase()+' discount ($'+editDiscountAmt.toFixed(2)+')':'';
-    document.getElementById('edit-price-breakdown').textContent=hrs+' est hrs × $65 = $'+base.toFixed(2)+editDiscountText+' + tax $'+tax.toFixed(2);
-    console.log('[calcEditPrice] total=$'+total+' hrs='+hrs+' svc='+svcType+' beds='+appt.beds+' baths='+appt.baths+' cond='+appt.condition+(editFreqDiscount>0?' freq='+editFreqVal:''));
+    var _eBaseLabel=ehrsManuallySet?(hrs+' hrs × $'+_eHourlyRate+' = $'+base.toFixed(2)):(hrs+' est hrs · $'+base.toFixed(2)+' base');
+    document.getElementById('edit-price-breakdown').textContent=_eBaseLabel+editDiscountText+' + tax $'+tax.toFixed(2);
+    console.log('[calcEditPrice] total=$'+total+' hrs='+hrs+' base=$'+base+' svc='+svcType+' beds='+appt.beds+' baths='+appt.baths+' sqft='+appt.sqft+' cond='+appt.condition+(editFreqDiscount>0?' freq='+editFreqVal:''));
   }
   // Cleaner pay display
   var editCleanerEl=document.getElementById('edit-cleaner');
@@ -6814,17 +6879,14 @@ function nlCalcPrice() {
   }
   if (!svc) { if (estRow) estRow.style.display = 'none'; return; }
 
-  // Use same _deriveHours function as the appointment form
-  if (typeof _deriveHours !== 'function') return;
-  var hrs = _deriveHours(beds, baths, svc, cond, null, sqft);
-  if (!hrs) { if (estRow) estRow.style.display = 'none'; return; }
+  // Single source of truth — price + hours from BookingKoala lookup tables
+  if (typeof _quotePrice !== 'function') return;
+  var q = _quotePrice({service:svc, beds:beds, baths:baths, sqft:sqft, condition:cond});
+  var hrs = q.hours;
+  var base = q.price;
+  if (!base || base <= 0) { if (estRow) estRow.style.display = 'none'; return; }
 
-  var rate = (svc === 'deep' || svc === 'moveout') ? 70 : 65;
-  var base = Math.round(hrs * rate * 100) / 100;
-
-  var discRate = freq === 'Weekly' ? 0.20 : freq === 'Biweekly' ? 0.15 :
-                 freq === 'Every 3 Weeks' ? 0.125 : freq === 'Monthly' ? 0.10 :
-                 freq === 'Every 6 Weeks' ? 0.10 : 0;
+  var discRate = _freqDiscPct(freq);
   var discAmt = Math.round(base * discRate * 100) / 100;
   var afterDisc = Math.round((base - discAmt) * 100) / 100;
   var tax = Math.round(afterDisc * 0.04712 * 100) / 100;
@@ -6832,10 +6894,12 @@ function nlCalcPrice() {
 
   if (estRow) estRow.style.display = '';
   if (estEl) {
+    var partsTxt = (q.parts || []).map(function(p){ return p.label + ' $' + p.price.toFixed(2); }).join(' + ');
     var out = '<div style="font-size:12px;line-height:1.9;">';
-    out += '<div>Est. hours: <b>' + hrs + ' hrs</b> &nbsp; Rate: <b>$' + rate + '/hr</b></div>';
+    out += '<div>Est. hours: <b>' + hrs + ' hrs</b></div>';
+    if (partsTxt) out += '<div style="color:#6b7280">' + partsTxt + '</div>';
     out += '<div>Base price: <b>$' + base.toFixed(2) + '</b></div>';
-    if (discAmt > 0) out += '<div style="color:#16a34a">Discount (' + Math.round(discRate * 100) + '%): <b>-$' + discAmt.toFixed(2) + '</b></div>';
+    if (discAmt > 0) out += '<div style="color:#16a34a">Discount (' + (Math.round(discRate * 1000) / 10) + '%): <b>-$' + discAmt.toFixed(2) + '</b></div>';
     out += '<div>GET Tax (4.712%): <b>$' + tax.toFixed(2) + '</b></div>';
     out += '<div style="margin-top:4px;font-size:14px;font-weight:700;color:#0284c7">Total: $' + total.toFixed(2) + '</div>';
     out += '</div>';
@@ -6850,15 +6914,15 @@ function _buildNLQuote() {
   var sqft = parseFloat(((document.getElementById('nl-sqft')||{}).value||'').replace(/[^0-9.]/g,'')) || 0;
   var cond = parseInt((document.getElementById('nl-condition')||{}).value) || 7;
   var freq = (document.getElementById('nl-freq')||{}).value || '';
-  if (typeof _deriveHours !== 'function') return null;
-  var hrs = _deriveHours(beds, baths, svc, cond, null, sqft);
-  if (!hrs || hrs <= 0) return null;
+  if (typeof _quotePrice !== 'function') return null;
+  var q = _quotePrice({service:svc, beds:beds, baths:baths, sqft:sqft, condition:cond});
+  var hrs = q.hours;
+  var base = q.price;
+  if (!base || base <= 0) return null;
   var rate = (svc === 'deep' || svc === 'moveout') ? 70 : 65;
-  var base = Math.round(hrs * rate * 100) / 100;
-  var discPct = freq === 'Weekly' ? 20 : freq === 'Biweekly' ? 15 :
-                freq === 'Every 3 Weeks' ? 12.5 : freq === 'Monthly' ? 10 :
-                freq === 'Every 6 Weeks' ? 10 : 0;
-  var discount = Math.round(base * (discPct/100) * 100) / 100;
+  var discPctRaw = _freqDiscPct(freq);
+  var discPct = Math.round(discPctRaw * 1000) / 10; // 12.5, 20, etc.
+  var discount = Math.round(base * discPctRaw * 100) / 100;
   var subtotal = Math.round((base - discount) * 100) / 100;
   var tax = Math.round(subtotal * 0.04712 * 100) / 100;
   var total = Math.round((subtotal + tax) * 100) / 100;

@@ -1340,9 +1340,9 @@ Mahalo 🌺</textarea>
             <div class="form-row"><label>Phone</label><input type="tel" id="na-phone" placeholder="(808) 555-0000" oninput="fmtPhone(this)"></div>
             <div class="form-row"><label>Email</label><input type="email" id="na-email" placeholder="client@email.com"></div>
           </div>
-          <div class="form-row" id="na-new-client-row">
+          <div class="form-row" id="na-existing-client-row">
             <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:normal;font-size:13px;color:var(--text-muted);">
-              <input type="checkbox" id="na-new-client"> Mark as new client (triggers first-clean follow-up automation)
+              <input type="checkbox" id="na-existing-client"> Mark as existing client (skip first-clean follow-up automation)
             </label>
           </div>
         </div>
@@ -5078,9 +5078,9 @@ async function saveNewAppt(){
       phone:_apptPhone, email:_apptEmail, address:apptAddress,
       service:naServiceText, freq:freq, beds:apptBeds, baths:apptBaths,
       cleaner:cleanerName,
-      // Toggle pressed = new client (pre_existing=false → first-clean automation fires).
-      // Toggle unpressed = pre-existing/imported (pre_existing=true → no first-clean).
-      preExisting: !((document.getElementById('na-new-client')||{}).checked)
+      // Toggle CHECKED = existing/imported client (pre_existing=true → no first-clean automation).
+      // Toggle UNCHECKED (default) = genuinely new client (pre_existing=false → first-clean fires).
+      preExisting: !!((document.getElementById('na-existing-client')||{}).checked)
     });
     console.log('[saveNewAppt] auto-created client:', _cRes);
     if(!_cRes.error && _cRes.data && _cRes.data[0]){
@@ -10794,11 +10794,11 @@ function scheduleLeadAppointment(){
     var _sqftEl=document.getElementById('na-sqft'); if(_sqftEl && lead.sqft && lead.sqft!=='—'){ _sqftEl.value = String(lead.sqft).replace(/[^0-9]/g,''); }
     var _condEl=document.getElementById('na-cond'); if(_condEl && lead.condition){ _condEl.value = String(lead.condition); }
     var _notesEl=document.getElementById('na-notes'); if(_notesEl && lead.notes && lead.notes!=='—'){ _notesEl.value = lead.notes; }
-    // Coming from lead card → genuinely new client, mark toggle on.
-    var _ncRow = document.getElementById('na-new-client-row');
-    var _ncChk = document.getElementById('na-new-client');
+    // Coming from lead card → genuinely new client. Keep toggle visible, default unchecked.
+    var _ncRow = document.getElementById('na-existing-client-row');
+    var _ncChk = document.getElementById('na-existing-client');
     if(_ncRow) _ncRow.style.display = '';
-    if(_ncChk) _ncChk.checked = true;
+    if(_ncChk) _ncChk.checked = false;
     populatePropertySelector(lead.name);
     calcPrice();
   }, 300);
@@ -11650,10 +11650,10 @@ function _clearNewApptPropertyFields(){
   if(resFields) resFields.style.display = '';
   var savePropRow = document.getElementById('na-save-prop-row');
   if(savePropRow) savePropRow.style.display = '';
-  // Show the new-client toggle, default unchecked. Existing-client autocomplete
-  // pick will hide it; lead pick or lead-card flow will check it.
-  var ncRow = document.getElementById('na-new-client-row');
-  var ncChk = document.getElementById('na-new-client');
+  // Show the existing-client toggle, default unchecked. Unchecked = new client (default
+  // for fresh bookings). Existing-client autocomplete pick will hide it.
+  var ncRow = document.getElementById('na-existing-client-row');
+  var ncChk = document.getElementById('na-existing-client');
   if(ncRow) ncRow.style.display = '';
   if(ncChk) ncChk.checked = false;
   calcPrice();
@@ -11705,9 +11705,9 @@ function initNewApptClientAutocomplete(){
         if(ph) ph.value = c.phone !== '—' ? c.phone : '';
         if(em) em.value = c.email !== '—' ? c.email : '';
         if(ad) ad.value = c.address !== '—' ? c.address : '';
-        // Existing client picked → hide new-client toggle (their pre_existing flag is already set)
-        var ncRow = document.getElementById('na-new-client-row');
-        var ncChk = document.getElementById('na-new-client');
+        // Existing client picked → hide existing-client toggle (their pre_existing flag is already set)
+        var ncRow = document.getElementById('na-existing-client-row');
+        var ncChk = document.getElementById('na-existing-client');
         if(ncRow) ncRow.style.display = 'none';
         if(ncChk) ncChk.checked = false;
         dropdown.style.display = 'none';
@@ -11751,12 +11751,12 @@ function initNewApptClientAutocomplete(){
         var sqftEl=document.getElementById('na-sqft'); if(sqftEl && l.sqft && l.sqft!=='—'){ sqftEl.value = String(l.sqft).replace(/[^0-9]/g,''); }
         var condEl=document.getElementById('na-cond'); if(condEl && l.condition){ condEl.value = String(l.condition); }
         var notesEl=document.getElementById('na-notes'); if(notesEl && l.notes && l.notes!=='—'){ notesEl.value = l.notes; }
-        // Lead picked → this is a genuinely new client coming from the pipeline.
-        // Auto-check the new-client toggle so first-clean automation fires after their first appt.
-        var ncRow = document.getElementById('na-new-client-row');
-        var ncChk = document.getElementById('na-new-client');
+        // Lead picked → genuinely new client. Keep existing-client toggle visible but
+        // unchecked (default), so first-clean automation fires after their first appt.
+        var ncRow = document.getElementById('na-existing-client-row');
+        var ncChk = document.getElementById('na-existing-client');
         if(ncRow) ncRow.style.display = '';
-        if(ncChk) ncChk.checked = true;
+        if(ncChk) ncChk.checked = false;
         dropdown.style.display = 'none';
         populatePropertySelector(l.name);
         if(typeof calcPrice==='function') calcPrice();

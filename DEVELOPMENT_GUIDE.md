@@ -212,3 +212,35 @@ Every automation fired by run-automations.js now logs `action: 'automation_fired
 ### Known gaps (not yet built)
 - Welcome email to new active client
 - Manual invoice overdue reminders are in run-invoice-reminders.js but not shown in Automations UI
+
+---
+
+## Critical Rule: Preventing Regressions (index.html)
+
+index.html is a single-file ~738KB app. Any tool (Claude Code or otherwise) that edits it MUST follow this exact sequence every time without exception:
+
+```bash
+# 1. Always pull latest before any edit
+git -C ~/Documents/hnc-crm pull origin main
+
+# 2. Make the edit (surgical, scoped to the task)
+
+# 3. Verify JS syntax before committing
+node --check ~/Documents/hnc-crm/index.html 2>/dev/null || echo "Check embedded scripts manually"
+
+# 4. Commit and push
+cd ~/Documents/hnc-crm && git add index.html && git commit -m "description" && git push origin main
+```
+
+**Why this matters:** If Claude Code starts from a stale local copy of index.html, any changes made in a previous session (e.g. automations UI work) will be overwritten when the pipeline edit is pushed. The `git pull` at step 1 is the only safeguard.
+
+**Never do this:**
+- Edit index.html from memory or a cached copy
+- Copy index.html from ~/Downloads without first pulling
+- Run `git push --force`
+
+## Known Issues (as of April 2026 — do not fix yet, just be aware)
+
+- Pricing calculator formula incorrect: Deep clean 1200sqft + condition 10 → shows $163 but should be ~$513 with tax
+- Service type list in new lead form has too many options — should only be: Regular Cleaning, Deep Cleaning, Move Out Cleaning
+- `renderAutoList()` is wrapped by `patchSystemAutoCards()` — any change to renderAutoList must preserve the wrapper in the patch script near </body>

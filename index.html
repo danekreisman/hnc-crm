@@ -3793,18 +3793,21 @@ function deleteEntireSeries(){
   // Collect dbIds of future occurrences so we can gcal-delete each
   var futureDbIds = [];
   var clickedDbId = (currentAppt && currentAppt.dbId) || null;
+  // Normalize time strings ("8am" vs "8:00am" vs "08:00") for robust comparison
+  function _normTime(s){ return String(s||'').replace(/\s+/g,'').toLowerCase().replace(/^0+(\d)/,'$1'); }
+  var targetTimeNorm = _normTime(targetTime);
   Object.keys(apptData).forEach(function(k){
     var parts = k.split('-').map(Number);
     var keyDate = new Date(parts[0], parts[1]-1, parts[2]);
     if(keyDate < todayKey) return; // only future
-    var before = apptData[k].length;
     apptData[k] = apptData[k].filter(function(e){
-      // Match if ANY condition is true: same series, same dbId as the clicked appt,
-      // or same client+time+address (whether or not the recurring flag is set on this row).
+      // Match if ANY condition is true. We deliberately drop the address requirement
+      // because address strings can drift (trailing space, "Honolulu, HI" vs "Honolulu, HI 96815"),
+      // which previously left orphaned occurrences on the calendar after a series halt.
       var bySeries = !!(targetSeriesId && e.seriesId === targetSeriesId);
       var byDbId = !!(clickedDbId && e.dbId === clickedDbId);
-      var byNameTimeAddr = (e.n === targetName && e.t === targetTime && e.address === targetAddress);
-      var matches = bySeries || byDbId || byNameTimeAddr;
+      var byNameTime = (e.n === targetName && _normTime(e.t) === targetTimeNorm);
+      var matches = bySeries || byDbId || byNameTime;
       if(matches && e.dbId) futureDbIds.push(e.dbId);
       return !matches;
     });
@@ -3815,7 +3818,7 @@ function deleteEntireSeries(){
     recurringAppts = recurringAppts.filter(function(r){ return r.seriesId !== targetSeriesId; });
   } else {
     recurringAppts = recurringAppts.filter(function(r){
-      return !(r.name === targetName && r.timeStr === targetTime && r.address === targetAddress);
+      return !(r.name === targetName && _normTime(r.timeStr) === targetTimeNorm);
     });
   }
 
@@ -13505,14 +13508,43 @@ function showLogsTab(tab) {
   loadLogs(tab);
 }
 async function loadLogs(tab) {
-  const container = document.getElementById('logs-content'); if (!container) return;
+  const container = document.getElementById('logs-content');
+  if (!container) {
+    // Panel not in the DOM yet — view just toggled visible. Retry shortly.
+    if ((loadLogs._retries = (loadLogs._retries||0) + 1) > 30) return;
+    return setTimeout(() => loadLogs(tab), 50);
+  }
+  loadLogs._retries = 0;
   container.innerHTML = '<div style="padding:2rem;text-align:center;color:var(--text-secondary);">Loading...</div>';
   try {
     if (tab === 'activity') {
       const { data } = await db.from('activity_logs').select('*').order('created_at', {ascending:false}).limit(200);
       const rows = (data || []).filter(r => r.action !== 'user_login').slice(0, 100);
       if (!rows.length) { container.innerHTML = '<div style="padding:2rem;text-align:center;color:var(--text-secondary);">No activity yet.</div>'; return; }
-      container.innerHTML = '<table style="width:100%;border-collapse:collapse;font-size:.875rem;"><thead><tr style="background:var(--bg-soft);border-bottom:1px solid var(--border);"><th style="padding:.75rem 1rem;text-align:left;font-weight:600;color:var(--text-secondary);">Time</th><th style="padding:.75rem 1rem;text-align:left;font-weight:600;color:var(--text-secondary);">Action</th><th style="padding:.75rem 1rem;text-align:left;font-weight:600;color:var(--text-secondary);">Description</th><th style="padding:.75rem 1rem;text-align:left;font-weight:600;color:var(--text-secondary);">User</th></tr></thead><tbody>' + rows.map((r,i) => { const t = new Date(r.created_at).toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}); return '<tr style="background:'+(i%2===0?'#fff':'var(--bg-soft)')+';border-bottom:1px solid var(--border);"><td style="padding:.65rem 1rem;color:var(--text-secondary);white-space:nowrap;">'+t+'</td><td style="padding:.65rem 1rem;"><span style="background:var(--brand-50);color:var(--brand-600);padding:.2rem .5rem;border-radius:4px;font-size:.8rem;font-weight:600;">'+r.action+'</span></td><td style="padding:.65rem 1rem;color:var(--text-primary);">'+(r.description||'')+'</td><td style="padding:.65rem 1rem;color:var(--text-secondary);font-size:.8rem;">'+(r.user_email||'')+'</td></tr>'; }).join('') + '</tbody></table>';
+      const esc = (s) => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+      const fmtMeta = (m, desc) => {
+        if (!m || typeof m !== 'object') return '';
+        const parts = [];
+        const seen = new Set();
+        const push = (label, val) => { const k = label+':'+val; if (val==null || val==='' || seen.has(k)) return; seen.add(k); parts.push(label + ': <b>' + esc(val) + '</b>'); };
+        if (m.amount != null && m.amount !== '') push('amount', '$' + parseFloat(m.amount).toFixed(2));
+        if (m.email && !String(desc||'').includes(m.email)) push('to', m.email);
+        if (m.clientName && !String(desc||'').includes(m.clientName)) push('client', m.clientName);
+        if (m.action) push('action', m.action);
+        if (m.count != null) push('count', m.count);
+        if (m.date) push('date', m.date);
+        if (m.dbId) push('apptId', m.dbId);
+        if (m.seriesId) push('seriesId', m.seriesId);
+        if (m.mode) push('mode', m.mode);
+        return parts.length ? '<div style="font-size:.75rem;color:var(--text-secondary);margin-top:.25rem;opacity:.85;">' + parts.join(' · ') + '</div>' : '';
+      };
+      const head = '<table style="width:100%;border-collapse:collapse;font-size:.875rem;"><thead><tr style="background:var(--bg-soft);border-bottom:1px solid var(--border);"><th style="padding:.75rem 1rem;text-align:left;font-weight:600;color:var(--text-secondary);">Time</th><th style="padding:.75rem 1rem;text-align:left;font-weight:600;color:var(--text-secondary);">Action</th><th style="padding:.75rem 1rem;text-align:left;font-weight:600;color:var(--text-secondary);">Description</th><th style="padding:.75rem 1rem;text-align:left;font-weight:600;color:var(--text-secondary);">User</th></tr></thead><tbody>';
+      const body = rows.map((r,i) => {
+        const t = new Date(r.created_at).toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
+        const meta = fmtMeta(r.metadata, r.description);
+        return '<tr style="background:'+(i%2===0?'#fff':'var(--bg-soft)')+';border-bottom:1px solid var(--border);vertical-align:top;"><td style="padding:.65rem 1rem;color:var(--text-secondary);white-space:nowrap;">'+t+'</td><td style="padding:.65rem 1rem;"><span style="background:var(--brand-50);color:var(--brand-600);padding:.2rem .5rem;border-radius:4px;font-size:.8rem;font-weight:600;">'+esc(r.action)+'</span></td><td style="padding:.65rem 1rem;color:var(--text-primary);">'+esc(r.description||'')+meta+'</td><td style="padding:.65rem 1rem;color:var(--text-secondary);font-size:.8rem;">'+esc(r.user_email||'')+'</td></tr>';
+      }).join('');
+      container.innerHTML = head + body + '</tbody></table>';
     } else {
       const { data } = await db.from('error_logs').select('*').order('occurred_at', {ascending:false}).limit(100);
       const rows = data || [];

@@ -216,10 +216,11 @@ tr.clickable:hover td{background:var(--brand-50);cursor:pointer;}
 .info-label{font-size:11px;color:var(--text-muted);flex-shrink:0;width:130px;}
 .info-val{font-size:12px;color:var(--text);text-align:right;font-weight:500;}
 .panel-section{font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;margin:14px 0 8px;}
-.booking-section{margin:10px 0;border:1px solid var(--border);border-radius:12px;background:#fff;overflow:hidden;transition:border-color .15s,box-shadow .15s;}
+.booking-section{margin:10px 0;border:1px solid var(--border);border-radius:12px;background:#fff;transition:border-color .15s,box-shadow .15s;}
 .booking-section:first-of-type{margin-top:0;}
 .booking-section[open]{border-color:var(--brand-300);box-shadow:0 1px 3px rgba(0,0,0,.04);}
-.booking-section>summary{font-size:13px;font-weight:600;color:var(--text);cursor:pointer;list-style:none;padding:13px 16px;display:flex;align-items:center;gap:10px;user-select:none;transition:background .12s;}
+.booking-section>summary{font-size:13px;font-weight:600;color:var(--text);cursor:pointer;list-style:none;padding:13px 16px;display:flex;align-items:center;gap:10px;user-select:none;transition:background .12s;border-radius:11px;}
+.booking-section[open]>summary{border-radius:11px 11px 0 0;}
 .booking-section>summary:hover{background:var(--bg-soft);}
 .booking-section>summary::-webkit-details-marker{display:none;}
 .booking-section>summary::before{content:"";display:inline-block;width:0;height:0;border-left:5px solid var(--text-muted);border-top:4px solid transparent;border-bottom:4px solid transparent;transition:transform .15s;flex-shrink:0;}
@@ -1332,7 +1333,7 @@ Mahalo 🌺</textarea>
           <div class="form-row"><label>Full name</label>
             <div style="position:relative;">
               <input type="text" id="na-name" placeholder="Search existing client or enter new name..." style="width:100%;" autocomplete="off">
-              <div id="na-name-dropdown" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid var(--border-strong);border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.12);z-index:200;max-height:220px;overflow-y:auto;margin-top:2px;"></div>
+              <div id="na-name-dropdown" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid var(--border-strong);border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.12);z-index:1000;max-height:220px;overflow-y:auto;margin-top:2px;"></div>
             </div>
           </div>
           <div class="form-two">

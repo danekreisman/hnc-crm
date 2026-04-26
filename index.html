@@ -3729,6 +3729,7 @@ async function cancelAllRecurring(){
   if(bar){bar.textContent='';}
   renderCal();
   closeOverlay('appt-overlay');
+  logActivity('series_cancelled','Series cancelled: '+targetName,'appointment',targetSeriesId||'',{count:removed,seriesId:targetSeriesId,clientName:targetName});
   showToast('Series for '+targetName+' cancelled');
 }
 
@@ -3770,6 +3771,7 @@ function deleteAppointment(){
   if(bar){ bar.textContent=''; }
   renderCal();
   closeOverlay('appt-overlay');
+  logActivity('appointment_deleted','Appt deleted: '+((currentAppt&&currentAppt.n)||'Unknown'),'appointment',(currentAppt&&currentAppt.dbId)||'',{date:currentApptKey,dbId:(currentAppt&&currentAppt.dbId)||null});
   showToast('Appointment deleted');
 }
 
@@ -3842,6 +3844,7 @@ function deleteEntireSeries(){
   if(bar){ bar.textContent=''; }
   renderCal();
   closeOverlay('appt-overlay');
+  logActivity('series_deleted','Series halted: '+targetName+' ('+futureDbIds.length+' future deleted)','appointment',targetSeriesId||'',{count:futureDbIds.length,seriesId:targetSeriesId,clientName:targetName,futureDbIds:futureDbIds});
   showToast('Series halted — '+futureDbIds.length+' future appointments deleted');
 }
 

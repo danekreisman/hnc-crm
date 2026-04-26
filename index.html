@@ -2655,7 +2655,7 @@ function renderLeadsPipeline(){
       card.dataset.leadId=id;
       var svc=l.service||'Service';
       var badgeCls=svc.toLowerCase().indexOf('commercial')>=0?'bc':'br';
-      var priceDisplay = l.quoteTotal ? '<span style="color:var(--brand-500);font-weight:600;">$'+Number(l.quoteTotal).toFixed(2)+'</span>' : (l.value && l.value!=='TBD' ? l.value : '<span style="color:var(--text-muted);">No quote yet</span>');
+      var priceDisplay = l.quoteTotal ? '<span style="color:var(--brand-500);font-weight:600;">$'+Number(l.quoteTotal).toFixed(2)+'</span>' : (l.value && l.value!=='TBD' ? '$'+l.value : '<span style="color:var(--text-muted);">No quote yet</span>');
       var freqDisplay = l.frequency ? '<div style="font-size:11px;color:var(--text-muted);margin-top:2px;">'+l.frequency+'</div>' : '';
       card.innerHTML='<div class="deal-name">'+l.name+'</div><div class="deal-type"><span class="badge '+badgeCls+'">'+svc+'</span>'+freqDisplay+'</div><div class="deal-val">'+priceDisplay+'</div>';
       (function(lid){card.addEventListener('click',function(){openLead(lid);});})(id);
@@ -4019,7 +4019,7 @@ function openLead(id){
   });
   // Quoted price
   var valEl=document.getElementById('lead-value');
-  if(valEl) valEl.textContent = d.quoteTotal ? '$'+Number(d.quoteTotal).toFixed(2) : (d.value&&d.value!=='TBD'?d.value:'No quote yet');
+  if(valEl) valEl.textContent = d.quoteTotal ? '$'+Number(d.quoteTotal).toFixed(2) : (d.value&&d.value!=='TBD'?'$'+d.value:'No quote yet');
   // Frequency
   var freqEl=document.getElementById('lead-frequency');
   if(freqEl) freqEl.textContent = d.frequency||'—';
@@ -5758,14 +5758,18 @@ try{var _sv=sessionStorage.getItem('hnc_currentView'); if(_sv && _sv!=='calendar
       <div class="panel-section">Opportunity</div>
       <div class="form-two">
         <div class="form-row"><label>Service type</label>
-          <select id="nl-service">
+          <select id="nl-service" onchange="nlServiceChange()">
             <option>Standard clean</option><option>Commercial weekly</option><option>Commercial daily</option><option>Deep clean</option><option>Move-out clean</option><option>Airbnb turnover</option><option>Janitorial</option><option>Government contract</option>
           </select>
         </div>
         <div class="form-row"><label>Est. monthly value</label><input type="text" id="nl-value" placeholder="e.g. $950/mo"></div>
       </div>
       <div class="form-two">
-        <div class="form-row"><label>Property size</label><input type="text" id="nl-sqft" placeholder="e.g. 2,400 sq ft"></div>
+        <div class="form-row"><label>Property size</label><input type="text" id="nl-sqft" placeholder="e.g. 2,400 sq ft" oninput="nlCalcPrice()"></div>
+        <div class="form-row" id="nl-beds-row"><label>Bedrooms</label><select id="nl-beds" onchange="nlCalcPrice()"><option value="">Select</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6+</option></select></div>
+        <div class="form-row" id="nl-baths-row"><label>Bathrooms</label><select id="nl-baths" onchange="nlCalcPrice()"><option value="">Select</option><option>1</option><option>1.5</option><option>2</option><option>2.5</option><option>3</option><option>4+</option></select></div>
+        <div class="form-row" id="nl-condition-row" style="display:none"><label>Condition (1-10)</label><select id="nl-condition" onchange="nlCalcPrice()"><option value="">Select</option><option value="10">10 - Excellent</option><option value="8">8 - Good</option><option value="7">7 - Average</option><option value="5">5 - Below Avg</option><option value="3">3 - Poor</option><option value="1">1 - Needs Work</option></select></div>
+        <div class="form-row" id="nl-est-row" style="display:none"><label style="color:#0284c7;font-weight:600">Est. price</label><div id="nl-est" style="padding:8px;background:#f0f9ff;border:1px solid #bae6fd;border-radius:6px;font-size:13px;color:#0284c7;font-weight:600">-</div></div>
         <div class="form-row"><label>Lead source</label>
           <select id="nl-source">
             <option>Google SEO</option><option>Referral</option><option>Cold outreach</option><option>Walk-in</option><option>Social media</option><option>RFP / Bid</option><option>Other</option>
@@ -5902,6 +5906,9 @@ function saveNewLead(){
     phone:document.getElementById('nl-phone').value||'—',email:document.getElementById('nl-email').value||'—',
     address:document.getElementById('nl-address').value||'—',value:value,
     service:service,sqft:document.getElementById('nl-sqft').value||'—',
+      beds: (document.getElementById('nl-beds')||{}).value||null,
+      baths: (document.getElementById('nl-baths')||{}).value||null,
+      condition: (document.getElementById('nl-condition')||{}).value||null,
     source:document.getElementById('nl-source').value,
     date:new Date().toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}),
     stage:stage,action:document.getElementById('nl-action').value||'Follow up',
@@ -6742,6 +6749,36 @@ async function resetSystemAutoTemplate() {
   if(savedEl){ savedEl.textContent='Reset to default'; savedEl.style.display='inline'; setTimeout(function(){ savedEl.style.display='none'; },2000); }
 }
 function openDayBeforeAutoEdit() { openSystemAutoEdit('db'); }
+function nlCalcPrice() {
+  var svc = (document.getElementById('nl-service')||{}).value||'';
+  var beds = parseFloat((document.getElementById('nl-beds')||{}).value)||0;
+  var baths = parseFloat((document.getElementById('nl-baths')||{}).value)||0;
+  var sqft = parseFloat(((document.getElementById('nl-sqft')||{}).value||'').replace(/[^0-9.]/g,''))||0;
+  var cond = parseFloat((document.getElementById('nl-condition')||{}).value)||7;
+  var s = svc.toLowerCase();
+  var isBeds = s.indexOf('standard')>-1||s.indexOf('airbnb')>-1||s.indexOf('regular')>-1;
+  var isSqft = s.indexOf('deep')>-1||s.indexOf('move')>-1;
+  var isJan = s.indexOf('janitorial')>-1||s.indexOf('commercial')>-1||s.indexOf('government')>-1;
+  var bedsRow=document.getElementById('nl-beds-row');
+  var bathsRow=document.getElementById('nl-baths-row');
+  var condRow=document.getElementById('nl-condition-row');
+  var estRow=document.getElementById('nl-est-row');
+  var estEl=document.getElementById('nl-est');
+  if(bedsRow) bedsRow.style.display=isSqft?'none':'';
+  if(bathsRow) bathsRow.style.display=isSqft?'none':'';
+  if(condRow) condRow.style.display=isSqft?'':'none';
+  if(isJan){if(estRow)estRow.style.display='';if(estEl){estEl.textContent='Custom - based on walkthrough';estEl.style.color='#6b7280';}return;}
+  var hours=0;
+  if(isBeds&&(beds||baths)){hours=0.75+(beds*0.75)+(baths*0.5);}
+  else if(isSqft&&sqft){var cm=cond>=9?1.0:cond>=7?1.2:cond>=5?1.4:1.8;hours=Math.max(2,(sqft/500)*cm);}
+  if(!hours){if(estRow)estRow.style.display='none';return;}
+  var total=hours*65*1.04712;
+  if(estRow)estRow.style.display='';
+  if(estEl){estEl.textContent='$$'+total.toFixed(2)+' (before frequency discount)';estEl.style.color='#0284c7';}
+  var valEl=document.getElementById('nl-value');
+  if(valEl&&!valEl.value)valEl.value='$$'+total.toFixed(2);
+}
+function nlServiceChange(){var v=document.getElementById('nl-value');if(v)v.value='';nlCalcPrice();}
 function openCancelEmailAutoEdit() { openSystemAutoEdit('ce'); }
 function openCancelClientSmsAutoEdit() { openSystemAutoEdit('cs'); }
 function openCancelCleanerSmsAutoEdit() { openSystemAutoEdit('cc'); }

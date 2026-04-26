@@ -127,11 +127,19 @@ export default async function handler(req, res) {
       // Fetch client info for the brief
       const { data: client } = await db
         .from('clients')
-        .select('name, phone, email')
+        .select('name, phone, email, pre_existing')
         .eq('id', appt.client_id)
         .single();
 
       if (!client) continue;
+
+      // Skip pre-existing/imported clients — they're not actually new to the business,
+      // they were just migrated into the CRM. The toggle on the booking form (default off)
+      // sets pre_existing=true unless the user explicitly marks the booking as a new client.
+      if (client.pre_existing === true) {
+        console.log(`[run-job-completions] Skipping first-clean task: ${client.name} is pre_existing`);
+        continue;
+      }
 
       // VA-task test mode guard: only create tasks for Dane during rollout
       if (!isTestSafeRecord(client)) {

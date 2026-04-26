@@ -2259,14 +2259,15 @@ async function dbSaveLead(data){
     phone:data.phone||null, email:data.email||null,
     address:data.address||null, service:data.service||null,
     sqft:data.sqft||null, estimated_value:data.value||null,
-    source:data.source||'Google SEO', stage:data.stage||'New inquiry',
-    next_action:data.action||null,
-    due_date:data.due||null,
-    assigned_to:data.assigned||'VA',
-    notes:data.notes||null
+    beds:data.beds||null, baths:data.baths||null,
+    condition:data.condition||null,
+    quote_total:data.quote_total||null,
+    quote_data:data.quote_data||null,
+    source:data.source||null, stage:data.stage||null,
+    next_action:data.action||null, due_date:data.due||null,
+    assigned_to:data.assigned||null, notes:data.notes||null
   }]);
-  if(error)console.error('Save lead error:',error);
-  return !error;
+  if(error) console.error('dbSaveLead', error);
 }
 
 async function dbLoadLeads(){

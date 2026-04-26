@@ -1,68 +1,49 @@
 import { fetchWithTimeout, TIMEOUTS } from './utils/with-timeout.js';
-import { getOpenPhoneHistory } from './utils/openphone-history.js';
-import { validateOrFail, SCHEMAS } from './utils/validate.js';
 import { logError } from './utils/error-logger.js';
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const { prompt: rawPrompt, leadId, clientId, clientPhone } = req.body;
+  const { leadId, prompt: customPrompt } = req.body || {};
 
-  const invalid = validateOrFail(req.body, SCHEMAS.aiSummary);
-  if (invalid) return res.status(400).json(invalid);
-
-  if (!rawPrompt && !leadId) {
-    return res.status(400).json({ success: false, error: 'Either prompt or leadId is required' });
+  if (!leadId && !customPrompt) {
+    return res.status(400).json({ success: false, error: 'leadId or prompt is required' });
   }
 
-  let prompt = rawPrompt;
-
   try {
+    let prompt = customPrompt;
+
     if (!prompt && leadId) {
-      const supaRes = await fetchWithTimeout(
-        `${process.env.SUPABASE_URL}/rest/v1/leads?id=eq.${leadId}&select=name,service,beds,baths,sqft,condition,notes,stage,address,created_at&limit=1`,
-        {
-          headers: {
-            'apikey': process.env.SUPABASE_SERVICE_ROLE_KEY,
-            'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
-          }
-        },
+      // Fetch lead data from Supabase
+      const leadRes = await fetchWithTimeout(
+        process.env.SUPABASE_URL + '/rest/v1/leads?id=eq.' + leadId + '&select=name,contact_name,phone,email,service,beds,baths,sqft,condition,notes,stage,address,created_at,value,quote_total&limit=1',
+        { headers: { apikey: process.env.SUPABASE_SERVICE_ROLE_KEY, Authorization: 'Bearer ' + process.env.SUPABASE_SERVICE_ROLE_KEY } },
         TIMEOUTS.SUPABASE
       );
+      const leads = await leadRes.json();
+      const lead = leads && leads[0];
+      if (!lead) return res.status(404).json({ success: false, error: 'Lead not found' });
 
-      if (!supaRes.ok) {
-        await logError('ai-summary', `Supabase fetch error: ${supaRes.status}`, { leadId });
-        return res.status(502).json({ error: 'Failed to fetch lead data' });
-      }
+      const property = [lead.beds ? lead.beds + 'br' : null, lead.baths ? lead.baths + 'ba' : null, lead.sqft ? lead.sqft + ' sqft' : null].filter(Boolean).join('/');
+      const price = lead.quote_total ? '$' + Number(lead.quote_total).toFixed(2) : (lead.value || 'TBD');
 
-      const leads = await supaRes.json();
-      const lead = leads[0];
+      prompt = 'Summarize this cleaning lead for a Hawaii Natural Clean sales rep in 2-3 sentences. Focus on what they want, their property, and the best next action. Be concise and practical.
 
-      if (!lead) {
-        return res.status(404).json({ error: 'Lead not found' });
-      }
-
-      prompt = `Summarize this cleaning lead for a Hawaii Natural Clean sales rep in 2-3 sentences. Focus on what they want, their property details, and the recommended next action. Lead name: ${lead.name}. Service: ${lead.service}. Property: ${lead.beds}br/${lead.baths}ba, ${lead.sqft} sqft, condition ${lead.condition}/10. Stage: ${lead.stage}. Address: ${lead.address}. Notes: ${lead.notes}.`;
+Lead: ' + (lead.name || lead.contact_name || 'Unknown') + '
+Service: ' + (lead.service || 'Unknown') + '
+Property: ' + (property || 'Unknown') + (lead.condition ? ', condition ' + lead.condition + '/10' : '') + '
+Stage: ' + (lead.stage || 'Unknown') + '
+Quoted: ' + price + '
+Address: ' + (lead.address || 'Not provided') + '
+Notes: ' + (lead.notes || 'None') + '
+Inquiry date: ' + (lead.created_at ? lead.created_at.slice(0, 10) : 'Unknown');
     }
 
-    // Enrich the prompt with live OpenPhone conversation history
-    let enrichedPrompt = prompt;
-    if (clientPhone) {
-      const history = await getOpenPhoneHistory(clientPhone, {
-        apiKey: process.env.QUO_API_KEY,
-        maxSms: 200,
-        maxCalls: 25,
-      });
-      if (history) {
-        enrichedPrompt += '\n\nLive conversation history from OpenPhone:\n' + history;
-      }
-    }
-
-    const response = await fetchWithTimeout(
+    // Call Anthropic
+    const anthropicRes = await fetchWithTimeout(
       'https://api.anthropic.com/v1/messages',
       {
         method: 'POST',
@@ -73,29 +54,20 @@ export default async function handler(req, res) {
         },
         body: JSON.stringify({
           model: 'claude-haiku-4-5-20251001',
-          max_tokens: 600,
-          messages: [{ role: 'user', content: enrichedPrompt }]
+          max_tokens: 300,
+          messages: [{ role: 'user', content: prompt }]
         })
       },
-      TIMEOUTS.ANTHROPIC,
+      TIMEOUTS.ANTHROPIC
     );
 
-    const data = await response.json();
+    const data = await anthropicRes.json();
+    const summary = data.content && data.content[0] && data.content[0].text;
+    if (!summary) throw new Error('No summary returned from Anthropic');
 
-    if (!response.ok) {
-      await logError('ai-summary', `Anthropic API error: ${response.status}`, {
-        status: response.status,
-        error: data?.error?.message,
-        clientId
-      });
-      return res.status(502).json({ error: 'AI service unavailable', detail: data?.error?.message });
-    }
-
-    const summary = data.content?.[0]?.text || 'Could not generate summary.';
-    return res.status(200).json({ summary });
-
+    return res.status(200).json({ success: true, summary });
   } catch (err) {
-    await logError('ai-summary', err, { clientId, leadId, promptLength: prompt?.length });
-    return res.status(500).json({ error: err.message });
+    await logError('ai-summary', err, { leadId });
+    return res.status(500).json({ success: false, error: err.message });
   }
 }

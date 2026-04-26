@@ -5759,7 +5759,7 @@ try{var _sv=sessionStorage.getItem('hnc_currentView'); if(_sv && _sv!=='calendar
       <div class="form-two">
         <div class="form-row"><label>Service type</label>
           <select id="nl-service" onchange="nlServiceChange()">
-            <option>Standard clean</option><option>Commercial weekly</option><option>Commercial daily</option><option>Deep clean</option><option>Move-out clean</option><option>Airbnb turnover</option><option>Janitorial</option><option>Government contract</option>
+            <option value="regular">Regular Clean</option><option value="deep">Deep Clean</option><option value="moveout">Move Out Clean</option><option value="janitorial">Janitorial Clean</option>
           </select>
         </div>
         <div class="form-row"><label>Est. monthly value</label><input type="text" id="nl-value" placeholder="e.g. $950/mo"></div>
@@ -5768,6 +5768,17 @@ try{var _sv=sessionStorage.getItem('hnc_currentView'); if(_sv && _sv!=='calendar
         <div class="form-row"><label>Property size</label><input type="text" id="nl-sqft" placeholder="e.g. 2,400 sq ft" oninput="nlCalcPrice()"></div>
         <div class="form-row" id="nl-beds-row"><label>Bedrooms</label><select id="nl-beds" onchange="nlCalcPrice()"><option value="">Select</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6+</option></select></div>
         <div class="form-row" id="nl-baths-row"><label>Bathrooms</label><select id="nl-baths" onchange="nlCalcPrice()"><option value="">Select</option><option>1</option><option>1.5</option><option>2</option><option>2.5</option><option>3</option><option>4+</option></select></div>
+        <div class="form-row" id="nl-freq-row">
+          <label>Frequency</label>
+          <select id="nl-freq" onchange="nlCalcPrice()">
+            <option value="">One-time</option>
+            <option value="Weekly">Weekly</option>
+            <option value="Biweekly">Biweekly</option>
+            <option value="Every 3 Weeks">Every 3 Weeks</option>
+            <option value="Monthly">Monthly</option>
+            <option value="Every 6 Weeks">Every 6 Weeks</option>
+          </select>
+        </div>
         <div class="form-row" id="nl-condition-row" style="display:none"><label>Condition (1-10)</label><select id="nl-condition" onchange="nlCalcPrice()"><option value="">Select</option><option value="10">10 - Excellent</option><option value="8">8 - Good</option><option value="7">7 - Average</option><option value="5">5 - Below Avg</option><option value="3">3 - Poor</option><option value="1">1 - Needs Work</option></select></div>
         <div class="form-row" id="nl-est-row" style="display:none"><label style="color:#0284c7;font-weight:600">Est. price</label><div id="nl-est" style="padding:8px;background:#f0f9ff;border:1px solid #bae6fd;border-radius:6px;font-size:13px;color:#0284c7;font-weight:600">-</div></div>
         <div class="form-row"><label>Lead source</label>
@@ -6750,33 +6761,72 @@ async function resetSystemAutoTemplate() {
 }
 function openDayBeforeAutoEdit() { openSystemAutoEdit('db'); }
 function nlCalcPrice() {
-  var svc = (document.getElementById('nl-service')||{}).value||'';
-  var beds = parseFloat((document.getElementById('nl-beds')||{}).value)||0;
-  var baths = parseFloat((document.getElementById('nl-baths')||{}).value)||0;
-  var sqft = parseFloat(((document.getElementById('nl-sqft')||{}).value||'').replace(/[^0-9.]/g,''))||0;
-  var cond = parseFloat((document.getElementById('nl-condition')||{}).value)||7;
-  var s = svc.toLowerCase();
-  var isBeds = s.indexOf('standard')>-1||s.indexOf('airbnb')>-1||s.indexOf('regular')>-1;
-  var isSqft = s.indexOf('deep')>-1||s.indexOf('move')>-1;
-  var isJan = s.indexOf('janitorial')>-1||s.indexOf('commercial')>-1||s.indexOf('government')>-1;
-  var bedsRow=document.getElementById('nl-beds-row');
-  var bathsRow=document.getElementById('nl-baths-row');
-  var condRow=document.getElementById('nl-condition-row');
-  var estRow=document.getElementById('nl-est-row');
-  var estEl=document.getElementById('nl-est');
-  if(bedsRow) bedsRow.style.display=isSqft?'none':'';
-  if(bathsRow) bathsRow.style.display=isSqft?'none':'';
-  if(condRow) condRow.style.display=isSqft?'':'none';
-  if(isJan){if(estRow)estRow.style.display='';if(estEl){estEl.textContent='Custom - based on walkthrough';estEl.style.color='#6b7280';}return;}
-  var hours=0;
-  if(isBeds&&(beds||baths)){hours=0.75+(beds*0.75)+(baths*0.5);}
-  else if(isSqft&&sqft){var cm=cond>=9?1.0:cond>=7?1.2:cond>=5?1.4:1.8;hours=Math.max(2,(sqft/500)*cm);}
-  if(!hours){if(estRow)estRow.style.display='none';return;}
-  var total=hours*65*1.04712;
-  if(estRow)estRow.style.display='';
-  if(estEl){estEl.textContent='$'+total.toFixed(2)+' (before frequency discount)';estEl.style.color='#0284c7';}
-  
-  
+  var svc = (document.getElementById('nl-service')||{}).value || '';
+  var beds = parseInt((document.getElementById('nl-beds')||{}).value) || 0;
+  var baths = parseFloat((document.getElementById('nl-baths')||{}).value) || 0;
+  var sqft = parseFloat(((document.getElementById('nl-sqft')||{}).value||'').replace(/[^0-9.]/g,'')) || 0;
+  var cond = parseInt((document.getElementById('nl-condition')||{}).value) || 7;
+  var freq = (document.getElementById('nl-freq')||{}).value || '';
+
+  var bedsRow = document.getElementById('nl-beds-row');
+  var bathsRow = document.getElementById('nl-baths-row');
+  var condRow = document.getElementById('nl-condition-row');
+  var sqftRow = document.querySelector('#new-lead-overlay .form-row:has(#nl-sqft)');
+  var estRow = document.getElementById('nl-est-row');
+  var estEl = document.getElementById('nl-est');
+
+  var isRegular = svc === 'regular';
+  var isDeep = svc === 'deep';
+  var isMoveout = svc === 'moveout';
+  var isJan = svc === 'janitorial';
+  var isSqftBased = isDeep || isMoveout;
+
+  if (bedsRow) bedsRow.style.display = '';
+  if (bathsRow) bathsRow.style.display = '';
+  if (sqftRow) sqftRow.style.display = isSqftBased ? '' : 'none';
+  if (condRow) condRow.style.display = '';
+
+  if (isJan) {
+    if (estRow) estRow.style.display = '';
+    if (estEl) { estEl.innerHTML = '<span style="color:#6b7280">Custom - based on walkthrough</span>'; }
+    return;
+  }
+  if (!svc) { if (estRow) estRow.style.display = 'none'; return; }
+
+  var baseHrs = 1.0 + (beds * 0.5) + (baths * 0.4);
+  if (isDeep) baseHrs *= 1.5;
+  else if (isMoveout) baseHrs *= 1.7;
+  var condMod = 1.0;
+  if (cond <= 2) condMod = 1.70;
+  else if (cond <= 4) condMod = 1.40;
+  else if (cond <= 6) condMod = 1.25;
+  var hrs = Math.round(baseHrs * condMod * 10) / 10;
+  if (!hrs) { if (estRow) estRow.style.display = 'none'; return; }
+
+  var rate = (isDeep || isMoveout) ? 70 : 65;
+  var base = Math.round(hrs * rate * 100) / 100;
+
+  var discRate = freq === 'Weekly' ? 0.20 : freq === 'Biweekly' ? 0.15 :
+                 freq === 'Every 3 Weeks' ? 0.125 : freq === 'Monthly' ? 0.10 :
+                 freq === 'Every 6 Weeks' ? 0.10 : 0;
+  var discAmt = Math.round(base * discRate * 100) / 100;
+  var afterDisc = Math.round((base - discAmt) * 100) / 100;
+
+  var tax = Math.round(afterDisc * 0.04712 * 100) / 100;
+  var total = Math.round((afterDisc + tax) * 100) / 100;
+
+  if (estRow) estRow.style.display = '';
+  if (estEl) {
+    var html = '<div style="font-size:12px;line-height:1.8;">';
+    html += '<div>Est. hours: <b>' + hrs + ' hrs</b></div>';
+    html += '<div>Rate: <b>$' + rate + '/hr</b></div>';
+    html += '<div>Base price: <b>$' + base.toFixed(2) + '</b></div>';
+    if (discAmt > 0) html += '<div style="color:#16a34a">Discount (' + Math.round(discRate*100) + '%): <b>-$' + discAmt.toFixed(2) + '</b></div>';
+    html += '<div>GET Tax (4.712%): <b>$' + tax.toFixed(2) + '</b></div>';
+    html += '<div style="font-size:14px;font-weight:700;color:#0284c7;margin-top:4px">Total: $' + total.toFixed(2) + '</div>';
+    html += '</div>';
+    estEl.innerHTML = html;
+  }
 }
 function nlServiceChange(){var v=document.getElementById('nl-value');if(v)v.value='';nlCalcPrice();}
 function openCancelEmailAutoEdit() { openSystemAutoEdit('ce'); }

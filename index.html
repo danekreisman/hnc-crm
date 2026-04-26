@@ -6774,9 +6774,9 @@ function nlCalcPrice() {
   if(!hours){if(estRow)estRow.style.display='none';return;}
   var total=hours*65*1.04712;
   if(estRow)estRow.style.display='';
-  if(estEl){estEl.textContent=' (before frequency discount)';estEl.style.color='#0284c7';}
-  var valEl=document.getElementById('nl-value');
-  if(valEl&&!valEl.value)valEl.value='$$'+total.toFixed(2);
+  if(estEl){estEl.textContent='$'+total.toFixed(2)+' (before frequency discount)';estEl.style.color='#0284c7';}
+  
+  
 }
 function nlServiceChange(){var v=document.getElementById('nl-value');if(v)v.value='';nlCalcPrice();}
 function openCancelEmailAutoEdit() { openSystemAutoEdit('ce'); }

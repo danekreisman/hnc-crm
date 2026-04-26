@@ -13,6 +13,23 @@ import { logError } from './utils/error-logger.js';
 import { getOpenPhoneHistory } from './utils/openphone-history.js';
 import { fetchWithTimeout, TIMEOUTS } from './utils/with-timeout.js';
 
+// ── VA TASK TEST MODE: limit task creation to Dane only during rollout ─────
+const TASK_AUTOMATIONS_TEST_MODE = true;
+const DANE_PHONE_DIGITS = '8082697636';
+const DANE_EMAIL = 'dane.kreisman@gmail.com';
+
+function _digitsOnly(s){ return (s||'').replace(/\D/g,''); }
+
+function isTestSafeRecord(record){
+  if(!TASK_AUTOMATIONS_TEST_MODE) return true;
+  if(!record) return false;
+  var phoneD = _digitsOnly(record.phone);
+  if(phoneD && phoneD.indexOf(DANE_PHONE_DIGITS) >= 0) return true;
+  var email = (record.email||'').trim().toLowerCase();
+  if(email && email === DANE_EMAIL) return true;
+  return false;
+}
+
 
 async function isNotifEnabled(db, clientId, key) {
   if (!clientId) return true;
@@ -110,11 +127,17 @@ export default async function handler(req, res) {
       // Fetch client info for the brief
       const { data: client } = await db
         .from('clients')
-        .select('name, phone')
+        .select('name, phone, email')
         .eq('id', appt.client_id)
         .single();
 
       if (!client) continue;
+
+      // VA-task test mode guard: only create tasks for Dane during rollout
+      if (!isTestSafeRecord(client)) {
+        console.log(`[run-job-completions] TEST_MODE: skipping first-clean task for ${client.name}`);
+        continue;
+      }
 
       // Generate a brief AI call note (light — no OpenPhone history needed for first clean)
       const today = new Date().toISOString().split('T')[0];
@@ -130,6 +153,13 @@ export default async function handler(req, res) {
 
       if (!taskErr) {
         firstCleanTasks.push(client.name);
+        try {
+          await fetch(process.env.SUPABASE_URL+'/rest/v1/activity_logs', {
+            method:'POST',
+            headers:{'apikey':process.env.SUPABASE_SERVICE_ROLE_KEY,'Authorization':'Bearer '+process.env.SUPABASE_SERVICE_ROLE_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+            body:JSON.stringify({action:'va_task_created',description:`First-clean follow-up for ${client.name}`,user_email:'system',entity_type:'va_task_created',metadata:{task_type:'call_client', client_id:appt.client_id, automation:'post_first_appt'}})
+          });
+        } catch(_){}
         console.log(`[run-job-completions] Created first-clean follow-up task for ${client.name}`);
       }
     }

@@ -3554,7 +3554,7 @@ async function saveApptEdit(mode){
     : mode==='single'&&a.recurring
       ? 'This appointment updated.'
       : 'Changes saved.';
-  showToast('', toastMsg);
+  showToast(toastMsg);
 
   // Persist to Supabase in background
   if(a.dbId){
@@ -3665,7 +3665,7 @@ async function cancelAppointment(){
 
   renderCal();
   closeOverlay('appt-overlay');
-  showToast('', 'Appointment cancelled.');
+  showToast('Appointment cancelled');
   // AUTOMATION HOOK: appointment.cancelled
   try { if (typeof hncFireEvent === 'function' && currentAppt) hncFireEvent('appointment.cancelled', {
     appointment_id: currentAppt.dbId||null, client_name: currentAppt.n||'', date: (currentApptKey||'').replace(/-/g,'-'),
@@ -3729,7 +3729,7 @@ async function cancelAllRecurring(){
   if(bar){bar.textContent='';}
   renderCal();
   closeOverlay('appt-overlay');
-  showToast('', 'Recurring series for '+targetName+' cancelled.');
+  showToast('Series for '+targetName+' cancelled');
 }
 
 function deleteAppointment(){
@@ -3770,7 +3770,7 @@ function deleteAppointment(){
   if(bar){ bar.textContent=''; }
   renderCal();
   closeOverlay('appt-overlay');
-  showToast('', 'Appointment deleted.');
+  showToast('Appointment deleted');
 }
 
 function deleteEntireSeries(){
@@ -3842,7 +3842,7 @@ function deleteEntireSeries(){
   if(bar){ bar.textContent=''; }
   renderCal();
   closeOverlay('appt-overlay');
-  showToast('', 'Series halted — '+futureDbIds.length+' future appointments deleted.');
+  showToast('Series halted — '+futureDbIds.length+' future appointments deleted');
 }
 
 function openClient(id){
@@ -5064,7 +5064,7 @@ async function saveNewAppt(){
   renderCal();
   closeOverlay('new-appt-overlay');
   var apptLabel=freq==='One-time'?'Appointment booked!':occDates.length+' '+freq.toLowerCase()+' appointments booked!';
-  showToast('', apptLabel);
+  showToast(apptLabel);
 
   // ── STEP 3: Persist to Supabase in background (UI already updated) ──
   if(freq==='One-time'){

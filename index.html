@@ -11139,53 +11139,54 @@ async function loadSuggestedQuote(){
   }
 }
 
-async function generateLeadSummary(){
+async function generateLeadSummary() {
   var d = currentLeadId ? leadDB[currentLeadId] : null;
-  if(!d) return;
+  if (!d) return;
   var summaryEl = document.getElementById('lead-ai-summary');
   var thinkingEl = document.getElementById('lead-ai-thinking');
-  if(!summaryEl || !thinkingEl) return;
-  summaryEl.style.display = 'none';
-  thinkingEl.style.display = 'block';
+  if (!summaryEl || !thinkingEl) return;
 
-  var msgs = [];
-  inboxData.forEach(function(thread){
-    if(thread.name === d.name){
-      thread.msgs.slice(-4).forEach(function(m){
-        msgs.push((m.out?'You: ':'Lead: ')+m.text);
-      });
-    }
-  });
+  if (thinkingEl) thinkingEl.style.display = 'block';
+  if (summaryEl) summaryEl.textContent = '';
 
-  var prompt = 'You are an assistant for Hawaii Natural Clean, a cleaning business in Hawaii.'
-    +' Generate a concise 3-4 sentence lead intelligence briefing.'
-    +' Rules: be factual — only report what the data shows, do not speculate. Summarize quote details, lead stage, and any concrete SMS/call patterns. End with one specific recommended next action.'
-    +' Assess deal likelihood, suggest next steps, and flag any urgency.\n\n'
-    +'Lead: '+d.name+'\n'
-    +'Stage: '+(d.stage||'New inquiry')+'\n'
-    +'Service: '+(d.service||'—')+'\n'
-    +'Est. value: '+(d.value||'—')+'\n'
-    +'Property: '+(d.sqft||'—')+'\n'
-    +'Source: '+(d.source||'—')+'\n'
-    +'Next action: '+(d.action||'—')+'\n'
-    +'Due: '+(d.due||'—')+'\n'
-    +'Assigned: '+(d.assigned||'—')+'\n'
-    +(d.notes&&d.notes!=='—'?'Notes: '+d.notes+'\n':'')
-    +(msgs.length?'\nRecent messages:\n'+msgs.join('\n'):'');
+  var name = d.name || d.contact_name || 'Unknown';
+  var svc = d.service || 'Unknown';
+  var stage = d.stage || 'New inquiry';
+  var notes = d.notes || 'None';
+  var price = d.quote_total ? '$' + Number(d.quote_total).toFixed(2) : (d.value || 'TBD');
+  var propParts = [];
+  if (d.beds) propParts.push(d.beds + 'br');
+  if (d.baths) propParts.push(d.baths + 'ba');
+  if (d.sqft) propParts.push(d.sqft + ' sqft');
+  var property = propParts.length ? propParts.join('/') : 'Unknown';
+
+  var prompt = 'You are an assistant for Hawaii Natural Clean, a cleaning business in Hawaii. Generate a concise 3-4 sentence lead intelligence briefing. Be factual. End with one specific recommended next action.';
+  prompt += '\n\nLead: ' + name;
+  prompt += '\nStage: ' + stage;
+  prompt += '\nService: ' + svc;
+  prompt += '\nProperty: ' + property;
+  if (d.condition) prompt += '\nCondition: ' + d.condition + '/10';
+  prompt += '\nQuoted price: ' + price;
+  prompt += '\nAddress: ' + (d.address || 'Not provided');
+  prompt += '\nNotes: ' + notes;
 
   try {
     var response = await fetch('/api/ai-summary', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt: prompt, clientPhone: cdata && cdata.phone || '' })
+      body: JSON.stringify({ prompt: prompt, clientPhone: d.phone || '' })
     });
     var data = await response.json();
-    thinkingEl.style.display = 'none';
-    summaryEl.textContent = data.summary || 'Could not generate summary.';
+    if (thinkingEl) thinkingEl.style.display = 'none';
+    if (data.success && data.summary) {
+      summaryEl.textContent = data.summary;
+    } else {
+      summaryEl.textContent = 'Error: ' + (data.error || 'No summary returned');
+    }
     summaryEl.style.display = 'block';
-  } catch(err) {
-    thinkingEl.style.display = 'none';
-    summaryEl.textContent = 'Error generating summary.';
+  } catch (err) {
+    if (thinkingEl) thinkingEl.style.display = 'none';
+    summaryEl.textContent = 'Error generating summary: ' + err.message;
     summaryEl.style.display = 'block';
   }
 }

@@ -179,8 +179,6 @@ Day 3 follow-up, Day 7 final, Nurture Month 1/3/6, One-time Day 30/60, Cancelled
 
 ## Known Bugs (do not fix yet — just be aware)
 
-1. **Pricing calculator formula wrong** — Deep clean 1200sqft + condition 10 shows ~$163, should be ~$513 with tax. Formula needs rework.
-2. **Service type list too long** — new lead form has 8 options, should only have: Regular Cleaning, Deep Cleaning, Move Out Cleaning.
 3. **Pipeline raw JS in deal-val** — one card renders `'+(lead.value||'TBD')+'` as literal text (likely a TBD lead with no value set).
 
 ---

@@ -6990,10 +6990,9 @@ function renderAutoList(){
       return '<div style="font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text-muted);margin:0 4px 8px;padding-bottom:4px;border-bottom:1px solid var(--border);">'+label+'</div>';
     };
     host.innerHTML =
-      _autoSectionHdrFirst('Leads')      + systemCard + janitorialCard +
-      _autoSectionHdr('Clients')         + bookingConfirmCard + reminderCard + cancelEmailCard + cancelClientSmsCard + reviewSmsCard +
-      _autoSectionHdr('Cleaners')        + cancelCleanerSmsCard +
-      _autoSectionHdr('Admin (VA tasks)') + vaQuoteDay1Card + vaDay5Card + vaPostFirstCleanCard +
+      _autoSectionHdrFirst('Leads') + systemCard + janitorialCard + vaQuoteDay1Card + vaDay5Card +
+      _autoSectionHdr('Clients')    + bookingConfirmCard + reminderCard + cancelEmailCard + cancelClientSmsCard + reviewSmsCard + vaPostFirstCleanCard +
+      _autoSectionHdr('Cleaners')   + cancelCleanerSmsCard +
       '<div class="empty-state" style="padding:28px;text-align:center;color:var(--muted);background:var(--panel);border:1px dashed var(--border);border-radius:var(--radius);margin-top:18px;">No custom automations yet. Click <b>+ New automation</b> to build your first rule.</div>';
     _ensureAutomationToggleListener();
     setTimeout(_syncAutomationStatusUI, 0);
@@ -7008,10 +7007,9 @@ function renderAutoList(){
     return '<div style="font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text-muted);margin:0 4px 8px;padding-bottom:4px;border-bottom:1px solid var(--border);">'+label+'</div>';
   };
   var html =
-    _autoSectionHdrFirst('Leads')      + systemCard + janitorialCard +
-    _autoSectionHdr('Clients')         + bookingConfirmCard + reminderCard + cancelEmailCard + cancelClientSmsCard + reviewSmsCard +
-    _autoSectionHdr('Cleaners')        + cancelCleanerSmsCard +
-    _autoSectionHdr('Admin (VA tasks)') + vaQuoteDay1Card + vaDay5Card + vaPostFirstCleanCard +
+    _autoSectionHdrFirst('Leads') + systemCard + janitorialCard + vaQuoteDay1Card + vaDay5Card +
+    _autoSectionHdr('Clients')    + bookingConfirmCard + reminderCard + cancelEmailCard + cancelClientSmsCard + reviewSmsCard + vaPostFirstCleanCard +
+    _autoSectionHdr('Cleaners')   + cancelCleanerSmsCard +
     _autoSectionHdr('Custom rules');
   for(var i=0;i<automations.length;i++){
     var a = automations[i];

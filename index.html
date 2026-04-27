@@ -7051,19 +7051,21 @@ function escAuto(s){ s=String(s==null?'':s); return s.replace(/[&<>"]/g, functio
 function _syncAutomationStatusUI(){
   var host = document.getElementById('auto-list');
   if(!host) return;
-  var cards = Array.from(host.querySelectorAll('.card'));
-  var totalToggles = 0, activeToggles = 0;
-  cards.forEach(function(card){
-    var toggle = card.querySelector('.auto-toggle input[type="checkbox"]');
-    if(!toggle) return;
-    totalToggles++;
+  /* Count every toggle in the auto-list, regardless of which class wraps it.
+     System cards use .card, lifecycle cards use .tw — using the toggle as the
+     anchor catches both. */
+  var toggles = Array.from(host.querySelectorAll('.auto-toggle input[type="checkbox"]'));
+  var totalToggles = toggles.length;
+  var activeToggles = 0;
+  toggles.forEach(function(toggle){
     if(toggle.checked) activeToggles++;
-    // Find or create the dynamic status pill (always the first one in the title row)
+    /* Walk up to the nearest card-like container so we can update its status pill */
+    var card = toggle.closest('.card, .tw, [data-lifecycle-card]');
+    if(!card) return;
     var pill = card.querySelector('[data-auto-status-pill]');
     if(!pill){
-      // Replace the first .pill or .badge that has ACTIVE/Off-like text with our marker
       var firstPill = card.querySelector('.pill, .badge');
-      if(firstPill && /^(ACTIVE|Off|PAUSED)$/i.test(firstPill.textContent.trim())){
+      if(firstPill && /^(ACTIVE|Off|PAUSED|DISABLED)$/i.test(firstPill.textContent.trim())){
         firstPill.setAttribute('data-auto-status-pill', '1');
         pill = firstPill;
       }

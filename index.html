@@ -6982,9 +6982,8 @@ function renderAutoList(){
   var reviewSmsCard = '<div class="card" style="padding:14px 16px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:12px;border-left:3px solid #d1d5db;"><div style="flex:1;min-width:0;"><div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;"><b style="font-size:14px;">Post-Clean Review Request</b><span class="badge" style="background:#f3f4f6;color:#6b7280;border:1px solid #d1d5db;font-size:11px;padding:2px 7px;border-radius:999px;">Off</span><span class="badge" style="background:#eff6ff;color:#3b82f6;border:1px solid #bfdbfe;font-size:11px;padding:2px 7px;border-radius:999px;">System</span></div><div style="font-size:12px;color:#6b7280;">After appointment completed · Cron: Daily · send Google review SMS to client</div></div><button class=\"btn\" style=\"font-size:12px;padding:4px 10px;margin-left:auto;margin-right:8px;\" onclick=\"openReviewSmsAutoEdit()\">Edit templates</button><label class=\"auto-toggle\" title=\"Enable automation\"><input type=\"checkbox\" id="toggle-review-sms"><div class="auto-toggle-track"><div class="auto-toggle-thumb"></div></div></label></div>';
   var bookingConfirmCard = '<div class="card" style="padding:14px 16px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:12px;border-left:3px solid #d1d5db;"><div style="flex:1;min-width:0;"><div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;"><b style="font-size:14px;">Booking Confirmation Email</b><span class="badge" style="background:#f3f4f6;color:#6b7280;border:1px solid #d1d5db;font-size:11px;padding:2px 7px;border-radius:999px;">Off</span><span class="badge" style="background:#eff6ff;color:#3b82f6;border:1px solid #bfdbfe;font-size:11px;padding:2px 7px;border-radius:999px;">System</span></div><div style="font-size:12px;color:#6b7280;">When client books via quote link · send confirmation email to client</div></div><button class=\"btn\" style=\"font-size:12px;padding:4px 10px;margin-left:auto;margin-right:8px;\" onclick=\"openBookingConfirmAutoEdit()\">Edit templates</button><label class=\"auto-toggle\" title=\"Enable automation\"><input type=\"checkbox\" id="toggle-booking-confirm"><div class="auto-toggle-track"><div class="auto-toggle-thumb"></div></div></label></div>';
     host.innerHTML = systemCard + janitorialCard + reminderCard + cancelEmailCard + cancelClientSmsCard + cancelCleanerSmsCard + reviewSmsCard + bookingConfirmCard + vaQuoteDay1Card + vaDay5Card + vaPostFirstCleanCard + '<div class="empty-state" style="padding:28px;text-align:center;color:var(--muted);background:var(--panel);border:1px dashed var(--border);border-radius:var(--radius);">No custom automations yet. Click <b>+ New automation</b> to build your first rule.</div>';
-    var ac = document.getElementById('auto-active-count'); if(ac) ac.textContent='3';
-    var atot = document.getElementById('auto-total-count'); if(atot) atot.textContent='3';
-    var tc = document.getElementById('auto-today-count'); if(tc) tc.textContent='0';
+    _ensureAutomationToggleListener();
+    setTimeout(_syncAutomationStatusUI, 0);
     return;
   }
   var html = systemCard + janitorialCard + reminderCard + vaQuoteDay1Card + vaDay5Card + vaPostFirstCleanCard;
@@ -7007,14 +7006,73 @@ function renderAutoList(){
       + '</div>';
   }
   host.innerHTML = html;
-  var active = 2 + automations.filter(function(a){return a.enabled;}).length; // +2 for system cards
-  var ac = document.getElementById('auto-active-count'); if(ac) ac.textContent=String(active);
-  var atot = document.getElementById('auto-total-count'); if(atot) atot.textContent=String(2+automations.length);
-  var today = (new Date()).toDateString();
-  var todayN = automationRuns.filter(function(r){ return new Date(r.ts).toDateString()===today; }).length;
-  var tc = document.getElementById('auto-today-count'); if(tc) tc.textContent=String(todayN);
+  _ensureAutomationToggleListener();
+  setTimeout(_syncAutomationStatusUI, 0);
 }
 function escAuto(s){ s=String(s==null?'':s); return s.replace(/[&<>"]/g, function(c){return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c];}); }
+
+/* ── Automations counters + status pills: source-of-truth sync ──────────────
+   The card HTML strings have static "ACTIVE"/"Off" badges that lie. This walks
+   every card after render and:
+   - Replaces the first status-looking badge with a dynamic ACTIVE/Off pill that
+     reflects the actual checkbox state.
+   - Updates the 3 metric counters (active / today / total) based on real toggle
+     state across all cards. Honest counter = (# of :checked toggles in #auto-list).
+   - Re-runs on any toggle change (delegated listener attached once).
+*/
+function _syncAutomationStatusUI(){
+  var host = document.getElementById('auto-list');
+  if(!host) return;
+  var cards = Array.from(host.querySelectorAll('.card'));
+  var totalToggles = 0, activeToggles = 0;
+  cards.forEach(function(card){
+    var toggle = card.querySelector('.auto-toggle input[type="checkbox"]');
+    if(!toggle) return;
+    totalToggles++;
+    if(toggle.checked) activeToggles++;
+    // Find or create the dynamic status pill (always the first one in the title row)
+    var pill = card.querySelector('[data-auto-status-pill]');
+    if(!pill){
+      // Replace the first .pill or .badge that has ACTIVE/Off-like text with our marker
+      var firstPill = card.querySelector('.pill, .badge');
+      if(firstPill && /^(ACTIVE|Off|PAUSED)$/i.test(firstPill.textContent.trim())){
+        firstPill.setAttribute('data-auto-status-pill', '1');
+        pill = firstPill;
+      }
+    }
+    if(pill){
+      if(toggle.checked){
+        pill.textContent = 'ACTIVE';
+        pill.style.cssText = 'font-size:10px;background:#d1fae5;color:#065f46;border:1px solid #6ee7b7;padding:2px 8px;border-radius:99px;';
+      } else {
+        pill.textContent = 'Off';
+        pill.style.cssText = 'font-size:10px;background:#f3f4f6;color:#6b7280;border:1px solid #d1d5db;padding:2px 8px;border-radius:99px;';
+      }
+    }
+  });
+  // Update the three metric counters
+  var ac = document.getElementById('auto-active-count'); if(ac) ac.textContent = String(activeToggles);
+  var atot = document.getElementById('auto-total-count'); if(atot) atot.textContent = String(totalToggles);
+  // "Triggered today" still pulls from automationRuns log
+  var today = (new Date()).toDateString();
+  var todayN = (typeof automationRuns !== 'undefined' && automationRuns)
+    ? automationRuns.filter(function(r){ return new Date(r.ts).toDateString()===today; }).length
+    : 0;
+  var tc = document.getElementById('auto-today-count'); if(tc) tc.textContent = String(todayN);
+}
+
+/* Attach a delegated change listener once so toggling any switch live-updates
+   counters and the status pill on its card. */
+function _ensureAutomationToggleListener(){
+  if(window._autoToggleListenerWired) return;
+  window._autoToggleListenerWired = true;
+  document.addEventListener('change', function(ev){
+    var t = ev.target;
+    if(t && t.matches && t.matches('#auto-list .auto-toggle input[type="checkbox"]')){
+      _syncAutomationStatusUI();
+    }
+  });
+}
 
 /* Toggle handler for VA task automations (UI-only persistence; backend cron is independent for now) */
 function _vaTaskToggle(key, enabled){

@@ -801,11 +801,8 @@ textarea{font-family:inherit;}
         </div>
         <div id="auto-list"></div>
 
-        <div style="display:flex;justify-content:space-between;align-items:center;margin:18px 0 10px;">
-          <div class="section-title" style="margin:0;">Lead automations</div>
-          <button class="btn btn-primary" onclick="openNewAuto()" style="font-size:12px;padding:6px 12px;">+ New automation</button>
-        </div>
-        <div id="lead-auto-list"></div>
+        <!-- Legacy lead-auto-list: cards from this table now render into the grouped auto-list above. Kept as a hidden fallback. -->
+        <div id="lead-auto-list" style="display:none;"></div>
       </div>
 
       <!-- AUTOMATION TEST MODAL -->
@@ -6990,9 +6987,12 @@ function renderAutoList(){
       return '<div style="font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text-muted);margin:0 4px 8px;padding-bottom:4px;border-bottom:1px solid var(--border);">'+label+'</div>';
     };
     host.innerHTML =
-      _autoSectionHdrFirst('Leads') + systemCard + janitorialCard + vaQuoteDay1Card + vaDay5Card +
-      _autoSectionHdr('Clients')    + bookingConfirmCard + reminderCard + cancelEmailCard + cancelClientSmsCard + reviewSmsCard + vaPostFirstCleanCard +
-      _autoSectionHdr('Cleaners')   + cancelCleanerSmsCard +
+      _autoSectionHdrFirst('Leads')
+        + '<div data-auto-section="leads">' + systemCard + janitorialCard + vaQuoteDay1Card + vaDay5Card + '</div>' +
+      _autoSectionHdr('Clients')
+        + '<div data-auto-section="clients">' + bookingConfirmCard + reminderCard + cancelEmailCard + cancelClientSmsCard + reviewSmsCard + vaPostFirstCleanCard + '</div>' +
+      _autoSectionHdr('Cleaners')
+        + '<div data-auto-section="cleaners">' + cancelCleanerSmsCard + '</div>' +
       '<div class="empty-state" style="padding:28px;text-align:center;color:var(--muted);background:var(--panel);border:1px dashed var(--border);border-radius:var(--radius);margin-top:18px;">No custom automations yet. Click <b>+ New automation</b> to build your first rule.</div>';
     _ensureAutomationToggleListener();
     setTimeout(_syncAutomationStatusUI, 0);
@@ -7007,9 +7007,12 @@ function renderAutoList(){
     return '<div style="font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text-muted);margin:0 4px 8px;padding-bottom:4px;border-bottom:1px solid var(--border);">'+label+'</div>';
   };
   var html =
-    _autoSectionHdrFirst('Leads') + systemCard + janitorialCard + vaQuoteDay1Card + vaDay5Card +
-    _autoSectionHdr('Clients')    + bookingConfirmCard + reminderCard + cancelEmailCard + cancelClientSmsCard + reviewSmsCard + vaPostFirstCleanCard +
-    _autoSectionHdr('Cleaners')   + cancelCleanerSmsCard +
+    _autoSectionHdrFirst('Leads')
+      + '<div data-auto-section="leads">' + systemCard + janitorialCard + vaQuoteDay1Card + vaDay5Card + '</div>' +
+    _autoSectionHdr('Clients')
+      + '<div data-auto-section="clients">' + bookingConfirmCard + reminderCard + cancelEmailCard + cancelClientSmsCard + reviewSmsCard + vaPostFirstCleanCard + '</div>' +
+    _autoSectionHdr('Cleaners')
+      + '<div data-auto-section="cleaners">' + cancelCleanerSmsCard + '</div>' +
     _autoSectionHdr('Custom rules');
   for(var i=0;i<automations.length;i++){
     var a = automations[i];
@@ -7800,17 +7803,30 @@ async function loadLeadAutomations(){
   }
 }
 
+/* Categorize a lead-lifecycle automation by its name pattern.
+   Returns 'leads' for early funnel + nurture sequences, 'clients' for
+   post-booking lifecycle and former-client win-back. */
+function _classifyLifecycleAuto(auto){
+  var n = (auto && auto.name || '').toLowerCase();
+  if(n.indexOf('new lead') >= 0 || n.indexOf('nurture') >= 0) return 'leads';
+  if(n.indexOf('one-time') >= 0 || n.indexOf('canceled') >= 0 || n.indexOf('cancelled') >= 0 || n.indexOf('client') >= 0) return 'clients';
+  return 'leads'; // sensible default for any uncategorized lead-table entry
+}
+
 function renderLeadAutoList(automationList){
-  var host = document.getElementById('lead-auto-list');
-  if(!host) return;
-  
-  host.innerHTML = '';
-  
+  /* Prefer rendering INTO the grouped auto-list (categories). Fall back to the
+     legacy lead-auto-list element only if the grouped list hasn't rendered yet. */
+  var grouped = document.querySelector('#auto-list [data-auto-section="leads"]');
+  var legacyHost = document.getElementById('lead-auto-list');
+  if(legacyHost) legacyHost.innerHTML = ''; // always clear the legacy host
+
   if(!automationList || automationList.length === 0){
-    host.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-muted);">No automations yet. Create your first one!</div>';
+    if(!grouped && legacyHost){
+      legacyHost.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-muted);">No automations yet. Create your first one!</div>';
+    }
     return;
   }
-  
+
   automationList.forEach(function(auto){
     var card = document.createElement('div');
     card.className = 'tw';
@@ -7854,8 +7870,18 @@ function renderLeadAutoList(automationList){
       '  </div>' +
       '</div>';
     
-    host.appendChild(card);
+    /* Route into the matching grouped section, fall back to legacy host. */
+    if(grouped){
+      var category = _classifyLifecycleAuto(auto);
+      var target = document.querySelector('#auto-list [data-auto-section="'+category+'"]');
+      if(target) target.appendChild(card);
+      else grouped.appendChild(card);
+    } else if(legacyHost){
+      legacyHost.appendChild(card);
+    }
   });
+  /* Re-run the counter sync now that lifecycle cards are in the DOM */
+  if(typeof _syncAutomationStatusUI === 'function') _syncAutomationStatusUI();
 }
 
 async function toggleLeadAuto(id, newState){

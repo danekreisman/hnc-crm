@@ -80,3 +80,6 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: err.message });
   }
 }
+
+// Build marker: force Vercel to rebuild this function bundle when the
+// imported send-broadcast.js changes. Bumped: 2026-04-27-cta-fix

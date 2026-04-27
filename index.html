@@ -357,6 +357,12 @@ textarea{font-family:inherit;}
 .auto-toggle-track{width:36px;height:20px;border-radius:20px;background:#d1d5db;transition:background .25s ease;flex-shrink:0;position:relative;}
 .auto-toggle input:checked + .auto-toggle-track{background:var(--brand-500);}
 .auto-toggle-thumb{position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.25);transition:transform .25s cubic-bezier(.34,1.56,.64,1);}
+.auto-tabs{display:flex;gap:4px;background:var(--bg-soft,#f8f9fb);border:1px solid var(--border);border-radius:12px;padding:4px;margin-bottom:16px;width:fit-content;}
+.auto-tab{display:flex;align-items:center;gap:8px;padding:8px 14px;border:0;background:transparent;border-radius:8px;font-size:13px;font-weight:500;color:var(--text-muted);cursor:pointer;transition:all .15s ease;}
+.auto-tab:hover{color:var(--text);}
+.auto-tab.active{background:#fff;color:var(--text);box-shadow:0 1px 3px rgba(15,23,42,.08);font-weight:600;}
+.auto-tab-count{display:inline-flex;align-items:center;justify-content:center;min-width:20px;height:20px;padding:0 6px;border-radius:10px;background:var(--border);color:var(--text-muted);font-size:11px;font-weight:600;}
+.auto-tab.active .auto-tab-count{background:var(--brand-50,#ecfdf5);color:var(--brand-600,#059669);}
 .auto-toggle input:checked + .auto-toggle-track .auto-toggle-thumb{transform:translateX(16px);}
 .template-tab.active{background:var(--brand-500);color:#fff;border-color:var(--brand-500);}
 .template-tab:hover:not(.active){background:var(--bg-soft);}
@@ -6903,7 +6909,7 @@ function renderAutoList(){
   if(!host) return;
 
   // System card: always shown first, not deletable
-  var systemCard = '<div class="card" style="padding:14px 16px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:12px;border-left:3px solid var(--brand-500);">'
+  var systemCard = '<div class="card" style="padding:14px 16px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:12px;border-left:3px solid var(--border);">'
     + '<div style="flex:1;min-width:0;">'
     +   '<div style="display:flex;align-items:center;gap:8px;"><b style="font-size:14px;">New Lead — Auto Quote</b>'
     +     '<span class="pill pill-ok" style="font-size:10px;">ACTIVE</span>'
@@ -6917,7 +6923,7 @@ function renderAutoList(){
     + '<label class="auto-toggle" title="Enable automation" style="margin-left:auto"><input type="checkbox" id="toggle-auto-quote"><div class="auto-toggle-track"><div class="auto-toggle-thumb"></div></div></label>'
     + '</div>';
 
-  var janitorialCard = '<div class="card" style="padding:14px 16px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:12px;border-left:3px solid #f59e0b;">'
+  var janitorialCard = '<div class="card" style="padding:14px 16px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:12px;border-left:3px solid var(--border);">'
     + '<div style="flex:1;min-width:0;">'
     +   '<div style="display:flex;align-items:center;gap:8px;"><b style="font-size:14px;">Janitorial Lead — Walkthrough Request</b>'
     +     '<span class="pill pill-ok" style="font-size:10px;">ACTIVE</span>'
@@ -6931,7 +6937,7 @@ function renderAutoList(){
     + '<label class="auto-toggle" title="Enable automation" style="margin-left:auto"><input type="checkbox" id="toggle-janitorial"><div class="auto-toggle-track"><div class="auto-toggle-thumb"></div></div></label>'
     + '</div>';
 
-  var reminderCard = '<div class="card" style="padding:14px 16px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:12px;border-left:3px solid #10b981;">'    + '<div style="flex:1;min-width:0;">'    +   '<div style="display:flex;align-items:center;gap:8px;"><b style="font-size:14px;">Day-Before Appointment Reminders</b>'    +     '<span class="pill pill-ok" style="font-size:10px;">ACTIVE</span>'    +     '<span style="font-size:10px;background:#f0f9ff;color:#1d4ed8;padding:2px 7px;border-radius:99px;border:1px solid #bfdbfe;">System</span>'    +     '<span style="font-size:10px;background:#f0fdf4;color:#166534;padding:2px 7px;border-radius:99px;border:1px solid #bbf7d0;">Cron · 6pm HST</span>'    +   '</div>'    +   '<div style="font-size:12px;color:var(--muted);margin-top:4px;">Daily at <b>6:00 PM HST</b> &middot; appointment is tomorrow &middot; do send_sms to customer + assigned cleaner</div>'    + '</div>'    + '<button class=\"btn\" style=\"font-size:12px;padding:4px 10px;margin-left:auto;margin-right:8px;\" onclick=\"openDayBeforeAutoEdit()\">Edit templates</button><label class=\"auto-toggle\" title=\"Enable automation\"><input type=\"checkbox\" id=\"toggle-reminders\" checked onchange="toggleReminderAuto(this.checked)"><div class="auto-toggle-track"><div class="auto-toggle-thumb"></div></div></label></div>';
+  var reminderCard = '<div class="card" style="padding:14px 16px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:12px;border-left:3px solid var(--border);">'    + '<div style="flex:1;min-width:0;">'    +   '<div style="display:flex;align-items:center;gap:8px;"><b style="font-size:14px;">Day-Before Appointment Reminders</b>'    +     '<span class="pill pill-ok" style="font-size:10px;">ACTIVE</span>'    +     '<span style="font-size:10px;background:#f0f9ff;color:#1d4ed8;padding:2px 7px;border-radius:99px;border:1px solid #bfdbfe;">System</span>'    +     '<span style="font-size:10px;background:#f0fdf4;color:#166534;padding:2px 7px;border-radius:99px;border:1px solid #bbf7d0;">Cron · 6pm HST</span>'    +   '</div>'    +   '<div style="font-size:12px;color:var(--muted);margin-top:4px;">Daily at <b>6:00 PM HST</b> &middot; appointment is tomorrow &middot; do send_sms to customer + assigned cleaner</div>'    + '</div>'    + '<button class=\"btn\" style=\"font-size:12px;padding:4px 10px;margin-left:auto;margin-right:8px;\" onclick=\"openDayBeforeAutoEdit()\">Edit templates</button><label class=\"auto-toggle\" title=\"Enable automation\"><input type=\"checkbox\" id=\"toggle-reminders\" checked onchange="toggleReminderAuto(this.checked)"><div class="auto-toggle-track"><div class="auto-toggle-thumb"></div></div></label></div>';
   // ── VA Task automations: create internal todos, NEVER contact anyone ──
   // Purple border distinguishes these from external-contact automations.
   // Toggle state persists to localStorage; backend cron jobs check this flag
@@ -6941,7 +6947,7 @@ function renderAutoList(){
   }
   function _vaTaskCardHTML(opts){
     var enabled = _vaTaskEnabled(opts.key);
-    return '<div class="card" style="padding:14px 16px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:12px;border-left:3px solid #8b5cf6;">'
+    return '<div class="card" style="padding:14px 16px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:12px;border-left:3px solid var(--border);">'
       + '<div style="flex:1;min-width:0;">'
       +   '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;"><b style="font-size:14px;">'+opts.title+'</b>'
       +     (enabled
@@ -6973,46 +6979,46 @@ function renderAutoList(){
   });
 
   if(!automations.length){
-    var cancelEmailCard = '<div class="card" style="padding:14px 16px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:12px;border-left:3px solid #d1d5db;"><div style="flex:1;min-width:0;"><div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;"><b style="font-size:14px;">Appointment Cancelled — Client Email</b><span class="badge" style="background:#f3f4f6;color:#6b7280;border:1px solid #d1d5db;font-size:11px;padding:2px 7px;border-radius:999px;">Off</span><span class="badge" style="background:#eff6ff;color:#3b82f6;border:1px solid #bfdbfe;font-size:11px;padding:2px 7px;border-radius:999px;">System</span></div><div style="font-size:12px;color:#6b7280;">When appointment is cancelled · send cancellation email to client</div></div><button class=\"btn\" style=\"font-size:12px;padding:4px 10px;margin-left:auto;margin-right:8px;\" onclick=\"openCancelEmailAutoEdit()\">Edit templates</button><label class=\"auto-toggle\" title=\"Enable automation\"><input type=\"checkbox\" id="toggle-cancel-email"><div class="auto-toggle-track"><div class="auto-toggle-thumb"></div></div></label></div>';
-  var cancelClientSmsCard = '<div class="card" style="padding:14px 16px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:12px;border-left:3px solid #d1d5db;"><div style="flex:1;min-width:0;"><div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;"><b style="font-size:14px;">Appointment Cancelled — Client SMS</b><span class="badge" style="background:#f3f4f6;color:#6b7280;border:1px solid #d1d5db;font-size:11px;padding:2px 7px;border-radius:999px;">Off</span><span class="badge" style="background:#eff6ff;color:#3b82f6;border:1px solid #bfdbfe;font-size:11px;padding:2px 7px;border-radius:999px;">System</span></div><div style="font-size:12px;color:#6b7280;">When appointment is cancelled · send SMS to client</div></div><button class=\"btn\" style=\"font-size:12px;padding:4px 10px;margin-left:auto;margin-right:8px;\" onclick=\"openCancelClientSmsAutoEdit()\">Edit templates</button><label class=\"auto-toggle\" title=\"Enable automation\"><input type=\"checkbox\" id="toggle-cancel-client-sms"><div class="auto-toggle-track"><div class="auto-toggle-thumb"></div></div></label></div>';
-  var cancelCleanerSmsCard = '<div class="card" style="padding:14px 16px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:12px;border-left:3px solid #d1d5db;"><div style="flex:1;min-width:0;"><div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;"><b style="font-size:14px;">Appointment Cancelled — Cleaner SMS</b><span class="badge" style="background:#f3f4f6;color:#6b7280;border:1px solid #d1d5db;font-size:11px;padding:2px 7px;border-radius:999px;">Off</span><span class="badge" style="background:#eff6ff;color:#3b82f6;border:1px solid #bfdbfe;font-size:11px;padding:2px 7px;border-radius:999px;">System</span></div><div style="font-size:12px;color:#6b7280;">When appointment is cancelled · send SMS to assigned cleaner</div></div><button class=\"btn\" style=\"font-size:12px;padding:4px 10px;margin-left:auto;margin-right:8px;\" onclick=\"openCancelCleanerSmsAutoEdit()\">Edit templates</button><label class=\"auto-toggle\" title=\"Enable automation\"><input type=\"checkbox\" id="toggle-cancel-cleaner-sms"><div class="auto-toggle-track"><div class="auto-toggle-thumb"></div></div></label></div>';
-  var reviewSmsCard = '<div class="card" style="padding:14px 16px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:12px;border-left:3px solid #d1d5db;"><div style="flex:1;min-width:0;"><div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;"><b style="font-size:14px;">Post-Clean Review Request</b><span class="badge" style="background:#f3f4f6;color:#6b7280;border:1px solid #d1d5db;font-size:11px;padding:2px 7px;border-radius:999px;">Off</span><span class="badge" style="background:#eff6ff;color:#3b82f6;border:1px solid #bfdbfe;font-size:11px;padding:2px 7px;border-radius:999px;">System</span></div><div style="font-size:12px;color:#6b7280;">After appointment completed · Cron: Daily · send Google review SMS to client</div></div><button class=\"btn\" style=\"font-size:12px;padding:4px 10px;margin-left:auto;margin-right:8px;\" onclick=\"openReviewSmsAutoEdit()\">Edit templates</button><label class=\"auto-toggle\" title=\"Enable automation\"><input type=\"checkbox\" id="toggle-review-sms"><div class="auto-toggle-track"><div class="auto-toggle-thumb"></div></div></label></div>';
-  var bookingConfirmCard = '<div class="card" style="padding:14px 16px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:12px;border-left:3px solid #d1d5db;"><div style="flex:1;min-width:0;"><div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;"><b style="font-size:14px;">Booking Confirmation Email</b><span class="badge" style="background:#f3f4f6;color:#6b7280;border:1px solid #d1d5db;font-size:11px;padding:2px 7px;border-radius:999px;">Off</span><span class="badge" style="background:#eff6ff;color:#3b82f6;border:1px solid #bfdbfe;font-size:11px;padding:2px 7px;border-radius:999px;">System</span></div><div style="font-size:12px;color:#6b7280;">When client books via quote link · send confirmation email to client</div></div><button class=\"btn\" style=\"font-size:12px;padding:4px 10px;margin-left:auto;margin-right:8px;\" onclick=\"openBookingConfirmAutoEdit()\">Edit templates</button><label class=\"auto-toggle\" title=\"Enable automation\"><input type=\"checkbox\" id="toggle-booking-confirm"><div class="auto-toggle-track"><div class="auto-toggle-thumb"></div></div></label></div>';
+    var cancelEmailCard = '<div class="card" style="padding:14px 16px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:12px;border-left:3px solid var(--border);"><div style="flex:1;min-width:0;"><div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;"><b style="font-size:14px;">Appointment Cancelled — Client Email</b><span class="badge" style="background:#f3f4f6;color:#6b7280;border:1px solid #d1d5db;font-size:11px;padding:2px 7px;border-radius:999px;">Off</span><span class="badge" style="background:#eff6ff;color:#3b82f6;border:1px solid #bfdbfe;font-size:11px;padding:2px 7px;border-radius:999px;">System</span></div><div style="font-size:12px;color:#6b7280;">When appointment is cancelled · send cancellation email to client</div></div><button class=\"btn\" style=\"font-size:12px;padding:4px 10px;margin-left:auto;margin-right:8px;\" onclick=\"openCancelEmailAutoEdit()\">Edit templates</button><label class=\"auto-toggle\" title=\"Enable automation\"><input type=\"checkbox\" id="toggle-cancel-email"><div class="auto-toggle-track"><div class="auto-toggle-thumb"></div></div></label></div>';
+  var cancelClientSmsCard = '<div class="card" style="padding:14px 16px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:12px;border-left:3px solid var(--border);"><div style="flex:1;min-width:0;"><div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;"><b style="font-size:14px;">Appointment Cancelled — Client SMS</b><span class="badge" style="background:#f3f4f6;color:#6b7280;border:1px solid #d1d5db;font-size:11px;padding:2px 7px;border-radius:999px;">Off</span><span class="badge" style="background:#eff6ff;color:#3b82f6;border:1px solid #bfdbfe;font-size:11px;padding:2px 7px;border-radius:999px;">System</span></div><div style="font-size:12px;color:#6b7280;">When appointment is cancelled · send SMS to client</div></div><button class=\"btn\" style=\"font-size:12px;padding:4px 10px;margin-left:auto;margin-right:8px;\" onclick=\"openCancelClientSmsAutoEdit()\">Edit templates</button><label class=\"auto-toggle\" title=\"Enable automation\"><input type=\"checkbox\" id="toggle-cancel-client-sms"><div class="auto-toggle-track"><div class="auto-toggle-thumb"></div></div></label></div>';
+  var cancelCleanerSmsCard = '<div class="card" style="padding:14px 16px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:12px;border-left:3px solid var(--border);"><div style="flex:1;min-width:0;"><div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;"><b style="font-size:14px;">Appointment Cancelled — Cleaner SMS</b><span class="badge" style="background:#f3f4f6;color:#6b7280;border:1px solid #d1d5db;font-size:11px;padding:2px 7px;border-radius:999px;">Off</span><span class="badge" style="background:#eff6ff;color:#3b82f6;border:1px solid #bfdbfe;font-size:11px;padding:2px 7px;border-radius:999px;">System</span></div><div style="font-size:12px;color:#6b7280;">When appointment is cancelled · send SMS to assigned cleaner</div></div><button class=\"btn\" style=\"font-size:12px;padding:4px 10px;margin-left:auto;margin-right:8px;\" onclick=\"openCancelCleanerSmsAutoEdit()\">Edit templates</button><label class=\"auto-toggle\" title=\"Enable automation\"><input type=\"checkbox\" id="toggle-cancel-cleaner-sms"><div class="auto-toggle-track"><div class="auto-toggle-thumb"></div></div></label></div>';
+  var reviewSmsCard = '<div class="card" style="padding:14px 16px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:12px;border-left:3px solid var(--border);"><div style="flex:1;min-width:0;"><div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;"><b style="font-size:14px;">Post-Clean Review Request</b><span class="badge" style="background:#f3f4f6;color:#6b7280;border:1px solid #d1d5db;font-size:11px;padding:2px 7px;border-radius:999px;">Off</span><span class="badge" style="background:#eff6ff;color:#3b82f6;border:1px solid #bfdbfe;font-size:11px;padding:2px 7px;border-radius:999px;">System</span></div><div style="font-size:12px;color:#6b7280;">After appointment completed · Cron: Daily · send Google review SMS to client</div></div><button class=\"btn\" style=\"font-size:12px;padding:4px 10px;margin-left:auto;margin-right:8px;\" onclick=\"openReviewSmsAutoEdit()\">Edit templates</button><label class=\"auto-toggle\" title=\"Enable automation\"><input type=\"checkbox\" id="toggle-review-sms"><div class="auto-toggle-track"><div class="auto-toggle-thumb"></div></div></label></div>';
+  var bookingConfirmCard = '<div class="card" style="padding:14px 16px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:12px;border-left:3px solid var(--border);"><div style="flex:1;min-width:0;"><div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;"><b style="font-size:14px;">Booking Confirmation Email</b><span class="badge" style="background:#f3f4f6;color:#6b7280;border:1px solid #d1d5db;font-size:11px;padding:2px 7px;border-radius:999px;">Off</span><span class="badge" style="background:#eff6ff;color:#3b82f6;border:1px solid #bfdbfe;font-size:11px;padding:2px 7px;border-radius:999px;">System</span></div><div style="font-size:12px;color:#6b7280;">When client books via quote link · send confirmation email to client</div></div><button class=\"btn\" style=\"font-size:12px;padding:4px 10px;margin-left:auto;margin-right:8px;\" onclick=\"openBookingConfirmAutoEdit()\">Edit templates</button><label class=\"auto-toggle\" title=\"Enable automation\"><input type=\"checkbox\" id="toggle-booking-confirm"><div class="auto-toggle-track"><div class="auto-toggle-thumb"></div></div></label></div>';
     /* Section header style — small uppercase pill above each group */
-    var _autoSectionHdr = function(label){
-      return '<div style="font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text-muted);margin:18px 4px 8px;padding-bottom:4px;border-bottom:1px solid var(--border);">'+label+'</div>';
-    };
-    /* First-section header skips the top margin so it lines up with the page */
-    var _autoSectionHdrFirst = function(label){
-      return '<div style="font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text-muted);margin:0 4px 8px;padding-bottom:4px;border-bottom:1px solid var(--border);">'+label+'</div>';
-    };
+    /* Tabs replace the inline section headers — these helpers return empty so layout stays consistent */
+    var _autoSectionHdr = function(label){ return ''; };
+    var _autoSectionHdrFirst = function(label){ return ''; };
     host.innerHTML =
+      '<div class="auto-tabs" id="auto-tabs"></div>' +
       _autoSectionHdrFirst('Leads')
-        + '<div data-auto-section="leads">' + systemCard + janitorialCard + vaQuoteDay1Card + vaDay5Card + '</div>' +
+        + '<div data-auto-section="leads">' + systemCard + janitorialCard + '</div>' +
       _autoSectionHdr('Clients')
-        + '<div data-auto-section="clients">' + bookingConfirmCard + reminderCard + cancelEmailCard + cancelClientSmsCard + reviewSmsCard + vaPostFirstCleanCard + '</div>' +
+        + '<div data-auto-section="clients">' + bookingConfirmCard + reminderCard + cancelEmailCard + cancelClientSmsCard + reviewSmsCard + '</div>' +
       _autoSectionHdr('Cleaners')
         + '<div data-auto-section="cleaners">' + cancelCleanerSmsCard + '</div>' +
+      _autoSectionHdr('Admin (VA tasks)')
+        + '<div data-auto-section="admin">' + vaQuoteDay1Card + vaDay5Card + vaPostFirstCleanCard + '</div>' +
       '<div class="empty-state" style="padding:28px;text-align:center;color:var(--muted);background:var(--panel);border:1px dashed var(--border);border-radius:var(--radius);margin-top:18px;">No custom automations yet. Click <b>+ New automation</b> to build your first rule.</div>';
     _ensureAutomationToggleListener();
+    _ensureAutomationTabListener();
+    _buildAutomationTabs();
     setTimeout(_syncAutomationStatusUI, 0);
     setTimeout(_loadAutomationToggleStates, 50);
     return;
   }
-  /* Same grouping as the empty branch — applies headers consistently. */
-  var _autoSectionHdr = function(label){
-    return '<div style="font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text-muted);margin:18px 4px 8px;padding-bottom:4px;border-bottom:1px solid var(--border);">'+label+'</div>';
-  };
-  var _autoSectionHdrFirst = function(label){
-    return '<div style="font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text-muted);margin:0 4px 8px;padding-bottom:4px;border-bottom:1px solid var(--border);">'+label+'</div>';
-  };
+  /* Tabs replace the inline section headers — these helpers return empty so layout stays consistent */
+  var _autoSectionHdr = function(label){ return ''; };
+  var _autoSectionHdrFirst = function(label){ return ''; };
   var html =
+    '<div class="auto-tabs" id="auto-tabs"></div>' +
     _autoSectionHdrFirst('Leads')
-      + '<div data-auto-section="leads">' + systemCard + janitorialCard + vaQuoteDay1Card + vaDay5Card + '</div>' +
+      + '<div data-auto-section="leads">' + systemCard + janitorialCard + '</div>' +
     _autoSectionHdr('Clients')
-      + '<div data-auto-section="clients">' + bookingConfirmCard + reminderCard + cancelEmailCard + cancelClientSmsCard + reviewSmsCard + vaPostFirstCleanCard + '</div>' +
+      + '<div data-auto-section="clients">' + bookingConfirmCard + reminderCard + cancelEmailCard + cancelClientSmsCard + reviewSmsCard + '</div>' +
     _autoSectionHdr('Cleaners')
       + '<div data-auto-section="cleaners">' + cancelCleanerSmsCard + '</div>' +
+    _autoSectionHdr('Admin (VA tasks)')
+      + '<div data-auto-section="admin">' + vaQuoteDay1Card + vaDay5Card + vaPostFirstCleanCard + '</div>' +
     _autoSectionHdr('Custom rules');
   for(var i=0;i<automations.length;i++){
     var a = automations[i];
@@ -7034,6 +7040,8 @@ function renderAutoList(){
   }
   host.innerHTML = html;
   _ensureAutomationToggleListener();
+  _ensureAutomationTabListener();
+  _buildAutomationTabs();
   setTimeout(_syncAutomationStatusUI, 0);
   setTimeout(_loadAutomationToggleStates, 50);
 }
@@ -7062,6 +7070,9 @@ function _syncAutomationStatusUI(){
     /* Walk up to the nearest card-like container so we can update its status pill */
     var card = toggle.closest('.card, .tw, [data-lifecycle-card]');
     if(!card) return;
+    /* Visually fade off cards, full opacity when on */
+    card.style.opacity = toggle.checked ? '1' : '0.55';
+    card.style.transition = 'opacity .15s ease';
     var pill = card.querySelector('[data-auto-status-pill]');
     if(!pill){
       var firstPill = card.querySelector('.pill, .badge');
@@ -7093,6 +7104,61 @@ function _syncAutomationStatusUI(){
 
 /* Attach a delegated change listener once so toggling any switch live-updates
    counters and the status pill on its card. */
+/* Build the tab nav at the top of the auto-list. Counts cards in each section
+   and stamps the count next to the label. Persists the active tab in
+   localStorage so navigating away and back keeps the user's place. */
+function _buildAutomationTabs(){
+  var nav = document.getElementById('auto-tabs');
+  if(!nav) return;
+  var sections = ['leads','clients','cleaners','admin'];
+  var labels = {leads:'Leads', clients:'Clients', cleaners:'Cleaners', admin:'Admin'};
+  var saved = localStorage.getItem('hnc_auto_tab') || 'leads';
+  if(sections.indexOf(saved) < 0) saved = 'leads';
+  nav.innerHTML = sections.map(function(s){
+    var wrap = document.querySelector('#auto-list [data-auto-section="'+s+'"]');
+    var count = wrap ? wrap.children.length : 0;
+    var active = (s === saved);
+    return '<button type="button" data-auto-tab="'+s+'" class="auto-tab'+(active?' active':'')+'">'
+      + '<span>'+labels[s]+'</span>'
+      + '<span class="auto-tab-count">'+count+'</span>'
+      + '</button>';
+  }).join('');
+  _applyAutomationTab(saved);
+}
+
+function _applyAutomationTab(name){
+  var sections = ['leads','clients','cleaners','admin'];
+  if(sections.indexOf(name) < 0) name = 'leads';
+  localStorage.setItem('hnc_auto_tab', name);
+  /* Toggle which section + its preceding header are visible. */
+  sections.forEach(function(s){
+    var wrap = document.querySelector('#auto-list [data-auto-section="'+s+'"]');
+    if(wrap){
+      wrap.style.display = (s === name) ? '' : 'none';
+      /* The header is the immediately-previous sibling — hide it too. */
+      var prev = wrap.previousElementSibling;
+      if(prev && prev.style && prev.textContent && /^(Leads|Clients|Cleaners|Admin)/i.test(prev.textContent.trim())){
+        prev.style.display = (s === name) ? 'none' : 'none'; // hide all section headers — tabs replace them
+      }
+    }
+  });
+  /* Mark the active tab button. */
+  document.querySelectorAll('#auto-tabs [data-auto-tab]').forEach(function(btn){
+    if(btn.getAttribute('data-auto-tab') === name) btn.classList.add('active');
+    else btn.classList.remove('active');
+  });
+}
+
+/* Delegated click handler for tabs. Wired once. */
+function _ensureAutomationTabListener(){
+  if(window._autoTabListenerWired) return;
+  window._autoTabListenerWired = true;
+  document.addEventListener('click', function(ev){
+    var btn = ev.target.closest && ev.target.closest('#auto-tabs [data-auto-tab]');
+    if(btn){ _applyAutomationTab(btn.getAttribute('data-auto-tab')); }
+  });
+}
+
 function _ensureAutomationToggleListener(){
   if(window._autoToggleListenerWired) return;
   window._autoToggleListenerWired = true;
@@ -7836,7 +7902,7 @@ function renderLeadAutoList(automationList){
     var card = document.createElement('div');
     card.className = 'tw lifecycle-card';
     card.setAttribute('data-lifecycle-card', '1');
-    card.style.cssText = 'padding:14px 16px;margin-bottom:10px;border-left:3px solid var(--brand-500);';
+    card.style.cssText = 'padding:14px 16px;margin-bottom:10px;border-left:3px solid var(--border);';
     
     var status = auto.is_enabled ? '<span class="badge" style="background:#dcfce7;color:#166534;">ACTIVE</span>' : '<span class="badge bin">DISABLED</span>';
     var triggerLabel = auto.trigger_type.replace(/_/g, ' ').toUpperCase();
@@ -7888,6 +7954,8 @@ function renderLeadAutoList(automationList){
   });
   /* Re-run the counter sync now that lifecycle cards are in the DOM */
   if(typeof _syncAutomationStatusUI === 'function') _syncAutomationStatusUI();
+  /* Rebuild tabs so the per-section counts include the lifecycle cards just added */
+  if(typeof _buildAutomationTabs === 'function') _buildAutomationTabs();
 }
 
 async function toggleLeadAuto(id, newState){

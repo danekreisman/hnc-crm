@@ -60,6 +60,90 @@ export default async function handler(req, res) {
   const phone     = d.phone.replace(/\D/g, '');
   const e164      = phone.startsWith('+') ? phone : '+1' + phone;
 
+  // ── 2.5. Owner notification + OpenPhone contact creation (fire-and-forget) ─
+  // We don't await these — if either fails, the lead is still saved and the
+  // quote flow still runs. Errors are logged for inspection.
+  const OWNER_EMAIL = 'dane.kreisman@gmail.com';
+  const OWNER_PHONE = '+18082697636';
+
+  const ownerSummary = `New lead: ${d.name} (${d.serviceType||'cleaning'}) | ${d.phone}${d.island?' | '+d.island:''}${d.beds?' | '+d.beds+'bd':''}${d.baths?'/'+d.baths+'ba':''}${d.sqft?' | '+d.sqft+'sf':''}`;
+
+  const ownerEmailBody = [
+    'A new lead just came in via the website.',
+    '',
+    `Name: ${d.name}`,
+    `Phone: ${d.phone}`,
+    `Email: ${d.email}`,
+    `Service: ${d.serviceType || '—'}`,
+    `Frequency: ${d.frequency || '—'}`,
+    `Island: ${d.island || '—'}`,
+    `Address: ${d.address || '—'}`,
+    `Beds: ${d.beds || '—'}  Baths: ${d.baths || '—'}  Sqft: ${d.sqft || '—'}`,
+    `Condition: ${d.condition ? d.condition + '/10' : '—'}`,
+    `Referral: ${d.referralSource || '—'}`,
+    d.notes ? `\nLead notes: ${d.notes}` : '',
+    '',
+    `Open in CRM: https://hnc-crm.vercel.app/?lead=${leadId}`
+  ].filter(Boolean).join('\n');
+
+  // (a) Owner email
+  fetch(`${BASE_URL}/api/send-email`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      to: OWNER_EMAIL,
+      subject: `New lead: ${d.name} — ${d.serviceType || 'cleaning'}`,
+      type: 'generic',
+      clientName: 'Dane',
+      notes: ownerEmailBody,
+    })
+  }).then(r => console.log('[lead-capture] owner email:', r.status))
+    .catch(err => console.error('[lead-capture] owner email failed:', err.message));
+
+  // (b) Owner SMS
+  fetch(`${BASE_URL}/api/send-sms`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ to: OWNER_PHONE, message: ownerSummary })
+  }).then(r => console.log('[lead-capture] owner sms:', r.status))
+    .catch(err => console.error('[lead-capture] owner sms failed:', err.message));
+
+  // (c) OpenPhone contact creation — so the lead's name appears in OpenPhone
+  // when they call. We attempt unconditionally; OpenPhone may dedupe by phone.
+  // Failure is non-fatal (logged only).
+  try {
+    const nameParts = d.name.trim().split(/\s+/);
+    const opFirst = nameParts[0] || d.name.trim();
+    const opLast  = nameParts.slice(1).join(' ') || undefined;
+    const opBody = {
+      defaultFields: {
+        firstName: opFirst,
+        company: d.serviceType === 'Janitorial Cleaning' || d.serviceType === 'Commercial Cleaning' ? (d.address || undefined) : undefined,
+        emails: d.email ? [{ name: 'email', value: d.email.trim() }] : [],
+        phoneNumbers: [{ name: 'phone', value: e164 }]
+      },
+      source: 'HNC CRM lead form',
+      externalId: leadId,
+    };
+    if (opLast) opBody.defaultFields.lastName = opLast;
+
+    fetch('https://api.openphone.com/v1/contacts', {
+      method: 'POST',
+      headers: {
+        'Authorization': process.env.QUO_API_KEY,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(opBody)
+    })
+      .then(async r => {
+        const text = await r.text();
+        console.log('[lead-capture] openphone contact:', r.status, text.slice(0, 200));
+      })
+      .catch(err => console.error('[lead-capture] openphone contact failed:', err.message));
+  } catch (err) {
+    console.error('[lead-capture] openphone contact build failed:', err.message);
+  }
+
   function applyVars(template, extra = {}) {
     return template
       .replace(/\{firstName\}/g, firstName)

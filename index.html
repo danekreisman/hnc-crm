@@ -897,6 +897,84 @@ textarea{font-family:inherit;}
             <!-- Template picker -->
             <div style="margin-bottom:20px;">
               <div style="font-size:13px;font-weight:600;margin-bottom:10px;">Holiday template</div>
+              <!-- AI Broadcast (top, full-width) -->
+              <div style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text-muted);margin-bottom:6px;">✨ AI-written</div>
+              <div style="margin-bottom:18px;">
+                <div class="bc-tmpl-card" id="bc-ai-card" onclick="openAiBroadcastForm()" data-key="ai_custom" style="border:2px solid transparent;background:linear-gradient(white,white) padding-box, linear-gradient(135deg,#a78bfa 0%,#3BB8E3 50%,#34d399 100%) border-box;border-radius:12px;padding:16px;cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:14px;">
+                  <div style="font-size:30px;line-height:1;">✨</div>
+                  <div style="flex:1;min-width:0;">
+                    <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:2px;">AI Broadcast</div>
+                    <div style="font-size:12px;color:var(--text-muted);">Tell Claude the vibe + your offer. It writes the email.</div>
+                  </div>
+                  <div style="font-size:11px;font-weight:600;color:#a78bfa;">Generate →</div>
+                </div>
+              </div>
+
+              <!-- AI generation panel (hidden by default) -->
+              <div id="bc-ai-panel" style="display:none;margin-bottom:18px;background:#faf7ff;border:1px solid #e9e2ff;border-radius:12px;padding:18px;">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+                  <div style="font-size:14px;font-weight:700;">✨ AI Broadcast generator</div>
+                  <button onclick="closeAiBroadcastForm()" style="background:none;border:none;font-size:18px;cursor:pointer;color:var(--text-muted);line-height:1;">×</button>
+                </div>
+
+                <!-- Vibe -->
+                <div style="margin-bottom:12px;">
+                  <label style="display:block;font-size:12px;font-weight:600;margin-bottom:6px;">Vibe</label>
+                  <select id="bc-ai-vibe" style="width:100%;padding:9px 11px;border:1px solid #d6c9ff;border-radius:8px;font-size:13px;background:#fff;box-sizing:border-box;">
+                    <option value="offer">Offer / Promotion</option>
+                    <option value="seasonal">Seasonal moment</option>
+                    <option value="holiday">Holiday-themed</option>
+                    <option value="reengagement">Re-engagement (we miss you)</option>
+                    <option value="referral">Referral push</option>
+                    <option value="hawaii_local">Hawaii-local (storms, tourist season, etc)</option>
+                  </select>
+                </div>
+
+                <!-- Offer / hook -->
+                <div style="margin-bottom:12px;">
+                  <label style="display:block;font-size:12px;font-weight:600;margin-bottom:6px;">Offer or hook <span style="font-weight:400;color:var(--text-muted);">— optional but recommended</span></label>
+                  <textarea id="bc-ai-offer" rows="3" placeholder="e.g. 20% off deep cleans booked this weekend only" style="width:100%;padding:9px 11px;border:1px solid #d6c9ff;border-radius:8px;font-size:13px;font-family:inherit;background:#fff;box-sizing:border-box;resize:vertical;"></textarea>
+                </div>
+
+                <!-- Tone -->
+                <div style="margin-bottom:14px;">
+                  <label style="display:block;font-size:12px;font-weight:600;margin-bottom:6px;">Tone</label>
+                  <div style="display:flex;gap:6px;">
+                    <button type="button" class="bc-ai-tone-btn active" data-tone="aloha" onclick="selectBcAiTone('aloha',this)" style="flex:1;padding:8px;border:2px solid var(--brand-500);border-radius:7px;background:rgba(59,184,227,.08);font-size:12px;font-weight:600;cursor:pointer;color:var(--brand-700);">Aloha-warm</button>
+                    <button type="button" class="bc-ai-tone-btn" data-tone="direct" onclick="selectBcAiTone('direct',this)" style="flex:1;padding:8px;border:2px solid var(--border);border-radius:7px;background:#fff;font-size:12px;cursor:pointer;">Direct</button>
+                    <button type="button" class="bc-ai-tone-btn" data-tone="hook" onclick="selectBcAiTone('hook',this)" style="flex:1;padding:8px;border:2px solid var(--border);border-radius:7px;background:#fff;font-size:12px;cursor:pointer;">Hook-driven</button>
+                  </div>
+                  <input type="hidden" id="bc-ai-tone" value="aloha">
+                </div>
+
+                <button id="bc-ai-generate-btn" onclick="generateAiBroadcast()" style="width:100%;padding:11px;background:linear-gradient(135deg,#a78bfa 0%,#3BB8E3 100%);color:#fff;border:none;border-radius:9px;font-size:13px;font-weight:600;cursor:pointer;">✨ Generate broadcast</button>
+
+                <!-- Preview (hidden until generated) -->
+                <div id="bc-ai-preview" style="display:none;margin-top:14px;background:#fff;border:1px solid #e9e2ff;border-radius:10px;padding:14px;">
+                  <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;">Preview</div>
+                  <div style="margin-bottom:10px;">
+                    <div style="font-size:11px;color:var(--text-muted);margin-bottom:2px;">Subject</div>
+                    <div id="bc-ai-preview-subject" style="font-size:14px;font-weight:600;"></div>
+                  </div>
+                  <div style="margin-bottom:10px;">
+                    <div style="font-size:11px;color:var(--text-muted);margin-bottom:2px;">Heading</div>
+                    <div id="bc-ai-preview-heading" style="font-size:13px;"></div>
+                  </div>
+                  <div style="margin-bottom:10px;">
+                    <div style="font-size:11px;color:var(--text-muted);margin-bottom:2px;">Intro</div>
+                    <div id="bc-ai-preview-intro" style="font-size:13px;color:#475569;font-style:italic;"></div>
+                  </div>
+                  <div style="margin-bottom:10px;">
+                    <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px;">Body preview</div>
+                    <div id="bc-ai-preview-body" style="font-size:13px;line-height:1.5;border:1px solid var(--border);border-radius:8px;padding:10px;background:#fafafa;max-height:200px;overflow-y:auto;"></div>
+                  </div>
+                  <div style="display:flex;gap:8px;margin-top:14px;">
+                    <button onclick="generateAiBroadcast()" style="flex:1;padding:9px;border:2px solid var(--border);border-radius:8px;background:#fff;font-size:12px;font-weight:600;cursor:pointer;">↻ Regenerate</button>
+                    <button onclick="acceptAiBroadcast()" style="flex:2;padding:9px;background:var(--brand-500);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;">Use this — fill the form ↓</button>
+                  </div>
+                </div>
+              </div>
+
               <!-- Holidays -->
               <div style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text-muted);margin-bottom:6px;">Holidays</div>
               <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:14px;" id="bc-template-grid">
@@ -991,6 +1069,13 @@ textarea{font-family:inherit;}
             <input type="hidden" id="bc-editing-id" value="" />
             <input type="hidden" id="bc-selected-template" value="" />
             <input type="hidden" id="bc-selected-audience" value="both" />
+            <!-- AI custom-content payload (populated only when AI broadcast is used) -->
+            <input type="hidden" id="bc-custom-preheader" value="" />
+            <input type="hidden" id="bc-custom-heading"   value="" />
+            <input type="hidden" id="bc-custom-intro"     value="" />
+            <input type="hidden" id="bc-custom-body-html" value="" />
+            <input type="hidden" id="bc-custom-cta-text"  value="" />
+            <input type="hidden" id="bc-custom-cta-url"   value="" />
 
             <!-- Test send -->
             <div style="background:#f8fafc;border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:14px;">
@@ -13148,6 +13233,12 @@ function selectBcTemplate(key) {
     c.style.borderColor = isSelected ? 'var(--brand-500)' : 'var(--border)';
     c.style.background  = isSelected ? 'rgba(59,184,227,.08)' : '';
   });
+  /* Picking a built-in template clears any AI-custom payload from a previous attempt */
+  ['bc-custom-preheader','bc-custom-heading','bc-custom-intro','bc-custom-body-html','bc-custom-cta-text','bc-custom-cta-url'].forEach(function(id){
+    var el = document.getElementById(id); if(el) el.value = '';
+  });
+  var aiPanel = document.getElementById('bc-ai-panel');
+  if (aiPanel) aiPanel.style.display = 'none';
 }
 
 function selectBcAudience(val, btn) {
@@ -13175,10 +13266,25 @@ function openNewBroadcast(broadcastData) {
   document.getElementById('bc-selected-audience').value = broadcastData ? broadcastData.audience : 'both';
   bcCurrentAudience = broadcastData ? broadcastData.audience : 'both';
 
-  // Reset template cards
+  /* Populate or clear hidden custom_* inputs based on whether the row being
+     edited is an AI-custom broadcast */
+  var customFields = ['preheader','heading','intro','body_html','cta_text','cta_url'];
+  customFields.forEach(function(f){
+    var el = document.getElementById('bc-custom-' + f.replace('_','-'));
+    if (el) el.value = (broadcastData && broadcastData.holiday_key === 'ai_custom' && broadcastData['custom_' + f]) ? broadcastData['custom_' + f] : '';
+  });
+  /* Hide the AI panel by default — opening it is an explicit click */
+  var aiPanel = document.getElementById('bc-ai-panel');
+  if (aiPanel) aiPanel.style.display = 'none';
+
+  // Reset template cards (including the AI card)
   document.querySelectorAll('.bc-tmpl-card').forEach(function(c) {
-    var isSelected = broadcastData && c.dataset.key === broadcastData.holiday_key;
-    c.style.borderColor = isSelected ? 'var(--brand-500)' : 'var(--border)';
+    var key = c.dataset.key || c.id;
+    var isSelected = broadcastData && (
+      c.dataset.key === broadcastData.holiday_key ||
+      (c.id === 'bc-ai-card' && broadcastData.holiday_key === 'ai_custom')
+    );
+    c.style.borderColor = isSelected ? 'var(--brand-500)' : (c.id === 'bc-ai-card' ? 'transparent' : 'var(--border)');
     c.style.background  = isSelected ? 'rgba(59,184,227,.08)' : '';
   });
 
@@ -13208,19 +13314,49 @@ async function saveBroadcast(sendNow) {
   var editingId   = document.getElementById('bc-editing-id').value;
   var audience    = document.getElementById('bc-selected-audience').value || 'both';
 
-  if (!templateKey) { alert('Please select a holiday template.'); return; }
+  if (!templateKey) { alert('Please pick a template (or generate an AI broadcast).'); return; }
   if (!subject)     { alert('Please enter a subject line.'); return; }
 
-  var tpl = BC_HOLIDAYS[templateKey];
-  var payload = {
-    name:         tpl.label,
-    holiday:      templateKey,
-    holiday_key:  templateKey,
-    subject:      subject,
-    audience:     audience,
-    status:       sendNow ? 'scheduled' : 'draft',
-    scheduled_for: schedule ? new Date(schedule).toISOString() : null,
-  };
+  /* Build the base payload — branch on whether this is a built-in template
+     or the AI-custom path */
+  var payload;
+  if (templateKey === 'ai_custom') {
+    var bodyHtml = document.getElementById('bc-custom-body-html').value;
+    if (!bodyHtml) {
+      alert('AI broadcast content is missing. Click the AI Broadcast card and generate first.');
+      return;
+    }
+    payload = {
+      name:         'AI: ' + subject.slice(0, 50),
+      holiday:      'ai_custom',
+      holiday_key:  'ai_custom',
+      subject:      subject,
+      audience:     audience,
+      status:       sendNow ? 'scheduled' : 'draft',
+      scheduled_for: schedule ? new Date(schedule).toISOString() : null,
+      custom_preheader: document.getElementById('bc-custom-preheader').value,
+      custom_heading:   document.getElementById('bc-custom-heading').value,
+      custom_intro:     document.getElementById('bc-custom-intro').value,
+      custom_body_html: bodyHtml,
+      custom_cta_text:  document.getElementById('bc-custom-cta-text').value,
+      custom_cta_url:   document.getElementById('bc-custom-cta-url').value,
+    };
+  } else {
+    var tpl = BC_HOLIDAYS[templateKey];
+    payload = {
+      name:         tpl.label,
+      holiday:      templateKey,
+      holiday_key:  templateKey,
+      subject:      subject,
+      audience:     audience,
+      status:       sendNow ? 'scheduled' : 'draft',
+      scheduled_for: schedule ? new Date(schedule).toISOString() : null,
+      /* Explicitly null out any custom_* fields in case this row was
+         previously edited as an AI broadcast */
+      custom_preheader: null, custom_heading: null, custom_intro: null,
+      custom_body_html: null, custom_cta_text: null, custom_cta_url: null,
+    };
+  }
 
   try {
     var saveResp, savedId;
@@ -15135,6 +15271,112 @@ function selectBcTemplate(key) {
     c.style.borderColor = isSelected ? 'var(--brand-500)' : 'var(--border)';
     c.style.background  = isSelected ? 'rgba(59,184,227,.08)' : '';
   });
+  /* Picking a built-in template clears any AI-custom payload from a previous attempt */
+  ['bc-custom-preheader','bc-custom-heading','bc-custom-intro','bc-custom-body-html','bc-custom-cta-text','bc-custom-cta-url'].forEach(function(id){
+    var el = document.getElementById(id); if(el) el.value = '';
+  });
+  var aiPanel = document.getElementById('bc-ai-panel');
+  if (aiPanel) aiPanel.style.display = 'none';
+}
+
+/* ── AI Broadcast generator ─────────────────────────────────────────────── */
+function openAiBroadcastForm() {
+  var panel = document.getElementById('bc-ai-panel');
+  if (!panel) return;
+  panel.style.display = '';
+  var preview = document.getElementById('bc-ai-preview');
+  if (preview) preview.style.display = 'none';
+  /* Deselect any built-in template card so the AI card stands alone */
+  document.querySelectorAll('.bc-tmpl-card').forEach(function(c) {
+    if (c.id !== 'bc-ai-card') {
+      c.style.borderColor = 'var(--border)';
+      c.style.background  = '';
+    }
+  });
+}
+
+function closeAiBroadcastForm() {
+  var panel = document.getElementById('bc-ai-panel');
+  if (panel) panel.style.display = 'none';
+}
+
+function selectBcAiTone(val, btn) {
+  document.getElementById('bc-ai-tone').value = val;
+  document.querySelectorAll('.bc-ai-tone-btn').forEach(function(b) {
+    b.classList.remove('active');
+    b.style.borderColor = 'var(--border)';
+    b.style.background  = '#fff';
+    b.style.color       = '';
+    b.style.fontWeight  = '';
+  });
+  btn.classList.add('active');
+  btn.style.borderColor = 'var(--brand-500)';
+  btn.style.background  = 'rgba(59,184,227,.08)';
+  btn.style.color       = 'var(--brand-700)';
+  btn.style.fontWeight  = '600';
+}
+
+async function generateAiBroadcast() {
+  var btn = document.getElementById('bc-ai-generate-btn');
+  var preview = document.getElementById('bc-ai-preview');
+  var vibe = document.getElementById('bc-ai-vibe').value;
+  var offer = document.getElementById('bc-ai-offer').value.trim();
+  var tone = document.getElementById('bc-ai-tone').value || 'aloha';
+  var aud = document.getElementById('bc-selected-audience').value || 'both';
+
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = '✨ Generating…';
+    btn.style.opacity = '0.7';
+  }
+
+  try {
+    var resp = await fetch('/api/ai-broadcast', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ vibe: vibe, offer: offer, audience: aud, tone: tone }),
+    });
+    var data = await resp.json();
+    if (!resp.ok || !data.success) {
+      alert('AI generation failed: ' + (data.error || 'Unknown error'));
+      return;
+    }
+    window._bcAiResult = data;
+    document.getElementById('bc-ai-preview-subject').textContent = data.subject;
+    document.getElementById('bc-ai-preview-heading').textContent = data.heading;
+    document.getElementById('bc-ai-preview-intro').textContent   = data.intro;
+    document.getElementById('bc-ai-preview-body').innerHTML      = data.body_html;
+    if (preview) preview.style.display = '';
+  } catch (err) {
+    alert('AI generation error: ' + err.message);
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = '✨ Generate broadcast';
+      btn.style.opacity = '1';
+    }
+  }
+}
+
+function acceptAiBroadcast() {
+  var data = window._bcAiResult;
+  if (!data) { alert('Generate a broadcast first.'); return; }
+  document.getElementById('bc-selected-template').value = 'ai_custom';
+  document.getElementById('bc-subject').value           = data.subject;
+  document.getElementById('bc-custom-preheader').value  = data.preheader  || '';
+  document.getElementById('bc-custom-heading').value    = data.heading    || '';
+  document.getElementById('bc-custom-intro').value      = data.intro      || '';
+  document.getElementById('bc-custom-body-html').value  = data.body_html  || '';
+  document.getElementById('bc-custom-cta-text').value   = data.cta_text   || '';
+  document.getElementById('bc-custom-cta-url').value    = data.cta_url    || '';
+  document.querySelectorAll('.bc-tmpl-card').forEach(function(c) {
+    var isAi = c.id === 'bc-ai-card';
+    c.style.borderColor = isAi ? 'var(--brand-500)' : 'var(--border)';
+    c.style.background  = isAi ? 'rgba(59,184,227,.08)' : '';
+  });
+  closeAiBroadcastForm();
+  var subj = document.getElementById('bc-subject');
+  if (subj) { subj.scrollIntoView({ behavior:'smooth', block:'center' }); subj.focus(); }
 }
 
 function selectBcAudience(val, btn) {
@@ -15162,10 +15404,25 @@ function openNewBroadcast(broadcastData) {
   document.getElementById('bc-selected-audience').value = broadcastData ? broadcastData.audience : 'both';
   bcCurrentAudience = broadcastData ? broadcastData.audience : 'both';
 
-  // Reset template cards
+  /* Populate or clear hidden custom_* inputs based on whether the row being
+     edited is an AI-custom broadcast */
+  var customFields = ['preheader','heading','intro','body_html','cta_text','cta_url'];
+  customFields.forEach(function(f){
+    var el = document.getElementById('bc-custom-' + f.replace('_','-'));
+    if (el) el.value = (broadcastData && broadcastData.holiday_key === 'ai_custom' && broadcastData['custom_' + f]) ? broadcastData['custom_' + f] : '';
+  });
+  /* Hide the AI panel by default — opening it is an explicit click */
+  var aiPanel = document.getElementById('bc-ai-panel');
+  if (aiPanel) aiPanel.style.display = 'none';
+
+  // Reset template cards (including the AI card)
   document.querySelectorAll('.bc-tmpl-card').forEach(function(c) {
-    var isSelected = broadcastData && c.dataset.key === broadcastData.holiday_key;
-    c.style.borderColor = isSelected ? 'var(--brand-500)' : 'var(--border)';
+    var key = c.dataset.key || c.id;
+    var isSelected = broadcastData && (
+      c.dataset.key === broadcastData.holiday_key ||
+      (c.id === 'bc-ai-card' && broadcastData.holiday_key === 'ai_custom')
+    );
+    c.style.borderColor = isSelected ? 'var(--brand-500)' : (c.id === 'bc-ai-card' ? 'transparent' : 'var(--border)');
     c.style.background  = isSelected ? 'rgba(59,184,227,.08)' : '';
   });
 
@@ -15195,19 +15452,49 @@ async function saveBroadcast(sendNow) {
   var editingId   = document.getElementById('bc-editing-id').value;
   var audience    = document.getElementById('bc-selected-audience').value || 'both';
 
-  if (!templateKey) { alert('Please select a holiday template.'); return; }
+  if (!templateKey) { alert('Please pick a template (or generate an AI broadcast).'); return; }
   if (!subject)     { alert('Please enter a subject line.'); return; }
 
-  var tpl = BC_HOLIDAYS[templateKey];
-  var payload = {
-    name:         tpl.label,
-    holiday:      templateKey,
-    holiday_key:  templateKey,
-    subject:      subject,
-    audience:     audience,
-    status:       sendNow ? 'scheduled' : 'draft',
-    scheduled_for: schedule ? new Date(schedule).toISOString() : null,
-  };
+  /* Build the base payload — branch on whether this is a built-in template
+     or the AI-custom path */
+  var payload;
+  if (templateKey === 'ai_custom') {
+    var bodyHtml = document.getElementById('bc-custom-body-html').value;
+    if (!bodyHtml) {
+      alert('AI broadcast content is missing. Click the AI Broadcast card and generate first.');
+      return;
+    }
+    payload = {
+      name:         'AI: ' + subject.slice(0, 50),
+      holiday:      'ai_custom',
+      holiday_key:  'ai_custom',
+      subject:      subject,
+      audience:     audience,
+      status:       sendNow ? 'scheduled' : 'draft',
+      scheduled_for: schedule ? new Date(schedule).toISOString() : null,
+      custom_preheader: document.getElementById('bc-custom-preheader').value,
+      custom_heading:   document.getElementById('bc-custom-heading').value,
+      custom_intro:     document.getElementById('bc-custom-intro').value,
+      custom_body_html: bodyHtml,
+      custom_cta_text:  document.getElementById('bc-custom-cta-text').value,
+      custom_cta_url:   document.getElementById('bc-custom-cta-url').value,
+    };
+  } else {
+    var tpl = BC_HOLIDAYS[templateKey];
+    payload = {
+      name:         tpl.label,
+      holiday:      templateKey,
+      holiday_key:  templateKey,
+      subject:      subject,
+      audience:     audience,
+      status:       sendNow ? 'scheduled' : 'draft',
+      scheduled_for: schedule ? new Date(schedule).toISOString() : null,
+      /* Explicitly null out any custom_* fields in case this row was
+         previously edited as an AI broadcast */
+      custom_preheader: null, custom_heading: null, custom_intro: null,
+      custom_body_html: null, custom_cta_text: null, custom_cta_url: null,
+    };
+  }
 
   try {
     var saveResp, savedId;

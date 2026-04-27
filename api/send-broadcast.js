@@ -202,10 +202,35 @@ const HOLIDAY_TEMPLATES = {
   },
 };
 
+// ─── Resolve a broadcast row to a renderable template object ───────────────
+// For built-in holiday_key values, returns the static template from
+// HOLIDAY_TEMPLATES. For holiday_key='ai_custom', builds a synthetic template
+// from the broadcast's custom_* columns. Returns null if the key is unknown
+// AND no custom_* fields are populated.
+function resolveTemplate(broadcast) {
+  if (broadcast.holiday_key && HOLIDAY_TEMPLATES[broadcast.holiday_key]) {
+    return HOLIDAY_TEMPLATES[broadcast.holiday_key];
+  }
+  // AI custom path — required fields must be present
+  if (broadcast.holiday_key === 'ai_custom' && broadcast.custom_body_html) {
+    const introTemplate = broadcast.custom_intro || 'Aloha {firstName}!';
+    return {
+      defaultSubject: broadcast.subject,
+      preheader: broadcast.custom_preheader || '',
+      heading:   broadcast.custom_heading   || broadcast.subject,
+      intro:     (firstName) => introTemplate.replace(/\{firstName\}/g, firstName),
+      body:      broadcast.custom_body_html,
+      ctaText:   broadcast.custom_cta_text  || 'Book a clean',
+      ctaUrl:    broadcast.custom_cta_url   || 'tel:8084685356',
+    };
+  }
+  return null;
+}
+
 // ─── Render a single recipient's email ───────────────────────────────────────
-function renderEmail(templateKey, firstName, unsubscribeUrl) {
-  const t = HOLIDAY_TEMPLATES[templateKey];
-  if (!t) throw new Error(`Unknown template key: ${templateKey}`);
+function renderEmail(template, firstName, unsubscribeUrl) {
+  const t = template;
+  if (!t) throw new Error('renderEmail called with null template');
 
   const BRAND = {
     primary: '#3BB8E3', text: '#0F172A', muted: '#64748B',
@@ -305,8 +330,11 @@ export default async function handler(req, res) {
     if (broadcast.status === 'sent') {
       return res.status(400).json({ error: 'Broadcast already sent', sentAt: broadcast.sent_at });
     }
-    if (!HOLIDAY_TEMPLATES[broadcast.holiday_key]) {
-      return res.status(400).json({ error: `Unknown template key: ${broadcast.holiday_key}` });
+    const resolvedTemplate = resolveTemplate(broadcast);
+    if (!resolvedTemplate) {
+      return res.status(400).json({
+        error: `Cannot resolve template for broadcast (holiday_key=${broadcast.holiday_key}). For ai_custom, custom_body_html must be set.`,
+      });
     }
 
     // Mark as sending
@@ -385,7 +413,7 @@ export default async function handler(req, res) {
       const unsubscribeUrl = `${BASE_URL}/api/unsubscribe?id=${r.id}&type=${r.type}`;
 
       try {
-        const html = renderEmail(broadcast.holiday_key, firstName, unsubscribeUrl);
+        const html = renderEmail(resolvedTemplate, firstName, unsubscribeUrl);
 
         const emailRes = await fetchWithTimeout(
           'https://api.resend.com/emails',

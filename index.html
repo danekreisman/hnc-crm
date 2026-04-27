@@ -7819,6 +7819,9 @@ function renderLeadAutoList(automationList){
   var grouped = document.querySelector('#auto-list [data-auto-section="leads"]');
   var legacyHost = document.getElementById('lead-auto-list');
   if(legacyHost) legacyHost.innerHTML = ''; // always clear the legacy host
+  /* Remove any previously-rendered lifecycle cards from the grouped list to
+     prevent duplicates when this function is called multiple times. */
+  document.querySelectorAll('#auto-list [data-lifecycle-card="1"]').forEach(function(el){ el.remove(); });
 
   if(!automationList || automationList.length === 0){
     if(!grouped && legacyHost){
@@ -7829,7 +7832,8 @@ function renderLeadAutoList(automationList){
 
   automationList.forEach(function(auto){
     var card = document.createElement('div');
-    card.className = 'tw';
+    card.className = 'tw lifecycle-card';
+    card.setAttribute('data-lifecycle-card', '1');
     card.style.cssText = 'padding:14px 16px;margin-bottom:10px;border-left:3px solid var(--brand-500);';
     
     var status = auto.is_enabled ? '<span class="badge" style="background:#dcfce7;color:#166534;">ACTIVE</span>' : '<span class="badge bin">DISABLED</span>';

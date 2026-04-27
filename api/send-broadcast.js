@@ -240,12 +240,16 @@ export function renderEmail(template, firstName, unsubscribeUrl) {
   };
   const LOGO_URL = `${BASE_URL}/hnc-logo.png`;
 
-  const ctaBlock = `
+  // Render the CTA button only if the template has non-empty ctaText. AI
+  // broadcasts intentionally pass empty strings to skip the button entirely
+  // and use a reply-to-claim model where the recipient replies with their
+  // desired appointment date.
+  const ctaBlock = (t.ctaText && t.ctaUrl) ? `
     <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:28px 0;">
       <tr><td align="center">
         <a href="${t.ctaUrl}" style="display:inline-block;background:${BRAND.primary};color:#ffffff;text-decoration:none;font-weight:600;font-size:15px;padding:14px 32px;border-radius:999px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;">${t.ctaText}</a>
       </td></tr>
-    </table>`;
+    </table>` : '';
 
   const unsubBlock = unsubscribeUrl
     ? `<p style="margin:12px 0 0;font-size:11px;color:#94a3b8;"><a href="${unsubscribeUrl}" style="color:#94a3b8;text-decoration:underline;">Unsubscribe</a></p>`

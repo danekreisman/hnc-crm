@@ -46,8 +46,17 @@ FIELD CONSTRAINTS — ABSOLUTE:
 - heading: 4-9 words. No leading emoji. Trailing emoji is OK if it fits naturally.
 - intro: A single paragraph 2-3 sentences. MUST start with "Aloha {firstName}!" (literal placeholder).
 - body_html: 2-3 short paragraphs PLUS an optional offer-callout box if the offer is provided. Use the EXACT inline style template shown in the examples below. Do not invent new styles.
-- cta_text: 2-5 words. Action-oriented. Examples: "Book a clean", "Reserve my slot", "Get my quote".
-- cta_url: default to "tel:8084685356" unless the user has specified a different action.
+- cta_text: leave as EMPTY STRING "". AI broadcasts use a reply-to-claim model — no button. The reply-prompt callout in body_html replaces the button entirely.
+- cta_url: leave as EMPTY STRING "". (Same reason — no button to link.)
+
+REPLY-TO-CLAIM MODEL — END EVERY BODY THIS WAY:
+Instead of a CTA button, the body MUST end with a styled callout box that tells the recipient to reply with their desired appointment date. This is the ONLY way recipients can claim/respond. The exact HTML to use as the FINAL element of body_html (after all other paragraphs and after the offer-callout box if present):
+
+<div style="background:#f8fafc;border-left:3px solid #3BB8E3;padding:14px 18px;margin:8px 0 0;border-radius:0 8px 8px 0;">
+  <p style="margin:0;color:#0F172A;font-size:14px;line-height:1.55;"><strong>To claim:</strong> Reply to this email with your desired appointment date and we'll confirm availability within the day. Mahalo!</p>
+</div>
+
+You may slightly adjust the wording inside the <p> to match the broadcast's vibe (e.g. "To book", "To get started", "To schedule") but the structure, styles, and core instruction (reply with desired appointment date) MUST remain. Do NOT add a separate closing paragraph after this callout — it IS the closing element.
 
 OFFER PRESERVATION — CRITICAL, NON-NEGOTIABLE:
 If the user provides an offer in their message, you MUST preserve EVERY literal detail of that offer EXACTLY:
@@ -63,9 +72,13 @@ Example — if user offer is "20% off deep cleans this weekend only":
 ✅ subject: "🌸 20% off deep cleans this weekend only"
 ✅ offer box headline: "20% Off Deep Cleans"
 ✅ offer box subtext: "Book this weekend only and save 20% on your deep clean."
+✅ body ends with: <div style="background:#f8fafc;border-left:3px solid #3BB8E3;padding:14px 18px;margin:8px 0 0;border-radius:0 8px 8px 0;"><p style="margin:0;color:#0F172A;font-size:14px;line-height:1.55;"><strong>To claim:</strong> Reply to this email with your desired appointment date and we'll confirm availability within the day. Mahalo!</p></div>
+✅ cta_text: ""  ← empty
+✅ cta_url:  ""  ← empty
 ❌ NEVER: "10% off", "15% off", "25% off"
 ❌ NEVER: "this week", "this month", "limited time"
 ❌ NEVER: "off cleaning" (must say "off deep cleans")
+❌ NEVER: cta_text="Book a clean" or any non-empty CTA — buttons are not used in AI broadcasts
 
 BODY HTML EXAMPLES — match this style exactly:
 
@@ -78,8 +91,8 @@ Offer-callout box (use ONLY if an offer is provided):
   <p style="margin:0;color:#64748B;font-size:14px;">One-sentence offer description.</p>
 </div>
 
-Final paragraph (always end with a soft close like "Mahalo!" or "We'd love to help."):
-<p style="margin:0 0 20px;color:#0F172A;font-size:15px;line-height:1.65;">Closing thought. Mahalo!</p>
+Final paragraph BEFORE the reply callout (no "Mahalo" here — Mahalo lives inside the reply callout):
+<p style="margin:0 0 16px;color:#0F172A;font-size:15px;line-height:1.65;">Closing thought, no farewell needed here.</p>
 
 OUTPUT FORMAT:
 Return ONLY valid JSON. No markdown fences, no commentary, no preamble. Exactly:
@@ -172,17 +185,22 @@ export default async function handler(req, res) {
       return res.status(502).json({ error: 'AI returned invalid JSON', detail: rawText.slice(0, 200) });
     }
 
-    // Validate the required fields
-    const required = ['subject', 'preheader', 'heading', 'intro', 'body_html', 'cta_text', 'cta_url'];
-    for (const f of required) {
+    // Validate the required fields. cta_text and cta_url are now allowed to be
+    // empty strings (AI broadcasts use the reply-to-claim model and skip the
+    // CTA button entirely) so we only enforce the body-content fields.
+    const requiredNonEmpty = ['subject', 'preheader', 'heading', 'intro', 'body_html'];
+    for (const f of requiredNonEmpty) {
       if (!parsed[f] || typeof parsed[f] !== 'string') {
         return res.status(502).json({ error: `AI response missing field: ${f}`, partial: parsed });
       }
     }
+    // cta_* may be empty strings — coerce to '' if missing entirely
+    if (typeof parsed.cta_text !== 'string') parsed.cta_text = '';
+    if (typeof parsed.cta_url  !== 'string') parsed.cta_url  = '';
 
-    // Default the CTA URL if AI didn't supply a real one
-    if (!parsed.cta_url.startsWith('tel:') && !parsed.cta_url.startsWith('http')) {
-      parsed.cta_url = 'tel:8084685356';
+    // If a non-empty CTA URL slipped through, sanitize it (safety net)
+    if (parsed.cta_url && !parsed.cta_url.startsWith('tel:') && !parsed.cta_url.startsWith('mailto:') && !parsed.cta_url.startsWith('http')) {
+      parsed.cta_url = '';
     }
 
     return res.status(200).json({

@@ -7130,16 +7130,12 @@ function _applyAutomationTab(name){
   var sections = ['leads','clients','cleaners','admin'];
   if(sections.indexOf(name) < 0) name = 'leads';
   localStorage.setItem('hnc_auto_tab', name);
-  /* Toggle which section + its preceding header are visible. */
+  /* Toggle which section is visible. Section headers (the helpers now return
+     empty strings, but be defensive) and the tabs nav are NEVER hidden here. */
   sections.forEach(function(s){
     var wrap = document.querySelector('#auto-list [data-auto-section="'+s+'"]');
     if(wrap){
       wrap.style.display = (s === name) ? '' : 'none';
-      /* The header is the immediately-previous sibling — hide it too. */
-      var prev = wrap.previousElementSibling;
-      if(prev && prev.style && prev.textContent && /^(Leads|Clients|Cleaners|Admin)/i.test(prev.textContent.trim())){
-        prev.style.display = (s === name) ? 'none' : 'none'; // hide all section headers — tabs replace them
-      }
     }
   });
   /* Mark the active tab button. */

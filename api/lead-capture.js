@@ -87,27 +87,35 @@ export default async function handler(req, res) {
     `Open in CRM: https://hnc-crm.vercel.app/?lead=${leadId}`
   ].filter(Boolean).join('\n');
 
-  // (a) Owner email
-  fetch(`${BASE_URL}/api/send-email`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      to: OWNER_EMAIL,
-      subject: `New lead: ${d.name} — ${d.serviceType || 'cleaning'}`,
-      type: 'generic',
-      clientName: 'Dane',
-      notes: ownerEmailBody,
-    })
-  }).then(r => console.log('[lead-capture] owner email:', r.status))
-    .catch(err => console.error('[lead-capture] owner email failed:', err.message));
+  // (a) Owner email — gated by new_lead_owner_email_enabled
+  if (await isAutomationEnabled(db, 'new_lead_owner_email_enabled')) {
+    fetch(`${BASE_URL}/api/send-email`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        to: OWNER_EMAIL,
+        subject: `New lead: ${d.name} — ${d.serviceType || 'cleaning'}`,
+        type: 'generic',
+        clientName: 'Dane',
+        notes: ownerEmailBody,
+      })
+    }).then(r => console.log('[lead-capture] owner email:', r.status))
+      .catch(err => console.error('[lead-capture] owner email failed:', err.message));
+  } else {
+    console.log('[lead-capture] new_lead_owner_email disabled — skipping');
+  }
 
-  // (b) Owner SMS
-  fetch(`${BASE_URL}/api/send-sms`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ to: OWNER_PHONE, message: ownerSummary })
-  }).then(r => console.log('[lead-capture] owner sms:', r.status))
-    .catch(err => console.error('[lead-capture] owner sms failed:', err.message));
+  // (b) Owner SMS — gated by new_lead_owner_sms_enabled
+  if (await isAutomationEnabled(db, 'new_lead_owner_sms_enabled')) {
+    fetch(`${BASE_URL}/api/send-sms`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ to: OWNER_PHONE, message: ownerSummary })
+    }).then(r => console.log('[lead-capture] owner sms:', r.status))
+      .catch(err => console.error('[lead-capture] owner sms failed:', err.message));
+  } else {
+    console.log('[lead-capture] new_lead_owner_sms disabled — skipping');
+  }
 
   // (c) OpenPhone contact creation — so the lead's name appears in OpenPhone
   // when they call. We attempt unconditionally; OpenPhone may dedupe by phone.

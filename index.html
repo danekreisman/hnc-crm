@@ -7030,6 +7030,38 @@ function renderAutoList(){
     cron:'Cron · 9am HST',
     toggleId:'toggle-policy-reminder'
   });
+  /* Internal alerts (Admin tab) — owner / VA / admin notifications */
+  var newLeadOwnerEmailCard = _sysCardHTML({
+    title:'New Lead — Owner Email',
+    desc:'When a new lead submits the form · email Dane with full lead details',
+    toggleId:'toggle-new-lead-owner-email'
+  });
+  var newLeadOwnerSmsCard = _sysCardHTML({
+    title:'New Lead — Owner SMS',
+    desc:'When a new lead submits the form · text Dane a short summary',
+    toggleId:'toggle-new-lead-owner-sms'
+  });
+  var autoBookAdminSmsCard = _sysCardHTML({
+    title:'Auto-Booking — Admin SMS',
+    desc:'When a lead books via quote link · text admin with booking details',
+    toggleId:'toggle-auto-book-admin-sms'
+  });
+  var taskCreatedEmailCard = _sysCardHTML({
+    title:'Task Created — Email',
+    desc:'When a VA task is created in the CRM · email assignee',
+    toggleId:'toggle-task-created-email'
+  });
+  var taskCreatedSmsCard = _sysCardHTML({
+    title:'Task Created — SMS',
+    desc:'When a VA task is created in the CRM · text assignee',
+    toggleId:'toggle-task-created-sms'
+  });
+  /* Customer-facing (Clients tab) — first-booking policy SMS */
+  var policyFirstBookingCard = _sysCardHTML({
+    title:'Policy Agreement — First Booking SMS',
+    desc:'When a new client books · send a one-time SMS with the policy agreement link',
+    toggleId:'toggle-policy-first-booking-sms'
+  });
     /* Section header style — small uppercase pill above each group */
     /* Tabs replace the inline section headers — these helpers return empty so layout stays consistent */
     var _autoSectionHdr = function(label){ return ''; };
@@ -7039,11 +7071,11 @@ function renderAutoList(){
       _autoSectionHdrFirst('Leads')
         + '<div data-auto-section="leads">' + systemCard + janitorialCard + '</div>' +
       _autoSectionHdr('Clients')
-        + '<div data-auto-section="clients">' + bookingConfirmCard + reminderCard + cancelEmailCard + cancelClientSmsCard + rescheduleEmailCard + reviewSmsCard + postCleanThankyouCard + invoiceReminderCard + policyReminderCard + '</div>' +
+        + '<div data-auto-section="clients">' + bookingConfirmCard + reminderCard + cancelEmailCard + cancelClientSmsCard + rescheduleEmailCard + reviewSmsCard + postCleanThankyouCard + invoiceReminderCard + policyReminderCard + policyFirstBookingCard + '</div>' +
       _autoSectionHdr('Cleaners')
         + '<div data-auto-section="cleaners">' + cancelCleanerSmsCard + rescheduleCleanerSmsCard + '</div>' +
       _autoSectionHdr('Admin (VA tasks)')
-        + '<div data-auto-section="admin">' + vaQuoteDay1Card + vaDay5Card + vaPostFirstCleanCard + '</div>' +
+        + '<div data-auto-section="admin">' + vaQuoteDay1Card + vaDay5Card + vaPostFirstCleanCard + newLeadOwnerEmailCard + newLeadOwnerSmsCard + autoBookAdminSmsCard + taskCreatedEmailCard + taskCreatedSmsCard + '</div>' +
       '<div class="empty-state" style="padding:28px;text-align:center;color:var(--muted);background:var(--panel);border:1px dashed var(--border);border-radius:var(--radius);margin-top:18px;">No custom automations yet. Click <b>+ New automation</b> to build your first rule.</div>';
     _ensureAutomationToggleListener();
     _ensureAutomationTabListener();
@@ -7060,11 +7092,11 @@ function renderAutoList(){
     _autoSectionHdrFirst('Leads')
       + '<div data-auto-section="leads">' + systemCard + janitorialCard + '</div>' +
     _autoSectionHdr('Clients')
-      + '<div data-auto-section="clients">' + bookingConfirmCard + reminderCard + cancelEmailCard + cancelClientSmsCard + rescheduleEmailCard + reviewSmsCard + postCleanThankyouCard + invoiceReminderCard + policyReminderCard + '</div>' +
+      + '<div data-auto-section="clients">' + bookingConfirmCard + reminderCard + cancelEmailCard + cancelClientSmsCard + rescheduleEmailCard + reviewSmsCard + postCleanThankyouCard + invoiceReminderCard + policyReminderCard + policyFirstBookingCard + '</div>' +
     _autoSectionHdr('Cleaners')
       + '<div data-auto-section="cleaners">' + cancelCleanerSmsCard + rescheduleCleanerSmsCard + '</div>' +
     _autoSectionHdr('Admin (VA tasks)')
-      + '<div data-auto-section="admin">' + vaQuoteDay1Card + vaDay5Card + vaPostFirstCleanCard + '</div>' +
+      + '<div data-auto-section="admin">' + vaQuoteDay1Card + vaDay5Card + vaPostFirstCleanCard + newLeadOwnerEmailCard + newLeadOwnerSmsCard + autoBookAdminSmsCard + taskCreatedEmailCard + taskCreatedSmsCard + '</div>' +
     _autoSectionHdr('Custom rules');
   for(var i=0;i<automations.length;i++){
     var a = automations[i];
@@ -7247,7 +7279,13 @@ window._automationToggleMap = {
   'toggle-reschedule-cleaner-sms':   'reschedule_cleaner_sms_enabled',
   'toggle-post-clean-thankyou':      'post_clean_thankyou_enabled',
   'toggle-invoice-reminder':         'invoice_reminder_enabled',
-  'toggle-policy-reminder':          'policy_reminder_enabled'
+  'toggle-policy-reminder':          'policy_reminder_enabled',
+  'toggle-new-lead-owner-email':     'new_lead_owner_email_enabled',
+  'toggle-new-lead-owner-sms':       'new_lead_owner_sms_enabled',
+  'toggle-auto-book-admin-sms':      'auto_book_admin_sms_enabled',
+  'toggle-policy-first-booking-sms': 'policy_first_booking_sms_enabled',
+  'toggle-task-created-email':       'task_created_email_enabled',
+  'toggle-task-created-sms':         'task_created_sms_enabled'
 };
 
 /* Load all automation flags from ai_booking_settings and apply to the

@@ -224,6 +224,7 @@ export default async function handler(req, res) {
     }
 
     // -- 7. Admin SMS notification (non-critical) ---------------------------
+    if (await isAutomationEnabled(supabase, 'auto_book_admin_sms_enabled')) {
     try {
       const adminSms = `✅ Auto-booked!\n${lead.name} · ${lead.service || 'Cleaning'}\n${prettyDate} at ${time}${totalWithTax ? '\nTotal: $' + totalWithTax : ''}${rushFee > 0 ? ' (incl. $' + rushFee + ' rush fee)' : ''}`;
       await fetchWithTimeout(`${BASE_URL}/api/send-sms`, {
@@ -234,10 +235,14 @@ export default async function handler(req, res) {
     } catch (err) {
       await logError('lead-book:admin-sms', err, { leadId: lead.id });
     }
+    } else {
+      console.log('[lead-book] auto_book_admin_sms disabled — skipping');
+    }
 
     // -- 8. Policy agreement SMS — only if client hasn't already agreed -----
     // New clients have policies_agreed_at = null. Existing clients who already
     // agreed are skipped automatically so they don't get a repeat message.
+    if (await isAutomationEnabled(supabase, 'policy_first_booking_sms_enabled')) {
     try {
       const { data: clientRecord } = await supabase
         .from('clients')
@@ -260,6 +265,9 @@ export default async function handler(req, res) {
     } catch (err) {
       // Policy SMS failure does NOT fail the booking
       await logError('lead-book:policy-sms', err, { leadId: lead.id, clientId });
+    }
+    } else {
+      console.log('[lead-book] policy_first_booking_sms disabled — skipping');
     }
 
   await logActivity('lead_booked', 'Lead booked as client: ' + (body.name || body.clientName || 'Unknown'), { name: body.name, service: body.service, date: body.date });

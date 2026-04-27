@@ -8,6 +8,7 @@
  */
 
 import { createClient } from '@supabase/supabase-js';
+import { isAutomationEnabled } from './utils/automation-gate.js';
 import { fetchWithTimeout, TIMEOUTS } from './utils/with-timeout.js';
 import { logError } from './utils/error-logger.js';
 import { getOpenPhoneHistory } from './utils/openphone-history.js';
@@ -168,7 +169,8 @@ export default async function handler(req, res) {
         }
       }
 
-      // Email VA
+      // Email VA — gated by task_created_email_enabled
+      if (await isAutomationEnabled(db, 'task_created_email_enabled')) {
       try {
         const _title = body.title || body.task_title || "Untitled";
         const _due = body.due_date ? new Date(body.due_date).toLocaleDateString("en-US",{month:"long",day:"numeric",year:"numeric"}) : null;
@@ -185,7 +187,9 @@ export default async function handler(req, res) {
       } catch(_emailErr) {
         await logError("tasks-email", _emailErr.message, { task: body });
       }
-      // SMS notification to VA
+      } else { console.log('[tasks] task_created_email disabled — skipping'); }
+      // SMS notification to VA — gated by task_created_sms_enabled
+      if (await isAutomationEnabled(db, 'task_created_sms_enabled')) {
       try {
         const _title = body.title || body.task_title || "Untitled";
         const _due = body.due_date ? " (Due: " + new Date(body.due_date).toLocaleDateString("en-US",{month:"short",day:"numeric"}) + ")" : "";
@@ -197,6 +201,7 @@ export default async function handler(req, res) {
       } catch(_smsErr) {
         await logError("tasks-sms", _smsErr.message, { task: body });
       }
+      } else { console.log('[tasks] task_created_sms disabled — skipping'); }
       return res.status(200).json({ success: true, task });
     }
 

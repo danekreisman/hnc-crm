@@ -6935,19 +6935,59 @@ function renderAutoList(){
     + '</div>';
 
   var reminderCard = '<div class="card" style="padding:14px 16px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:12px;border-left:3px solid #10b981;">'    + '<div style="flex:1;min-width:0;">'    +   '<div style="display:flex;align-items:center;gap:8px;"><b style="font-size:14px;">Day-Before Appointment Reminders</b>'    +     '<span class="pill pill-ok" style="font-size:10px;">ACTIVE</span>'    +     '<span style="font-size:10px;background:#f0f9ff;color:#1d4ed8;padding:2px 7px;border-radius:99px;border:1px solid #bfdbfe;">System</span>'    +     '<span style="font-size:10px;background:#f0fdf4;color:#166534;padding:2px 7px;border-radius:99px;border:1px solid #bbf7d0;">Cron · 6pm HST</span>'    +   '</div>'    +   '<div style="font-size:12px;color:var(--muted);margin-top:4px;">Daily at <b>6:00 PM HST</b> &middot; appointment is tomorrow &middot; do send_sms to customer + assigned cleaner</div>'    + '</div>'    + '<button class=\"btn\" style=\"font-size:12px;padding:4px 10px;margin-left:auto;margin-right:8px;\" onclick=\"openDayBeforeAutoEdit()\">Edit templates</button><label class=\"auto-toggle\" title=\"Enable automation\"><input type=\"checkbox\" id=\"toggle-reminders\" checked onchange="toggleReminderAuto(this.checked)"><div class="auto-toggle-track"><div class="auto-toggle-thumb"></div></div></label></div>';
+  // ── VA Task automations: create internal todos, NEVER contact anyone ──
+  // Purple border distinguishes these from external-contact automations.
+  // Toggle state persists to localStorage; backend cron jobs check this flag
+  // before creating tasks (or will, once wired — currently always-on per cron).
+  function _vaTaskEnabled(key){
+    try{ var v = localStorage.getItem('hnc_va_task_'+key); return v === null ? true : v === '1'; }catch(_){ return true; }
+  }
+  function _vaTaskCardHTML(opts){
+    var enabled = _vaTaskEnabled(opts.key);
+    return '<div class="card" style="padding:14px 16px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:12px;border-left:3px solid #8b5cf6;">'
+      + '<div style="flex:1;min-width:0;">'
+      +   '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;"><b style="font-size:14px;">'+opts.title+'</b>'
+      +     (enabled
+            ? '<span class="pill pill-ok" style="font-size:10px;">ACTIVE</span>'
+            : '<span class="badge" style="background:#f3f4f6;color:#6b7280;border:1px solid #d1d5db;font-size:11px;padding:2px 7px;border-radius:999px;">Off</span>')
+      +     '<span style="font-size:10px;background:#f0f9ff;color:#1d4ed8;padding:2px 7px;border-radius:99px;border:1px solid #bfdbfe;">System</span>'
+      +     '<span style="font-size:10px;background:#faf5ff;color:#7c3aed;padding:2px 7px;border-radius:99px;border:1px solid #ddd6fe;">Internal task</span>'
+      +     '<span style="font-size:10px;background:#f0fdf4;color:#166534;padding:2px 7px;border-radius:99px;border:1px solid #bbf7d0;">Cron · 8am HST</span>'
+      +   '</div>'
+      +   '<div style="font-size:12px;color:var(--muted);margin-top:4px;">'+opts.description+'</div>'
+      + '</div>'
+      + '<label class="auto-toggle" title="Enable automation" style="margin-left:auto"><input type="checkbox" id="toggle-va-'+opts.key+'" '+(enabled?'checked':'')+' onchange="_vaTaskToggle(\''+opts.key+'\', this.checked)"><div class="auto-toggle-track"><div class="auto-toggle-thumb"></div></div></label>'
+      + '</div>';
+  }
+  var vaQuoteDay1Card = _vaTaskCardHTML({
+    key: 'quote_day1',
+    title: 'Quote Sent — Day 1 Follow-up Call',
+    description: 'When <b>quote sent yesterday</b> &middot; lead not won/lost &middot; do create_va_task'
+  });
+  var vaDay5Card = _vaTaskCardHTML({
+    key: 'quote_day5',
+    title: 'Quote Sent — Day 5 Re-engagement Call',
+    description: 'When <b>quote sent 5 days ago</b> &middot; lead not won/lost &middot; do create_va_task'
+  });
+  var vaPostFirstCleanCard = _vaTaskCardHTML({
+    key: 'post_first_clean',
+    title: 'First Clean Complete — Follow-up Call',
+    description: 'When <b>first appointment completed</b> &middot; client not pre-existing &middot; do create_va_task'
+  });
+
   if(!automations.length){
     var cancelEmailCard = '<div class="card" style="padding:14px 16px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:12px;border-left:3px solid #d1d5db;"><div style="flex:1;min-width:0;"><div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;"><b style="font-size:14px;">Appointment Cancelled — Client Email</b><span class="badge" style="background:#f3f4f6;color:#6b7280;border:1px solid #d1d5db;font-size:11px;padding:2px 7px;border-radius:999px;">Off</span><span class="badge" style="background:#eff6ff;color:#3b82f6;border:1px solid #bfdbfe;font-size:11px;padding:2px 7px;border-radius:999px;">System</span></div><div style="font-size:12px;color:#6b7280;">When appointment is cancelled · send cancellation email to client</div></div><button class=\"btn\" style=\"font-size:12px;padding:4px 10px;margin-left:auto;margin-right:8px;\" onclick=\"openCancelEmailAutoEdit()\">Edit templates</button><label class=\"auto-toggle\" title=\"Enable automation\"><input type=\"checkbox\" id="toggle-cancel-email"><div class="auto-toggle-track"><div class="auto-toggle-thumb"></div></div></label></div>';
   var cancelClientSmsCard = '<div class="card" style="padding:14px 16px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:12px;border-left:3px solid #d1d5db;"><div style="flex:1;min-width:0;"><div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;"><b style="font-size:14px;">Appointment Cancelled — Client SMS</b><span class="badge" style="background:#f3f4f6;color:#6b7280;border:1px solid #d1d5db;font-size:11px;padding:2px 7px;border-radius:999px;">Off</span><span class="badge" style="background:#eff6ff;color:#3b82f6;border:1px solid #bfdbfe;font-size:11px;padding:2px 7px;border-radius:999px;">System</span></div><div style="font-size:12px;color:#6b7280;">When appointment is cancelled · send SMS to client</div></div><button class=\"btn\" style=\"font-size:12px;padding:4px 10px;margin-left:auto;margin-right:8px;\" onclick=\"openCancelClientSmsAutoEdit()\">Edit templates</button><label class=\"auto-toggle\" title=\"Enable automation\"><input type=\"checkbox\" id="toggle-cancel-client-sms"><div class="auto-toggle-track"><div class="auto-toggle-thumb"></div></div></label></div>';
   var cancelCleanerSmsCard = '<div class="card" style="padding:14px 16px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:12px;border-left:3px solid #d1d5db;"><div style="flex:1;min-width:0;"><div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;"><b style="font-size:14px;">Appointment Cancelled — Cleaner SMS</b><span class="badge" style="background:#f3f4f6;color:#6b7280;border:1px solid #d1d5db;font-size:11px;padding:2px 7px;border-radius:999px;">Off</span><span class="badge" style="background:#eff6ff;color:#3b82f6;border:1px solid #bfdbfe;font-size:11px;padding:2px 7px;border-radius:999px;">System</span></div><div style="font-size:12px;color:#6b7280;">When appointment is cancelled · send SMS to assigned cleaner</div></div><button class=\"btn\" style=\"font-size:12px;padding:4px 10px;margin-left:auto;margin-right:8px;\" onclick=\"openCancelCleanerSmsAutoEdit()\">Edit templates</button><label class=\"auto-toggle\" title=\"Enable automation\"><input type=\"checkbox\" id="toggle-cancel-cleaner-sms"><div class="auto-toggle-track"><div class="auto-toggle-thumb"></div></div></label></div>';
   var reviewSmsCard = '<div class="card" style="padding:14px 16px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:12px;border-left:3px solid #d1d5db;"><div style="flex:1;min-width:0;"><div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;"><b style="font-size:14px;">Post-Clean Review Request</b><span class="badge" style="background:#f3f4f6;color:#6b7280;border:1px solid #d1d5db;font-size:11px;padding:2px 7px;border-radius:999px;">Off</span><span class="badge" style="background:#eff6ff;color:#3b82f6;border:1px solid #bfdbfe;font-size:11px;padding:2px 7px;border-radius:999px;">System</span></div><div style="font-size:12px;color:#6b7280;">After appointment completed · Cron: Daily · send Google review SMS to client</div></div><button class=\"btn\" style=\"font-size:12px;padding:4px 10px;margin-left:auto;margin-right:8px;\" onclick=\"openReviewSmsAutoEdit()\">Edit templates</button><label class=\"auto-toggle\" title=\"Enable automation\"><input type=\"checkbox\" id="toggle-review-sms"><div class="auto-toggle-track"><div class="auto-toggle-thumb"></div></div></label></div>';
   var bookingConfirmCard = '<div class="card" style="padding:14px 16px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:12px;border-left:3px solid #d1d5db;"><div style="flex:1;min-width:0;"><div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;"><b style="font-size:14px;">Booking Confirmation Email</b><span class="badge" style="background:#f3f4f6;color:#6b7280;border:1px solid #d1d5db;font-size:11px;padding:2px 7px;border-radius:999px;">Off</span><span class="badge" style="background:#eff6ff;color:#3b82f6;border:1px solid #bfdbfe;font-size:11px;padding:2px 7px;border-radius:999px;">System</span></div><div style="font-size:12px;color:#6b7280;">When client books via quote link · send confirmation email to client</div></div><button class=\"btn\" style=\"font-size:12px;padding:4px 10px;margin-left:auto;margin-right:8px;\" onclick=\"openBookingConfirmAutoEdit()\">Edit templates</button><label class=\"auto-toggle\" title=\"Enable automation\"><input type=\"checkbox\" id="toggle-booking-confirm"><div class="auto-toggle-track"><div class="auto-toggle-thumb"></div></div></label></div>';
-    host.innerHTML = systemCard + janitorialCard + reminderCard + cancelEmailCard + cancelClientSmsCard + cancelCleanerSmsCard + reviewSmsCard + bookingConfirmCard + '<div class="empty-state" style="padding:28px;text-align:center;color:var(--muted);background:var(--panel);border:1px dashed var(--border);border-radius:var(--radius);">No custom automations yet. Click <b>+ New automation</b> to build your first rule.</div>';
+    host.innerHTML = systemCard + janitorialCard + reminderCard + cancelEmailCard + cancelClientSmsCard + cancelCleanerSmsCard + reviewSmsCard + bookingConfirmCard + vaQuoteDay1Card + vaDay5Card + vaPostFirstCleanCard + '<div class="empty-state" style="padding:28px;text-align:center;color:var(--muted);background:var(--panel);border:1px dashed var(--border);border-radius:var(--radius);">No custom automations yet. Click <b>+ New automation</b> to build your first rule.</div>';
     var ac = document.getElementById('auto-active-count'); if(ac) ac.textContent='3';
     var atot = document.getElementById('auto-total-count'); if(atot) atot.textContent='3';
     var tc = document.getElementById('auto-today-count'); if(tc) tc.textContent='0';
     return;
   }
-  var html = systemCard + janitorialCard + reminderCard;
+  var html = systemCard + janitorialCard + reminderCard + vaQuoteDay1Card + vaDay5Card + vaPostFirstCleanCard;
   for(var i=0;i<automations.length;i++){
     var a = automations[i];
     var condSummary = (a.conditions&&a.conditions.length) ? (a.conditions.length+' condition'+(a.conditions.length>1?'s':'')+' ('+(a.logic||'AND')+')') : 'runs every time';
@@ -6975,6 +7015,15 @@ function renderAutoList(){
   var tc = document.getElementById('auto-today-count'); if(tc) tc.textContent=String(todayN);
 }
 function escAuto(s){ s=String(s==null?'':s); return s.replace(/[&<>"]/g, function(c){return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c];}); }
+
+/* Toggle handler for VA task automations (UI-only persistence; backend cron is independent for now) */
+function _vaTaskToggle(key, enabled){
+  try{ localStorage.setItem('hnc_va_task_'+key, enabled ? '1' : '0'); }catch(_){}
+  if(typeof logActivity==='function'){
+    try{ logActivity('automation_toggled', (enabled?'Enabled':'Disabled')+' VA task: '+key, {automation:key, enabled:enabled}); }catch(_){}
+  }
+  if(typeof renderAutoList==='function') renderAutoList();
+}
 
 async function openQuoteAutoEdit(){
   var savedEl = document.getElementById('qat-saved');

@@ -1413,11 +1413,11 @@ Mahalo 🌺</textarea>
           <div class="form-two">
             <div class="form-row"><label>Service type</label>
               <select id="na-service" onchange="calcPrice()">
-                <option value="standard">Regular Cleaning</option>
-                <option value="deep">Deep Cleaning</option>
-                <option value="moveout">Move Out Cleaning</option>
+                <option value="standard">Regular Clean</option>
+                <option value="deep">Deep Clean</option>
+                <option value="moveout">Move Out Clean</option>
                 <option value="airbnb">Airbnb Turnover</option>
-                <option value="commercial">Commercial Cleaning</option>
+                <option value="commercial">Janitorial Clean</option>
               </select>
             </div>
             <div class="form-row" id="na-freq-row"><label>Frequency</label>
@@ -1570,10 +1570,11 @@ Mahalo 🌺</textarea>
         <div class="form-two">
           <div class="form-row"><label>Service type</label>
             <select id="edit-service" onchange="calcEditPrice()">
-              <option value="Regular Cleaning">Regular Cleaning</option>
-              <option value="Deep Cleaning">Deep Cleaning</option>
-              <option value="Move Out Cleaning">Move Out Cleaning</option>
-              <option value="Commercial Cleaning">Commercial Cleaning</option>
+              <option value="Regular Clean">Regular Clean</option>
+              <option value="Deep Clean">Deep Clean</option>
+              <option value="Move Out Clean">Move Out Clean</option>
+              <option value="Airbnb Turnover">Airbnb Turnover</option>
+              <option value="Janitorial Clean">Janitorial Clean</option>
             </select>
           </div>
           <div class="form-row"><label>Frequency</label>
@@ -1832,7 +1833,7 @@ Mahalo 🌺</textarea>
         <div class="form-row"><label>Email</label><input type="email" id="led-email"></div>
         <div class="form-row"><label>Address</label><input type="text" id="led-address"></div>
         <div class="form-row"><label>Est. monthly value ($)</label><input type="number" id="led-value"></div>
-        <div class="form-row"><label>Service type</label><select id="led-service"><option>Standard clean</option><option>Commercial weekly</option><option>Commercial daily</option><option>Deep clean</option><option>Move-out clean</option><option>Janitorial</option></select></div>
+        <div class="form-row"><label>Service type</label><select id="led-service"><option>Regular Clean</option><option>Deep Clean</option><option>Move Out Clean</option><option>Airbnb Turnover</option><option>Janitorial Clean</option></select></div>
         <div class="form-row"><label>Stage</label><select id="led-stage"><option>New inquiry</option><option>Quoted</option><option>Follow-up</option></select></div>
         <div class="form-row"><label>Lead source</label><select id="led-source"><option>Google SEO</option><option>Referral</option><option>Cold outreach</option><option>Walk-in</option><option>Social media</option></select></div>
         <div class="form-row"><label>Next action</label><input type="text" id="led-action"></div>
@@ -3361,7 +3362,8 @@ function showApptEdit(){
     if(_svcSel){
       var _svc = _a.service || 'Regular Cleaning';
       // If current appointment has a service value not in the list, add it as an option so it doesn't silently change
-      var _known = ['Regular Cleaning','Deep Cleaning','Move Out Cleaning','Commercial Cleaning'];
+      var _known = ['Regular Clean','Deep Clean','Move Out Clean','Airbnb Turnover','Janitorial Clean',
+        'Regular Cleaning','Deep Cleaning','Move Out Cleaning','Commercial Cleaning'];
       if(_svc && _known.indexOf(_svc)<0){ var _o=document.createElement('option'); _o.value=_svc; _o.textContent=_svc; _svcSel.insertBefore(_o, _svcSel.firstChild); }
       _svcSel.value = _svc;
     }
@@ -5085,11 +5087,18 @@ function calcEditPrice(){
   // Derive hours from currentAppt property inputs — this is the single source of truth
   // so that property changes immediately recalculate price without saving first
   var appt=currentAppt||{};
-  var svcTextMap={'Regular Cleaning':'standard','Deep Cleaning':'deep','Move Out Cleaning':'moveout',
-    'Airbnb Turnover':'airbnb','Commercial Cleaning':'commercial',
+  var svcTextMap={
+    // Canonical short-form names (current)
+    'Regular Clean':'standard','Deep Clean':'deep','Move Out Clean':'moveout',
+    'Airbnb Turnover':'airbnb','Janitorial Clean':'commercial',
+    // Legacy long-form names (preserved for existing appointments)
+    'Regular Cleaning':'standard','Deep Cleaning':'deep','Move Out Cleaning':'moveout',
+    'Commercial Cleaning':'commercial',
+    // Older variants from imports / mock data
     'Standard clean':'standard','Deep clean':'deep','Move-out clean':'moveout',
     'Commercial weekly':'commercial','Commercial daily':'commercial','Airbnb turnover':'airbnb',
-    'Standard':'standard','Deep Clean':'deep','Move In/Out':'moveout','Post-Construction':'standard'};
+    'Janitorial':'commercial',
+    'Standard':'standard','Move In/Out':'moveout','Post-Construction':'standard'};
   var _calcSvcEl=document.getElementById('edit-service');
   var svcText=(_calcSvcEl&&_calcSvcEl.value)||appt.service||'Regular Cleaning';
   var svcType=svcTextMap[svcText]||'standard';
@@ -6122,6 +6131,7 @@ try{var _sv=sessionStorage.getItem('hnc_currentView'); if(_sv && _sv!=='calendar
             <option value="standard">Regular Clean</option>
             <option value="deep">Deep Clean</option>
             <option value="moveout">Move Out Clean</option>
+            <option value="airbnb">Airbnb Turnover</option>
             <option value="janitorial">Janitorial Clean</option>
           </select>
         </div>
@@ -6200,7 +6210,7 @@ try{var _sv=sessionStorage.getItem('hnc_currentView'); if(_sv && _sv!=='calendar
           <select id="nc-type"><option>Residential</option><option>Commercial</option></select>
         </div>
         <div class="form-row"><label>Service type</label>
-          <select id="nc-service"><option>Standard clean</option><option>Deep clean</option><option>Move-out clean</option><option>Commercial weekly</option><option>Commercial daily</option><option>Airbnb turnover</option></select>
+          <select id="nc-service"><option>Regular Clean</option><option>Deep Clean</option><option>Move Out Clean</option><option>Airbnb Turnover</option><option>Janitorial Clean</option></select>
         </div>
       </div>
       <div class="form-two">

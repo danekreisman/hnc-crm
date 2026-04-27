@@ -49,6 +49,24 @@ FIELD CONSTRAINTS — ABSOLUTE:
 - cta_text: 2-5 words. Action-oriented. Examples: "Book a clean", "Reserve my slot", "Get my quote".
 - cta_url: default to "tel:8084685356" unless the user has specified a different action.
 
+OFFER PRESERVATION — CRITICAL, NON-NEGOTIABLE:
+If the user provides an offer in their message, you MUST preserve EVERY literal detail of that offer EXACTLY:
+- Discount percentage: if user says "20% off", output "20% off" — NEVER change to 10%, 15%, or any other number
+- Time window: if user says "this weekend", keep "this weekend" — don't substitute "this month", "this week", or anything else
+- Service type: if user says "deep cleans", keep "deep cleans" — don't generalize to "cleaning"
+- Booking deadline: if user gives a specific date or window, keep that exact date/window
+- Dollar amounts: if user says "$50 off", keep "$50 off" — never round, never change
+
+The user's offer text is the source of truth. You may paraphrase the SURROUNDING language for tone, but you may NEVER alter the offer's numbers, dates, percentages, dollar amounts, or service references. Reproduce the offer's specifics verbatim in BOTH the offer-callout box AND any prose that references the offer.
+
+Example — if user offer is "20% off deep cleans this weekend only":
+✅ subject: "🌸 20% off deep cleans this weekend only"
+✅ offer box headline: "20% Off Deep Cleans"
+✅ offer box subtext: "Book this weekend only and save 20% on your deep clean."
+❌ NEVER: "10% off", "15% off", "25% off"
+❌ NEVER: "this week", "this month", "limited time"
+❌ NEVER: "off cleaning" (must say "off deep cleans")
+
 BODY HTML EXAMPLES — match this style exactly:
 
 Plain paragraph:
@@ -111,10 +129,13 @@ export default async function handler(req, res) {
       `Vibe: ${vibe} — ${VIBE_GUIDANCE[vibe]}`,
       `Audience: ${audience} — ${AUDIENCE_GUIDANCE[audience] || AUDIENCE_GUIDANCE.both}`,
       `Tone: ${tone} — ${TONE_GUIDANCE[tone] || TONE_GUIDANCE.aloha}`,
-      offer ? `Offer / hook to include: "${offer}"` : 'No specific offer — write evergreen content for this vibe. Skip the offer-callout box if no offer.',
+      offer
+        ? `OFFER (preserve EXACTLY — every number, date, percentage, and service reference must appear verbatim in the output): "${offer}"`
+        : 'No specific offer — write evergreen content for this vibe. Skip the offer-callout box if no offer.',
       '',
+      offer ? `Reminder: the offer above contains specific details. If the user wrote "${offer}", your output must contain those exact details. Do not change percentages, time windows, service types, or any numbers.` : '',
       'Generate the broadcast now. Return ONLY the JSON object — no markdown, no commentary.',
-    ].join('\n');
+    ].filter(Boolean).join('\n');
 
     const resp = await fetchWithTimeout('https://api.anthropic.com/v1/messages', {
       method: 'POST',

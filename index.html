@@ -970,6 +970,7 @@ textarea{font-family:inherit;}
                   </div>
                   <div style="display:flex;gap:8px;margin-top:14px;">
                     <button onclick="generateAiBroadcast()" style="flex:1;padding:9px;border:2px solid var(--border);border-radius:8px;background:#fff;font-size:12px;font-weight:600;cursor:pointer;">↻ Regenerate</button>
+                    <button onclick="previewAiBroadcastEmail()" style="flex:1;padding:9px;border:2px solid var(--border);border-radius:8px;background:#fff;font-size:12px;font-weight:600;cursor:pointer;">👁 Preview email</button>
                     <button onclick="acceptAiBroadcast()" style="flex:2;padding:9px;background:var(--brand-500);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;">Use this — fill the form ↓</button>
                   </div>
                 </div>
@@ -1076,6 +1077,14 @@ textarea{font-family:inherit;}
             <input type="hidden" id="bc-custom-body-html" value="" />
             <input type="hidden" id="bc-custom-cta-text"  value="" />
             <input type="hidden" id="bc-custom-cta-url"   value="" />
+
+            <!-- Preview rendered email (no send) -->
+            <div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:10px;padding:12px 16px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:10px;">
+              <div style="font-size:12px;color:#0c4a6e;">
+                <span style="font-weight:700;">👁 See exactly what recipients will see.</span> Opens in a new tab. Nothing is sent.
+              </div>
+              <button onclick="previewBroadcastEmail()" style="padding:8px 14px;background:#0284c7;color:#fff;border:none;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;">Preview email</button>
+            </div>
 
             <!-- Test send -->
             <div style="background:#f8fafc;border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:14px;">
@@ -15377,6 +15386,88 @@ function acceptAiBroadcast() {
   closeAiBroadcastForm();
   var subj = document.getElementById('bc-subject');
   if (subj) { subj.scrollIntoView({ behavior:'smooth', block:'center' }); subj.focus(); }
+}
+
+/* Preview the email rendered by the server using the AI generation result.
+   Distinct from previewBroadcastEmail because it works BEFORE acceptAiBroadcast
+   has populated the hidden inputs — we read straight from window._bcAiResult. */
+async function previewAiBroadcastEmail() {
+  var data = window._bcAiResult;
+  if (!data) { alert('Generate a broadcast first.'); return; }
+  var subject = (document.getElementById('bc-subject').value || data.subject || '').trim();
+  var payload = {
+    holiday_key:      'ai_custom',
+    subject:          subject,
+    custom_preheader: data.preheader,
+    custom_heading:   data.heading,
+    custom_intro:     data.intro,
+    custom_body_html: data.body_html,
+    custom_cta_text:  data.cta_text,
+    custom_cta_url:   data.cta_url,
+  };
+  await _openBroadcastPreview(payload);
+}
+
+/* Preview the email for whatever's currently selected in the modal — works for
+   both built-in templates and AI-custom drafts. Reads from the hidden inputs
+   that saveBroadcast also reads from, so the preview matches what would send. */
+async function previewBroadcastEmail() {
+  var templateKey = document.getElementById('bc-selected-template').value;
+  var subject     = document.getElementById('bc-subject').value.trim();
+  if (!templateKey) { alert('Pick a template (or generate an AI broadcast) first.'); return; }
+  if (!subject)     { alert('Enter a subject line first.'); return; }
+
+  var payload = { holiday_key: templateKey, subject: subject };
+  if (templateKey === 'ai_custom') {
+    payload.custom_preheader = document.getElementById('bc-custom-preheader').value;
+    payload.custom_heading   = document.getElementById('bc-custom-heading').value;
+    payload.custom_intro     = document.getElementById('bc-custom-intro').value;
+    payload.custom_body_html = document.getElementById('bc-custom-body-html').value;
+    payload.custom_cta_text  = document.getElementById('bc-custom-cta-text').value;
+    payload.custom_cta_url   = document.getElementById('bc-custom-cta-url').value;
+    if (!payload.custom_body_html) {
+      alert('AI broadcast content is missing. Generate a broadcast and click "Use this" first.');
+      return;
+    }
+  }
+  await _openBroadcastPreview(payload);
+}
+
+/* Shared: POST the payload to /api/preview-broadcast, get back HTML, open in
+   a new tab. Using a blob URL avoids any cross-origin issues that document.write
+   into a popup can hit. */
+async function _openBroadcastPreview(payload) {
+  /* Open the tab synchronously BEFORE the await — popup blockers only fire
+     when window.open is called outside a user-gesture stack. The tab shows
+     a loading message while we fetch. */
+  var preview = window.open('', '_blank');
+  if (!preview) {
+    alert('Popup blocked. Please allow popups for this site, then click Preview again.');
+    return;
+  }
+  preview.document.write('<!DOCTYPE html><html><head><title>Loading preview…</title><style>body{font-family:-apple-system,sans-serif;padding:40px;text-align:center;color:#64748b;}</style></head><body><p>Loading email preview…</p></body></html>');
+  try {
+    var resp = await fetch('/api/preview-broadcast', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!resp.ok) {
+      var err = await resp.json().catch(function(){ return { error: 'HTTP ' + resp.status }; });
+      preview.document.open();
+      preview.document.write('<!DOCTYPE html><html><body style="font-family:sans-serif;padding:40px;"><h2>Preview failed</h2><pre style="background:#fee;padding:14px;border-radius:8px;">' + (err.error || 'Unknown error') + '</pre></body></html>');
+      preview.document.close();
+      return;
+    }
+    var html = await resp.text();
+    preview.document.open();
+    preview.document.write(html);
+    preview.document.close();
+  } catch (e) {
+    preview.document.open();
+    preview.document.write('<!DOCTYPE html><html><body style="font-family:sans-serif;padding:40px;"><h2>Preview failed</h2><p>' + e.message + '</p></body></html>');
+    preview.document.close();
+  }
 }
 
 function selectBcAudience(val, btn) {

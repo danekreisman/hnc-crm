@@ -207,7 +207,8 @@ const HOLIDAY_TEMPLATES = {
 // HOLIDAY_TEMPLATES. For holiday_key='ai_custom', builds a synthetic template
 // from the broadcast's custom_* columns. Returns null if the key is unknown
 // AND no custom_* fields are populated.
-function resolveTemplate(broadcast) {
+// EXPORTED so /api/preview-broadcast can reuse the same logic.
+export function resolveTemplate(broadcast) {
   if (broadcast.holiday_key && HOLIDAY_TEMPLATES[broadcast.holiday_key]) {
     return HOLIDAY_TEMPLATES[broadcast.holiday_key];
   }
@@ -228,7 +229,8 @@ function resolveTemplate(broadcast) {
 }
 
 // ─── Render a single recipient's email ───────────────────────────────────────
-function renderEmail(template, firstName, unsubscribeUrl) {
+// EXPORTED so /api/preview-broadcast can reuse the same renderer for previews.
+export function renderEmail(template, firstName, unsubscribeUrl) {
   const t = template;
   if (!t) throw new Error('renderEmail called with null template');
 

@@ -218,20 +218,25 @@ export default async function handler(req, res) {
         const cards = await stripe.paymentMethods.list({ customer: cust.id, type: 'card' });
         return res.status(200).json({ success: true, customerId: cust.id, cards: cards.data });
       } catch (e) {
-    await logActivity('invoice_sent', 'Invoice sent to client via Stripe', { invoiceId: invoiceId || stripeInvoiceId });
         return res.status(200).json({ success: false, customerId: null, cards: [], error: e.message });
       }
     }
     
   // Void invoice
   if (action === 'void_invoice') {
-    const { invoiceId } = body;
+    const { invoiceId } = req.body;
     if (!invoiceId) return res.status(400).json({ error: 'invoiceId required' });
     const voidRes = await stripe.invoices.voidInvoice(invoiceId);
     return res.status(200).json({ success: true, status: voidRes.status });
   }
 
-  return res.status(400).json({ error: 'Unknown action' });
+  // Diagnostic: if we got here, the action wasn't recognized. Log what was sent
+  // so any future occurrences are easy to investigate.
+  console.error('[stripe-invoice] Unknown action received. Body keys:',
+    Object.keys(req.body || {}),
+    '· action value:', JSON.stringify(action),
+    '· content-type:', req.headers['content-type']);
+  return res.status(400).json({ error: 'Unknown action', received_action: action || null });
   } catch (err) {
             console.error('[stripe-invoice] Error:', err);
             return res.status(500).json({ error: err.message });

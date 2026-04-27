@@ -12,6 +12,7 @@ import { createClient } from '@supabase/supabase-js';
 import { logError } from './utils/error-logger.js';
 import { getOpenPhoneHistory } from './utils/openphone-history.js';
 import { fetchWithTimeout, TIMEOUTS } from './utils/with-timeout.js';
+import { isAutomationEnabled } from './utils/automation-gate.js';
 
 // ── VA TASK TEST MODE: limit task creation to Dane only during rollout ─────
 const TASK_AUTOMATIONS_TEST_MODE = true;
@@ -97,7 +98,11 @@ export default async function handler(req, res) {
     console.log(`[run-job-completions] Marked ${toComplete.length} appointment(s) as completed`);
 
     // ── First-clean task: call client immediately after first appointment ──
+    const firstCleanEnabled = await isAutomationEnabled(db, 'va_task_post_first_clean_enabled');
     const firstCleanTasks = [];
+    if (!firstCleanEnabled) {
+      console.log('[run-job-completions] post-first-clean disabled — skipping');
+    } else {
     for (const apptId of toComplete) {
       const appt = appointments.find(a => a.id === apptId);
       if (!appt?.client_id) continue;
@@ -171,6 +176,7 @@ export default async function handler(req, res) {
         console.log(`[run-job-completions] Created first-clean follow-up task for ${client.name}`);
       }
     }
+    } // end firstCleanEnabled block
 
     // ── Post-clean thank-you email with feedback gate ─────────────────────
     for (const apptId of toComplete) {

@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { validateOrFail, SCHEMAS } from './utils/validate.js';
+import { isAutomationEnabled } from './utils/automation-gate.js';
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -154,6 +155,11 @@ export default async function handler(req, res) {
 
   // ── 3. Janitorial branch ────────────────────────────────────────────────
   if (isJanitorial) {
+    const janEnabled = await isAutomationEnabled(db, 'janitorial_enabled');
+    if (!janEnabled) {
+      console.log('[lead-capture] janitorial_enabled is FALSE — skipping janitorial walkthrough send');
+      return res.status(200).json({ success: true, leadId, skipped: 'janitorial_enabled is FALSE' });
+    }
     let janSms = null, janSubject = null, janIntro = null;
     try {
       const [sr, subr, intr] = await Promise.all([
@@ -236,6 +242,11 @@ export default async function handler(req, res) {
 
   // ── 6. Send quote email + SMS ───────────────────────────────────────────
   if (quoteResult && !quoteResult.error) {
+    const autoQuoteEnabled = await isAutomationEnabled(db, 'auto_quote_enabled');
+    if (!autoQuoteEnabled) {
+      console.log('[lead-capture] auto_quote_enabled is FALSE — skipping quote email/SMS send');
+      return res.status(200).json({ success: true, leadId, skipped: 'auto_quote_enabled is FALSE' });
+    }
     const isCustom  = quoteResult.custom_quote === true;
     const totalStr  = isCustom ? 'custom' : `$${Number(quoteResult.total).toFixed(2)}`;
     const extraVars = { total: isCustom ? 'custom' : Number(quoteResult.total).toFixed(2) };

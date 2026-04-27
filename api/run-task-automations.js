@@ -25,6 +25,7 @@ import { createClient } from '@supabase/supabase-js';
 import { logError } from './utils/error-logger.js';
 import { getOpenPhoneHistory } from './utils/openphone-history.js';
 import { fetchWithTimeout, TIMEOUTS } from './utils/with-timeout.js';
+import { isAutomationEnabled } from './utils/automation-gate.js';
 
 const ANTHROPIC_API = 'https://api.anthropic.com/v1/messages';
 
@@ -138,6 +139,10 @@ export default async function handler(req, res) {
     const fourDaysAgo = new Date(Date.now() - 4 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
     // ── 1. Quote Day 1 followup (quote sent yesterday → call today) ──────────
+    const day1Enabled = await isAutomationEnabled(db, 'va_task_quote_day1_enabled');
+    if (!day1Enabled) {
+      console.log('[run-task-automations] Day 1 disabled — skipping');
+    } else {
     const { data: day1Leads, error: day1Err } = await db
       .from('leads')
       .select('id, name, phone, email, service, quote_total, address, notes, stage')
@@ -177,8 +182,13 @@ export default async function handler(req, res) {
         results.errors++;
       }
     }
+    } // end of day1Enabled block
 
     // ── 2. Day 5 re-engagement call (quote sent 5d ago → call today) ────────
+    const day5Enabled = await isAutomationEnabled(db, 'va_task_quote_day5_enabled');
+    if (!day5Enabled) {
+      console.log('[run-task-automations] Day 5 disabled — skipping');
+    } else {
     const { data: day5Leads, error: day5Err } = await db
       .from('leads')
       .select('id, name, phone, email, service, quote_total, address, notes, stage')
@@ -218,6 +228,7 @@ export default async function handler(req, res) {
         results.errors++;
       }
     }
+    } // end of day5Enabled block
 
     return res.status(200).json({ success: true, ...results });
 

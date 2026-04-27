@@ -6984,6 +6984,7 @@ function renderAutoList(){
     host.innerHTML = systemCard + janitorialCard + reminderCard + cancelEmailCard + cancelClientSmsCard + cancelCleanerSmsCard + reviewSmsCard + bookingConfirmCard + vaQuoteDay1Card + vaDay5Card + vaPostFirstCleanCard + '<div class="empty-state" style="padding:28px;text-align:center;color:var(--muted);background:var(--panel);border:1px dashed var(--border);border-radius:var(--radius);">No custom automations yet. Click <b>+ New automation</b> to build your first rule.</div>';
     _ensureAutomationToggleListener();
     setTimeout(_syncAutomationStatusUI, 0);
+    setTimeout(_loadAutomationToggleStates, 50);
     return;
   }
   var html = systemCard + janitorialCard + reminderCard + vaQuoteDay1Card + vaDay5Card + vaPostFirstCleanCard;
@@ -7008,6 +7009,7 @@ function renderAutoList(){
   host.innerHTML = html;
   _ensureAutomationToggleListener();
   setTimeout(_syncAutomationStatusUI, 0);
+  setTimeout(_loadAutomationToggleStates, 50);
 }
 function escAuto(s){ s=String(s==null?'':s); return s.replace(/[&<>"]/g, function(c){return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c];}); }
 
@@ -7070,8 +7072,72 @@ function _ensureAutomationToggleListener(){
     var t = ev.target;
     if(t && t.matches && t.matches('#auto-list .auto-toggle input[type="checkbox"]')){
       _syncAutomationStatusUI();
+      // Also persist this toggle's state to ai_booking_settings if it maps to a known column
+      var col = (window._automationToggleMap||{})[t.id];
+      if(col && typeof db !== 'undefined' && db){
+        var update = {};
+        update[col] = !!t.checked;
+        db.from('ai_booking_settings').update(update).eq('id', 1).then(function(r){
+          if(r && r.error){ console.warn('[automations] save toggle failed:', t.id, r.error.message); }
+          else { console.log('[automations] saved', t.id, '→', col, '=', !!t.checked); }
+          // Mirror to in-memory cache so backend gates evaluated client-side stay in sync
+          if(!window._automationFlags) window._automationFlags = {};
+          window._automationFlags[col] = !!t.checked;
+        });
+        // Activity log
+        if(typeof logActivity === 'function'){
+          logActivity('automation_toggled', t.id+' set to '+(t.checked?'ENABLED':'DISABLED'), {column: col, enabled: !!t.checked});
+        }
+      }
     }
   });
+}
+
+/* DOM-id → ai_booking_settings column name. Used by the change listener and
+   the load function. The reminders toggle is intentionally NOT in this map —
+   it has its own existing handler (toggleReminderAuto) that stays untouched. */
+window._automationToggleMap = {
+  'toggle-auto-quote':         'auto_quote_enabled',
+  'toggle-janitorial':         'janitorial_enabled',
+  'toggle-cancel-email':       'cancel_email_enabled',
+  'toggle-cancel-client-sms':  'cancel_client_sms_enabled',
+  'toggle-cancel-cleaner-sms': 'cancel_cleaner_sms_enabled',
+  'toggle-review-sms':         'review_sms_enabled',
+  'toggle-booking-confirm':    'booking_confirm_enabled',
+  'toggle-va-quote_day1':            'va_task_quote_day1_enabled',
+  'toggle-va-quote_day5':            'va_task_quote_day5_enabled',
+  'toggle-va-post_first_clean':      'va_task_post_first_clean_enabled'
+};
+
+/* Load all automation flags from ai_booking_settings and apply to the
+   matching DOM toggles. Called when the Automations view opens, after
+   renderAutoList has built the cards. */
+async function _loadAutomationToggleStates(){
+  if(typeof db === 'undefined' || !db) return;
+  try{
+    var cols = Object.values(window._automationToggleMap || {});
+    var sel = cols.concat(['reminders_enabled']).join(',');
+    var r = await db.from('ai_booking_settings').select(sel).eq('id', 1).maybeSingle();
+    if(r.error){ console.warn('[automations] load flags failed:', r.error.message); return; }
+    var data = r.data || {};
+    window._automationFlags = data;
+    Object.entries(window._automationToggleMap).forEach(function(e){
+      var domId = e[0], col = e[1];
+      var el = document.getElementById(domId);
+      if(el) el.checked = data[col] === true;
+    });
+    // Also sync the existing reminders toggle since we read it
+    var remEl = document.getElementById('toggle-reminders');
+    if(remEl && data.reminders_enabled !== undefined) remEl.checked = data.reminders_enabled !== false;
+    _syncAutomationStatusUI();
+  }catch(err){ console.warn('[automations] load flags exception:', err); }
+}
+
+/* Frontend gate: returns whether an automation key is currently enabled.
+   Reads from the in-memory cache populated by _loadAutomationToggleStates.
+   Defaults to FALSE if the cache hasn't loaded yet — fail-closed. */
+function _isAutomationEnabledClient(key){
+  return !!(window._automationFlags && window._automationFlags[key] === true);
 }
 
 /* Toggle handler for VA task automations (UI-only persistence; backend cron is independent for now) */
@@ -14084,7 +14150,7 @@ document.addEventListener('DOMContentLoaded', function() {
             if (r.data && r.data.email) {
               var _sess; db.auth.getSession().then(function(s) {
                 _sess = s.data.session;
-                fetch('/api/send-email', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (_sess ? _sess.access_token : '') }, body: JSON.stringify({ type: 'cancellation', to: r.data.email, clientName: r.data.name || apptName, service: window.currentAppt.service || 'Cleaning', date: apptDate }) });
+                if(_isAutomationEnabledClient('cancel_email_enabled')){ fetch('/api/send-email', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (_sess ? _sess.access_token : '') }, body: JSON.stringify({ type: 'cancellation', to: r.data.email, clientName: r.data.name || apptName, service: window.currentAppt.service || 'Cleaning', date: apptDate }) }); } else { console.log('[cancel] cancel_email_enabled is FALSE — skipping client cancellation email'); }
               });
             }
           });
@@ -14105,7 +14171,7 @@ document.addEventListener('DOMContentLoaded', function() {
               if (_cleanerId) {
                 db.from('cleaners').select('name, phone').eq('id', _cleanerId).single().then(function(clRes) {
                   if (clRes.data && clRes.data.phone) {
-                    fetch('/api/send-sms', { method: 'POST', headers: _headers, body: JSON.stringify({ to: clRes.data.phone, message: 'Hi ' + (clRes.data.name || 'there') + ', heads up: the appointment for ' + apptName + ' on ' + _date + ' has been cancelled. No action needed.' }) });
+                    if(_isAutomationEnabledClient('cancel_cleaner_sms_enabled')){ fetch('/api/send-sms', { method: 'POST', headers: _headers, body: JSON.stringify({ to: clRes.data.phone, message: 'Hi ' + (clRes.data.name || 'there') + ', heads up: the appointment for ' + apptName + ' on ' + _date + ' has been cancelled. No action needed.' }) }); } else { console.log('[cancel] cancel_cleaner_sms_enabled is FALSE — skipping cleaner SMS'); }
                   }
                 });
               }
@@ -14114,7 +14180,7 @@ document.addEventListener('DOMContentLoaded', function() {
               if (_clientId2) {
                 db.from('clients').select('phone').eq('id', _clientId2).single().then(function(clRes2) {
                   if (clRes2.data && clRes2.data.phone) {
-                    fetch('/api/send-sms', { method: 'POST', headers: _headers, body: JSON.stringify({ to: clRes2.data.phone, message: 'Hi ' + apptName + ', your Hawaii Natural Clean appointment (' + _svc + ') on ' + _date + ' has been cancelled. Questions? Call/text (808) 468-5356.' }) });
+                    if(_isAutomationEnabledClient('cancel_client_sms_enabled')){ fetch('/api/send-sms', { method: 'POST', headers: _headers, body: JSON.stringify({ to: clRes2.data.phone, message: 'Hi ' + apptName + ', your Hawaii Natural Clean appointment (' + _svc + ') on ' + _date + ' has been cancelled. Questions? Call/text (808) 468-5356.' }) }); } else { console.log('[cancel] cancel_client_sms_enabled is FALSE — skipping client SMS'); }
                   }
                 });
               }
@@ -15980,7 +16046,7 @@ document.addEventListener('DOMContentLoaded', function() {
             if (r.data && r.data.email) {
               var _sess; db.auth.getSession().then(function(s) {
                 _sess = s.data.session;
-                fetch('/api/send-email', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (_sess ? _sess.access_token : '') }, body: JSON.stringify({ type: 'cancellation', to: r.data.email, clientName: r.data.name || apptName, service: window.currentAppt.service || 'Cleaning', date: apptDate }) });
+                if(_isAutomationEnabledClient('cancel_email_enabled')){ fetch('/api/send-email', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (_sess ? _sess.access_token : '') }, body: JSON.stringify({ type: 'cancellation', to: r.data.email, clientName: r.data.name || apptName, service: window.currentAppt.service || 'Cleaning', date: apptDate }) }); } else { console.log('[cancel] cancel_email_enabled is FALSE — skipping client cancellation email'); }
               });
             }
           });
@@ -16001,7 +16067,7 @@ document.addEventListener('DOMContentLoaded', function() {
               if (_cleanerId) {
                 db.from('cleaners').select('name, phone').eq('id', _cleanerId).single().then(function(clRes) {
                   if (clRes.data && clRes.data.phone) {
-                    fetch('/api/send-sms', { method: 'POST', headers: _headers, body: JSON.stringify({ to: clRes.data.phone, message: 'Hi ' + (clRes.data.name || 'there') + ', heads up: the appointment for ' + apptName + ' on ' + _date + ' has been cancelled. No action needed.' }) });
+                    if(_isAutomationEnabledClient('cancel_cleaner_sms_enabled')){ fetch('/api/send-sms', { method: 'POST', headers: _headers, body: JSON.stringify({ to: clRes.data.phone, message: 'Hi ' + (clRes.data.name || 'there') + ', heads up: the appointment for ' + apptName + ' on ' + _date + ' has been cancelled. No action needed.' }) }); } else { console.log('[cancel] cancel_cleaner_sms_enabled is FALSE — skipping cleaner SMS'); }
                   }
                 });
               }
@@ -16010,7 +16076,7 @@ document.addEventListener('DOMContentLoaded', function() {
               if (_clientId2) {
                 db.from('clients').select('phone').eq('id', _clientId2).single().then(function(clRes2) {
                   if (clRes2.data && clRes2.data.phone) {
-                    fetch('/api/send-sms', { method: 'POST', headers: _headers, body: JSON.stringify({ to: clRes2.data.phone, message: 'Hi ' + apptName + ', your Hawaii Natural Clean appointment (' + _svc + ') on ' + _date + ' has been cancelled. Questions? Call/text (808) 468-5356.' }) });
+                    if(_isAutomationEnabledClient('cancel_client_sms_enabled')){ fetch('/api/send-sms', { method: 'POST', headers: _headers, body: JSON.stringify({ to: clRes2.data.phone, message: 'Hi ' + apptName + ', your Hawaii Natural Clean appointment (' + _svc + ') on ' + _date + ' has been cancelled. Questions? Call/text (808) 468-5356.' }) }); } else { console.log('[cancel] cancel_client_sms_enabled is FALSE — skipping client SMS'); }
                   }
                 });
               }

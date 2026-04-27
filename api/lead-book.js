@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 import { validateOrFail, SCHEMAS } from './utils/validate.js';
 import { fetchWithTimeout, TIMEOUTS } from './utils/with-timeout.js';
 import { logError } from './utils/error-logger.js';
+import { isAutomationEnabled } from './utils/automation-gate.js';
 
 // -- Activity Logger ----------------------------------------------------------
 async function logActivity(action, description, metadata = {}) {
@@ -193,10 +194,12 @@ export default async function handler(req, res) {
       ? ` A ${rushFee === 200 ? 'same-day' : rushFee === 100 ? 'next-day' : '2-day'} booking fee of $${rushFee} applies.`
       : '';
 
-    // -- 6. Confirmation email — check prefs first (non-critical) ------------
+    // -- 6. Confirmation email — check global automation toggle + per-client prefs (non-critical) --
+    const bookingConfirmEnabled = await isAutomationEnabled(db, 'booking_confirm_enabled');
     const bookingNotifOn = await isNotifEnabled(db, result.client_id, 'booking_confirmation');
+    if (!bookingConfirmEnabled) console.log('[lead-book] booking_confirm_enabled is FALSE — skipping confirmation email');
     if (!bookingNotifOn) console.log('[lead-book] booking_confirmation disabled for client', result.client_id);
-    if (bookingNotifOn) try {
+    if (bookingConfirmEnabled && bookingNotifOn) try {
       await fetchWithTimeout(`${BASE_URL}/api/send-email`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

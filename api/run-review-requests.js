@@ -15,6 +15,7 @@ import { createClient } from '@supabase/supabase-js';
 import { fetchWithTimeout, TIMEOUTS } from './utils/with-timeout.js';
 import { logError } from './utils/error-logger.js';
 import { getOpenPhoneHistory } from './utils/openphone-history.js';
+import { isAutomationEnabled } from './utils/automation-gate.js';
 
 const BASE_URL       = 'https://hnc-crm.vercel.app';
 const BUSINESS_NAME  = 'Hawaii Natural Clean';
@@ -48,6 +49,15 @@ export default async function handler(req, res) {
     return res.status(400).json({
       error: 'Manual calls require testClientId in body. To test, pass a specific client ID. Cron calls run automatically.'
     });
+  }
+
+  // ── Master enable gate ──────────────────────────────────────────────────
+  // Hard-stop unless review_sms_enabled = TRUE in ai_booking_settings. Default
+  // is FALSE — automation is OFF until explicitly turned on in the UI.
+  const enabled = await isAutomationEnabled(db, 'review_sms_enabled');
+  if (!enabled) {
+    console.log('[run-review-requests] disabled — review_sms_enabled is not true. Skipping.');
+    return res.status(200).json({ skipped: 'review_sms_enabled is FALSE', sent: 0 });
   }
 
   try {

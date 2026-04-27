@@ -447,6 +447,42 @@ export default async function handler(req, res) {
       });
     }
 
+    else if (type === 'reschedule') {
+      const { oldDate, oldTime, newDate, newTime, customSubject, customBody } = req.body;
+
+      // Subject: prefer caller-supplied (from CRM template), else default
+      subject = customSubject || 'Your cleaning has been rescheduled';
+
+      const detailRows = [
+        oldDate ? detailRow('Original date', oldDate + (oldTime ? ' at ' + oldTime : '')) : '',
+        detailRow('New date', (newDate || '') + (newTime ? ' at ' + newTime : '')),
+        service ? detailRow('Service', service) : '',
+        cleaner ? detailRow('Cleaner', cleaner) : '',
+      ].filter(Boolean).join('');
+
+      const detailTable = `<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">${detailRows}</table>`;
+
+      // Body: customBody is plain text with optional placeholders ({client_name}, {old_date}, {new_date}).
+      // We render it above the detail table. If empty, use friendly default.
+      const bodyText = (customBody || `Aloha ${firstName} — your cleaning has been rescheduled. The new details are below. Please reply if this time doesn't work for you.`)
+        .replace(/\{client_name\}/g, firstName)
+        .replace(/\{old_date\}/g, oldDate || '')
+        .replace(/\{old_time\}/g, oldTime || '')
+        .replace(/\{new_date\}/g, newDate || '')
+        .replace(/\{new_time\}/g, newTime || '');
+      const bodyParas = bodyText.split(/\n\s*\n/)
+        .map(p => `<p style="margin:0 0 16px;color:${BRAND.text};font-size:15px;line-height:1.65;">${p.replace(/\n/g, '<br>')}</p>`)
+        .join('');
+
+      html = renderBrandedEmail({
+        preheader: `Your cleaning has been rescheduled to ${newDate || 'a new date'}`,
+        heading: 'Your cleaning has been rescheduled',
+        intro: '',
+        bodyHtml: bodyParas + card('Updated appointment', detailTable),
+        footnote: `Need a different time? Reply here or text us at <a href="tel:${PHONE.replace(/\D/g,'')}" style="color:${BRAND.primary};text-decoration:none;">${PHONE}</a>.`,
+      });
+    }
+
     // ─── GENERIC (used by automation test emails and ad-hoc sends) ──────────
     else {
       // The "notes" field holds the message content. We render it cleanly with

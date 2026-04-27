@@ -1188,6 +1188,18 @@ Mahalo 🌺</textarea>
               <div class="form-row"><label>SMS invoice message</label>
                 <textarea id="tmpl-sms-invoice" style="min-height:80px;font-size:12px;">Hi {client_name}, your invoice for ${amount} from Hawaii Natural Clean is ready. Pay here: {invoice_link}</textarea>
               </div>
+              <div class="form-row"><label>Reschedule email subject</label>
+                <input type="text" id="tmpl-reschedule-subject" value="Your cleaning has been rescheduled" style="font-size:12px;">
+              </div>
+              <div class="form-row"><label>Reschedule email body</label>
+                <textarea id="tmpl-reschedule-body" style="min-height:100px;font-size:12px;">Aloha {client_name},
+
+Your cleaning has been rescheduled. The new details are below.
+
+If this time doesn't work for you, please reply or call us — we're happy to find another slot.
+
+Mahalo 🌺</textarea>
+              </div>
               <div class="form-row"><label>SMS payment confirmation</label>
                 <textarea id="tmpl-sms-paid" style="min-height:80px;font-size:12px;">Hi {client_name}, we received your payment of ${amount}. Thank you! See you on your next clean. 🌺</textarea>
               </div>
@@ -1605,6 +1617,16 @@ Mahalo 🌺</textarea>
           </div>
         </div>
         <div class="form-row"><label>Notes</label><textarea id="edit-notes" style="min-height:60px;"></textarea></div>
+        <!-- Reschedule notifications: appear when date or time changes from original -->
+        <div id="edit-reschedule-notify" style="display:none;background:var(--brand-50);border:1px solid #9ae6b4;border-radius:8px;padding:10px 12px;margin:10px 0;">
+          <div style="font-size:11px;font-weight:600;color:#276749;text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px;">Reschedule notifications</div>
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:var(--text);font-weight:normal;margin-bottom:6px;">
+            <input type="checkbox" id="edit-notify-client-email" checked> Email client (Resend)
+          </label>
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:var(--text);font-weight:normal;">
+            <input type="checkbox" id="edit-notify-cleaner-sms" checked> SMS cleaner (OpenPhone)
+          </label>
+        </div>
         <div class="save-bar" id="edit-save-bar">
           <button class="btn btn-primary" onclick="saveApptEdit('single')">Save changes</button>
           <button class="btn" onclick="hideApptEdit()">Cancel</button>
@@ -3308,6 +3330,26 @@ function showApptEdit(){
   document.getElementById('appt-view').style.display='none';
   document.getElementById('appt-edit').style.display='block';
   populateEditPropertySelector(currentClientName);
+  // Snapshot original date/time so we can detect a change and toggle the reschedule
+  // notification panel. Stored on window so saveApptEdit can compare.
+  window._editOrigDate = (document.getElementById('edit-date')||{}).value || '';
+  window._editOrigTime = (document.getElementById('edit-time')||{}).value || '';
+  // Hide the notification panel until user changes date or time
+  var notifPanel = document.getElementById('edit-reschedule-notify');
+  if(notifPanel) notifPanel.style.display = 'none';
+  // Reset toggles to ON (they default checked, but reset in case user unchecked last time)
+  var ce = document.getElementById('edit-notify-client-email'); if(ce) ce.checked = true;
+  var cs = document.getElementById('edit-notify-cleaner-sms'); if(cs) cs.checked = true;
+  // Wire change detection on date and time inputs (idempotent — overwrites prior handler)
+  var _dateEl = document.getElementById('edit-date');
+  var _timeEl = document.getElementById('edit-time');
+  function _checkRescheduleChange(){
+    var changed = ((_dateEl && _dateEl.value !== window._editOrigDate) ||
+                   (_timeEl && _timeEl.value !== window._editOrigTime));
+    if(notifPanel) notifPanel.style.display = changed ? '' : 'none';
+  }
+  if(_dateEl) _dateEl.onchange = _checkRescheduleChange;
+  if(_timeEl) _timeEl.onchange = _checkRescheduleChange;
   // Rebuild cleaner dropdown fresh from cleanerDB, restore current cleaner
   var currentCleaner=currentAppt?currentAppt.cleaner:'Unassigned';
   populateCleanerDropdown('edit-cleaner', currentCleaner);
@@ -3597,6 +3639,111 @@ async function saveApptEdit(mode){
       ? 'This appointment updated.'
       : 'Changes saved.';
   showToast(toastMsg);
+
+  // ── Reschedule notifications ───────────────────────────────────────────
+  // Fires only when user changed date or time. Toggles control client email +
+  // cleaner SMS independently, both default ON. TEST_MODE limits sends to
+  // matching Dane Kreisman records during rollout — flip TEST_MODE_DANE_ONLY
+  // to false to enable for everyone.
+  try{
+    var _origDate = window._editOrigDate || '';
+    var _origTime = window._editOrigTime || '';
+    var _newDate = dateVal;
+    var _newTime = timeVal;
+    var _dateChanged = (_origDate && _newDate && _origDate !== _newDate);
+    var _timeChanged = (_origTime && _newTime && _origTime !== _newTime);
+    if(_dateChanged || _timeChanged){
+      var TEST_MODE_DANE_ONLY = true; // flip to false for full rollout
+      var DANE_PHONE = '8082697636';
+      var DANE_EMAIL = 'dane.kreisman@gmail.com';
+      function _digits(s){ return (s||'').replace(/\D/g,''); }
+      function _isTestSafeContact(phone, email){
+        if(!TEST_MODE_DANE_ONLY) return true;
+        if(_digits(phone).indexOf(DANE_PHONE) >= 0) return true;
+        if((email||'').trim().toLowerCase() === DANE_EMAIL) return true;
+        return false;
+      }
+
+      // Look up client contact info from clientDB
+      var _clientObj = null;
+      Object.entries(clientDB||{}).forEach(function(e){ if(e[1].name === editClient) _clientObj = e[1]; });
+      var _clientPhone = _clientObj && _clientObj.phone !== '—' ? _clientObj.phone : '';
+      var _clientEmail = _clientObj && _clientObj.email !== '—' ? _clientObj.email : '';
+      // Look up cleaner contact info from cleanerDB
+      var _cleanerObj = null;
+      Object.entries(cleanerDB||{}).forEach(function(e){ if(e[1].name === cleanerVal) _cleanerObj = e[1]; });
+      var _cleanerPhone = _cleanerObj && _cleanerObj.phone !== '—' ? _cleanerObj.phone : '';
+
+      // Friendly date/time formatting for templates
+      var _fmtDate = function(iso){
+        if(!iso) return '';
+        var p = iso.split('-');
+        if(p.length!==3) return iso;
+        var d = new Date(parseInt(p[0]), parseInt(p[1])-1, parseInt(p[2]));
+        return d.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});
+      };
+      var _fmtTime = function(t){
+        if(!t) return '';
+        var p = t.split(':');
+        if(p.length<2) return t;
+        var hh = parseInt(p[0]); var mm = parseInt(p[1]);
+        var ampm = hh >= 12 ? 'pm' : 'am';
+        hh = hh%12 || 12;
+        return hh + (mm? ':'+(mm<10?'0':'')+mm : '') + ampm;
+      };
+      var _oldDStr = _fmtDate(_origDate), _oldTStr = _fmtTime(_origTime);
+      var _newDStr = _fmtDate(_newDate), _newTStr = _fmtTime(_newTime);
+
+      // (a) Client email
+      var _emailChk = document.getElementById('edit-notify-client-email');
+      if(_emailChk && _emailChk.checked && _clientEmail){
+        if(!_isTestSafeContact(_clientPhone, _clientEmail)){
+          console.log('[reschedule-notify] TEST_MODE: skipping client email to', _clientEmail);
+        } else {
+          var _tmplSubj = (messageTemplates && messageTemplates.rescheduleSubject) || 'Your cleaning has been rescheduled';
+          var _tmplBody = (messageTemplates && messageTemplates.rescheduleBody) || '';
+          fetch('/api/send-email', {
+            method:'POST',
+            headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({
+              to: _clientEmail,
+              type: 'reschedule',
+              clientName: editClient,
+              service: svcText,
+              cleaner: cleanerVal,
+              oldDate: _oldDStr, oldTime: _oldTStr,
+              newDate: _newDStr, newTime: _newTStr,
+              customSubject: _tmplSubj,
+              customBody: _tmplBody
+            })
+          }).then(function(r){ return r.json(); }).then(function(d){
+            console.log('[reschedule-notify] client email →', _clientEmail, d.success ? 'ok' : 'fail');
+            if(typeof logActivity==='function') logActivity('reschedule_email_sent','Reschedule email to '+editClient,{to:_clientEmail,oldDate:_origDate,newDate:_newDate});
+          }).catch(function(err){ console.warn('[reschedule-notify] client email error:', err); });
+        }
+      }
+
+      // (b) Cleaner SMS
+      var _smsChk = document.getElementById('edit-notify-cleaner-sms');
+      if(_smsChk && _smsChk.checked && _cleanerPhone && cleanerVal !== 'Unassigned'){
+        if(!_isTestSafeContact(_cleanerPhone, '')){
+          console.log('[reschedule-notify] TEST_MODE: skipping cleaner SMS to', _cleanerPhone);
+        } else {
+          var _smsMsg = 'Schedule update: '+editClient+' rescheduled from '+
+            _oldDStr+(_oldTStr?' at '+_oldTStr:'')+' to '+
+            _newDStr+(_newTStr?' at '+_newTStr:'')+'. Check the CRM for details.';
+          fetch('/api/send-sms', {
+            method:'POST',
+            headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({ to: _cleanerPhone, message: _smsMsg })
+          }).then(function(r){ return r.json(); }).then(function(d){
+            console.log('[reschedule-notify] cleaner sms →', _cleanerPhone, d.success ? 'ok' : 'fail');
+            if(typeof logActivity==='function') logActivity('reschedule_sms_sent','Reschedule SMS to '+cleanerVal,{to:_cleanerPhone,oldDate:_origDate,newDate:_newDate});
+          }).catch(function(err){ console.warn('[reschedule-notify] cleaner sms error:', err); });
+        }
+      }
+    }
+  }catch(_notifErr){ console.warn('[reschedule-notify] error:', _notifErr); }
 
   // Persist to Supabase in background
   if(a.dbId){
@@ -5884,7 +6031,9 @@ var messageTemplates = {
   emailSubject: 'Invoice from Hawaii Natural Clean',
   emailBody: 'Hi {client_name},\n\nPlease find your invoice for ${amount} attached. Payment is due {due_date}.\n\nPay online here: {invoice_link}\n\nThank you for choosing Hawaii Natural Clean!\nMahalo 🌺',
   smsInvoice: 'Hi {client_name}, your invoice for ${amount} from Hawaii Natural Clean is ready. Pay here: {invoice_link}',
-  smsPaid: 'Hi {client_name}, we received your payment of ${amount}. Thank you! See you on your next clean. 🌺'
+  smsPaid: 'Hi {client_name}, we received your payment of ${amount}. Thank you! See you on your next clean. 🌺',
+  rescheduleSubject: 'Your cleaning has been rescheduled',
+  rescheduleBody: 'Aloha {client_name},\n\nYour cleaning has been rescheduled. The new details are below.\n\nIf this time doesn\'t work for you, please reply or call us — we\'re happy to find another slot.\n\nMahalo 🌺'
 };
 
 function saveMessageTemplates(){
@@ -5892,6 +6041,10 @@ function saveMessageTemplates(){
   messageTemplates.emailBody = document.getElementById('tmpl-email-body').value;
   messageTemplates.smsInvoice = document.getElementById('tmpl-sms-invoice').value;
   messageTemplates.smsPaid = document.getElementById('tmpl-sms-paid').value;
+  var rsEl = document.getElementById('tmpl-reschedule-subject');
+  var rbEl = document.getElementById('tmpl-reschedule-body');
+  if(rsEl) messageTemplates.rescheduleSubject = rsEl.value;
+  if(rbEl) messageTemplates.rescheduleBody = rbEl.value;
   localStorage.setItem('hnc_message_templates', JSON.stringify(messageTemplates));
   var s = document.getElementById('msg-tmpl-success');
   s.classList.add('show');
@@ -5902,12 +6055,16 @@ function loadMessageTemplates(){
   var saved = localStorage.getItem('hnc_message_templates');
   if(saved){
     try {
-      messageTemplates = JSON.parse(saved);
+      messageTemplates = Object.assign(messageTemplates, JSON.parse(saved));
       if(document.getElementById('tmpl-email-subject')){
         document.getElementById('tmpl-email-subject').value = messageTemplates.emailSubject || '';
         document.getElementById('tmpl-email-body').value = messageTemplates.emailBody || '';
         document.getElementById('tmpl-sms-invoice').value = messageTemplates.smsInvoice || '';
         document.getElementById('tmpl-sms-paid').value = messageTemplates.smsPaid || '';
+        var rsEl2 = document.getElementById('tmpl-reschedule-subject');
+        var rbEl2 = document.getElementById('tmpl-reschedule-body');
+        if(rsEl2 && messageTemplates.rescheduleSubject) rsEl2.value = messageTemplates.rescheduleSubject;
+        if(rbEl2 && messageTemplates.rescheduleBody) rbEl2.value = messageTemplates.rescheduleBody;
       }
     } catch(e){}
   }

@@ -50,12 +50,12 @@ export default async function handler(req, res) {
       broadcast = {
         holiday_key:      body.holiday_key,
         subject:          body.subject || '(no subject)',
-        custom_preheader: body.custom_preheader || null,
-        custom_heading:   body.custom_heading   || null,
-        custom_intro:     body.custom_intro     || null,
-        custom_body_html: body.custom_body_html || null,
-        custom_cta_text:  body.custom_cta_text  || null,
-        custom_cta_url:   body.custom_cta_url   || null,
+        custom_preheader: body.custom_preheader ?? null,
+        custom_heading:   body.custom_heading   ?? null,
+        custom_intro:     body.custom_intro     ?? null,
+        custom_body_html: body.custom_body_html ?? null,
+        custom_cta_text:  body.custom_cta_text  ?? null,
+        custom_cta_url:   body.custom_cta_url   ?? null,
       };
     }
 

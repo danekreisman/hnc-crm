@@ -179,6 +179,10 @@ export default async function handler(req, res) {
     } // end firstCleanEnabled block
 
     // ── Post-clean thank-you email with feedback gate ─────────────────────
+    const thankyouEnabled = await isAutomationEnabled(db, 'post_clean_thankyou_enabled');
+    if (!thankyouEnabled) {
+      console.log('[run-job-completions] post_clean_thankyou disabled — skipping thank-you emails');
+    } else {
     for (const apptId of toComplete) {
       const appt = appointments.find(a => a.id === apptId);
       if (!appt?.client_id) continue;
@@ -207,6 +211,7 @@ export default async function handler(req, res) {
         console.error('[run-job-completions] Post-clean email failed:', emailErr.message);
       }
     }
+    } // end thankyouEnabled block
 
     return res.status(200).json({
       success: true,

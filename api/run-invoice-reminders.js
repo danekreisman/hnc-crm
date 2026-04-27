@@ -9,6 +9,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { fetchWithTimeout, TIMEOUTS } from './utils/with-timeout.js';
 import { logError } from './utils/error-logger.js';
+import { isAutomationEnabled } from './utils/automation-gate.js';
 
 async function logActivity(action, description, metadata={}) {
   try {
@@ -54,6 +55,13 @@ export default async function handler(req, res) {
     process.env.SUPABASE_SERVICE_ROLE_KEY,
     { auth: { persistSession: false } }
   );
+
+  // Master automation gate
+  const enabled = await isAutomationEnabled(db, 'invoice_reminder_enabled');
+  if (!enabled) {
+    console.log('[run-invoice-reminders] disabled — invoice_reminder_enabled is not true. Skipping.');
+    return res.status(200).json({ skipped: 'invoice_reminder_enabled is FALSE', sent: 0 });
+  }
 
   try {
     const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString();

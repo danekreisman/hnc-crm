@@ -11,6 +11,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { fetchWithTimeout, TIMEOUTS } from './utils/with-timeout.js';
 import { logError } from './utils/error-logger.js';
+import { isAutomationEnabled } from './utils/automation-gate.js';
 
 const BASE_URL       = 'https://hnc-crm.vercel.app';
 const BUSINESS_NAME  = 'Hawaii Natural Clean';
@@ -33,6 +34,13 @@ export default async function handler(req, res) {
     process.env.SUPABASE_SERVICE_ROLE_KEY,
     { auth: { persistSession: false } }
   );
+
+  // Master automation gate
+  const enabled = await isAutomationEnabled(db, 'policy_reminder_enabled');
+  if (!enabled) {
+    console.log('[run-policy-reminders] disabled — policy_reminder_enabled is not true. Skipping.');
+    return res.status(200).json({ skipped: 'policy_reminder_enabled is FALSE', sent: 0 });
+  }
 
   try {
     const today = new Date().toISOString().split('T')[0];

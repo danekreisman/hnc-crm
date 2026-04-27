@@ -221,8 +221,12 @@ export function resolveTemplate(broadcast) {
       heading:   broadcast.custom_heading   || broadcast.subject,
       intro:     (firstName) => introTemplate.replace(/\{firstName\}/g, firstName),
       body:      broadcast.custom_body_html,
-      ctaText:   broadcast.custom_cta_text  || 'Book a clean',
-      ctaUrl:    broadcast.custom_cta_url   || 'tel:8084685356',
+      /* Use ?? not || — an explicitly empty string for ctaText means
+         "no button" (AI broadcasts use the reply-to-claim pattern) and must
+         be preserved. Only fall back to the defaults when the column is
+         null or undefined (not present in the row). */
+      ctaText:   broadcast.custom_cta_text  ?? 'Book a clean',
+      ctaUrl:    broadcast.custom_cta_url   ?? 'tel:8084685356',
     };
   }
   return null;

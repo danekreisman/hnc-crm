@@ -184,6 +184,26 @@ export default async function handler(req, res) {
             html: "<div style=\"font-family:Inter,sans-serif;padding:2rem;max-width:500px\"><h2>New Task Assigned</h2><p><strong>Task:</strong> " + _title + "</p>" + (_due ? "<p><strong>Due:</strong> " + _due + "</p>" : "") + (body.notes ? "<p><strong>Notes:</strong> " + body.notes + "</p>" : "") + "<a href=\"https://hnc-crm.vercel.app\" style=\"background:#3BB8E3;color:#fff;padding:.75rem 1.5rem;border-radius:8px;text-decoration:none;display:inline-block;margin-top:1rem\">View in CRM</a></div>"
           })
         }, 10000);
+        // Log VA-task email to activity_logs (direct Resend bypasses /api/send-email)
+        try {
+          await fetch(process.env.SUPABASE_URL + '/rest/v1/activity_logs', {
+            method: 'POST',
+            headers: {
+              'apikey': process.env.SUPABASE_SERVICE_ROLE_KEY,
+              'Authorization': 'Bearer ' + process.env.SUPABASE_SERVICE_ROLE_KEY,
+              'Content-Type': 'application/json',
+              'Prefer': 'return=minimal',
+            },
+            body: JSON.stringify({
+              action: 'email_sent_va_task',
+              description: 'VA task email: ' + (body.title || body.task_title || 'Untitled'),
+              user_email: 'system',
+              entity_type: 'task',
+              entity_id: '',
+              metadata: { task_title: body.title || body.task_title, due_date: body.due_date || null },
+            }),
+          });
+        } catch (_) { /* logging failure must not break the send */ }
       } catch(_emailErr) {
         await logError("tasks-email", _emailErr.message, { task: body });
       }

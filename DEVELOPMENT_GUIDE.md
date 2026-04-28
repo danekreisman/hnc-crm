@@ -234,6 +234,7 @@ Run through this checklist:
 - **`run-automations.js`** is not yet using `logError` — errors only go to console. Add it when touching that file.
 - **`lead-capture.js`** does not have an atomic transaction like `lead-book.js` does — if it fails midway you can end up with a lead but no email/SMS sent.
 - **Context drift** between chat sessions is a recurring problem. Always reference this document at the start of a session and update it when something significant changes.
+- **RLS on `appointments`** caused a "phantom delete" bug (April 2026): appointments appeared to save (UI-first insert into in-memory `apptData`) but vanished on refresh because the anon-key SELECT returned 0 rows. Inserts were also silently rejected because errors went only to `console.error`, not to a toast. Fix: disable RLS in Supabase dashboard. Lesson: any new DB write path must surface errors to the user via `showToast(msg, true)` AND roll back the optimistic in-memory update — never trust the UI-first pattern without an error fallback.
 
 ---
 - **The 5-layer lead form whitelist trap** (see "Lead Form Data Flow" section above). When a new lead field "isn't saving" or "shows TBD", check all 5 layers: `_buildNLQuote` data shape, `saveNewLead` in-memory cache, `dbSaveLead` insert whitelist, `dbLoadLeads` mapping, `openLead` setter.
@@ -407,4 +408,4 @@ Supabase project's default mailer is rate-limited. Magic links to the VA (Leo) w
 
 ---
 
-*Last updated: April 28, 2026 — documented activity log coverage, client profile modal architecture, calendar→client navigation, and browser-editor workflow patterns.*
+*Last updated: April 28, 2026 — added RLS phantom-delete gotcha and optimistic-update rollback pattern after appointments-disappearing-on-refresh bug.*

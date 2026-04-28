@@ -5450,6 +5450,13 @@ async function saveNewAppt(){
         console.log('[saveNewAppt] Supabase one-time saved, dbId='+apptObj.dbId);
       } else if(sbRes.error){
         console.error('[saveNewAppt] Supabase one-time error:', sbRes.error);
+        // Roll back in-memory so UI doesn't show an appointment that didn't save
+        var _rollbackKey=yr+'-'+mo+'-'+dy;
+        if(apptData[_rollbackKey]){
+          apptData[_rollbackKey]=apptData[_rollbackKey].filter(function(x){return x!==apptObj;});
+        }
+        renderCal();
+        showToast('⚠️ Appointment could not be saved: '+(sbRes.error.message||'database error')+'. Check Supabase RLS settings.', 'error');
       }
     });
   } else {
@@ -5483,6 +5490,7 @@ async function saveNewAppt(){
         console.log('[saveNewAppt] Supabase batch saved '+batchRows.length+' rows, first dbId='+apptObj.dbId);
       } else if(batchRes.error){
         console.error('[saveNewAppt] Supabase batch error:', batchRes.error);
+        showToast('⚠️ Appointments could not be saved: '+(batchRes.error.message||'database error')+'. Check Supabase RLS settings.', 'error');
       }
     });
   }

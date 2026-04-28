@@ -1457,6 +1457,48 @@ Mahalo 🌺</textarea>
         </div>
       </details>
       <details class="booking-section" open>
+        <summary>Service</summary>
+        <div class="booking-section-body">
+          <div class="form-two">
+            <div class="form-row"><label>Service type</label>
+              <select id="na-service" onchange="calcPrice()">
+                <option value="standard">Regular Clean</option>
+                <option value="deep">Deep Clean</option>
+                <option value="moveout">Move Out Clean</option>
+                <option value="airbnb">Airbnb Turnover</option>
+                <option value="commercial">Janitorial Clean</option>
+              </select>
+            </div>
+            <div class="form-row" id="na-freq-row"><label>Frequency</label>
+              <select id="na-freq" onchange="calcPrice();showClientPricingRules(_findClientByName&&_findClientByName((document.getElementById('na-name')||{}).value||'')?clientDB[_findClientByName((document.getElementById('na-name')||{}).value||'').id]:null)">
+                <option value="Every Day">Every Day</option>
+                <option value="Weekly">Weekly</option>
+                <option value="Biweekly" selected>Biweekly (every 2 weeks)</option>
+                <option value="Every 3 Weeks">Every 3 Weeks</option>
+                <option value="Monthly">Monthly (every 4 weeks)</option>
+                <option value="Every 6 Weeks">Every 6 Weeks</option>
+                <option value="One-time">One-time</option>
+              </select>
+            </div>
+          </div>
+          <div id="na-commercial-fields" style="display:none;">
+            <div class="form-row"><label>Total hours</label>
+              <input type="number" id="na-commercial-hrs" placeholder="e.g. 4" min="1" step="0.5" oninput="calcPrice()">
+            </div>
+          </div>
+          <div class="form-two">
+            <div class="form-row"><label>Date</label><input type="date" id="na-date"></div>
+            <div class="form-row"><label>Time</label><input type="time" id="na-time" value="08:00" onchange="this.blur()"></div>
+          </div>
+          <div class="form-row"><label>Assign cleaner</label>
+            <select id="na-cleaner" onchange="calcPrice()">
+              <option value="unassigned">Leave unassigned</option>
+            </select>
+          </div>
+          <div class="form-row"><label>Notes</label><textarea id="na-notes" style="min-height:60px;" placeholder="Any special instructions or notes..."></textarea></div>
+        </div>
+      </details>
+      <details class="booking-section" open>
         <summary>Property</summary>
         <div class="booking-section-body">
           <div class="form-row">
@@ -1502,48 +1544,6 @@ Mahalo 🌺</textarea>
               <input type="checkbox" id="na-save-property"> Save as property for this client
             </label>
           </div>
-        </div>
-      </details>
-      <details class="booking-section" open>
-        <summary>Service</summary>
-        <div class="booking-section-body">
-          <div class="form-two">
-            <div class="form-row"><label>Service type</label>
-              <select id="na-service" onchange="calcPrice()">
-                <option value="standard">Regular Clean</option>
-                <option value="deep">Deep Clean</option>
-                <option value="moveout">Move Out Clean</option>
-                <option value="airbnb">Airbnb Turnover</option>
-                <option value="commercial">Janitorial Clean</option>
-              </select>
-            </div>
-            <div class="form-row" id="na-freq-row"><label>Frequency</label>
-              <select id="na-freq" onchange="calcPrice();showClientPricingRules(_findClientByName&&_findClientByName((document.getElementById('na-name')||{}).value||'')?clientDB[_findClientByName((document.getElementById('na-name')||{}).value||'').id]:null)">
-                <option value="Every Day">Every Day</option>
-                <option value="Weekly">Weekly</option>
-                <option value="Biweekly" selected>Biweekly (every 2 weeks)</option>
-                <option value="Every 3 Weeks">Every 3 Weeks</option>
-                <option value="Monthly">Monthly (every 4 weeks)</option>
-                <option value="Every 6 Weeks">Every 6 Weeks</option>
-                <option value="One-time">One-time</option>
-              </select>
-            </div>
-          </div>
-          <div id="na-commercial-fields" style="display:none;">
-            <div class="form-row"><label>Total hours</label>
-              <input type="number" id="na-commercial-hrs" placeholder="e.g. 4" min="1" step="0.5" oninput="calcPrice()">
-            </div>
-          </div>
-          <div class="form-two">
-            <div class="form-row"><label>Date</label><input type="date" id="na-date"></div>
-            <div class="form-row"><label>Time</label><input type="time" id="na-time" value="08:00"></div>
-          </div>
-          <div class="form-row"><label>Assign cleaner</label>
-            <select id="na-cleaner" onchange="calcPrice()">
-              <option value="unassigned">Leave unassigned</option>
-            </select>
-          </div>
-          <div class="form-row"><label>Notes</label><textarea id="na-notes" style="min-height:60px;" placeholder="Any special instructions or notes..."></textarea></div>
         </div>
       </details>
       <details class="booking-section booking-quote" open ontoggle="if(!this.open) this.open=true">
@@ -1662,7 +1662,7 @@ Mahalo 🌺</textarea>
         </div>
         <div class="form-two">
           <div class="form-row"><label>Date</label><input type="date" id="edit-date"></div>
-          <div class="form-row"><label>Time</label><input type="time" id="edit-time"></div>
+          <div class="form-row"><label>Time</label><input type="time" id="edit-time" onchange="this.blur()"></div>
         </div>
         <div class="form-two">
           <div class="form-row"><label>Service type</label>
@@ -13151,6 +13151,11 @@ Your total will update automatically when you select a payment method.</textarea
 <!-- Google Maps Places Autocomplete -->
 <script>
 (function(){
+  // Google calls this if the API key is invalid, restricted, or quota-exceeded
+  window.gm_authFailure = function(){
+    console.error('[HNC Maps] AUTH FAILURE — Google Maps API key rejected. Check Google Cloud Console: (1) API key restrictions allow hnc-crm.vercel.app referer, (2) Maps JavaScript API + Places API are enabled, (3) billing is active and daily quota not exceeded.');
+    if(typeof showToast === 'function') showToast('Google Maps autocomplete unavailable — API key/quota issue. See console.', true);
+  };
   window.HNC_MAPS_KEY = "AIzaSyCkn8UeVuv5iek_Rm3jqdozF1HGMhSuGNk";
   window.HNC_ADDRESS_IDS = ['na-address','edit-address','led-address','nl-address','nc-address','prop-address'];
   window.hncAttachedAutocomplete = Object.create(null);
@@ -15186,84 +15191,6 @@ Your total will update automatically when you select a payment method.</textarea
 </div>
 
 
-<!-- Google Maps Places Autocomplete -->
-<script>
-(function(){
-  window.HNC_MAPS_KEY = "AIzaSyCkn8UeVuv5iek_Rm3jqdozF1HGMhSuGNk";
-  window.HNC_ADDRESS_IDS = ['na-address','edit-address','led-address','nl-address','nc-address','prop-address'];
-  window.hncAttachedAutocomplete = Object.create(null);
-  window.hncInitMapsAutocomplete = function(){
-    if(!(window.google && google.maps && google.maps.places)) return;
-    // Hawaii bounding box (approx)
-    var hawaiiBounds = new google.maps.LatLngBounds(
-      new google.maps.LatLng(18.9, -160.3),
-      new google.maps.LatLng(22.3, -154.7)
-    );
-    window.HNC_ADDRESS_IDS.forEach(function(id){
-      var el = document.getElementById(id);
-      if(!el || window.hncAttachedAutocomplete[id]) return;
-      try {
-        var ac = new google.maps.places.Autocomplete(el, {
-          fields: ['formatted_address','geometry','place_id','name','address_components'],
-          types: ['address'],
-          componentRestrictions: {country:'us'},
-          bounds: hawaiiBounds,
-          strictBounds: false
-        });
-        ac.addListener('place_changed', function(){
-          var p = ac.getPlace();
-          if(!p) return;
-          var addr = p.formatted_address || (p.name ? p.name : el.value);
-          el.value = addr;
-          if(p.geometry && p.geometry.location){
-            el.dataset.lat = p.geometry.location.lat();
-            el.dataset.lng = p.geometry.location.lng();
-          } else {
-            delete el.dataset.lat; delete el.dataset.lng;
-          }
-          if(p.place_id) el.dataset.placeId = p.place_id; else delete el.dataset.placeId;
-          // Fire input/change events so the app's save logic sees the new value
-          el.dispatchEvent(new Event('input', {bubbles:true}));
-          el.dispatchEvent(new Event('change', {bubbles:true}));
-        });
-        // Prevent form submit on Enter while a suggestion is open
-        el.addEventListener('keydown', function(e){
-          if(e.key === 'Enter'){
-            var pac = document.querySelector('.pac-container');
-            if(pac && pac.style.display !== 'none' && pac.offsetParent !== null) e.preventDefault();
-          }
-        });
-        window.hncAttachedAutocomplete[id] = ac;
-      } catch(err){ console.warn('[HNC Maps] attach failed for '+id, err); }
-    });
-  };
-  // Also re-run after any modal opens (belt & suspenders)
-  window.hncScheduleMapsAttach = function(){
-    if(window.hncMapsAttachTimer) return;
-    window.hncMapsAttachTimer = setTimeout(function(){
-      window.hncMapsAttachTimer = null;
-      window.hncInitMapsAutocomplete();
-    }, 50);
-  };
-  document.addEventListener('click', window.hncScheduleMapsAttach, true);
-  document.addEventListener('focusin', function(e){
-    if(e.target && e.target.id && window.HNC_ADDRESS_IDS.indexOf(e.target.id) !== -1){
-      window.hncScheduleMapsAttach();
-    }
-  }, true);
-  // CSS tweak so .pac-container shows above modals (which use high z-index)
-  var s = document.createElement('style');
-  s.textContent = '.pac-container{z-index: 2147483647 !important;}';
-  document.head.appendChild(s);
-  // Load Maps JS (async, using callback)
-  var script = document.createElement('script');
-  script.src = 'https://maps.googleapis.com/maps/api/js?key='+encodeURIComponent(window.HNC_MAPS_KEY)+'&libraries=places&callback=hncInitMapsAutocomplete&loading=async';
-  script.async = true;
-  script.defer = true;
-  script.onerror = function(){ console.error('[HNC Maps] failed to load Maps JS'); };
-  document.head.appendChild(script);
-})();
-</script>
 <script>
 // ── Broadcast holidays reference ─────────────────────────────────────────────
 var BC_HOLIDAYS = {

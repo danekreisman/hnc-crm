@@ -1792,6 +1792,9 @@ Mahalo 🌺</textarea>
           <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px;">Control which automated messages this client receives.</div>
           <div style="display:flex;flex-direction:column;gap:6px;" id="cl-notif-toggles"></div>
         </div>
+        <!-- Activity log: filtered to this client's email/phone -->
+        <div class="panel-section">Automation log</div>
+        <div id="cl-activity-log" style="font-size:13px;color:var(--text-muted);padding:6px 0 4px;">Loading…</div>
         <div class="panel-section">Notes</div>
         <div class="info-block"><div style="font-size:12px;color:var(--text);line-height:1.6;" id="cl-notes">—</div></div>
         <div class="action-grid" style="margin-top:14px;">
@@ -4180,6 +4183,7 @@ function openClient(id){
     var el=document.getElementById('cl-'+f);if(el)el.textContent=d[f]||'—';
   });
   loadNotifPrefs(id);
+  loadClientActivityLog(id);
   // Policies agreed
   var polEl = document.getElementById('cl-policies');
   if(polEl){
@@ -16886,6 +16890,59 @@ if (_origRenderAutoList) {
 // Run immediately for current render
 document.addEventListener('DOMContentLoaded', function(){ setTimeout(patchSystemAutoCards, 200); });
 setTimeout(patchSystemAutoCards, 1500);
+
+/* ────────────────────────────────────────────────────────────────────────────
+   loadClientActivityLog — populates #cl-activity-log on the client profile
+   modal with rows from activity_logs whose metadata.to matches this client's
+   email or phone. Broadcasts use direct Resend and intentionally don't log.
+   ──────────────────────────────────────────────────────────────────────────── */
+async function loadClientActivityLog(clientId){
+  var el = document.getElementById('cl-activity-log');
+  if (!el) return;
+  el.textContent = 'Loading\u2026';
+  try {
+    var c = await db.from('clients').select('email,phone').eq('id', clientId).maybeSingle();
+    if (!c.data) { el.innerHTML = '<div style="color:var(--text-muted);padding:8px 0;">No automations sent yet.</div>'; return; }
+    var email = (c.data.email || '').toLowerCase().trim();
+    var phoneDigits = (c.data.phone || '').replace(/[^0-9]/g, '');
+    var phoneE164 = phoneDigits ? ('+1' + phoneDigits.replace(/^1/, '')) : '';
+    var rows = [];
+    if (email) {
+      var r1 = await db.from('activity_logs').select('action, description, created_at, metadata').eq('metadata->>to', email).order('created_at', {ascending:false}).limit(100);
+      if (r1.data) rows = rows.concat(r1.data);
+    }
+    if (phoneE164) {
+      var r2 = await db.from('activity_logs').select('action, description, created_at, metadata').eq('metadata->>to', phoneE164).order('created_at', {ascending:false}).limit(100);
+      if (r2.data) rows = rows.concat(r2.data);
+    }
+    rows.sort(function(a,b){ return new Date(b.created_at) - new Date(a.created_at); });
+    var seen = new Set();
+    rows = rows.filter(function(r){ var k = r.action+'|'+r.created_at; if(seen.has(k)) return false; seen.add(k); return true; });
+    if (rows.length === 0) {
+      el.innerHTML = '<div style="color:var(--text-muted);padding:8px 0;">No automations sent yet.</div>';
+      return;
+    }
+    var iconMap = {sms_sent:'\ud83d\udcac', email_sent_invoice:'\ud83d\udcb0', email_sent_invoice_reminder:'\u26a0\ufe0f', email_sent_reschedule:'\ud83d\udd04', email_sent_thankyou:'\ud83c\udf3a', email_sent_booking_confirmation:'\u2705', email_sent_reminder:'\u23f0', email_sent_quote:'\ud83d\udccb', email_sent_lead_followup:'\ud83d\udc4b', email_sent_cancellation:'\u274c', email_sent_receipt:'\ud83e\uddfe', email_sent_va_task:'\ud83d\udcdd', email_sent_reactivation:'\ud83d\udc99', email_sent_generic:'\ud83d\udce8'};
+    el.innerHTML = rows.slice(0, 50).map(function(r){
+      var d = new Date(r.created_at);
+      var when = d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) + ' \u00b7 ' + d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
+      var icon = iconMap[r.action] || '\ud83d\udce8';
+      var label = r.action.replace(/^email_sent_/,'').replace(/^sms_sent$/,'SMS').replace(/_/g,' ');
+      var desc = (r.description || '').replace(/[<>]/g,'').slice(0, 110);
+      return '<div style="display:flex;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);align-items:flex-start;">' +
+        '<span style="font-size:15px;flex-shrink:0;line-height:1.5;">' + icon + '</span>' +
+        '<div style="flex:1;min-width:0;">' +
+          '<div style="color:var(--text);font-size:13px;font-weight:500;text-transform:capitalize;">' + label + '</div>' +
+          '<div style="color:var(--text-muted);font-size:11px;margin-top:1px;">' + when + '</div>' +
+          (desc ? '<div style="color:var(--text-muted);font-size:12px;margin-top:3px;line-height:1.4;">' + desc + '</div>' : '') +
+        '</div>' +
+      '</div>';
+    }).join('') + (rows.length > 50 ? '<div style="color:var(--text-muted);font-size:11px;padding:8px 0;text-align:center;">Showing 50 most recent of ' + rows.length + '</div>' : '');
+  } catch (e) {
+    el.innerHTML = '<div style="color:#dc2626;font-size:12px;padding:8px 0;">Failed to load: ' + (e.message || 'unknown error') + '</div>';
+  }
+}
+
 </script>
 
 </body>

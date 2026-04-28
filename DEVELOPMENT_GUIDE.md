@@ -235,6 +235,7 @@ Run through this checklist:
 - **`lead-capture.js`** does not have an atomic transaction like `lead-book.js` does — if it fails midway you can end up with a lead but no email/SMS sent.
 - **Context drift** between chat sessions is a recurring problem. Always reference this document at the start of a session and update it when something significant changes.
 - **RLS on `appointments`** caused a "phantom delete" bug (April 2026): appointments appeared to save (UI-first insert into in-memory `apptData`) but vanished on refresh because the anon-key SELECT returned 0 rows. Inserts were also silently rejected because errors went only to `console.error`, not to a toast. Fix: disable RLS in Supabase dashboard. Lesson: any new DB write path must surface errors to the user via `showToast(msg, true)` AND roll back the optimistic in-memory update — never trust the UI-first pattern without an error fallback.
+- **Large duplicate block in `index.html`** (discovered April 28, 2026): a copy/paste accident at some point left ~19+ functions duplicated in the file (`BC_HOLIDAYS`, `selectBcAudience`, `openNewBroadcast`, `closeBroadcastModal`, `escHtml`, `showToast`, `applyUserRole`, `renderHolidayStrip`, `selectBcTemplate`, `escHtml`, etc.) plus the entire Google Maps Places Autocomplete `<script>` block. The duplicate-loaded Maps script broke autocomplete because Google throws "included multiple times" and disables the bindings. Fixed the Maps duplicate; the rest is dead code (later definition overwrites earlier) but bloats the file and risks future bugs. **TODO:** dedicated session to find duplicate boundaries, diff-merge any drift, and delete one full copy. To find duplicates: `grep -n '^function ' index.html | awk '{print $2}' | sort | uniq -d` (and same for `^var `, `^const `, `^window.`).
 
 ---
 - **The 5-layer lead form whitelist trap** (see "Lead Form Data Flow" section above). When a new lead field "isn't saving" or "shows TBD", check all 5 layers: `_buildNLQuote` data shape, `saveNewLead` in-memory cache, `dbSaveLead` insert whitelist, `dbLoadLeads` mapping, `openLead` setter.
@@ -408,4 +409,4 @@ Supabase project's default mailer is rate-limited. Magic links to the VA (Leo) w
 
 ---
 
-*Last updated: April 28, 2026 — added RLS phantom-delete gotcha and optimistic-update rollback pattern after appointments-disappearing-on-refresh bug.*
+*Last updated: April 28, 2026 — added booking form Service-before-Property reorder, time-picker blur fix, Maps duplicate-script fix, and flagged the larger duplicate-block problem in index.html for a future cleanup session.*

@@ -17006,6 +17006,40 @@ async function loadClientHistory(clientId) {
   } catch (e) { console.warn('[loadClientHistory] failed:', e && e.message); }
 }
 
+
+/* Patch openAppt: make appointment title and Client row clickable to open the client profile. Runtime wrapper, leaves _openApptInner untouched. */
+(function patchApptClient(){
+  if (typeof window.openAppt !== 'function') { setTimeout(patchApptClient, 200); return; }
+  if (window.__apptClientPatched) return;
+  window.__apptClientPatched = true;
+  var orig = window.openAppt;
+  window.openAppt = function(a, dateKey) {
+    var result;
+    try { result = orig.apply(this, arguments); } catch (e) { throw e; }
+    setTimeout(function(){
+      var clientId = a && a.client_id;
+      if (!clientId) return;
+      ['appt-title', 'ai-client'].forEach(function(id){
+        var el = document.getElementById(id);
+        if (!el) return;
+        el.style.cursor = 'pointer';
+        el.style.textDecoration = 'underline';
+        el.style.textDecorationStyle = 'dotted';
+        el.style.textUnderlineOffset = '3px';
+        el.style.textDecorationColor = 'var(--text-muted)';
+        el.title = 'Click to open client profile';
+        el.onclick = function(ev){
+          ev.preventDefault();
+          ev.stopPropagation();
+          try { if (typeof closeOverlay === 'function') closeOverlay('appt-overlay'); } catch(_){}
+          if (typeof openClient === 'function') openClient(clientId);
+        };
+      });
+    }, 50);
+    return result;
+  };
+})();
+
 </script>
 
 </body>

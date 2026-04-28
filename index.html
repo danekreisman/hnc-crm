@@ -4185,6 +4185,7 @@ function openClient(id){
   loadNotifPrefs(id);
   loadClientActivityLog(id);
   loadClientStats(id);
+  loadClientHistory(id);
   // Policies agreed
   var polEl = document.getElementById('cl-policies');
   if(polEl){
@@ -16968,6 +16969,41 @@ async function loadClientStats(clientId) {
     if (avgEl)  avgEl.textContent  = totalJobs > 0 ? fmt(avg) : '\u2014';
     if (mrrEl)  mrrEl.textContent  = monthlyRev > 0 ? fmt(monthlyRev) : '\u2014';
   } catch (e) { console.warn('[loadClientStats] failed:', e && e.message); }
+}
+
+
+/* loadClientHistory: renders past completed/paid appointments into #cl-history. Most recent first, capped at 30. Includes date, service, cleaner name, and amount. */
+async function loadClientHistory(clientId) {
+  var el = document.getElementById('cl-history');
+  if (!el) return;
+  try {
+    var r = await db.from('appointments').select('id, date, time, service, status, total_price, cleaner_id').eq('client_id', clientId).in('status', ['completed', 'paid']).order('date', {ascending: false}).limit(30);
+    var rows = r.data || [];
+    if (rows.length === 0) {
+      el.innerHTML = '<div style="color:var(--text-muted);padding:8px 0;font-size:13px;">No past appointments yet.</div>';
+      return;
+    }
+    var cleanerIds = Array.from(new Set(rows.map(function(a){return a.cleaner_id;}).filter(Boolean)));
+    var cleanerMap = {};
+    if (cleanerIds.length > 0) {
+      var c = await db.from('cleaners').select('id, name').in('id', cleanerIds);
+      (c.data || []).forEach(function(c){ cleanerMap[c.id] = c.name; });
+    }
+    var fmt$ = function(n){ return '$' + Number(n||0).toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ','); };
+    el.innerHTML = rows.map(function(a){
+      var d = new Date(a.date + 'T00:00:00');
+      var dateStr = d.toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'});
+      var cleaner = cleanerMap[a.cleaner_id] || '\u2014';
+      var svc = (a.service || 'Cleaning').replace(/[<>]/g,'');
+      return '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border);gap:12px;">' +
+        '<div style="flex:1;min-width:0;">' +
+          '<div style="color:var(--text);font-size:13px;font-weight:500;">' + dateStr + ' \u00b7 ' + svc + '</div>' +
+          '<div style="color:var(--text-muted);font-size:12px;margin-top:2px;">Cleaner: ' + cleaner + '</div>' +
+        '</div>' +
+        '<div style="color:var(--text);font-size:13px;font-weight:500;flex-shrink:0;">' + fmt$(a.total_price) + '</div>' +
+      '</div>';
+    }).join('') + (rows.length === 30 ? '<div style="color:var(--text-muted);font-size:11px;padding:8px 0;text-align:center;">Showing 30 most recent</div>' : '');
+  } catch (e) { console.warn('[loadClientHistory] failed:', e && e.message); }
 }
 
 </script>

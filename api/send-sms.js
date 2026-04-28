@@ -53,6 +53,28 @@ export default async function handler(req, res) {
         status: response.status,
         response: data
       });
+    } else {
+      // Log every successful SMS send to activity_logs so it shows in the timeline.
+      // Broadcasts don't send SMS, so this naturally only catches per-recipient automations.
+      try {
+        await fetch(process.env.SUPABASE_URL + '/rest/v1/activity_logs', {
+          method: 'POST',
+          headers: {
+            'apikey': process.env.SUPABASE_SERVICE_ROLE_KEY,
+            'Authorization': 'Bearer ' + process.env.SUPABASE_SERVICE_ROLE_KEY,
+            'Content-Type': 'application/json',
+            'Prefer': 'return=minimal',
+          },
+          body: JSON.stringify({
+            action: 'sms_sent',
+            description: `SMS to ${phone}: ${(message || '').slice(0, 60)}${(message || '').length > 60 ? '…' : ''}`,
+            user_email: 'system',
+            entity_type: 'client',
+            entity_id: '',
+            metadata: { to: phone, message_length: (message || '').length, openphone_id: data?.id },
+          }),
+        });
+      } catch (_) { /* logging failure must not break the send */ }
     }
 
     return res.status(200).json({ success: response.ok, status: response.status, data });

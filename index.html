@@ -4184,6 +4184,7 @@ function openClient(id){
   });
   loadNotifPrefs(id);
   loadClientActivityLog(id);
+  loadClientStats(id);
   // Policies agreed
   var polEl = document.getElementById('cl-policies');
   if(polEl){
@@ -16941,6 +16942,32 @@ async function loadClientActivityLog(clientId){
   } catch (e) {
     el.innerHTML = '<div style="color:#dc2626;font-size:12px;padding:8px 0;">Failed to load: ' + (e.message || 'unknown error') + '</div>';
   }
+}
+
+
+/* loadClientStats: calculates and renders Lifetime value, Total jobs, Avg job value, and Monthly revenue (rolling 30 days) into the client profile stat tiles. Counts both 'completed' and 'paid' as done jobs; excludes 'cancelled'. */
+async function loadClientStats(clientId) {
+  try {
+    var r = await db.from('appointments').select('total_price, status, date').eq('client_id', clientId);
+    var rows = r.data || [];
+    var done = rows.filter(function(a){ return a.status === 'completed' || a.status === 'paid'; });
+    var totalJobs = done.length;
+    var lifetime = done.reduce(function(s, a){ return s + Number(a.total_price || 0); }, 0);
+    var avg = totalJobs > 0 ? lifetime / totalJobs : 0;
+    var cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 30);
+    var cutoffStr = cutoff.toISOString().slice(0, 10);
+    var last30 = done.filter(function(a){ return a.date >= cutoffStr; });
+    var monthlyRev = last30.reduce(function(s, a){ return s + Number(a.total_price || 0); }, 0);
+    var fmt = function(n){ return '$' + n.toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ','); };
+    var ltvEl  = document.getElementById('cl-ltv');
+    var jobsEl = document.getElementById('cl-jobs');
+    var avgEl  = document.getElementById('cl-avg');
+    var mrrEl  = document.getElementById('cl-mrr');
+    if (ltvEl)  ltvEl.textContent  = lifetime > 0 ? fmt(lifetime) : '$0';
+    if (jobsEl) jobsEl.textContent = String(totalJobs);
+    if (avgEl)  avgEl.textContent  = totalJobs > 0 ? fmt(avg) : '\u2014';
+    if (mrrEl)  mrrEl.textContent  = monthlyRev > 0 ? fmt(monthlyRev) : '\u2014';
+  } catch (e) { console.warn('[loadClientStats] failed:', e && e.message); }
 }
 
 </script>

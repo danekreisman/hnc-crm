@@ -14,6 +14,81 @@ function _hncIdempKey(prefix, payload) {
 async function _hncIdempCreate(resource, prefix, params) {
   return resource.create(params, { idempotencyKey: _hncIdempKey(prefix, params) });
 }
+
+// ── Charge audit + invoice backfill (added 2026-04-30 after Jan Vernon incident) ─
+// Every successful Stripe charge writes an immutable audit row to error_logs
+// (source='stripe-charge-success') with the payment_intent_id, customer, amount,
+// action, and requesting user. Then we best-effort PATCH any matching invoice rows
+// that lack stripe_payment_intent_id — so the next incident is reconcilable from
+// the database alone, without needing to reconcile by hand against Stripe.
+async function _hncRecordCharge(req, paymentIntent) {
+  try {
+    const SB_URL = process.env.SUPABASE_URL;
+    const SB_SVC = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!SB_URL || !SB_SVC || !paymentIntent) return;
+    const customer = paymentIntent.customer || null;
+    const amount = (paymentIntent.amount || 0) / 100;
+    const piId = paymentIntent.id;
+    const userEmail = (req && req.body && req.body._authedEmail) || null;
+    const apptId = (req && req.body && (req.body.appointment_id || req.body.appointmentId)) || null;
+
+    fetch(SB_URL + '/rest/v1/error_logs', {
+      method: 'POST',
+      headers: {
+        apikey: SB_SVC,
+        Authorization: 'Bearer ' + SB_SVC,
+        'Content-Type': 'application/json',
+        Prefer: 'return=minimal'
+      },
+      body: JSON.stringify({
+        source: 'stripe-charge-success',
+        message: 'charge_succeeded ' + piId,
+        context: {
+          payment_intent_id: piId,
+          stripe_customer_id: customer,
+          amount,
+          status: paymentIntent.status,
+          action: (req && req.body && req.body.action) || null,
+          appointment_id: apptId,
+          requesting_user_email: userEmail
+        }
+      })
+    }).catch(() => {});
+
+    if (!customer) return;
+    try {
+      const cliRes = await fetch(
+        SB_URL + '/rest/v1/clients?select=id&stripe_customer_id=eq.' + encodeURIComponent(customer),
+        { headers: { apikey: SB_SVC, Authorization: 'Bearer ' + SB_SVC } }
+      );
+      if (!cliRes.ok) return;
+      const clients = await cliRes.json();
+      if (!clients || !clients.length) return;
+      const clientId = clients[0].id;
+      const tenMinAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+
+      await fetch(
+        SB_URL + '/rest/v1/invoices?client_id=eq.' + clientId +
+          '&total=eq.' + amount +
+          '&stripe_payment_intent_id=is.null' +
+          '&created_at=gte.' + encodeURIComponent(tenMinAgo),
+        {
+          method: 'PATCH',
+          headers: {
+            apikey: SB_SVC,
+            Authorization: 'Bearer ' + SB_SVC,
+            'Content-Type': 'application/json',
+            Prefer: 'return=minimal'
+          },
+          body: JSON.stringify({ stripe_payment_intent_id: piId })
+        }
+      );
+    } catch {
+    }
+  } catch (e) {
+    console.error('[stripe-invoice] _hncRecordCharge failed:', e && e.message);
+  }
+}
 // ────────────────────────────────────────────────────────────────────────────────
 
 
@@ -203,6 +278,7 @@ export default async function handler(req, res) {
                                     description: service || 'Cleaning service',
                                     metadata: { customerName, service }
                       });
+                      await _hncRecordCharge(req, paymentIntent);
                       return res.status(200).json({ success: true, paymentIntentId: paymentIntent.id, status: paymentIntent.status });
           }
 
@@ -219,6 +295,7 @@ export default async function handler(req, res) {
                                     description: service || 'Cleaning service',
                                     metadata: { customerName, service }
                       });
+                      await _hncRecordCharge(req, paymentIntent);
                       return res.status(200).json({ success: true, paymentIntentId: paymentIntent.id, status: paymentIntent.status });
           }
 

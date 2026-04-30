@@ -2523,6 +2523,20 @@ async function loadAllData(){
     // Load appointments — resolve names via FK now that clientDB/cleanerDB are populated
     const appts=await dbLoadAppointments();
     console.log('[loadAllData] Loaded '+appts.length+' real appointments from Supabase');
+    // Build series_id → name maps so spawned occurrences with null client_id/client_name
+    // can recover the name from any sibling row in the same series (legacy populateRecurringMonth bug).
+    var seriesNameMap={}, seriesCleanerMap={};
+    appts.forEach(function(a){
+      if(!a.series_id) return;
+      if(!seriesNameMap[a.series_id]){
+        var n=(a.client_id&&clientDB[a.client_id])?clientDB[a.client_id].name:(a.client_name||null);
+        if(n && n !== 'Unknown') seriesNameMap[a.series_id]=n;
+      }
+      if(!seriesCleanerMap[a.series_id]){
+        var c=(a.cleaner_id&&cleanerDB[a.cleaner_id])?cleanerDB[a.cleaner_id].name:(a.cleaner_name||null);
+        if(c && c !== 'Unassigned') seriesCleanerMap[a.series_id]=c;
+      }
+    });
     appts.forEach(function(a){
       const d=new Date(a.date+'T12:00:00');
       const key=d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate();
@@ -2530,8 +2544,8 @@ async function loadAllData(){
       const exists=apptData[key].some(function(x){return x.dbId===a.id;});
       if(!exists){
         // Resolve names from FK — client_name/cleaner_name columns were dropped in Phase 4
-        var clientName=(a.client_id&&clientDB[a.client_id])?clientDB[a.client_id].name:(a.client_name||'Unknown');
-        var cleanerName=(a.cleaner_id&&cleanerDB[a.cleaner_id])?cleanerDB[a.cleaner_id].name:(a.cleaner_name||'Unassigned');
+        var clientName=(a.client_id&&clientDB[a.client_id])?clientDB[a.client_id].name:(a.client_name||(a.series_id&&seriesNameMap[a.series_id])||'Unknown');
+        var cleanerName=(a.cleaner_id&&cleanerDB[a.cleaner_id])?cleanerDB[a.cleaner_id].name:(a.cleaner_name||(a.series_id&&seriesCleanerMap[a.series_id])||'Unassigned');
         apptData[key].push({
           n:clientName, s:a.status||'unassigned',
           t:a.time||'8am', cleaner:cleanerName,
@@ -2559,8 +2573,8 @@ async function loadAllData(){
     var recurSeen={};
     appts.forEach(function(a){
       if(!a.recurring||!a.frequency||a.frequency==='One-time')return;
-      var clientName=(a.client_id&&clientDB[a.client_id])?clientDB[a.client_id].name:(a.client_name||'Unknown');
-      var cleanerName=(a.cleaner_id&&cleanerDB[a.cleaner_id])?cleanerDB[a.cleaner_id].name:(a.cleaner_name||'Unassigned');
+      var clientName=(a.client_id&&clientDB[a.client_id])?clientDB[a.client_id].name:(a.client_name||(a.series_id&&seriesNameMap[a.series_id])||'Unknown');
+      var cleanerName=(a.cleaner_id&&cleanerDB[a.cleaner_id])?cleanerDB[a.cleaner_id].name:(a.cleaner_name||(a.series_id&&seriesCleanerMap[a.series_id])||'Unassigned');
       var rKey=clientName+'|'+a.time+'|'+a.frequency;
       if(recurSeen[rKey])return;
       recurSeen[rKey]=true;
@@ -5594,7 +5608,9 @@ function populateRecurringMonth(yr,mo){
           var isoDate = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
           var insertRow = {
             client_id: r.client_id||null,
+            client_name: (r.name && r.name !== 'Unknown') ? r.name : null,
             cleaner_id: r.cleaner_id||null,
+            cleaner_name: (r.cleaner && r.cleaner !== 'Unassigned') ? r.cleaner : null,
             service: r.service || 'Regular Cleaning',
             frequency: r.freq,
             date: isoDate,

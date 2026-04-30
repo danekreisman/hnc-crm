@@ -2123,6 +2123,75 @@ Mahalo 🌺</textarea>
 </div>
 
 <script>
+// ── HNC: client-side stripe-invoice de-duplication (fix 4/5) ──────────────────
+// Added 2026-04-30 after Jan Vernon was charged $195.54 four times in 9 seconds.
+// Wraps fetch() so identical /api/stripe-invoice requests within a 10-second
+// window are coalesced or refused. Works regardless of which button fired the
+// click — protects current AND future call sites without any onclick changes.
+(function () {
+  try {
+    if (window.__hncStripeFetchPatched) return;
+    window.__hncStripeFetchPatched = true;
+
+    var _origFetch = window.fetch;
+    var _inFlight = new Map();
+    var _recent = new Map();
+    var DUPE_WINDOW_MS = 10000;
+
+    function bodyToKey(method, body) {
+      try {
+        var s = (typeof body === 'string') ? body : (body ? JSON.stringify(body) : '');
+        var h = 5381;
+        for (var i = 0; i < s.length; i++) h = (((h << 5) + h) + s.charCodeAt(i)) | 0;
+        return method + ':' + (h >>> 0).toString(16);
+      } catch (e) { return null; }
+    }
+
+    window.fetch = function (input, init) {
+      try {
+        var url = (typeof input === 'string') ? input : ((input && input.url) || '');
+        if (url.indexOf('/api/stripe-invoice') === -1) {
+          return _origFetch.apply(this, arguments);
+        }
+        var method = ((init && init.method) || (input && input.method) || 'POST').toUpperCase();
+        var body = (init && init.body) || (input && input.body) || '';
+        var key = bodyToKey(method, body);
+        if (!key) return _origFetch.apply(this, arguments);
+
+        if (_inFlight.has(key)) {
+          if (window.console && console.warn) console.warn('[hnc] /api/stripe-invoice duplicate coalesced (in-flight)', key);
+          return _inFlight.get(key);
+        }
+        var ra = _recent.get(key);
+        if (ra && (Date.now() - ra) < DUPE_WINDOW_MS) {
+          if (window.console && console.warn) console.warn('[hnc] /api/stripe-invoice duplicate refused (recent <10s)', key);
+          return Promise.resolve(new Response(JSON.stringify({
+            error: 'duplicate_request_blocked',
+            message: 'Please wait a moment before retrying.'
+          }), { status: 429, headers: { 'Content-Type': 'application/json' } }));
+        }
+
+        var p = _origFetch.apply(this, arguments);
+        _inFlight.set(key, p);
+        var done = function () {
+          _inFlight.delete(key);
+          _recent.set(key, Date.now());
+          var cutoff = Date.now() - DUPE_WINDOW_MS * 2;
+          for (var entry of _recent.entries()) {
+            if (entry[1] < cutoff) _recent.delete(entry[0]);
+          }
+        };
+        p.then(done, done);
+        return p;
+      } catch (e) {
+        return _origFetch.apply(this, arguments);
+      }
+    };
+  } catch (e) {
+    if (window.console && console.error) console.error('[hnc] fetch patch failed:', e);
+  }
+})();
+
 const SUPABASE_URL = 'https://hehfecnjmgsthxjxlvpz.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhlaGZlY25qbWdzdGh4anhsdnB6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUyNDMwOTMsImV4cCI6MjA5MDgxOTA5M30.LRfDNzOjVQYUeldULv-8VFlZl6akxdHVfLBFCZDCa5o';
 const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);

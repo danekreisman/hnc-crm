@@ -2287,10 +2287,13 @@ async function dbLoadCleaners(){
       async function dbSaveAppointment(data){
   var clientId=null;
   if(typeof clientDB!=='undefined'&&data.clientName){
-    clientId=Object.keys(clientDB).find(function(_id){return clientDB[_id]&&clientDB[_id].name===data.clientName;})||null;
+    var _found=_findClientByName(data.clientName);
+    clientId=_found?_found.id:null;
   }
   var row={
-    client_id:clientId, service:data.service||'Regular Cleaning',
+    client_id:clientId,
+    client_name:(data.clientName&&String(data.clientName).trim())||null,
+    service:data.service||'Regular Cleaning',
     frequency:data.freq||'One-time', date:data.date,
     time:data.time||'8am', address:data.address||null,
     beds:parseInt(data.beds)||null, baths:parseFloat(data.baths)||null,
@@ -5470,7 +5473,9 @@ async function saveNewAppt(){
         _cleanerId=Object.keys(cleanerDB).find(function(_id){return cleanerDB[_id]&&cleanerDB[_id].name===cleanerName;})||null;
       }
       return {
-        client_id:_clientId, service:naServiceText, frequency:freq,
+        client_id:_clientId,
+        client_name:(name&&String(name).trim())||null,
+        service:naServiceText, frequency:freq,
         date:odStr, time:timeStr, address:apptAddress||null,
         beds:parseInt(apptBeds)||null, baths:parseFloat(apptBaths)||null,
         sqft:parseInt(apptSqft)||null, condition:parseInt(apptCond)||7,
@@ -12230,9 +12235,12 @@ async function removeProperty(idx){
 var _propSaveContext = 'client'; // 'client' | 'booking' | 'edit'
 
 function _findClientByName(name){
+  if(!name) return null;
+  var needle = String(name).trim().toLowerCase();
+  if(!needle) return null;
   var result = null;
   Object.entries(clientDB).forEach(function(e){
-    if(e[1].name === name) result = {id: e[0], data: e[1]};
+    if(e[1] && e[1].name && String(e[1].name).trim().toLowerCase() === needle) result = {id: e[0], data: e[1]};
   });
   return result;
 }

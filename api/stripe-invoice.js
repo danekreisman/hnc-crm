@@ -17,6 +17,17 @@ async function logActivity(action, description, metadata = {}) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default async function handler(req, res) {
+  // EMERGENCY KILL SWITCH (added 2026-04-30 after duplicate-charge incident, 4 dupe charges to Jan Vernon).
+  // Refuses ALL charge/invoice operations until ALLOW_STRIPE_CHARGES === 'true' is set in Vercel env.
+  // Re-enable only after idempotency keys + button-debounce + duplicate guard are deployed.
+  if (process.env.ALLOW_STRIPE_CHARGES !== 'true') {
+    console.error('[stripe-invoice] BLOCKED by kill switch. Method:', req.method, 'Body keys:', req.body ? Object.keys(req.body) : '(no body)');
+    return res.status(503).json({
+      error: 'stripe_charges_disabled',
+      message: 'Charge creation temporarily disabled. Contact admin.'
+    });
+  }
+
         res.setHeader('Access-Control-Allow-Origin', '*');
         res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
         if (req.method === 'OPTIONS') return res.status(200).end();

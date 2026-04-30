@@ -160,6 +160,107 @@ Clicking the provider's button surfaces an error in `#hnc-login-msg` like *"Unsu
 ---
 
 
+## Stripe Charge Security (defense-in-depth, added 2026-04-30)
+
+After a fired VA used a residual session to fire 4 duplicate charges (~$782 to one customer), the entire charge path was hardened with five independent layers, any one of which would have stopped the incident on its own. **Don't remove any of these without understanding what they protect against.**
+
+### Layer 0 — kill switch
+Env var `ALLOW_STRIPE_CHARGES=true` (Production scope only, in Vercel) must be set for charges to fire. When unset/missing, `/api/stripe-invoice` returns 503 immediately, before any auth, dispatch, or Stripe call.
+
+To engage the kill switch in an emergency, set the var to `false` (or delete it) and trigger a redeploy. **Vercel env-var changes don't apply to running deployments — push an empty commit to redeploy:**
+```
+git commit --allow-empty -m "Force redeploy" && git push origin main
+```
+
+### Layer 1 — Stripe idempotency keys on every `.create`
+All 8 `.create` calls in `api/stripe-invoice.js` are wrapped with `_hncIdempCreate(resource, prefix, params)`. The wrapper builds a deterministic key like `hnc_pi_2026-04-30_a3f9b201` (prefix + UTC day + djb2 hash of params) and passes it to Stripe. Stripe then guarantees that any retry of the same logical request inside 24h returns the **same resource** instead of creating a new one.
+
+Resource → prefix mapping (do not change):
+- `customers.create` → `cu`
+- `invoiceItems.create` → `ii`
+- `invoices.create` → `inv`
+- `paymentIntents.create` → `pi` ← the critical one
+- `setupIntents.create` → `si`
+
+`finalizeInvoice` and `sendInvoice` are intentionally NOT wrapped; they're already idempotent on the invoice id.
+
+### Layer 2 — charge audit log + invoice backfill
+After every successful `paymentIntents.create`, `_hncRecordCharge(req, paymentIntent)` runs and:
+1. Fire-and-forget POSTs an immutable row to `error_logs` with `source='stripe-charge-success'` and full context (payment_intent_id, stripe_customer_id, amount, action, requesting_user_email)
+2. Best-effort PATCHes any matching invoice rows that lack `stripe_payment_intent_id` (matched by client_id + total + created_at within last 10 min)
+
+Both are wrapped in try/catch — Supabase failures never break the charge response. Forensic query:
+```sql
+SELECT occurred_at,
+       context->>'payment_intent_id' AS pi,
+       context->>'amount' AS amount,
+       context->>'action' AS action,
+       context->>'requesting_user_email' AS user
+FROM error_logs
+WHERE source = 'stripe-charge-success'
+ORDER BY occurred_at DESC
+LIMIT 100;
+```
+
+### Layer 3 — server-side duplicate guard
+Before each `paymentIntents.create` in `charge_card` and `charge_specific_card`, `_hncRecentDuplicateGuard(stripeCustomerId, amount)` runs. It looks up the local client by `stripe_customer_id`, then queries `invoices` for `status='paid'` rows matching `client_id + total + created_at >= now()-5min`. If found, returns **409 `duplicate_charge_blocked`** without ever calling Stripe.
+
+Fail-open on Supabase errors so a Supabase blip can't block legit charges (Layer 1 idempotency stays primary).
+
+### Layer 4 — client-side fetch interceptor (`index.html`)
+A self-installing IIFE at the very top of the first inline `<script>` block patches `window.fetch` for `/api/stripe-invoice` URLs only. It:
+- **Auto-injects `Authorization: Bearer <access_token>`** by reading the Supabase session from localStorage — so all 18 charge call sites pass the requireAdmin gate without any onclick changes
+- **Coalesces in-flight duplicates**: identical bodies fired before the first response returns the same Promise
+- **Refuses near-duplicates**: identical bodies within a 10s post-completion window get a synthetic **429 `duplicate_request_blocked`**
+
+Marker: `window.__hncStripeFetchPatched = true`. The patch is idempotent; reloads re-install it. Search for the comment `// ── HNC: client-side stripe-invoice de-duplication` to find the IIFE.
+
+### Layer 5 — admin-only auth gate
+`requireAdmin(req, res)` in `api/utils/auth-check.js` calls `requireAuth` then enforces an `ADMIN_EMAILS` allowlist. Anyone not on the allowlist (VA, employee, anonymous) gets **403 `admin_only`**.
+
+Used by:
+- `/api/stripe-invoice` (after the kill switch)
+- `/api/admin/revoke-user`
+
+`requireAuth` itself enforces a `BLOCKED_EMAILS` denylist for instant lockout of compromised accounts.
+
+### Adding/removing admins or blocked users
+Both lists live in `api/utils/auth-check.js`:
+- `ADMIN_EMAILS` — Set of lowercase emails who can hit financial endpoints
+- `BLOCKED_EMAILS` — Set of lowercase emails who get 403 on ANY auth-gated endpoint
+
+Edit and push. Effective on next deploy (~60s).
+
+### Locking out a compromised user end-to-end
+1. Add their email to `BLOCKED_EMAILS` in `auth-check.js` and push (instant on deploy)
+2. POST `/api/admin/revoke-user` with `{email}` to permanently ban their Supabase auth user (sets `banned_until` ~year 9999)
+3. (Belt-and-suspenders) Manually ban in Supabase auth dashboard
+
+### Action normalization (Unknown-action bug fix, 2026-04-30)
+The dispatcher in `stripe-invoice.js` normalizes the input so whitespace/case/null don't fall through to the catch-all:
+```js
+let { action, ... } = (req.body || {});
+action = (typeof action === 'string' ? action : '').trim().toLowerCase();
+```
+The catch-all also writes a forensic row to `error_logs`:
+```sql
+SELECT occurred_at, message,
+       context->>'received_action' AS got,
+       context->>'received_type' AS type,
+       context->'body_keys' AS body_keys
+FROM error_logs
+WHERE source = 'stripe-invoice-unknown-action'
+ORDER BY occurred_at DESC LIMIT 50;
+```
+
+### Helper reference (all in `api/stripe-invoice.js`)
+| Helper | Purpose |
+|---|---|
+| `_hncIdempKey(prefix, payload)` | Deterministic idempotency key (prefix + UTC day + djb2 hash) |
+| `_hncIdempCreate(resource, prefix, params)` | Wrapper around `resource.create()` that adds the idempotency key |
+| `_hncRecordCharge(req, paymentIntent)` | Audit log + invoice backfill after successful charge |
+| `_hncRecentDuplicateGuard(stripeCustomerId, amount)` | Pre-charge DB lookup for recent paid-invoice match |
+
 ## The Foundation (DO NOT SKIP THESE)
 
 These four things were built specifically so new features don't corrupt data or fail silently.
@@ -368,6 +469,19 @@ Single source of truth for what landed in the most recent sessions. Most recent 
 
 ---
 
+
+**2026-04-30 — Stripe security overhaul (response to dup-charge incident):**
+- `2f731da` kill switch on stripe-invoice (ALLOW_STRIPE_CHARGES env var gate)
+- `d157c77` → `46bdf26` /api/admin/revoke-user (paginated GoTrue lookup, ban + sign-out by email)
+- `3815bf0` BLOCKED_EMAILS denylist in requireAuth
+- `1d7abf3` Fix 1/5 — idempotency keys on all 8 Stripe .create calls
+- `e67e340` Fix 2/5 — charge audit log + invoice backfill
+- `5288320` Fix 3/5 — server-side duplicate guard
+- `b8b12fb` Fix 4/5 — client-side fetch interceptor
+- `0497b86` + `18a197d` + `3c70dba` + `7a13790` Fix 5/5 — requireAdmin gate + ADMIN_EMAILS + frontend Authorization header injection
+- `ad18ddb` Unknown-action fix — action normalization + error_logs catch-all logging
+- `1c55e4c` Null-safe destructure follow-up
+
 ## Activity Log Coverage
 
 **Goal:** every non-broadcast outbound communication is automatically logged to `activity_logs`. No per-call wiring required when adding new automation features.
@@ -464,6 +578,14 @@ Only relevant if Claude is operating in an environment without bash/git access (
 
 ---
 
+
+- **Vercel env-var changes don't apply to running deployments.** After adding/changing an env var (e.g. `ALLOW_STRIPE_CHARGES`) the existing serverless functions keep using the old values until a new deployment runs. To force a fresh deploy, push an empty commit:
+  ```
+  git commit --allow-empty -m "Force redeploy" && git push origin main
+  ```
+- **The `/api/stripe-invoice` endpoint had no auth at all before 2026-04-30.** It was publicly callable. The kill switch was the only thing standing between the public internet and live Stripe charges. After Fix 5/5 it requires `requireAdmin`. If you ever see a 401 on a charge, it's because the frontend interceptor failed to inject the Authorization header (check that `window.__hncStripeFetchPatched` is true after page load).
+- **Direct API tests don't exercise the server-side duplicate guard (Layer 3).** The guard checks for existing invoice rows; direct API tests don't write those rows the way the UI does. Test the guard by inserting a synthetic paid invoice row first, then firing `charge_card` — should return 409.
+
 ## Cleaner Portal
 
 The cleaner-facing portal lives at `hnc-crm.vercel.app/portal` (file: `portal.html`). This was built April 18-19 with Google sign-in, schedule view, upcoming jobs list, and Google Calendar sync. **It is the canonical cleaner portal.** Don't recreate it.
@@ -548,7 +670,14 @@ Supabase project's default mailer is rate-limited. Magic links to the VA (Leo) w
 - Optional polish: "paid" badge in Job History (logic added but doesn't appear visually — may need a CSS color tweak).
 - Decide whether `cl-mrr` should mean "rolling 30 days" (current) or "current calendar month".
 
-### VA login & security
+### VA login & security ✅ COMPLETED 2026-04-30
+See **Stripe Charge Security (defense-in-depth)** above. The 5-layer defense + admin allowlist + email denylist + revoke-user endpoint together address the VA security concerns that were originally tracked here. Specifically:
+- VAs can no longer hit `/api/stripe-invoice` (requireAdmin allowlist blocks them with 403)
+- A compromised account can be locked out instantly via `BLOCKED_EMAILS` in `auth-check.js`
+- `/api/admin/revoke-user` permanently bans a Supabase auth user and signs out all their sessions
+
+Original notes preserved below for context.
+
 - Flip `TEST_MODE_DANE_ONLY = true → false` in 3 places once Dane confirms ready: `run-task-automations.js`, `run-job-completions.js`, `saveApptEdit` in `index.html` (~line 3650).
 - Consider a `VA_EMAILS` allowlist (currently only `ADMIN_EMAILS` exists; non-admin users get the `hnc-va-user` class).
 - Reporting page is hidden for VA via CSS only — devtools could reveal it. Consider also hiding Automations + Broadcasts.

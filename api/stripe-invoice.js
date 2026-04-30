@@ -1,3 +1,4 @@
+import { requireAdmin } from './utils/auth-check.js';
 // ── Idempotency helpers (added 2026-04-30 after duplicate-charge incident) ─────
 // Building an idempotency key from a stable prefix + UTC day + a hash of the payload
 // guarantees that retries of the SAME logical request within 24h reuse the same Stripe
@@ -161,6 +162,11 @@ export default async function handler(req, res) {
       message: 'Charge creation temporarily disabled. Contact admin.'
     });
   }
+
+  // Admin-only gate (fix 5/5). Any authenticated user can hit this endpoint without it.
+  // requireAdmin checks the JWT, then enforces the ADMIN_EMAILS allowlist.
+  const _admin = await requireAdmin(req, res);
+  if (!_admin) return; // requireAdmin already responded with 401/403
 
         res.setHeader('Access-Control-Allow-Origin', '*');
         res.setHeader('Access-Control-Allow-Headers', 'Content-Type');

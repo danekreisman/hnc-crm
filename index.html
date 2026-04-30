@@ -2086,7 +2086,12 @@ Mahalo 🌺</textarea>
           <div class="info-row"><span class="info-label">Background check</span><span class="info-val"><span class="badge" id="cp-bg">—</span></span></div>
           <div class="info-row"><span class="info-label">Notes</span><span class="info-val" id="cp-notes">—</span></div>
         </div>
-        <div class="action-grid">
+        <div class="panel-section">Cleaner Portal</div>
+          <div class="info-block">
+            <div class="info-row"><span class="info-label">Status</span><span class="info-val" id="cp-portal-status" style="font-size:12px;">—</span></div>
+          </div>
+          <div class="action-grid"><button class="action-btn blue full" id="cp-invite-btn" onclick="hncInviteCleaner()">Send portal invite SMS</button></div>
+          <div class="action-grid">
           <button class="action-btn blue" onclick="openMsgFromCleaner()">Send SMS</button>
           <button class="action-btn amber" onclick="showCleanerEdit()">Edit profile</button>
           <button class="action-btn full" id="cp-toggle-active" onclick="toggleCleanerActive()" style="background:#fef3c7;color:#92400e;">Deactivate cleaner</button>
@@ -4493,7 +4498,84 @@ function openCleaner(id){
   });
   var bg=document.getElementById('cp-bg');bg.textContent=d.bgcheck;bg.className='badge '+(d.bgcheck==='Cleared'?'bac':'bpn');
   hideCleanerEdit();
+  if(typeof refreshInviteStatus==='function')refreshInviteStatus();
   openOverlay('cleaner-overlay');
+}
+
+async function hncInviteCleaner(){
+  if(!currentCleanerId){ alert('No cleaner selected'); return; }
+  var c=cleanerDB[currentCleanerId];
+  if(!c){ alert('Cleaner not found'); return; }
+  if(!c.phone || !String(c.phone).trim()){
+    alert('This cleaner has no phone number on file. Add one in their profile before sending an invite.');
+    return;
+  }
+  var btn=document.getElementById('cp-invite-btn');
+  var origLabel=btn?btn.textContent:'';
+  if(btn){ btn.disabled=true; btn.textContent='Sending…'; }
+  try{
+    var sess=(await db.auth.getSession()).data.session;
+    if(!sess){ alert('Sign in required.'); if(btn){btn.disabled=false;btn.textContent=origLabel;} return; }
+    var r=await fetch('/api/cleaner-portal/send-invite',{
+      method:'POST',
+      headers:{'Content-Type':'application/json',Authorization:'Bearer '+sess.access_token},
+      body:JSON.stringify({cleaner_id:currentCleanerId})
+    });
+    var j=await r.json().catch(function(){return{};});
+    if(!r.ok){
+      alert('Invite failed: '+(j.error||('HTTP '+r.status)));
+      if(btn){btn.disabled=false;btn.textContent=origLabel;}
+      return;
+    }
+    if(typeof showToast==='function') showToast('Invite SMS sent to '+(c.name||'cleaner'));
+    else alert('Invite SMS sent to '+(c.name||'cleaner'));
+    if(btn){btn.disabled=false;}
+    refreshInviteStatus();
+  } catch(e){
+    alert('Network error: '+e.message);
+    if(btn){btn.disabled=false;btn.textContent=origLabel;}
+  }
+}
+
+async function refreshInviteStatus(){
+  var statusEl=document.getElementById('cp-portal-status');
+  var btn=document.getElementById('cp-invite-btn');
+  if(!statusEl||!currentCleanerId)return;
+  statusEl.textContent='—';
+  statusEl.style.color='var(--text-muted)';
+  if(btn){ btn.textContent='Send portal invite SMS'; btn.disabled=false; }
+  try{
+    var c=cleanerDB[currentCleanerId];
+    if(c && c.auth_email){
+      statusEl.textContent='Activated as '+c.auth_email;
+      statusEl.style.color='#059669';
+      if(btn) btn.textContent='Re-send invite (replaces email)';
+      return;
+    }
+    var res=await db.from('cleaner_invites')
+      .select('created_at,used_at,expires_at')
+      .eq('cleaner_id',currentCleanerId)
+      .order('created_at',{ascending:false})
+      .limit(1)
+      .maybeSingle();
+    if(res.error){
+      // Migration likely not run yet
+      statusEl.textContent='(invite table missing — run migration)';
+      statusEl.style.color='#b91c1c';
+      return;
+    }
+    if(res.data && !res.data.used_at && new Date(res.data.expires_at)>new Date()){
+      var sentMs=Date.now()-new Date(res.data.created_at).getTime();
+      var sentMin=Math.round(sentMs/60000);
+      var sentTxt=sentMin<60?(sentMin+' min ago'):(Math.round(sentMin/60)+' hr ago');
+      statusEl.textContent='Invite pending (sent '+sentTxt+')';
+      if(btn) btn.textContent='Re-send invite';
+    } else {
+      statusEl.textContent='Not invited';
+    }
+  } catch(e){
+    statusEl.textContent='Status unknown';
+  }
 }
 
 function toggleCleanerActive(){

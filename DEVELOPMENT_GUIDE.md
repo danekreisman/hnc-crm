@@ -486,7 +486,7 @@ Self-service portal for cleaners to sign in (Google OAuth) and view their own sc
 
 ### Status
 - [x] Migration `supabase/add_cleaner_invites.sql` (commit `edd5a35`) — needs to be run on Supabase
-- [ ] `/api/cleaner-portal/send-invite.js` (admin-gated, generates token + sends SMS)
+- [x] `/api/cleaner-portal/send-invite.js` (commit `2e2979d`) — admin-gated, generates 32-byte token, inserts `cleaner_invites` row (7d expiry), sends SMS via Quo
 - [ ] `/api/cleaner-portal/redeem-invite.js` (validates + binds email)
 - [ ] Invite button + status display on cleaner profile in CRM
 - [ ] `/cleaner-portal.html` page (Google sign-in + redemption UI)
@@ -520,4 +520,4 @@ Supabase project's default mailer is rate-limited. Magic links to the VA (Leo) w
 
 ---
 
-*Last updated: April 30, 2026 — started Cleaner Portal slice (commit `edd5a35`): migration adds `cleaner_invites` table + `cleaners.auth_email` column. Earlier today: Google OAuth sign-in, sidebar sign-out button, Unknown-client/cleaner repair, property-data persistence fix. Deploy path: Claude pushes directly via PAT; Browser-Editor / Contents-API fallback when Chrome-only.*
+*Last updated: April 30, 2026 — Cleaner Portal slice in progress: migration `edd5a35`, `validate.js` schemas + `send-invite.js` endpoint `8090e30`/`2e2979d`. Earlier today: Google OAuth, sign-out button, Unknown-client/cleaner repair, property-data persistence. Deploy path: PAT-based; Browser-Editor / Contents-API fallback when Chrome-only.*

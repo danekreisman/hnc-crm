@@ -139,7 +139,8 @@ UI gating after sign-in is done client-side in `applyUserRole(email)`:
 |---|---|
 | Login overlay CSS | `index.html` ~line 408 |
 | Login overlay HTML (Google button + email field) | `index.html` ~line 413 |
-| `ADMIN_EMAILS`, `initAuth`, `applyUserRole`, `hncSendMagicLink`, `hncSignInWithGoogle` | `index.html` ~lines 14550–14582 |
+| Sidebar user footer (signed-in email + sign-out button) | `index.html` ~line 440 |
+| `ADMIN_EMAILS`, `initAuth`, `applyUserRole`, `_setUserFooter`, `hncSendMagicLink`, `hncSignInWithGoogle`, `hncSignOut` | `index.html` ~lines 14575–14619 |
 
 ### Adding a new OAuth provider
 1. Enable provider in Supabase Studio: **Authentication → Providers → [Provider]**.

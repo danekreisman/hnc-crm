@@ -3,11 +3,11 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Hawaii Natural Clean â Cleaner Portal</title>
+<title>Hawaii Natural Clean — Cleaner Portal</title>
   <link rel="icon" href="/hnc-logo.png" />
 <style>
   :root{
-    /* HNC Design Tokens â unified brand palette */
+    /* HNC Design Tokens — unified brand palette */
     --brand-500:#3BB8E3; --brand-400:#59C7E2; --brand-300:#79D3E1;
     --brand-200:#A5E6E9; --brand-50:#EAF7FB;
     --brand-600:#1F9EC6; --brand-700:#16758F;
@@ -22,7 +22,7 @@
     --shadow-sm:0 1px 2px rgba(15,42,53,.04), 0 1px 1px rgba(15,42,53,.03);
     --shadow:0 8px 24px -10px rgba(31,158,198,.18), 0 2px 6px rgba(15,42,53,.05);
     --glow:0 0 0 1px rgba(59,184,227,.35), 0 0 22px rgba(59,184,227,.25);
-    /* Legacy-name compat shim â keeps existing var(--accent) etc. working */
+    /* Legacy-name compat shim — keeps existing var(--accent) etc. working */
     --panel2:var(--panel-muted);
     --accent:var(--brand-500);
     --accent2:var(--brand-300);
@@ -84,32 +84,21 @@
   .wrap{padding:12px!important;max-width:100%!important;box-sizing:border-box;}
   .auth{max-width:100%!important;margin:0 auto!important;}
   .auth.card{padding:22px 18px!important;border-radius:14px!important;box-shadow:0 4px 16px rgba(0,0,0,.06)!important;}
-  /* Inputs: 16px font prevents iOS zoom on focus; 48px min-height for tap targets */
   input,select,textarea{font-size:16px!important;min-height:48px!important;padding:12px 14px!important;border-radius:10px!important;box-sizing:border-box;width:100%;}
-  /* Buttons: full-width, big tap targets, no double-tap delay */
   .btn{min-height:52px!important;font-size:16px!important;padding:14px 18px!important;border-radius:12px!important;width:100%!important;touch-action:manipulation;display:inline-flex;align-items:center;justify-content:center;gap:8px;}
   .btn.google,.btn.secondary,.btn.ghost{width:100%!important;}
-  /* Inline link-style buttons */
   .link-btn{min-height:44px!important;padding:10px 12px!important;font-size:15px!important;display:inline-flex;align-items:center;touch-action:manipulation;}
-  /* Cards */
   .gcard{padding:14px!important;border-radius:14px!important;}
-  /* KPI tiles */
   .kpi{padding:14px!important;border-radius:12px!important;}
   .kpi .value{font-size:22px!important;line-height:1.1;}
   .kpi .label{font-size:12px!important;}
-  /* Status badges stay legible without dominating */
   .badge,.status{font-size:12px!important;padding:4px 8px!important;}
-  /* Fields */
   .field{margin-bottom:12px!important;}
   .field label{font-size:13px!important;margin-bottom:6px!important;display:block;}
-  /* Divider */
   .divider{font-size:12px!important;margin:14px 0!important;}
-  /* Headings */
   h1{font-size:22px!important;line-height:1.25;}
   h2{font-size:18px!important;line-height:1.3;}
-  /* Smooth touch scrolling for any scrollable lists */
   .who,.wrap{-webkit-overflow-scrolling:touch;}
-  /* Stack any flex .row content on narrow phones */
   .row{flex-direction:column;align-items:stretch;}
 }
 </style>
@@ -243,7 +232,7 @@ function weekdayIndex(name){
 }
 
 // Compute the current pay period [start, end] inclusive dates as YYYY-MM-DD based on payroll config.
-// Weekly: period = [prev payday, payday-1] â i.e. the week ending on the day before payday.
+// Weekly: period = [prev payday, payday-1] — i.e. the week ending on the day before payday.
 function currentPeriod(cfg){
   const pdIdx = weekdayIndex(cfg.payday);
   const today = new Date();
@@ -302,9 +291,9 @@ function renderDashboard(ctx){
 
   const header = $(`
     <header>
-      <div class="brand" style="display:flex;align-items:center;gap:10px;"><img src="/hnc-logo.png" alt="Hawaii Natural Clean" style="height:32px;width:auto;filter:drop-shadow(0 2px 6px rgba(59,184,227,.22));"><h1 style="margin:0;">Hawaii Natural Clean â Portal</h1></div>
+      <div class="brand" style="display:flex;align-items:center;gap:10px;"><img src="/hnc-logo.png" alt="Hawaii Natural Clean" style="height:32px;width:auto;filter:drop-shadow(0 2px 6px rgba(59,184,227,.22));"><h1 style="margin:0;">Hawaii Natural Clean — Portal</h1></div>
       <div class="row" style="gap:12px">
-        <div class="who">${cleaner.name} Â· ${user.email||''}</div>
+        <div class="who">${cleaner.name} · ${user.email||''}</div>
         <button class="btn ghost" id="signOut">Sign out</button>
       </div>
     </header>`);
@@ -323,7 +312,7 @@ function renderDashboard(ctx){
       <div class="row">
         <div>
           <div style="color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.08em">Current pay period</div>
-          <div style="margin-top:4px;font-size:15px">${fmtDate(period.start)} â ${fmtDate(period.end)} Â· Payday ${fmtDate(period.payday)} (${cfg.frequency}, ${cfg.payday})</div>
+          <div style="margin-top:4px;font-size:15px">${fmtDate(period.start)} → ${fmtDate(period.end)} · Payday ${fmtDate(period.payday)} (${cfg.frequency}, ${cfg.payday})</div>
         </div>
         <div style="color:var(--muted);font-size:13px">Rate: ${fmtMoney(cleaner.hourly_rate)}/hr</div>
       </div>
@@ -335,7 +324,7 @@ function renderDashboard(ctx){
     <div class="card gcard">
       <div>
         <div style="font-weight:600">Google Calendar</div>
-        <div class="status ${connected?'connected':''}">${connected ? ('Connected as ' + (integration.provider_email||'(unknown)')) : 'Not connected â your jobs will not sync to your calendar'}</div>
+        <div class="status ${connected?'connected':''}">${connected ? ('Connected as ' + (integration.provider_email||'(unknown)')) : 'Not connected — your jobs will not sync to your calendar'}</div>
       </div>
       <button class="btn ${connected?'secondary':''}" id="gcalBtn">${connected?'Reconnect':'Connect Google Calendar'}</button> ${connected?'<button class="btn" id="gcalSyncBtn">Sync my upcoming jobs</button>':''}
     </div>`);

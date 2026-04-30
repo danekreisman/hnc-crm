@@ -176,7 +176,7 @@ export default async function handler(req, res) {
   try {
             const Stripe = (await import('stripe')).default;
             const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
-            let { action, customerName, customerEmail, customerId, amount, service, terms, notes, paymentIntentId, emailSubject, emailBody } = req.body;
+            let { action, customerName, customerEmail, customerId, amount, service, terms, notes, paymentIntentId, emailSubject, emailBody } = (req.body || {});
             // hnc:normalize-action — fix Unknown-action bug. Normalize whitespace, case, and null body.
             if (!req.body || typeof req.body !== 'object') {
               return res.status(400).json({ error: 'invalid_body', message: 'Request body must be JSON' });

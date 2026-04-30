@@ -1,3 +1,21 @@
+// ── Idempotency helpers (added 2026-04-30 after duplicate-charge incident) ─────
+// Building an idempotency key from a stable prefix + UTC day + a hash of the payload
+// guarantees that retries of the SAME logical request within 24h reuse the same Stripe
+// resource instead of creating a new one. Different payload OR different day → different
+// key → new resource (intended). Stripe expires keys after 24h, which matches our day scope.
+function _hncIdempKey(prefix, payload) {
+  const day = new Date().toISOString().slice(0, 10); // YYYY-MM-DD UTC
+  const json = JSON.stringify(payload || {});
+  let h = 5381;
+  for (let i = 0; i < json.length; i++) h = (((h << 5) + h) + json.charCodeAt(i)) | 0; // djb2
+  const hex = (h >>> 0).toString(16).padStart(8, '0');
+  return `hnc_${prefix}_${day}_${hex}`;
+}
+async function _hncIdempCreate(resource, prefix, params) {
+  return resource.create(params, { idempotencyKey: _hncIdempKey(prefix, params) });
+}
+// ────────────────────────────────────────────────────────────────────────────────
+
 
 // ── Activity Logger ──────────────────────────────────────────────────────────
 async function logActivity(action, description, metadata = {}) {
@@ -75,7 +93,7 @@ export default async function handler(req, res) {
                                     if (existing.data.length > 0) {
                                                     customer = existing.data[0];
                                     } else {
-                                                    const newCust = await stripe.customers.create({ name: customerName, email: customerEmail });
+                                                    const newCust = await _hncIdempCreate(stripe.customers, 'cu', { name: customerName, email: customerEmail });
                                                     customer = newCust;
                                     }
                       }
@@ -89,7 +107,7 @@ export default async function handler(req, res) {
                                     if (existing.data.length > 0) {
                                                     customerId2 = existing.data[0].id;
                                     } else {
-                                                    const newCust = await stripe.customers.create({ name: customerName, email: customerEmail });
+                                                    const newCust = await _hncIdempCreate(stripe.customers, 'cu', { name: customerName, email: customerEmail });
                                                     customerId2 = newCust.id;
                                     }
                       }
@@ -129,7 +147,7 @@ export default async function handler(req, res) {
                   const liAmtCents = Math.round(liAmtNum * 100);
                   const liDesc = (li.description || 'Cleaning service').toString().slice(0, 500);
                   if (liAmtCents > 0) {
-                    await stripe.invoiceItems.create({
+                    await _hncIdempCreate(stripe.invoiceItems, 'ii', {
                       customer: customerId2,
                       amount: liAmtCents,
                       currency: 'usd',
@@ -139,7 +157,7 @@ export default async function handler(req, res) {
                 }
                 // Tax is included as a line item by the frontend (avoids double-tax).
               } else {
-                await stripe.invoiceItems.create({
+                await _hncIdempCreate(stripe.invoiceItems, 'ii', {
                   customer: customerId2,
                   amount: amountCents,
                   currency: 'usd',
@@ -147,7 +165,7 @@ export default async function handler(req, res) {
                 });
               }
 
-              const invoice = await stripe.invoices.create({
+              const invoice = await _hncIdempCreate(stripe.invoices, 'inv', {
                             customer: customerId2,
                             collection_method: 'send_invoice',
                             days_until_due: (days > 0 ? days : 30),
@@ -175,7 +193,7 @@ export default async function handler(req, res) {
                                     return res.status(400).json({ success: false, error: 'No card on file for this customer' });
                       }
                       const pm = paymentMethods.data[0];
-                      const paymentIntent = await stripe.paymentIntents.create({
+                      const paymentIntent = await _hncIdempCreate(stripe.paymentIntents, 'pi', {
                                     amount: amountCents,
                                     currency: 'usd',
                                     customer: customerId,
@@ -191,7 +209,7 @@ export default async function handler(req, res) {
           if (action === 'charge_specific_card') {
                       const { paymentMethodId } = req.body;
                       const amountCents = Math.round(parseFloat(amount) * 100);
-                      const paymentIntent = await stripe.paymentIntents.create({
+                      const paymentIntent = await _hncIdempCreate(stripe.paymentIntents, 'pi', {
                                     amount: amountCents,
                                     currency: 'usd',
                                     customer: customerId,
@@ -210,7 +228,7 @@ export default async function handler(req, res) {
           }
 
           if (action === 'create_setup_intent') {
-                      const setupIntent = await stripe.setupIntents.create({ customer: customerId, payment_method_types: ['card'] });
+                      const setupIntent = await _hncIdempCreate(stripe.setupIntents, 'si', { customer: customerId, payment_method_types: ['card'] });
                       return res.status(200).json({ success: true, clientSecret: setupIntent.client_secret });
           }
 

@@ -474,6 +474,8 @@ The cleaner-facing portal lives at `hnc-crm.vercel.app/portal` (file: `portal.ht
 - On subsequent loads, `findCleaner(user)` looks up the cleaner by `auth_user_id`. If no cleaner is linked, the portal shows "No cleaner record linked."
 - This is admin-email matching, not email-based auth — `cleaners.email` is contact info, NOT used for portal auth.
 
+**The portal is invite-only by UI design.** The "Need an account? Sign up" toggle was removed in commit ca74b4a — the portal frontend has no path to call `supa.auth.signUp()` anymore. `mode` is permanently `'signin'` and the dead signup branch is unreachable. Anyone who somehow creates a Supabase account from another entry point still hits "No cleaner record linked" because they have no row in `cleaners`.
+
 ### Inviting a cleaner
 1. Admin opens a cleaner profile in the CRM and clicks **Invite Cleaner**.
 2. The button calls `POST /api/portal/send-invite` with the cleaner's id.

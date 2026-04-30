@@ -15,6 +15,47 @@ async function _hncIdempCreate(resource, prefix, params) {
   return resource.create(params, { idempotencyKey: _hncIdempKey(prefix, params) });
 }
 
+// ── Duplicate-charge guard (added 2026-04-30 — fix 3/5 of Jan Vernon series) ────
+// Returns the duplicate invoice row if a 'paid' invoice for the same client + amount
+// was created within the last 5 minutes; else null. Fail-open: returns null on any
+// error so a Supabase blip can't block legitimate charges (idempotency keys remain
+// primary protection against duplicates).
+async function _hncRecentDuplicateGuard(stripeCustomerId, amount) {
+  try {
+    const SB_URL = process.env.SUPABASE_URL;
+    const SB_SVC = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!SB_URL || !SB_SVC || !stripeCustomerId || amount == null) return null;
+    const amt = Number(amount);
+    if (!isFinite(amt) || amt <= 0) return null;
+
+    const cliRes = await fetch(
+      SB_URL + '/rest/v1/clients?select=id&stripe_customer_id=eq.' + encodeURIComponent(stripeCustomerId),
+      { headers: { apikey: SB_SVC, Authorization: 'Bearer ' + SB_SVC } }
+    );
+    if (!cliRes.ok) return null;
+    const clients = await cliRes.json();
+    if (!clients || !clients.length) return null;
+    const clientId = clients[0].id;
+
+    const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+    const dupRes = await fetch(
+      SB_URL + '/rest/v1/invoices?select=id,created_at,total,stripe_payment_intent_id' +
+        '&client_id=eq.' + clientId +
+        '&total=eq.' + amt +
+        '&status=eq.paid' +
+        '&created_at=gte.' + encodeURIComponent(fiveMinAgo) +
+        '&order=created_at.desc&limit=1',
+      { headers: { apikey: SB_SVC, Authorization: 'Bearer ' + SB_SVC } }
+    );
+    if (!dupRes.ok) return null;
+    const rows = await dupRes.json();
+    return (rows && rows.length) ? rows[0] : null;
+  } catch (e) {
+    console.error('[stripe-invoice] _hncRecentDuplicateGuard failed:', e && e.message);
+    return null;
+  }
+}
+
 // ── Charge audit + invoice backfill (added 2026-04-30 after Jan Vernon incident) ─
 // Every successful Stripe charge writes an immutable audit row to error_logs
 // (source='stripe-charge-success') with the payment_intent_id, customer, amount,
@@ -262,6 +303,17 @@ export default async function handler(req, res) {
           }
 
           if (action === 'charge_card') {
+                      // Duplicate-charge guard (fix 3/5 — refuse if paid invoice exists for this customer+amount in last 5 min)
+                      {
+                        const _dup = await _hncRecentDuplicateGuard(req.body && req.body.customerId, req.body && req.body.amount);
+                        if (_dup) return res.status(409).json({
+                          error: 'duplicate_charge_blocked',
+                          message: 'A paid invoice for this customer and amount already exists from the last 5 minutes.',
+                          existing_invoice_id: _dup.id,
+                          existing_payment_intent_id: _dup.stripe_payment_intent_id || null,
+                          existing_created_at: _dup.created_at
+                        });
+                      }
                       const amountCents = Math.round(parseFloat(amount) * 100);
                       const paymentMethods = await stripe.paymentMethods.list({ customer: customerId, type: 'card' });
                       if (paymentMethods.data.length === 0) {
@@ -283,6 +335,17 @@ export default async function handler(req, res) {
           }
 
           if (action === 'charge_specific_card') {
+                      // Duplicate-charge guard (fix 3/5 — refuse if paid invoice exists for this customer+amount in last 5 min)
+                      {
+                        const _dup = await _hncRecentDuplicateGuard(req.body && req.body.customerId, req.body && req.body.amount);
+                        if (_dup) return res.status(409).json({
+                          error: 'duplicate_charge_blocked',
+                          message: 'A paid invoice for this customer and amount already exists from the last 5 minutes.',
+                          existing_invoice_id: _dup.id,
+                          existing_payment_intent_id: _dup.stripe_payment_intent_id || null,
+                          existing_created_at: _dup.created_at
+                        });
+                      }
                       const { paymentMethodId } = req.body;
                       const amountCents = Math.round(parseFloat(amount) * 100);
                       const paymentIntent = await _hncIdempCreate(stripe.paymentIntents, 'pi', {

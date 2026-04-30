@@ -348,6 +348,7 @@ Run through this checklist:
 | Function | Purpose |
 |---|---|
 | `book_lead_atomic` | Atomically creates client + appointment + closes lead |
+| `redeem_cleaner_invite` | Atomically validates an invite token, marks it used, and writes the verified email to `cleaners.auth_email` |
 
 ---
 
@@ -486,8 +487,9 @@ Self-service portal for cleaners to sign in (Google OAuth) and view their own sc
 
 ### Status
 - [x] Migration `supabase/add_cleaner_invites.sql` (commit `edd5a35`) — needs to be run on Supabase
+- [x] Migration `supabase/add_redeem_cleaner_invite_rpc.sql` (commit `77d6bdd`) — atomic redemption RPC, also needs to be run on Supabase
 - [x] `/api/cleaner-portal/send-invite.js` (commit `2e2979d`) — admin-gated, generates 32-byte token, inserts `cleaner_invites` row (7d expiry), sends SMS via Quo
-- [ ] `/api/cleaner-portal/redeem-invite.js` (validates + binds email)
+- [x] `/api/cleaner-portal/redeem-invite.js` (commit `91c6ced`) — verifies session via requireAuth, calls `redeem_cleaner_invite` RPC for atomic mark-used + bind-email
 - [ ] Invite button + status display on cleaner profile in CRM
 - [ ] `/cleaner-portal.html` page (Google sign-in + redemption UI)
 
@@ -520,4 +522,4 @@ Supabase project's default mailer is rate-limited. Magic links to the VA (Leo) w
 
 ---
 
-*Last updated: April 30, 2026 — Cleaner Portal slice in progress: migration `edd5a35`, `validate.js` schemas + `send-invite.js` endpoint `8090e30`/`2e2979d`. Earlier today: Google OAuth, sign-out button, Unknown-client/cleaner repair, property-data persistence. Deploy path: PAT-based; Browser-Editor / Contents-API fallback when Chrome-only.*
+*Last updated: April 30, 2026 — Cleaner Portal slice progress: API side complete (`send-invite` `2e2979d`, `redeem-invite` `91c6ced`, RPC `77d6bdd`). Two migrations pending Supabase run. Frontend portal page + invite button next.*

@@ -149,24 +149,15 @@ function renderLogin(message){
       </form>
       <div class="row" style="margin-top:10px">
         <button class="link-btn" id="forgot">Forgot password?</button>
-        <button class="link-btn" id="toggleMode">Need an account? Sign up</button>
       </div>
       <div class="msg" id="authMsg">${message||''}</div>
     </div>`);
   app.appendChild(card);
 
   let mode = 'signin';
-  const toggle = card.querySelector('#toggleMode');
   const form = card.querySelector('#emailForm');
   const msg = card.querySelector('#authMsg');
 
-  toggle.onclick = () => {
-    mode = mode==='signin' ? 'signup' : 'signin';
-    toggle.textContent = mode==='signin' ? 'Need an account? Sign up' : 'Have an account? Sign in';
-    form.querySelector('button[type=submit]').textContent = mode==='signin' ? 'Sign in' : 'Create account';
-    msg.textContent = '';
-    msg.className = 'msg';
-  };
 
   card.querySelector('#googleBtn').onclick = async () => {
     msg.textContent = 'Redirecting to Google...';

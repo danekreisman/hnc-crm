@@ -2153,6 +2153,44 @@ Mahalo 🌺</textarea>
         if (url.indexOf('/api/stripe-invoice') === -1) {
           return _origFetch.apply(this, arguments);
         }
+        // Inject Authorization header from Supabase session if missing.
+        // The 18 charge call sites in this file don't add auth headers themselves;
+        // we centralize it here so the requireAdmin gate on /api/stripe-invoice can verify the user.
+        try {
+          var hasAuthHdr = false;
+          var hdrs = (init && init.headers) || (input && input.headers) || null;
+          if (hdrs) {
+            if (typeof hdrs.has === 'function') hasAuthHdr = hdrs.has('Authorization') || hdrs.has('authorization');
+            else hasAuthHdr = !!(hdrs['Authorization'] || hdrs['authorization']);
+          }
+          if (!hasAuthHdr) {
+            var sbToken = null;
+            try {
+              for (var ki = 0; ki < localStorage.length; ki++) {
+                var lk = localStorage.key(ki);
+                if (lk && lk.indexOf('sb-') === 0 && lk.indexOf('-auth-token') !== -1) {
+                  var raw = localStorage.getItem(lk);
+                  if (raw) {
+                    var sess = JSON.parse(raw);
+                    if (sess && sess.access_token) { sbToken = sess.access_token; break; }
+                  }
+                }
+              }
+            } catch (eTok) {}
+            if (sbToken) {
+              var newHdrs;
+              if (hdrs && typeof hdrs.has === 'function') {
+                newHdrs = new Headers(hdrs);
+                newHdrs.set('Authorization', 'Bearer ' + sbToken);
+              } else {
+                newHdrs = Object.assign({}, hdrs || {});
+                newHdrs['Authorization'] = 'Bearer ' + sbToken;
+              }
+              init = Object.assign({}, init || {}, { headers: newHdrs });
+              arguments[1] = init;
+            }
+          }
+        } catch (eAuth) { /* fail-open: send without auth, server will reject with 401 */ }
         var method = ((init && init.method) || (input && input.method) || 'POST').toUpperCase();
         var body = (init && init.body) || (input && input.body) || '';
         var key = bodyToKey(method, body);

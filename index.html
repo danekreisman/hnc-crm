@@ -14573,7 +14573,7 @@ async function clientNotifEnabled(dbClient, clientId, key) {
 
 
 // === HNC AUTH ===
-const ADMIN_EMAILS = ['dane.kreisman@gmail.com'];
+const ADMIN_EMAILS = ['dane.kreisman@gmail.com', 'dane@hawaiinaturalclean.net'];
 async function initAuth() {
   const { data: { session } } = await db.auth.getSession();
   if (session) { applyUserRole(session.user.email); document.getElementById('hnc-login-overlay').style.display = 'none'; }

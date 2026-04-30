@@ -59,6 +59,19 @@ Wait ~60s after push for Vercel to roll out, then verify against `hnc-crm.vercel
 git commit --allow-empty -m "Force redeploy" && git push origin main
 ```
 
+### Auth
+
+Claude's environment has no persistent GitHub credentials. Dane pastes a GitHub PAT (classic, `repo` scope) into chat at the start of each session. Claude uses it inline on the push URL:
+
+```bash
+git push "https://<PAT>@github.com/danekreisman/hnc-crm.git" main
+```
+
+Rules when handling the PAT:
+- Use it inline on the push command. Don't write it to a file, a commit message, or any other persistent surface.
+- Don't echo it back into chat unnecessarily. It's already in context once — don't repeat it.
+- The PAT is rotated periodically by Dane. If a push returns `403` or auth-related errors, ask Dane for a fresh one rather than guessing.
+
 If `git push` fails (auth, network, branch protection), report the exact error to Dane immediately. Do NOT silently fall back to outputting the patched file or asking Dane to push manually — that defeats the whole point of the new workflow. Dane's environment is no longer a dependency.
 
 ---
@@ -436,4 +449,4 @@ Supabase project's default mailer is rate-limited. Magic links to the VA (Leo) w
 
 ---
 
-*Last updated: April 29, 2026 — switched primary deploy path: Claude clones, edits, and pushes directly from its own environment. Browser-editor workflow demoted to legacy fallback.*
+*Last updated: April 29, 2026 — switched primary deploy path: Claude clones, edits, and pushes directly from its own environment using a PAT pasted by Dane at session start. Browser-editor workflow demoted to legacy fallback.*

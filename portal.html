@@ -79,7 +79,21 @@
   .row{flex-wrap:wrap;gap:8px!important;}
 }
 @media(max-width:480px){
-  html,body{overflow-x:hidden;-webkit-text-size-adjust:100%;}
+  html,body{overflow-x:hidden;-webkit-text-size-adjust:100%;word-wrap:break-word;overflow-wrap:break-word;}
+  /* Cards must respect viewport width and never expose content past the edge */
+  .gcard,.card{max-width:100%!important;box-sizing:border-box;word-wrap:break-word;overflow-wrap:anywhere;}
+  /* Every descendant of a card: cap width, reset flex min-width (the classic flexbox overflow fix) */
+  .gcard *,.card *{min-width:0!important;max-width:100%;box-sizing:border-box;word-wrap:break-word;overflow-wrap:anywhere;}
+  /* Long inline strings (addresses, emails, urls) wrap at any character if needed */
+  .who,.label,.value,address,a,code,pre{word-break:break-word;overflow-wrap:anywhere;}
+  /* Stack flex/grid rows on phones so date/name/address/badge don't fight for one line */
+  .gcard .row,.card .row,.row{flex-wrap:wrap!important;gap:6px 10px!important;}
+  /* Any element trying to be a single-line row with white-space:nowrap — let it wrap on phones */
+  *[style*="white-space:nowrap"],*[style*="white-space: nowrap"]{white-space:normal!important;}
+  /* Trim card inner padding so more horizontal room is available for text */
+  .gcard{padding:14px 12px!important;}
+  /* Status badges shouldn't be the thing pushing rows wide — keep them compact */
+  .badge,.status{display:inline-block;white-space:nowrap;flex-shrink:0;max-width:100%;}
   body{padding-top:env(safe-area-inset-top,0px)!important;}
   .wrap{padding:12px!important;max-width:100%!important;box-sizing:border-box;}
   .auth{max-width:100%!important;margin:0 auto!important;}

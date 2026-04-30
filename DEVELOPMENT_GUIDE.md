@@ -17,6 +17,10 @@ Don't generate Claude Code prompts, don't output the patched file for Dane to co
 
 Don't propose multiple options or ask clarifying questions about code. Pick the right fix, deploy it, test it against the live site, and iterate until it works. After it works, give a brief summary. No long postambles.
 
+### Update this guide after every successful change — not at session end.
+
+After every change that ships (code or migration), the very next action is updating `DEVELOPMENT_GUIDE.md` to reflect it. Don't batch guide updates for the end of a session and don't move to the next task until the guide is current. The chain is: edit → commit → push → verify deploy → update guide → commit guide → push guide → next task. Skipping the guide update means the next session starts blind.
+
 
 The single-file `index.html` is large (6500+ lines). To prevent token exhaustion and resume cycles:
 

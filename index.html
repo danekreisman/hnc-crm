@@ -1442,7 +1442,7 @@ Mahalo 🌺</textarea>
         <div class="booking-section-body">
           <div class="form-row"><label>Full name</label>
             <div style="position:relative;">
-              <input type="text" id="na-name" placeholder="Search existing client or enter new name..." style="width:100%;" autocomplete="off">
+              <input type="text" id="na-name" placeholder="Search existing client or enter new name..." style="width:100%;" autocomplete="off" onblur="populatePropertySelector(this.value)">
               <div id="na-name-dropdown" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid var(--border-strong);border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.12);z-index:1000;max-height:220px;overflow-y:auto;margin-top:2px;"></div>
             </div>
           </div>
@@ -5329,7 +5329,7 @@ async function saveNewAppt(){
   var apptAddress=(document.getElementById('na-address')||{}).value||'';
   var apptBeds=isCommercialAppt?'':(document.getElementById('na-beds')||{}).value||'';
   var apptBaths=isCommercialAppt?'':(document.getElementById('na-baths')||{}).value||'';
-  var apptSqft=isCommercialAppt?'':(document.getElementById('na-sqft')||{}).value||'';
+  var apptSqft=(document.getElementById('na-sqft')||{}).value||'';
   var apptCond=isCommercialAppt?'':(document.getElementById('na-cond')||{}).value||'7';
   var apptComHrs=isCommercialAppt?(document.getElementById('na-commercial-hrs')||{}).value||'':'';
   var overrideChk=document.getElementById('na-price-override-chk');

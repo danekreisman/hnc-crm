@@ -134,7 +134,6 @@ export const SCHEMAS = {
 
   cleanerInviteRedeem: {
     token: { required: true, rules: [is.nonEmpty, is.maxLength(64)], message: 'Invite token is required' },
-    email: { required: true, rules: [is.email],                       message: 'A valid email is required' },
   },
 
 };

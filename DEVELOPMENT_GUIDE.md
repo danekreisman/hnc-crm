@@ -122,6 +122,39 @@ if(myEl) myEl.textContent = d.myField || '—';
 ```
 
 
+## Auth
+
+The CRM uses Supabase Auth with two sign-in methods, both granting the same session:
+- **Magic link** via `db.auth.signInWithOtp({ email })` — used by VAs (e.g., Leo). Email delivered through the Resend SMTP setup on the Supabase project.
+- **Google OAuth** via `db.auth.signInWithOAuth({ provider: 'google' })` — primary for admins.
+
+UI gating after sign-in is done client-side in `applyUserRole(email)`:
+- Email in `ADMIN_EMAILS` → no class added, full UI.
+- Otherwise → `hnc-va-user` class added to `<body>`, which hides admin-only sections via CSS rules at the top of `index.html`.
+
+> **Important:** This is UI hiding, not server-side authorization. A non-admin with a valid Supabase session can still call the API directly. Real enforcement is tracked under "VA login & security" in Pending.
+
+### Auth code locations
+| What | File / Line |
+|---|---|
+| Login overlay CSS | `index.html` ~line 408 |
+| Login overlay HTML (Google button + email field) | `index.html` ~line 413 |
+| `ADMIN_EMAILS`, `initAuth`, `applyUserRole`, `hncSendMagicLink`, `hncSignInWithGoogle` | `index.html` ~lines 14550–14582 |
+
+### Adding a new OAuth provider
+1. Enable provider in Supabase Studio: **Authentication → Providers → [Provider]**.
+2. Provide the Client ID and Client Secret from the provider's developer console.
+3. In the provider's developer console, add Supabase's callback URL as an authorized redirect:
+   `https://hehfecnjmgsthxjxlvpz.supabase.co/auth/v1/callback`
+4. In Supabase: **Authentication → URL Configuration → Redirect URLs**, ensure `https://hnc-crm.vercel.app` (and any other deploy domains) are allowlisted.
+5. Add a button in the login overlay HTML (~line 413) and a handler near `hncSignInWithGoogle` (~line 14572) modeled on the existing pattern.
+
+### Symptoms when a provider isn't configured
+Clicking the provider's button surfaces an error in `#hnc-login-msg` like *"Unsupported provider: Provider is not enabled"*. The user stays on the login overlay. If you see this, the fix is on the Supabase config side — not in the frontend code.
+
+---
+
+
 ## The Foundation (DO NOT SKIP THESE)
 
 These four things were built specifically so new features don't corrupt data or fail silently.
@@ -449,4 +482,4 @@ Supabase project's default mailer is rate-limited. Magic links to the VA (Leo) w
 
 ---
 
-*Last updated: April 29, 2026 — switched primary deploy path: Claude clones, edits, and pushes directly from its own environment using a PAT pasted by Dane at session start. Browser-editor workflow demoted to legacy fallback.*
+*Last updated: April 29, 2026 — added Google OAuth as a second sign-in option in the login overlay; new Auth section in the guide. Switched primary deploy path: Claude clones, edits, and pushes directly from its own environment using a PAT pasted by Dane at session start. Browser-editor workflow demoted to legacy fallback.*

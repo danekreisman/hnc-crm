@@ -176,7 +176,12 @@ export default async function handler(req, res) {
   try {
             const Stripe = (await import('stripe')).default;
             const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
-            const { action, customerName, customerEmail, customerId, amount, service, terms, notes, paymentIntentId, emailSubject, emailBody } = req.body;
+            let { action, customerName, customerEmail, customerId, amount, service, terms, notes, paymentIntentId, emailSubject, emailBody } = req.body;
+            // hnc:normalize-action — fix Unknown-action bug. Normalize whitespace, case, and null body.
+            if (!req.body || typeof req.body !== 'object') {
+              return res.status(400).json({ error: 'invalid_body', message: 'Request body must be JSON' });
+            }
+            action = (typeof action === 'string' ? action : '').trim().toLowerCase();
 
           if (action === 'debug_customer') {
                       let cust;
@@ -411,6 +416,33 @@ export default async function handler(req, res) {
     Object.keys(req.body || {}),
     '· action value:', JSON.stringify(action),
     '· content-type:', req.headers['content-type']);
+  // Catch-all logging — fire-and-forget audit row to error_logs so future "Unknown action" hits are debuggable from Supabase.
+  try {
+    const _SB_URL = process.env.SUPABASE_URL;
+    const _SB_SVC = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (_SB_URL && _SB_SVC) {
+      fetch(_SB_URL + '/rest/v1/error_logs', {
+        method: 'POST',
+        headers: {
+          apikey: _SB_SVC,
+          Authorization: 'Bearer ' + _SB_SVC,
+          'Content-Type': 'application/json',
+          Prefer: 'return=minimal'
+        },
+        body: JSON.stringify({
+          source: 'stripe-invoice-unknown-action',
+          message: 'Unknown action: ' + JSON.stringify(action),
+          context: {
+            received_action: action,
+            received_type: typeof action,
+            body_keys: req.body && typeof req.body === 'object' ? Object.keys(req.body) : null,
+            method: req.method,
+            content_type: req.headers && (req.headers['content-type'] || req.headers['Content-Type']) || null
+          }
+        })
+      }).catch(() => {});
+    }
+  } catch (_e) { /* never block the response */ }
   return res.status(400).json({ error: 'Unknown action', received_action: action || null });
   } catch (err) {
             console.error('[stripe-invoice] Error:', err);

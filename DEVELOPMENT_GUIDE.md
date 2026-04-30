@@ -7,11 +7,11 @@ Read it at the start of every session before touching any code.
 
 ## Token-Efficient Editing Rules
 
-### Do the work, don't write Claude Code prompts.
+### Do the work, don't hand it back to Dane.
 
-Dane uses Claude in two modes: chat (Claude in Chrome) and Claude Code (terminal). When Dane asks for a fix, default to executing it yourself via the Chrome extension — fetch index.html via the GitHub blob API, do surgical `str_replace`-style edits, sanity-check syntax, push via the Contents API, then test against the live site after the ~60s Vercel deploy. Loop until it works.
+Claude deploys directly — Dane is not in the deploy loop. When Dane asks for a fix: clone (or reuse) the repo in Claude's own environment, do surgical `str_replace` edits, sanity-check with `node --check`, commit, and push. Vercel auto-deploys from `main` in ~60s. Test against the live site, loop until it works.
 
-Only write a Claude Code prompt when Dane explicitly asks for one (because he wants to run it in his terminal). Don't generate prompts as a substitute for doing the work.
+Don't generate Claude Code prompts, don't output the patched file for Dane to copy, don't tell Dane to run git commands. The only acceptable fallback is if `git push` itself fails (auth, network) — in which case report the failure plainly and don't pretend the deploy happened.
 
 ### One problem, one fix, one deploy, one test — then loop.
 
@@ -33,6 +33,33 @@ The single-file `index.html` is large (6500+ lines). To prevent token exhaustion
 6. **Don't ask Dane clarifying questions about code.** He's not a developer. Use `grep` to find the answer yourself.
 
 7. **Don't propose multiple options.** Pick the right fix and execute it. One diagnosis, one fix, one deploy.
+
+---
+
+## Deployment Workflow
+
+Claude clones, edits, and pushes directly from its own environment. Dane never touches local files or git. Vercel is wired to auto-deploy from `main`.
+
+```bash
+# Once per session (skip if already cloned):
+git clone https://github.com/danekreisman/hnc-crm.git /home/claude/hnc-crm
+
+# Every edit:
+cd /home/claude/hnc-crm
+# ...locate with grep -n, extract with sed, edit with str_replace, verify with node --check...
+git add -A
+git commit -m "<concise message>"
+git push origin main
+```
+
+Wait ~60s after push for Vercel to roll out, then verify against `hnc-crm.vercel.app`.
+
+**Force redeploy** (when Vercel serves stale content):
+```bash
+git commit --allow-empty -m "Force redeploy" && git push origin main
+```
+
+If `git push` fails (auth, network, branch protection), report the exact error to Dane immediately. Do NOT silently fall back to outputting the patched file or asking Dane to push manually — that defeats the whole point of the new workflow. Dane's environment is no longer a dependency.
 
 ---
 
@@ -349,9 +376,9 @@ The handler is set up via a one-shot IIFE near the end of the script. Uses dotte
 
 ---
 
-## Browser-Editor Workflow (sessions without file/git tools)
+## Browser-Editor Workflow (legacy fallback — rarely needed)
 
-When operating purely through Claude in Chrome (no bash/file editing), code edits go through GitHub's web editor. Patterns learned the hard way:
+Only relevant if Claude is operating in an environment without bash/git access (e.g., a pure Claude in Chrome session with no filesystem tools). The default deploy path is now the **Deployment Workflow** section above. Patterns below are kept for the rare fallback case:
 
 ### The fetch → modify → clipboard → paste loop
 1. Fetch raw file from `https://raw.githubusercontent.com/danekreisman/hnc-crm/main/<path>` via `fetch()` in browser JS.
@@ -409,4 +436,4 @@ Supabase project's default mailer is rate-limited. Magic links to the VA (Leo) w
 
 ---
 
-*Last updated: April 28, 2026 — completed the index.html dedup (~1866 lines removed). All earlier session fixes still in place.*
+*Last updated: April 29, 2026 — switched primary deploy path: Claude clones, edits, and pushes directly from its own environment. Browser-editor workflow demoted to legacy fallback.*

@@ -341,6 +341,7 @@ Run through this checklist:
 |---|---|
 | `webhook_events` | Tracks processed webhooks to prevent duplicates |
 | `error_logs` | Central log of all API errors |
+| `cleaner_invites` | One-time tokens for cleaner-portal invite flow (admin-issued, redeemed after Google sign-in) |
 
 ## Supabase Functions Added During Foundation Work
 
@@ -462,6 +463,35 @@ Only relevant if Claude is operating in an environment without bash/git access (
 
 ---
 
+## Cleaner Portal (in progress)
+
+Self-service portal for cleaners to sign in (Google OAuth) and view their own schedule + jobs. Lives at `/cleaner-portal` on the same Vercel deployment.
+
+### Auth model
+1. Admin clicks **Invite Cleaner** on a cleaner's profile in the CRM.
+2. Backend generates a one-time token, stores it in `cleaner_invites` (7-day expiry, single use), sends an SMS to `cleaners.phone` via Quo.
+3. Cleaner taps the link → `/cleaner-portal?invite=<token>`.
+4. Cleaner clicks **Sign in with Google** → Supabase OAuth.
+5. Frontend POSTs `{ token, email }` to `/api/cleaner-portal/redeem-invite`. Server validates the token (exists, not expired, not used), writes the authenticated email to `cleaners.auth_email`, and marks the token used.
+6. Future visits: cleaner clicks **Sign in with Google**. Portal looks up `cleaners.auth_email` (case-insensitive) and grants access if the email matches a cleaner record.
+
+### Why `cleaners.auth_email` is separate from `cleaners.email`
+`cleaners.email` is admin-entered contact info — may be empty, may not be a real login email, may be the cleaner's preferred contact rather than their Google account. `cleaners.auth_email` is the verified OAuth identity used strictly for portal access. Don't conflate them.
+
+### "Random person" defenses
+- No invite token in URL → portal hides the sign-in button and shows "This portal requires an invitation."
+- Token used by the wrong person → admin re-invites; new token rebinds.
+- Direct sign-in with no matching `cleaners.auth_email` → portal signs them out and shows "You're not on our cleaner roster."
+- Token reuse / expired token → redeem endpoint rejects with a clear error.
+
+### Status
+- [x] Migration `supabase/add_cleaner_invites.sql` (commit `edd5a35`) — needs to be run on Supabase
+- [ ] `/api/cleaner-portal/send-invite.js` (admin-gated, generates token + sends SMS)
+- [ ] `/api/cleaner-portal/redeem-invite.js` (validates + binds email)
+- [ ] Invite button + status display on cleaner profile in CRM
+- [ ] `/cleaner-portal.html` page (Google sign-in + redemption UI)
+
+---
 ## Pending / On the Horizon
 
 Outstanding work tracked across sessions. In rough priority order:
@@ -490,4 +520,4 @@ Supabase project's default mailer is rate-limited. Magic links to the VA (Leo) w
 
 ---
 
-*Last updated: April 29, 2026 — added Google OAuth as a second sign-in option in the login overlay; new Auth section in the guide. Switched primary deploy path: Claude clones, edits, and pushes directly from its own environment using a PAT pasted by Dane at session start. Browser-editor workflow demoted to legacy fallback.*
+*Last updated: April 30, 2026 — started Cleaner Portal slice (commit `edd5a35`): migration adds `cleaner_invites` table + `cleaners.auth_email` column. Earlier today: Google OAuth sign-in, sidebar sign-out button, Unknown-client/cleaner repair, property-data persistence fix. Deploy path: Claude pushes directly via PAT; Browser-Editor / Contents-API fallback when Chrome-only.*

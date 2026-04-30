@@ -12,7 +12,7 @@
 
 import { fetchWithTimeout, TIMEOUTS } from '../utils/with-timeout.js';
 import { logError } from '../utils/error-logger.js';
-import { requireAuth } from '../utils/auth-check.js';
+import { requireAdmin } from '../utils/auth-check.js';
 
 const SB_URL = process.env.SUPABASE_URL;
 const SB_SVC = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -20,7 +20,7 @@ const SB_SVC = process.env.SUPABASE_SERVICE_ROLE_KEY;
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'method_not_allowed' });
 
-  const user = await requireAuth(req, res);
+  const user = await requireAdmin(req, res);
   if (!user) return;
 
   const email = (req.body && typeof req.body.email === 'string') ? req.body.email.trim().toLowerCase() : '';

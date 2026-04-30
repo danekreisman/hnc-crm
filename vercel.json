@@ -17,6 +17,10 @@
       "destination": "/portal.html"
     },
     {
+      "source": "/cleaner-portal",
+      "destination": "/cleaner-portal.html"
+    },
+    {
       "source": "/agree",
       "destination": "/agree.html"
     },

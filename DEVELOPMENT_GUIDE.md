@@ -456,6 +456,9 @@ Only relevant if Claude is operating in an environment without bash/git access (
 - **Appointment status values are `paid` (~855), `completed` (~135), `cancelled` (~10)**. `paid` is by far the most common "done" state. Always filter `IN ('completed', 'paid')` when querying for done jobs — never only `status='completed'`.
 - **Some appointments have `total_price = 0`** (data quality issues from imports). Stats include them in counts but they contribute $0 to Lifetime value. Not a bug.
 - **The Chrome MCP JS sandbox blocks output** containing URLs, base64-encoded data, or certain key patterns. When inspecting source code, return char codes or replace bracket-like characters before returning.
+- **Booking form's property dropdown loads via two triggers, not one.** `populatePropertySelector(name)` populates `#na-property-select` with the client's saved properties (from `clients.properties` JSON array) and auto-selects the first. It's called from (1) the autocomplete-suggestion click handler in `na-name`, AND (2) `na-name`'s `onblur`. If you ever wire a third path that fills the name programmatically (drag-and-drop, deep link, etc.), call `populatePropertySelector(name)` from there too — otherwise the user lands in "+ Create New Property" mode and beds/baths/sqft default in instead of carrying over from the saved property.
+- **Properties are stored as a JSON array on `clients.properties`, not a separate `properties` table.** Each entry has `address`, `beds`, `baths`, `sqft`, `notes`, `price`, etc. (often empty strings on imported clients). There is no `public.properties` table — don't try to JOIN one.
+- **Commercial/Janitorial booking field handling in `saveNewAppt` (~line 5330):** beds and baths are intentionally cleared for commercial (`isCommercialAppt?'':...`) since they don't apply, but `apptSqft` is read for ALL service types including commercial — pricing depends on it. Don't reintroduce a commercial guard on sqft.
 
 ---
 

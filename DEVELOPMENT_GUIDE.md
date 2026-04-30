@@ -494,6 +494,26 @@ Self-service portal for cleaners to sign in (Google OAuth) and view their own sc
 - [ ] `/cleaner-portal.html` page (Google sign-in + redemption UI)
 
 ---
+### Frontend pieces (invite button + portal page)
+
+- **`cleaner-portal.html`** (repo root) — public-facing page. Handles three states: signed-out (with or without `?invite=` param), signed-in with invite token (auto-POSTs to `/api/cleaner-portal/redeem-invite` with the bearer token, then strips the param and reloads), and signed-in without invite token (looks up cleaner by `auth_email`, shows portal placeholder or "not on roster" message). `SUPABASE_URL` and `SUPABASE_KEY` are inlined in a `<script>` block, same pattern as `index.html`.
+- **CRM cleaner profile panel** (`index.html` ~line 2089) — adds a "Cleaner Portal" status row plus a "Send portal invite SMS" button immediately above the action grid.
+- **`hncInviteCleaner` + `refreshInviteStatus`** (`index.html` ~line 4498, right after `openCleaner`) — `hncInviteCleaner` POSTs `{cleaner_id}` to `/api/cleaner-portal/send-invite` with the admin's bearer token. `refreshInviteStatus` reads from `cleaners.auth_email` (shows "Activated as X") or the most recent unused/unexpired row in `cleaner_invites` (shows "Invite pending"). `openCleaner` also calls `refreshInviteStatus` so the panel auto-populates.
+- **Pre-flight check** — if `db.from('cleaner_invites').select(...)` returns an error (table missing), the status row shows "(invite table missing — run migration)" rather than failing silently. This is the canary that the migration hasn't been run.
+
+### Migrations to run before invites work
+
+Both files are committed in `supabase/` but Supabase doesn't auto-apply them:
+- `supabase/add_cleaner_invites.sql` — creates `cleaner_invites` table and `cleaners.auth_email` column.
+- `supabase/add_redeem_cleaner_invite_rpc.sql` — defines the atomic `redeem_cleaner_invite()` RPC.
+
+Paste each into the Supabase SQL editor and run. Both are idempotent (`IF NOT EXISTS` / `CREATE OR REPLACE`) so re-running is safe.
+
+### Future: domain consolidation
+
+`hawaiinaturalclean.com` runs on Duda, which can't host the CRM. Long-term unified UX is a CNAME like `portal.hawaiinaturalclean.com → hnc-crm.vercel.app`. The portal page is at the deployment root (`/cleaner-portal`), so the subdomain swap is a DNS-only change, no code edits needed.
+
+
 ## Pending / On the Horizon
 
 Outstanding work tracked across sessions. In rough priority order:
@@ -522,4 +542,4 @@ Supabase project's default mailer is rate-limited. Magic links to the VA (Leo) w
 
 ---
 
-*Last updated: April 30, 2026 — Cleaner Portal slice progress: API side complete (`send-invite` `2e2979d`, `redeem-invite` `91c6ced`, RPC `77d6bdd`). Two migrations pending Supabase run. Frontend portal page + invite button next.*
+*Last updated: April 30, 2026 — Cleaner Portal frontend shipped: cleaner-portal.html public page + invite button on cleaner profile + status row. Migrations still need a manual run on Supabase.*

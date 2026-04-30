@@ -437,6 +437,7 @@ textarea{font-family:inherit;}
       <div class="nav-item" id="nav-logs" onclick="sv('logs',this);loadLogs(_logsCurrentTab||'activity');setTimeout(()=>loadLogs(_logsCurrentTab||'activity'),800)"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg><span>Logs</span></div>
       <div class="nav-section">AI</div>
     <div class="nav-item" onclick="sv('agent',this)" style="color:#553c9a;"><svg class="nav-icon" viewBox="0 0 16 16" fill="none" style="opacity:1;"><circle cx="8" cy="8" r="6" stroke="#553c9a" stroke-width="1.3"/><path d="M5.5 9.5s.8 1.5 2.5 1.5 2.5-1.5 2.5-1.5" stroke="#553c9a" stroke-width="1.2" stroke-linecap="round"/><circle cx="6" cy="7" r="1" fill="#553c9a"/><circle cx="10" cy="7" r="1" fill="#553c9a"/></svg>AI Agent</div>
+    <div id="hnc-user-footer" style="margin-top:auto;padding:12px 16px;border-top:1px solid var(--border);display:none;align-items:center;gap:10px;"><div style="flex:1;min-width:0;"><div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px;font-family:Inter,sans-serif;">Signed in as</div><div id="hnc-user-email" style="font-size:12px;color:var(--text);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-family:Inter,sans-serif;" title=""></div></div><button onclick="hncSignOut()" title="Sign out" style="flex-shrink:0;background:#fff;border:1px solid var(--border);border-radius:6px;padding:6px 9px;cursor:pointer;display:flex;align-items:center;color:var(--text-muted);font-size:11px;font-family:Inter,sans-serif;font-weight:600;" onmouseover="this.style.borderColor='var(--brand-500)';this.style.color='var(--brand-500)';" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text-muted)';"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" style="margin-right:4px;"><path d="M6 14H3.5a1.5 1.5 0 0 1-1.5-1.5v-9A1.5 1.5 0 0 1 3.5 2H6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M11 11l3-3-3-3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M14 8H6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>Sign out</button></div>
   </div>
 
   <div class="main">
@@ -14576,12 +14577,24 @@ const ADMIN_EMAILS = ['dane.kreisman@gmail.com'];
 async function initAuth() {
   const { data: { session } } = await db.auth.getSession();
   if (session) { applyUserRole(session.user.email); document.getElementById('hnc-login-overlay').style.display = 'none'; }
-  else { document.getElementById('hnc-login-overlay').style.display = 'flex'; }
+  else { _setUserFooter(null); document.getElementById('hnc-login-overlay').style.display = 'flex'; }
   db.auth.onAuthStateChange((event, session) => {
     if (session) { applyUserRole(session.user.email); document.getElementById('hnc-login-overlay').style.display = 'none'; if (window.location.hash.includes('access_token')) window.history.replaceState({}, document.title, window.location.pathname); }
   });
 }
-function applyUserRole(email) { if (!ADMIN_EMAILS.map(e=>e.toLowerCase()).includes(email.toLowerCase())) document.body.classList.add('hnc-va-user'); }
+function applyUserRole(email) { if (!ADMIN_EMAILS.map(e=>e.toLowerCase()).includes(email.toLowerCase())) document.body.classList.add('hnc-va-user'); _setUserFooter(email); }
+function _setUserFooter(email){
+  var f=document.getElementById('hnc-user-footer'), e=document.getElementById('hnc-user-email');
+  if(!f||!e)return;
+  if(email){ e.textContent=email; e.title=email; f.style.display='flex'; }
+  else { e.textContent=''; e.title=''; f.style.display='none'; }
+}
+async function hncSignOut(){
+  try { await db.auth.signOut(); } catch(err){ console.warn('signOut error:',err); }
+  // Belt-and-suspenders: clear any cached Supabase session keys before reload
+  try { Object.keys(localStorage).filter(function(k){return k.startsWith('sb-');}).forEach(function(k){localStorage.removeItem(k);}); } catch(err){}
+  location.reload();
+}
 async function hncSendMagicLink() {
   const emailInput = document.getElementById('hnc-login-email'), msgEl = document.getElementById('hnc-login-msg'), btn = document.getElementById('hnc-login-btn');
   const email = emailInput.value.trim();

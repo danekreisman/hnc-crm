@@ -30,31 +30,34 @@ export default async function handler(req, res) {
 
   const t = (TIMEOUTS && TIMEOUTS.medium) || 12000;
 
-  // 1) Look up the user in auth.users via the GoTrue admin API.
-  //    GET /auth/v1/admin/users?filter=email
-  let lookupRes;
-  try {
-    lookupRes = await fetchWithTimeout(
-      `${SB_URL}/auth/v1/admin/users?filter=${encodeURIComponent('email.eq.' + email)}`,
-      { headers: { apikey: SB_SVC, Authorization: 'Bearer ' + SB_SVC } },
-      t
-    );
-  } catch (e) {
-    await logError('admin/revoke-user', 'lookup_threw', { err: String(e), email });
-    return res.status(500).json({ error: 'lookup_threw', detail: String(e) });
+  // 1) Page through auth.users and match locally — GoTrue's filter param is unreliable.
+  let target = null;
+  let totalScanned = 0;
+  for (let page = 1; page <= 50 && !target; page++) {
+    let pageRes;
+    try {
+      pageRes = await fetchWithTimeout(
+        `${SB_URL}/auth/v1/admin/users?page=${page}&per_page=200`,
+        { headers: { apikey: SB_SVC, Authorization: 'Bearer ' + SB_SVC } },
+        t
+      );
+    } catch (e) {
+      await logError('admin/revoke-user', 'lookup_threw', { err: String(e), email, page });
+      return res.status(500).json({ error: 'lookup_threw', detail: String(e) });
+    }
+    if (!pageRes.ok) {
+      const txt = await pageRes.text().catch(() => '');
+      await logError('admin/revoke-user', 'lookup_failed', { status: pageRes.status, body: txt.slice(0, 300), email, page });
+      return res.status(500).json({ error: 'lookup_failed', status: pageRes.status, page });
+    }
+    const body = await pageRes.json();
+    const users = Array.isArray(body) ? body : (body.users || []);
+    if (users.length === 0) break;
+    totalScanned += users.length;
+    target = users.find(u => (u.email || '').toLowerCase() === email);
   }
-  if (!lookupRes.ok) {
-    const txt = await lookupRes.text().catch(() => '');
-    await logError('admin/revoke-user', 'lookup_failed', { status: lookupRes.status, body: txt.slice(0, 300), email });
-    return res.status(500).json({ error: 'lookup_failed', status: lookupRes.status });
-  }
-  const lookupBody = await lookupRes.json();
-  // GoTrue admin returns either { users: [...] } or [...] depending on filter
-  const users = Array.isArray(lookupBody) ? lookupBody : (lookupBody.users || []);
-  // Defensive: GoTrue's filter param can be flaky — verify email match locally
-  const target = users.find(u => (u.email || '').toLowerCase() === email);
   if (!target) {
-    return res.status(404).json({ error: 'user_not_found', email, totalReturned: users.length });
+    return res.status(404).json({ error: 'user_not_found', email, totalScanned });
   }
   const userId = target.id;
 

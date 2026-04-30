@@ -128,6 +128,15 @@ export const SCHEMAS = {
     policiesAgreed: { required: true,  rules: [(v) => v === true],                        message: 'You must agree to all policies to complete your booking' },
   },
 
+  cleanerInvite: {
+    cleaner_id: { required: true, rules: [is.uuid], message: 'cleaner_id must be a valid UUID' },
+  },
+
+  cleanerInviteRedeem: {
+    token: { required: true, rules: [is.nonEmpty, is.maxLength(64)], message: 'Invite token is required' },
+    email: { required: true, rules: [is.email],                       message: 'A valid email is required' },
+  },
+
 };
 
 /**

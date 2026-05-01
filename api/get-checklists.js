@@ -89,7 +89,7 @@ const DEFAULTS = {
     {
       id: 'moveout',
       label: 'Move-out Cleaning',
-      intro: 'Designed to meet landlord and property manager standards. Includes everything in Deep Cleaning, plus:',
+      intro: 'Our most thorough service, designed to meet landlord and property manager move-out standards. We deep-clean every standard surface — counters, floors, appliances inside and out, fixtures, baseboards — plus the move-out specifics below.',
       required: [
         'All personal possessions must be removed from the property — including garage, lanai, storage closets, and outdoor areas. The unit must be completely empty.',
         'All trash and debris removed from the premises before our arrival (we are not a junk-haul service)',

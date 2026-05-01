@@ -130,8 +130,14 @@ function renderAll(){
     + '</div></div>';
 
   if (CHECKLISTS && CHECKLISTS.services && CHECKLISTS.services.length) {
-    var visibleServices = SVC_FILTER.length
-      ? CHECKLISTS.services.filter(function(s){ return SVC_FILTER.indexOf(s.id) !== -1; })
+    // Compute effective filter: deep auto-pairs with regular (deep inherits from regular)
+    var effectiveFilter = SVC_FILTER.slice();
+    if (effectiveFilter.indexOf('deep') !== -1 && effectiveFilter.indexOf('regular') === -1) {
+      effectiveFilter.unshift('regular');
+    }
+
+    var visibleServices = effectiveFilter.length
+      ? CHECKLISTS.services.filter(function(s){ return effectiveFilter.indexOf(s.id) !== -1; })
       : CHECKLISTS.services;
 
     if (visibleServices.length) {

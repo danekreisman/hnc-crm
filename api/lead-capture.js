@@ -212,8 +212,11 @@ export default async function handler(req, res) {
       console.log('[lead-capture] janitorial SMS sent:', smsRes.status);
     } catch(err) { console.error('[lead-capture] janitorial SMS failed:', err.message); }
 
-    // Mark quote_sent_at so we know something was sent
-    await db.from('leads').update({ quote_sent_at: new Date().toISOString() }).eq('id', leadId);
+    // Mark quote_sent_at so we know something was sent + advance stage to Quoted
+    await db.from('leads').update({
+      quote_sent_at: new Date().toISOString(),
+      stage: 'Quoted'
+    }).eq('id', leadId);
 
     return res.status(200).json({ success: true, leadId });
   }
@@ -298,7 +301,7 @@ export default async function handler(req, res) {
       console.log('[lead-capture] SMS sent:', smsRes.status);
     } catch(err) { console.error('[lead-capture] send-sms failed:', err.message); }
 
-    const quoteUpdate = { quote_sent_at: new Date().toISOString(), quote_data: quoteResult };
+    const quoteUpdate = { quote_sent_at: new Date().toISOString(), quote_data: quoteResult, stage: 'Quoted' };
     if (!isCustom && quoteResult.total != null) quoteUpdate.quote_total = quoteResult.total;
     const { error: updateErr } = await db.from('leads').update(quoteUpdate).eq('id', leadId);
     if (updateErr) console.error('[lead-capture] update quote fields error:', JSON.stringify(updateErr));

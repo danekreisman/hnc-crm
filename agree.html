@@ -115,6 +115,32 @@ if(!CLIENT_ID){
   ]).then(function(results){
     POLICIES = (results[0] && results[0].policies) || [];
     CHECKLISTS = results[1] || {};
+
+    // If move-out is filtered, inject the move-out required items as additional
+    // policy checkboxes so customer must acknowledge each one before agreeing.
+    if (SVC_FILTER.indexOf('moveout') !== -1 && CHECKLISTS.services) {
+      var moveout = CHECKLISTS.services.filter(function(s){return s.id==='moveout';})[0];
+      if (moveout && moveout.required && moveout.required.length) {
+        var MO_TITLES = [
+          'Property completely empty',
+          'Trash and debris removed',
+          'Fridge and freezer defrosted',
+          'Utilities on during service',
+          'Oven and stovetop operational',
+          'Pest issues disclosed'
+        ];
+        var moPolicies = moveout.required.map(function(item, idx){
+          return {
+            id: 'mo' + (idx+1),
+            title: MO_TITLES[idx] || 'Move-out requirement',
+            detail: item
+          };
+        });
+        var lastPolicy = POLICIES[POLICIES.length - 1];
+        POLICIES = POLICIES.slice(0, -1).concat(moPolicies).concat([lastPolicy]);
+      }
+    }
+
     renderAll();
   }).catch(function(){
     $('app').innerHTML='<div class="card"><div class="card-body"><div class="error-banner">Unable to load. Please try again or contact us at (808) 468-5356.</div></div></div>';
@@ -186,7 +212,10 @@ function renderService(svc, alwaysOpen){
   var inner = '';
   if (svc.intro) inner += '<div class="service-intro">'+esc(svc.intro)+'</div>';
 
-  if (svc.required && svc.required.length) {
+  // Skip the required block here when moveout is in the URL filter — its items
+  // are surfaced as separate policy checkboxes below for stronger acknowledgement.
+  var requiredAsPolicies = (svc.id === 'moveout' && SVC_FILTER.indexOf('moveout') !== -1);
+  if (svc.required && svc.required.length && !requiredAsPolicies) {
     inner += '<div class="required-block">'
       + '<div class="required-heading">Required before we arrive</div>'
       + '<ul class="required-list">'

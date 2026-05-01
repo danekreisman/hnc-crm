@@ -73,7 +73,45 @@ body{background:linear-gradient(160deg,#eaf7fb 0%,#f7fbfc 40%,#eaf7fb 100%)}
 .policy-item.checked{border-color:var(--blue);background:var(--blue-light)}
 .policy-item input[type=checkbox]{width:18px;height:18px;accent-color:var(--blue);flex-shrink:0;margin-top:2px;cursor:pointer}
 .pi-title{font-size:13px;font-weight:600;color:var(--text);margin-bottom:2px}
-.pi-detail{font-size:12px;color:var(--muted);line-height:1.5}
+.pi-detail{font-size:12px;color:var(--muted);line-height:1.5;white-space:pre-line}
+
+/* Service checklist accordion */
+.checklist-section{margin-bottom:22px}
+.checklist-section-head{font-family:'Playfair Display',serif;font-size:18px;font-weight:700;margin-bottom:6px;color:var(--text)}
+.checklist-section-sub{font-size:13px;color:var(--muted);margin-bottom:14px;line-height:1.55}
+.service-row{border:1.5px solid var(--border);border-radius:10px;margin-bottom:8px;overflow:hidden;background:#fff;transition:border-color .2s}
+.service-row.open{border-color:var(--blue-border)}
+.service-toggle{width:100%;background:none;border:none;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;font-family:inherit;font-size:14px;font-weight:600;color:var(--text);cursor:pointer;text-align:left;transition:background .2s}
+.service-toggle:hover{background:var(--blue-light)}
+.service-row.open .service-toggle{background:var(--blue-light);border-bottom:1px solid var(--border)}
+.svc-label{display:flex;align-items:center;gap:10px}
+.svc-emoji{font-size:18px}
+.caret{color:var(--blue);font-size:13px;transition:transform .25s ease;display:inline-block}
+.service-row.open .caret{transform:rotate(180deg)}
+.service-detail{display:none;padding:16px 18px 18px}
+.service-row.open .service-detail{display:block}
+.service-intro{font-size:13px;color:var(--muted);font-style:italic;margin-bottom:14px;padding-bottom:12px;border-bottom:1px dashed var(--border)}
+.section-heading{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--blue-dark);margin:14px 0 6px}
+.section-heading:first-of-type{margin-top:0}
+.checklist-items{list-style:none;padding:0}
+.checklist-items li{padding:5px 0 5px 24px;position:relative;font-size:13px;color:var(--text);line-height:1.55}
+.checklist-items li::before{content:'';position:absolute;left:6px;top:10px;width:6px;height:10px;border:solid var(--blue);border-width:0 2px 2px 0;transform:rotate(45deg)}
+.service-footnote{margin-top:14px;padding:10px 12px;background:#fff8e6;border:1px solid #f4d35e;border-radius:8px;font-size:12px;color:#7a5c00;line-height:1.5}
+
+/* Not-included block */
+.not-included-block{margin-top:16px;padding:12px 14px;background:#fafafa;border:1px dashed #d0d6db;border-radius:8px}
+.not-included-heading{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin-bottom:8px}
+.not-included-list{list-style:none;padding:0}
+.not-included-list li{padding:3px 0 3px 22px;position:relative;font-size:12.5px;color:var(--muted);line-height:1.5}
+.not-included-list li::before{content:'\00d7';position:absolute;left:6px;top:1px;color:#b91c1c;font-weight:700;font-size:14px}
+
+/* Before-we-arrive prep list */
+.prep-block{margin-bottom:22px;padding:16px 18px;background:#fff;border:1px solid var(--border);border-radius:10px}
+.prep-heading{font-family:'Playfair Display',serif;font-size:16px;font-weight:700;margin-bottom:4px;color:var(--text)}
+.prep-sub{font-size:12px;color:var(--muted);margin-bottom:10px}
+.prep-list{list-style:none;padding:0}
+.prep-list li{padding:6px 0 6px 26px;position:relative;font-size:13px;color:var(--text);line-height:1.55}
+.prep-list li::before{content:'';position:absolute;left:0;top:8px;width:13px;height:13px;border:1.5px solid var(--blue);border-radius:3px}
 
 /* Calendar */
 .cal-nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
@@ -161,6 +199,21 @@ var RUSH_FEE = 0;
 var ALL_SLOTS = ['8:00 AM','9:00 AM','10:00 AM','11:00 AM','12:00 PM','1:00 PM','2:00 PM','3:00 PM','4:00 PM'];
 var TAX_RATE  = 0.04712;
 
+var SERVICE_EMOJI = { regular:'\uD83E\uDDFA', deep:'\uD83E\uDDFC', moveout:'\uD83D\uDCE6', airbnb:'\uD83C\uDFDD\uFE0F' };
+var POLICIES = [];
+var CHECKLISTS = null;
+
+// Map LEAD.service string to checklist id ('Move-out Cleaning' -> 'moveout', etc)
+function serviceLabelToId(label){
+  if (!label) return null;
+  var L = String(label).toLowerCase();
+  if (L.indexOf('move') !== -1) return 'moveout';
+  if (L.indexOf('deep') !== -1) return 'deep';
+  if (L.indexOf('airbnb') !== -1 || L.indexOf('turnover') !== -1) return 'airbnb';
+  if (L.indexOf('regular') !== -1) return 'regular';
+  return null;
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────
 function $(id){ return document.getElementById(id); }
 function fmt(n){ return '$' + Number(n).toFixed(2); }
@@ -182,10 +235,16 @@ if(!TOKEN){
 
 async function loadLead(){
   try {
-    var r = await fetch('/api/lead-book?token='+encodeURIComponent(TOKEN));
-    var j = await r.json();
-    if(!r.ok) throw new Error(j.error || 'Invalid link');
-    LEAD = j;
+    var results = await Promise.all([
+      fetch('/api/lead-book?token='+encodeURIComponent(TOKEN)).then(function(r){return r.json().then(function(j){return {ok:r.ok, body:j};});}),
+      fetch('/api/get-policies').then(function(r){return r.json();}).catch(function(){return {policies:[]};}),
+      fetch('/api/get-checklists').then(function(r){return r.json();}).catch(function(){return {};})
+    ]);
+    var leadResp = results[0];
+    if(!leadResp.ok) throw new Error(leadResp.body.error || 'Invalid link');
+    LEAD = leadResp.body;
+    POLICIES = (results[1] && results[1].policies) || [];
+    CHECKLISTS = results[2] || {};
     renderStep1();
   } catch(e){
     $('app').innerHTML='<div class="card"><div class="card-body"><div class="error-banner">'+e.message+'</div><p style="text-align:center;color:var(--muted);font-size:13px;margin-top:14px">Questions? Call or text <strong>(808) 468-5356</strong></p></div></div>';
@@ -238,24 +297,99 @@ function renderStep1(){
 function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c];}); }
 
 // ─────────────────────────────────────────────────────────────────────────
-// STEP 2 — Policies
+// STEP 2 — Checklist + Before we arrive + Policies
 // ─────────────────────────────────────────────────────────────────────────
-var POLICIES = [
-  { id:'p1', title:'Cancellation policy',
-    detail:'Please provide at least 24 hours notice to cancel or reschedule. Late cancellations may incur a fee.' },
-  { id:'p2', title:'Home preparation',
-    detail:'Please tidy clutter from surfaces, do dishes or put them away, and secure any pets before our team arrives. This helps us focus on deep cleaning.' },
-  { id:'p3', title:'Property access',
-    detail:'Please ensure we have access to your property at the scheduled time. You will be asked to provide entry instructions when booking.' },
-  { id:'p4', title:'Payment terms',
-    detail:'Payment is due on the day of service. We accept ACH bank transfer (free) and credit/debit card (3% processing fee).' },
-  { id:'p5', title:'I agree to the terms of service',
-    detail:'By proceeding I authorise Hawaii Natural Clean to perform cleaning services as described and agree to the policies above.' }
-];
+
+// (POLICIES + CHECKLISTS loaded in loadLead). Move-out requirements get
+// injected as one bulleted policy when the booked service is move-out.
+function getStep2Policies(){
+  var basePolicies = POLICIES.slice();
+  var svcId = serviceLabelToId(LEAD && LEAD.service);
+  if (svcId === 'moveout' && CHECKLISTS && CHECKLISTS.services) {
+    var moveout = CHECKLISTS.services.filter(function(s){return s.id==='moveout';})[0];
+    if (moveout && moveout.required && moveout.required.length) {
+      var moDetail = 'Before we arrive, the following must be done. If conditions on arrival do not meet these, we may need to reschedule and a trip fee will apply:\n\n• ' + moveout.required.join('\n• ');
+      var moPolicy = {
+        id: 'mo_req',
+        title: 'Move-out preparation requirements',
+        detail: moDetail
+      };
+      var lastPolicy = basePolicies[basePolicies.length - 1];
+      basePolicies = basePolicies.slice(0, -1).concat([moPolicy]).concat([lastPolicy]);
+    }
+  }
+  return basePolicies;
+}
+
+function renderChecklistService(svc){
+  var emoji = SERVICE_EMOJI[svc.id] || '\u2728';
+  var inner = '';
+  if (svc.intro) inner += '<div class="service-intro">'+esc(svc.intro)+'</div>';
+
+  // Skip required block — those become policy checkboxes for moveout
+  inner += (svc.sections || []).map(function(sec){
+    return '<div class="section-heading">'+esc(sec.heading)+'</div>'
+      + '<ul class="checklist-items">'
+      + (sec.items || []).map(function(it){return '<li>'+esc(it)+'</li>';}).join('')
+      + '</ul>';
+  }).join('');
+
+  if (svc.notIncluded && svc.notIncluded.length) {
+    inner += '<div class="not-included-block">'
+      + '<div class="not-included-heading">Not included</div>'
+      + '<ul class="not-included-list">'
+      + svc.notIncluded.map(function(it){return '<li>'+esc(it)+'</li>';}).join('')
+      + '</ul></div>';
+  }
+  if (svc.footnote) inner += '<div class="service-footnote">'+esc(svc.footnote)+'</div>';
+
+  return '<div class="service-row" id="svc-row-'+svc.id+'">'
+    + '<button class="service-toggle" type="button" onclick="toggleService(\''+svc.id+'\')">'
+      + '<span class="svc-label"><span class="svc-emoji">'+emoji+'</span><span>'+esc(svc.label)+'</span></span>'
+      + '<span class="caret">&#x25BE;</span>'
+    + '</button>'
+    + '<div class="service-detail">'+inner+'</div>'
+    + '</div>';
+}
+
+function toggleService(id){
+  var row = $('svc-row-'+id);
+  if (row) row.classList.toggle('open');
+}
 
 function renderStep2(){
   setStep(2);
-  var items = POLICIES.map(function(p){
+  var svcId = serviceLabelToId(LEAD && LEAD.service);
+
+  // ---- Checklist (auto-pair Deep+Regular) ----
+  var checklistHtml = '';
+  if (CHECKLISTS && CHECKLISTS.services && svcId) {
+    var visibleIds = [svcId];
+    if (svcId === 'deep' && visibleIds.indexOf('regular') === -1) visibleIds.unshift('regular');
+    var visibleServices = CHECKLISTS.services.filter(function(s){ return visibleIds.indexOf(s.id) !== -1; });
+    if (visibleServices.length) {
+      checklistHtml = '<div class="checklist-section">'
+        + '<div class="checklist-section-head">What\'s included \u2728</div>'
+        + '<div class="checklist-section-sub">Tap a service to see the full checklist.</div>'
+        + visibleServices.map(renderChecklistService).join('')
+        + '</div>';
+    }
+  }
+
+  // ---- Before we arrive (hide if moveout-only since moveout has its own requirements) ----
+  var prepHtml = '';
+  if (CHECKLISTS && CHECKLISTS.beforeArrival && CHECKLISTS.beforeArrival.length && svcId !== 'moveout') {
+    prepHtml = '<div class="prep-block">'
+      + '<div class="prep-heading">Before we arrive \uD83C\uDFDD\uFE0F</div>'
+      + '<div class="prep-sub">A few quick things that help us do our best work for you.</div>'
+      + '<ul class="prep-list">'
+      + CHECKLISTS.beforeArrival.map(function(it){return '<li>'+esc(it)+'</li>';}).join('')
+      + '</ul></div>';
+  }
+
+  // ---- Policies (with moveout req injection) ----
+  var step2Policies = getStep2Policies();
+  var items = step2Policies.map(function(p){
     return '<div class="policy-item" id="pi-'+p.id+'" onclick="togglePolicy(\''+p.id+'\')">'
       +'<input type="checkbox" id="cb-'+p.id+'" onclick="event.stopPropagation();togglePolicy(\''+p.id+'\')">'
       +'<div><div class="pi-title">'+esc(p.title)+'</div><div class="pi-detail">'+esc(p.detail)+'</div></div>'
@@ -263,10 +397,12 @@ function renderStep2(){
   }).join('');
 
   $('app').innerHTML = '<div class="card">'
-    +'<div class="card-head"><h2>Policies &amp; checklist</h2>'
-    +'<p>Please read and agree to all items below to continue with your booking.</p></div>'
+    +'<div class="card-head"><h2>Review &amp; agree</h2>'
+    +'<p>Here\'s what\'s included in your service and the policies that apply. Please review and check each policy below to continue.</p></div>'
     +'<div class="card-body">'
-    +items
+    + checklistHtml
+    + prepHtml
+    + items
     +'<button class="btn-primary" id="policy-btn" onclick="confirmPolicies()" disabled>Agree &amp; Continue &rarr;</button>'
     +'<button class="btn-ghost" onclick="renderStep1()">&larr; Back</button>'
     +'</div></div>';
@@ -278,13 +414,15 @@ function togglePolicy(id){
   if(!cb) return;
   cb.checked = !cb.checked;
   item.className = 'policy-item'+(cb.checked?' checked':'');
-  var allOk = POLICIES.every(function(p){ var c=$('cb-'+p.id); return c&&c.checked; });
+  var step2Policies = getStep2Policies();
+  var allOk = step2Policies.every(function(p){ var c=$('cb-'+p.id); return c&&c.checked; });
   var btn = $('policy-btn');
   if(btn){ btn.disabled=!allOk; }
 }
 
 function confirmPolicies(){
-  var allOk = POLICIES.every(function(p){ var c=$('cb-'+p.id); return c&&c.checked; });
+  var step2Policies = getStep2Policies();
+  var allOk = step2Policies.every(function(p){ var c=$('cb-'+p.id); return c&&c.checked; });
   if(!allOk){ alert('Please agree to all items to continue.'); return; }
   renderStep3();
 }

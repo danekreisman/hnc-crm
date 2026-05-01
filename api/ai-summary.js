@@ -82,6 +82,10 @@ export default async function handler(req, res) {
     if (!finalPrompt) return res.status(400).json({ success: false, error: 'Could not build prompt' });
 
     const useSonnet = !!(mode && data);
+    // Structured Sonnet calls process a lot of context (up to 100 SMS + 10 calls
+    // worth of OpenPhone history) and can take 20-30s for long-time customers.
+    // The 15s default in TIMEOUTS.ANTHROPIC is too tight for this workload.
+    const aiTimeout = useSonnet ? 45000 : TIMEOUTS.ANTHROPIC;
     const aiRes = await fetchWithTimeout('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
@@ -94,7 +98,7 @@ export default async function handler(req, res) {
         max_tokens: useSonnet ? 1000 : 300,
         messages: [{ role: 'user', content: finalPrompt }],
       }),
-    }, TIMEOUTS.ANTHROPIC);
+    }, aiTimeout);
 
     const aiData = await aiRes.json();
     const summary = aiData.content && aiData.content[0] && aiData.content[0].text;

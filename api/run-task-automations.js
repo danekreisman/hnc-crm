@@ -92,7 +92,7 @@ async function generateCallBrief(db, lead, purpose) {
         max_tokens: 1000,
         messages: [{ role: 'user', content: prompt }],
       }),
-    }, TIMEOUTS.ANTHROPIC);
+    }, 45000); // 45s — Sonnet on heavy OpenPhone history can exceed the 15s default
 
     const data = await resp.json();
     return data.content?.[0]?.text || null;

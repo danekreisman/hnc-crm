@@ -47,10 +47,13 @@ export default async function handler(req, res) {
       const phoneToFetch = phone || clientPhone;
       if (phoneToFetch && process.env.QUO_API_KEY) {
         try {
+          // User-triggered endpoint — keep history bounded so the summary lands
+          // in a couple seconds. The VA pre-call brief (run-task-automations.js)
+          // pulls the full 100/10 since it's a background cron.
           history = await getOpenPhoneHistory(phoneToFetch, {
             apiKey: process.env.QUO_API_KEY,
-            maxSms: 100,
-            maxCalls: 10,
+            maxSms: 30,
+            maxCalls: 5,
           });
           if (history && history.length) usedHistory = true;
         } catch (histErr) {
@@ -81,11 +84,13 @@ export default async function handler(req, res) {
 
     if (!finalPrompt) return res.status(400).json({ success: false, error: 'Could not build prompt' });
 
-    const useSonnet = !!(mode && data);
-    // Structured Sonnet calls process a lot of context (up to 100 SMS + 10 calls
-    // worth of OpenPhone history) and can take 20-30s for long-time customers.
-    // The 15s default in TIMEOUTS.ANTHROPIC is too tight for this workload.
-    const aiTimeout = useSonnet ? 45000 : TIMEOUTS.ANTHROPIC;
+    const useStructured = !!(mode && data);
+    // User-triggered endpoint runs Haiku for speed (target: 2-5s land time even
+    // with 30 SMS + 5 calls of OpenPhone history). Sonnet 4.6 was technically
+    // capable but consistently 15-25s for long-time customers — too slow for a
+    // button click. The VA pre-call brief in run-task-automations.js still uses
+    // Sonnet because it's a background cron and quality > latency there.
+    const aiTimeout = useStructured ? 30000 : TIMEOUTS.ANTHROPIC;
     const aiRes = await fetchWithTimeout('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
@@ -94,8 +99,8 @@ export default async function handler(req, res) {
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: useSonnet ? 'claude-sonnet-4-6' : 'claude-haiku-4-5-20251001',
-        max_tokens: useSonnet ? 1000 : 300,
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: useStructured ? 1000 : 300,
         messages: [{ role: 'user', content: finalPrompt }],
       }),
     }, aiTimeout);
@@ -109,7 +114,7 @@ export default async function handler(req, res) {
       summary,
       generated_at: new Date().toISOString(),
       used_openphone_history: usedHistory,
-      model: useSonnet ? 'claude-sonnet-4-6' : 'claude-haiku-4-5-20251001',
+      model: 'claude-haiku-4-5-20251001',
     });
   } catch (err) {
     await logError('ai-summary', err, { leadId, mode });

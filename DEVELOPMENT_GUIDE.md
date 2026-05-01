@@ -471,6 +471,7 @@ Single source of truth for what landed in the most recent sessions. Most recent 
 
 | Commit | What |
 |---|---|
+| (this session, 2026-04-30) | **Waiver overhaul (commits `89fe28b`–`1dfe763`)**: condition-tier picker on `lead-form.html` (5 photo cards, real HNC job photos for 4 tiers, hover-zoom desktop-only); `agree.html` rewritten with hero/checklist/before-arrival/policies architecture and `?svc=` URL filtering; `book.html` step 2 ported to mirror `agree.html` (loads from `/api/get-policies` + `/api/get-checklists`, infers service from `LEAD.service`); new p5 policy "Quote accuracy & on-arrival adjustment" (legal hook for raising prices on under-described moveouts); move-out 6-item required block surfaces as ONE consolidated bulleted policy checkbox titled "Move-out preparation requirements"; all service cards collapsed by default; new `/api/get-checklists` endpoint with full DEFAULTS fallback; `supabase/add_service_checklists.sql` migration; service-aware waiver SMS routing in `api/lead-book.js` (uses `body.service`) and `api/run-policy-reminders.js` (uses upcoming appointment's `service` from join). |
 | (this session, 2026-04-30) | `migrations/2026-04-30-backfill-cleaner-service-rates.sql` — backfill `rate_regular_cents` / `rate_deep_cents` / `rate_moveout_cents` on cleaners that pre-date these columns. Formula: regular = `hourly_rate`, deep = `hourly_rate + 5`, moveout = `hourly_rate + 5`. Run once in Supabase SQL editor. Also updated DEVELOPMENT_GUIDE Known Gotchas with a note explaining the per-service rate system already exists in `calcCleanerPay()` / `serviceRateKey()` and not to reinvent it. |
 | (this session) | `DEVELOPMENT_GUIDE.md` — document activity log coverage, client profile modal, calendar→client link, browser-editor workflow, new gotchas |
 | `53df3d6` | `index.html` — wire up client profile Stats (Lifetime, Total jobs, Avg, Monthly) from appointments |
@@ -675,6 +676,33 @@ Always run a round-trip sanity check (`decode(encode(str)) === str`) before push
 
 Outstanding work tracked across sessions. In rough priority order:
 
+### Waiver service-routing — needs live end-to-end test (pick up here)
+The full waiver-routing plumbing shipped this session but Dane was too tired to test before turning automations on. Before flipping the kill-switch, run these checks in order:
+
+1. **Confirm DB migration ran.** In Supabase SQL editor:
+   ```sql
+   SELECT key, jsonb_pretty(value) FROM settings WHERE key IN ('policy_items', 'service_checklists');
+   ```
+   `policy_items` should have 6 items including `p5` "Quote accuracy & on-arrival adjustment". `service_checklists` should have 4 services (regular/deep/moveout/airbnb) with the move-out intro starting "Our most thorough service, designed to meet landlord and property manager move-out standards…" If either is wrong/missing, run `supabase/add_service_checklists.sql` in the SQL editor.
+
+2. **Test agree.html visually on mobile** — 4 URLs using Dane's client UUID, no token needed:
+   - `https://hnc-crm.vercel.app/agree.html?c=b0e79508-7583-49af-a15a-2b854e72e8b2&svc=moveout`
+   - `https://hnc-crm.vercel.app/agree.html?c=b0e79508-7583-49af-a15a-2b854e72e8b2&svc=deep` (auto-pairs with Regular)
+   - `https://hnc-crm.vercel.app/agree.html?c=b0e79508-7583-49af-a15a-2b854e72e8b2&svc=regular`
+   - `https://hnc-crm.vercel.app/agree.html?c=b0e79508-7583-49af-a15a-2b854e72e8b2&svc=airbnb`
+   Expected: cards collapsed by default, move-out shows the consolidated "Move-out preparation requirements" policy checkbox, "Before we arrive" prep card hidden for moveout-only.
+
+3. **Test book.html step 2** — needs a real booking token. Get tokens from existing leads:
+   ```sql
+   SELECT name, service, booking_token, created_at
+   FROM leads WHERE booking_token IS NOT NULL ORDER BY created_at DESC LIMIT 20;
+   ```
+   Visit `https://hnc-crm.vercel.app/book.html?token=THE_TOKEN`. If no token exists for a service type, submit a fresh test lead through `lead-form.html` for that service. Step 2 should auto-show the right service's checklist + correct policies based on `LEAD.service`.
+
+4. **Test the full SMS pipeline.** Submit a test lead through `lead-form.html` (with Dane's own phone), book through book.html, verify the policy SMS arrives with the right `?svc=` in the link. Repeat for at least move-out + one other service. Assumes `policy_first_booking_sms_enabled` automation is ON.
+
+5. **Pristine tier photo on lead-form.html** is still a Pexels CDN URL (4800179). Swap when Dane has a real after-photo from a deep clean.
+
 ### Resend SMTP for Supabase Auth (in progress)
 Supabase project's default mailer is rate-limited. Magic links to the VA (Leo) weren't being delivered. Fix in progress: configure custom SMTP in Supabase project Auth settings using Resend (host: `smtp.resend.com`, port: 465, username: `resend`, password: Resend API key, sender: `noreply@hawaiinaturalclean.com`). All fields filled in the SMTP config form except password — Dane to paste the Resend API key himself.
 
@@ -707,4 +735,4 @@ Original notes preserved below for context.
 
 ---
 
-*Last updated: April 30, 2026 — Cleaner Portal frontend shipped: cleaner-portal.html public page + invite button on cleaner profile + status row. Migrations still need a manual run on Supabase.*
+*Last updated: April 30, 2026 — Waiver overhaul complete: condition-tier picker, agree.html rewrite, book.html step 2 ported, move-out requirements consolidated into one policy, service-aware SMS routing in lead-book.js + run-policy-reminders.js. Pending: end-to-end test before flipping automations on (see top of Pending section for checklist).*

@@ -148,11 +148,17 @@ function renderAll(){
   }
 
   if (CHECKLISTS && CHECKLISTS.beforeArrival && CHECKLISTS.beforeArrival.length) {
-    html += '<div class="card">'
-      + '<div class="card-head"><h2>Before we arrive \uD83C\uDFDD\uFE0F</h2><p>A few quick things that help us do our best work for you.</p></div>'
-      + '<div class="card-body"><ul class="prep-list">'
-      + CHECKLISTS.beforeArrival.map(function(item){return '<li>'+esc(item)+'</li>';}).join('')
-      + '</ul></div></div>';
+    var visibleIds = SVC_FILTER.length
+      ? SVC_FILTER
+      : ((CHECKLISTS.services || []).map(function(s){return s.id;}));
+    var moveoutOnly = visibleIds.length === 1 && visibleIds[0] === 'moveout';
+    if (!moveoutOnly) {
+      html += '<div class="card">'
+        + '<div class="card-head"><h2>Before we arrive \uD83C\uDFDD\uFE0F</h2><p>A few quick things that help us do our best work for you.</p></div>'
+        + '<div class="card-body"><ul class="prep-list">'
+        + CHECKLISTS.beforeArrival.map(function(item){return '<li>'+esc(item)+'</li>';}).join('')
+        + '</ul></div></div>';
+    }
   }
 
   html += '<div class="card">'

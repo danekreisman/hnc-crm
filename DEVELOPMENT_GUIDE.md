@@ -696,27 +696,30 @@ Always run a round-trip sanity check (`decode(encode(str)) === str`) before push
 
 Outstanding work tracked across sessions. In rough priority order:
 
-### Lead automations rollout — flip-the-switch checklist (this session)
-Audit complete. Three bugs fixed (see `94aef6d` in commits log). Before flipping any toggles in the Automations view, confirm:
+### Lead form public launch (this session)
 
-1. **Owner contact is right.** `OWNER_PHONE = '+18084685356'` (business line), `OWNER_EMAIL = 'dane@hawaiinaturalclean.net'` — both hardcoded in `api/lead-capture.js`.
-2. **Toggles to flip ON in the Automations view** for the rollout:
-   - `new_lead_owner_sms_enabled` — SMS to Dane on every new lead
-   - `new_lead_owner_email_enabled` — email to Dane on every new lead
-   - `auto_quote_enabled` — sends customer the auto-quote SMS+email and advances stage to Quoted
-   - `janitorial_enabled` — sends janitorial leads the walkthrough SMS+email
-   - `policy_first_booking_sms_enabled` — sends waiver SMS after booking (this is the service-aware waiver work from earlier this session — needs the agree.html flow tested first)
-3. **Pipeline stage advance** to `Follow-up` runs daily at 18:00 UTC via `run-task-automations.js`. No toggle — fires automatically once `auto_quote_enabled` is on (since stage='Quoted' is what makes a lead eligible to advance).
-4. **The `TASK_AUTOMATIONS_TEST_MODE = true` flag** at the top of `api/run-task-automations.js` still limits VA-task creation (Day 1, Day 5) to Dane's own phone/email. Flip to `false` when ready to roll out task creation for all leads. The stage-advance step ignores TEST_MODE (DB-only, no contact side effects).
-5. **Submit a real test lead through `lead-form.html`** with Dane's own phone/email before opening it up, to confirm the full pipeline works end-to-end:
-   - SMS arrives to `+18084685356` (business line)
-   - Email arrives at `dane@hawaiinaturalclean.net`
-   - Lead appears in CRM with stage = `New inquiry` AND segment = `initial_sequence`
-   - Within seconds, customer gets auto-quote SMS + email
-   - Lead's stage flips to `Quoted` and `quote_sent_at` is set
+The lead form (`/lead-form.html`) is feature-complete and ready to put on the public website. Pre-launch checklist:
+
+1. **Confirm hardcoded owner contact in `api/lead-capture.js`:** `OWNER_PHONE = '+18084685356'` (HNC business line), `OWNER_EMAIL = 'dane@hawaiinaturalclean.net'`.
+2. **Toggle ON in the Automations view** before any public traffic:
+   - `new_lead_owner_sms_enabled` — SMS alert to business line on every new lead
+   - `new_lead_owner_email_enabled` — email alert to dane@hawaiinaturalclean.net
+   - `auto_quote_enabled` — auto-quote SMS+email back to the customer + advances stage to Quoted
+   - `janitorial_enabled` — janitorial walkthrough flow
+   - `policy_first_booking_sms_enabled` — waiver SMS after booking (depends on the service-aware waiver work)
+3. **Submit one test lead through the form with Dane's personal info** before going public. Verify: owner SMS+email land, lead appears in CRM with stage=New inquiry / segment=initial_sequence, customer gets quote SMS+email within seconds, stage flips to Quoted.
+4. **Pipeline stage advance** (Quoted → Follow-up after 3 days) runs automatically via the daily 18:00 UTC `run-task-automations.js` cron. No toggle — pure DB write.
+5. **`TASK_AUTOMATIONS_TEST_MODE = true`** at the top of `api/run-task-automations.js` still limits Day-1/Day-5 VA task creation to Dane's personal number. Flip to `false` to roll out VA tasks for real leads. Stage-advance step ignores this flag.
+
+**Public URL options for posting on the website:**
+
+- **Quick (Vercel default):** `https://hnc-crm.vercel.app/lead-form.html` works as-is. Also `https://hnc-crm.vercel.app/contact` already redirects to it (rewrite in `vercel.json`). Works today, no DNS work.
+- **Recommended (custom subdomain):** add `book.hawaiinaturalclean.com` (or `.net`, whichever Dane's website domain is on) as a custom domain on the `hnc-crm` Vercel project, then add a CNAME at the DNS provider pointing to `cname.vercel-dns.com`. Vercel auto-provisions SSL. Form URL becomes `https://book.hawaiinaturalclean.com/contact`. Reads as a real business URL on a phone screen instead of a tech subdomain.
+
+The form page is self-contained (own header, branding, success view), so a direct link from the website's "Get a quote" CTA is cleaner than an iframe embed. Iframes complicate mobile rendering and CSS scope.
 
 ### Waiver service-routing — needs live end-to-end test (still pending)
-The full waiver-routing plumbing shipped this session but Dane was too tired to test before turning automations on. Before flipping the kill-switch, run these checks in order:
+The full waiver-routing plumbing shipped earlier but Dane was too tired to test before turning automations on. Before flipping the kill-switch, run these checks in order:
 
 1. **Confirm DB migration ran.** In Supabase SQL editor:
    ```sql
@@ -774,4 +777,4 @@ Original notes preserved below for context.
 
 ---
 
-*Last updated: April 30, 2026 — Structured 6-section AI summaries (lead + client profiles + VA pre-call briefs) now share a prompt template, render as bulleted HTML, include OpenPhone history, and show a freshness timestamp. Sonnet 4.6, max 1000 tokens.*
+*Last updated: May 1, 2026 — AI summary collapsed to a single "🚩 Things to know" section for lead/client profiles (focuses on buried context: preferences, complaints, access notes, open threads). VA pre-call brief keeps the 6-section format. Lead form launch checklist + custom-domain guidance added at top of Pending.*

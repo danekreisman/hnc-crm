@@ -437,6 +437,18 @@ Run through this checklist:
 
   To deploy on a new environment, run `supabase/add_service_checklists.sql` once in the SQL editor to upsert both rows.
 
+- **Lead pipeline lifecycle** (added April 2026 during automations rollout audit). Stages: `New inquiry` → `Quoted` → `Follow-up` → `Closed won` / `Closed lost`. Transitions:
+
+  - **→ New inquiry**: set on insert by `api/lead-capture.js` when the public `lead-form.html` is submitted. Also sets `segment: 'initial_sequence'` + `segment_moved_at` so the `days_since_response` automation (in `run-automations.js`) can find them later.
+  - **→ Quoted**: set inside `api/lead-capture.js` on the same DB call that writes `quote_sent_at`, in BOTH branches (regular auto-quote and janitorial walkthrough). Gated by `auto_quote_enabled` for regular and `janitorial_enabled` for janitorial — if neither flag is on, the lead never gets a quote and stays in `New inquiry`.
+  - **→ Follow-up**: set by daily cron `api/run-task-automations.js` (18:00 UTC) when `stage = 'Quoted'` AND `quote_sent_at` is 3+ days old AND `last_responded_at IS NULL` AND `do_not_contact = false`. Pure DB write, no kill switch, does NOT respect `TASK_AUTOMATIONS_TEST_MODE`. Also set manually by `reactivateLead()` in `index.html` when a user clicks "Reactivate" on a Closed-lost lead.
+  - **→ Closed won**: set by `api/lead-book.js` (via the `book_lead_atomic` RPC) when the lead books through `book.html`.
+  - **→ Closed lost**: only set manually via the lead detail panel's stage dropdown.
+
+  Tracking fields used by the pipeline: `quote_sent_at` (set in lead-capture, used by both task automations and stage advance); `last_responded_at` (set by `openphone-webhook.js` on inbound SMS replies, used by stage advance and `days_since_response` trigger); `response_count` (incremented by openphone-webhook); `segment` + `segment_moved_at` (used by run-automations triggers).
+
+  Owner notifications on new lead: `api/lead-capture.js` fires both an email (gated by `new_lead_owner_email_enabled`) to `dane@hawaiinaturalclean.net` and an SMS (gated by `new_lead_owner_sms_enabled`) to `+18082697636`. Both addresses are HARDCODED in `api/lead-capture.js` — change them there if Dane's contact info changes.
+
 ## Utilities Reference
 
 | File | What it does |
@@ -471,6 +483,7 @@ Single source of truth for what landed in the most recent sessions. Most recent 
 
 | Commit | What |
 |---|---|
+| `94aef6d` (this session) | **Lead automation rollout audit + fixes**. Pre-flight before flipping `auto_quote_enabled` / `new_lead_owner_sms_enabled` on. Three real bugs found and fixed: (1) lead `stage` was never auto-advanced past 'New inquiry' — `lead-capture.js` now sets `stage: 'Quoted'` alongside `quote_sent_at` in BOTH the auto-quote branch and the janitorial-walkthrough branch (commit `69f4fd2`); (2) new leads had `segment = NULL` so the `days_since_response` automation never matched anyone — `lead-capture.js` now sets `segment: 'initial_sequence'` + `segment_moved_at` on insert; (3) no rule ever moved leads to 'Follow-up' — added a step to `run-task-automations.js` (existing daily cron at 18:00 UTC) that advances `Quoted → Follow-up` after 3 days when `quote_sent_at` is 3+ days old AND `last_responded_at IS NULL` AND `do_not_contact = false`. Stage-advance step is a pure DB write with no contact side effects, so it does NOT respect the `TASK_AUTOMATIONS_TEST_MODE` flag at the top of that file. Also: `OWNER_EMAIL` in `lead-capture.js` updated from `dane.kreisman@gmail.com` to `dane@hawaiinaturalclean.net`. |
 | (this session, 2026-04-30) | **Waiver overhaul (commits `89fe28b`–`1dfe763`)**: condition-tier picker on `lead-form.html` (5 photo cards, real HNC job photos for 4 tiers, hover-zoom desktop-only); `agree.html` rewritten with hero/checklist/before-arrival/policies architecture and `?svc=` URL filtering; `book.html` step 2 ported to mirror `agree.html` (loads from `/api/get-policies` + `/api/get-checklists`, infers service from `LEAD.service`); new p5 policy "Quote accuracy & on-arrival adjustment" (legal hook for raising prices on under-described moveouts); move-out 6-item required block surfaces as ONE consolidated bulleted policy checkbox titled "Move-out preparation requirements"; all service cards collapsed by default; new `/api/get-checklists` endpoint with full DEFAULTS fallback; `supabase/add_service_checklists.sql` migration; service-aware waiver SMS routing in `api/lead-book.js` (uses `body.service`) and `api/run-policy-reminders.js` (uses upcoming appointment's `service` from join). |
 | (this session, 2026-04-30) | `migrations/2026-04-30-backfill-cleaner-service-rates.sql` — backfill `rate_regular_cents` / `rate_deep_cents` / `rate_moveout_cents` on cleaners that pre-date these columns. Formula: regular = `hourly_rate`, deep = `hourly_rate + 5`, moveout = `hourly_rate + 5`. Run once in Supabase SQL editor. Also updated DEVELOPMENT_GUIDE Known Gotchas with a note explaining the per-service rate system already exists in `calcCleanerPay()` / `serviceRateKey()` and not to reinvent it. |
 | (this session) | `DEVELOPMENT_GUIDE.md` — document activity log coverage, client profile modal, calendar→client link, browser-editor workflow, new gotchas |
@@ -676,7 +689,26 @@ Always run a round-trip sanity check (`decode(encode(str)) === str`) before push
 
 Outstanding work tracked across sessions. In rough priority order:
 
-### Waiver service-routing — needs live end-to-end test (pick up here)
+### Lead automations rollout — flip-the-switch checklist (this session)
+Audit complete. Three bugs fixed (see `94aef6d` in commits log). Before flipping any toggles in the Automations view, confirm:
+
+1. **Owner contact is right.** `OWNER_PHONE = '+18082697636'`, `OWNER_EMAIL = 'dane@hawaiinaturalclean.net'` — both hardcoded in `api/lead-capture.js`.
+2. **Toggles to flip ON in the Automations view** for the rollout:
+   - `new_lead_owner_sms_enabled` — SMS to Dane on every new lead
+   - `new_lead_owner_email_enabled` — email to Dane on every new lead
+   - `auto_quote_enabled` — sends customer the auto-quote SMS+email and advances stage to Quoted
+   - `janitorial_enabled` — sends janitorial leads the walkthrough SMS+email
+   - `policy_first_booking_sms_enabled` — sends waiver SMS after booking (this is the service-aware waiver work from earlier this session — needs the agree.html flow tested first)
+3. **Pipeline stage advance** to `Follow-up` runs daily at 18:00 UTC via `run-task-automations.js`. No toggle — fires automatically once `auto_quote_enabled` is on (since stage='Quoted' is what makes a lead eligible to advance).
+4. **The `TASK_AUTOMATIONS_TEST_MODE = true` flag** at the top of `api/run-task-automations.js` still limits VA-task creation (Day 1, Day 5) to Dane's own phone/email. Flip to `false` when ready to roll out task creation for all leads. The stage-advance step ignores TEST_MODE (DB-only, no contact side effects).
+5. **Submit a real test lead through `lead-form.html`** with Dane's own phone/email before opening it up, to confirm the full pipeline works end-to-end:
+   - SMS arrives to `+18082697636`
+   - Email arrives at `dane@hawaiinaturalclean.net`
+   - Lead appears in CRM with stage = `New inquiry` AND segment = `initial_sequence`
+   - Within seconds, customer gets auto-quote SMS + email
+   - Lead's stage flips to `Quoted` and `quote_sent_at` is set
+
+### Waiver service-routing — needs live end-to-end test (still pending)
 The full waiver-routing plumbing shipped this session but Dane was too tired to test before turning automations on. Before flipping the kill-switch, run these checks in order:
 
 1. **Confirm DB migration ran.** In Supabase SQL editor:
@@ -735,4 +767,4 @@ Original notes preserved below for context.
 
 ---
 
-*Last updated: April 30, 2026 — Waiver overhaul complete: condition-tier picker, agree.html rewrite, book.html step 2 ported, move-out requirements consolidated into one policy, service-aware SMS routing in lead-book.js + run-policy-reminders.js. Pending: end-to-end test before flipping automations on (see top of Pending section for checklist).*
+*Last updated: April 30, 2026 — Lead automations rollout audit: stage now auto-advances New inquiry → Quoted on quote send, and Quoted → Follow-up after 3 days of silence. New leads tagged with segment='initial_sequence'. Owner email switched to dane@hawaiinaturalclean.net. See top of Pending section for flip-the-switch checklist.*

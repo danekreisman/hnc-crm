@@ -97,7 +97,7 @@ export default async function handler(req, res) {
       },
       body: JSON.stringify({
         model: 'claude-haiku-4-5-20251001',
-        max_tokens: useStructured ? 800 : 300,
+        max_tokens: useStructured ? 600 : 300,
         messages: [{ role: 'user', content: finalPrompt }],
       }),
     }, aiTimeout);

@@ -203,8 +203,11 @@ body{font-family:'Josefin Sans',sans-serif;color:var(--text);overflow-x:hidden;}
 .condition-wrap.show{display:block;}
 .condition-label{font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--text-muted);margin-bottom:12px;}
 .tier-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;}
-.tier-card{position:relative;border:1.5px solid var(--border);border-radius:10px;background:#fff;cursor:pointer;overflow:hidden;transition:all .15s ease;text-align:left;display:flex;flex-direction:column;}
-.tier-card:hover{border-color:var(--blue3);transform:translateY(-1px);}
+.tier-card{position:relative;border:1.5px solid var(--border);border-radius:10px;background:#fff;cursor:pointer;overflow:hidden;transition:transform .2s ease,box-shadow .2s ease,border-color .15s ease;text-align:left;display:flex;flex-direction:column;}
+.tier-card:hover{border-color:var(--blue3);}
+@media (hover:hover){
+  .tier-card:hover{transform:translateY(-6px) scale(1.12);box-shadow:0 14px 32px rgba(26,46,56,.22);z-index:10;border-color:var(--blue);}
+}
 .tier-card.selected{border-color:var(--blue);border-width:2px;box-shadow:0 4px 12px rgba(59,184,227,.25);}
 .tier-card.selected::after{content:'✓';position:absolute;top:6px;right:6px;width:20px;height:20px;border-radius:50%;background:var(--blue);color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;}
 .tier-photo{width:100%;aspect-ratio:4/3;object-fit:cover;display:block;background:#e8f4fa;}
@@ -574,22 +577,22 @@ body{font-family:'Josefin Sans',sans-serif;color:var(--text);overflow-x:hidden;}
         <div class="condition-label">Property condition <span style="color:var(--error)">*</span></div>
         <div class="tier-grid" id="tierGrid">
           <div class="tier-card" data-tier="extreme" data-value="2">
-            <img class="tier-photo" src="https://commons.wikimedia.org/wiki/Special:FilePath/Compulsive_hoarding_Apartment.jpg?width=400" alt="Extreme" loading="lazy">
+            <img class="tier-photo" src="/tier-photos/extreme.jpg" alt="Extreme" loading="lazy">
             <div class="tier-name">Extreme</div>
             <div class="tier-desc">Severe neglect. Trash, caked-on grime, possibly mold throughout.</div>
           </div>
           <div class="tier-card" data-tier="very_dirty" data-value="4">
-            <img class="tier-photo" src="https://images.pexels.com/photos/20374786/pexels-photo-20374786.jpeg?auto=compress&cs=tinysrgb&w=300" alt="Very dirty" loading="lazy">
+            <img class="tier-photo" src="/tier-photos/very-dirty.jpg" alt="Very dirty" loading="lazy">
             <div class="tier-name">Very dirty</div>
             <div class="tier-desc">Hasn't been cleaned in months. Heavy buildup, kitchen and bathroom grime.</div>
           </div>
           <div class="tier-card" data-tier="moderately_dirty" data-value="6">
-            <img class="tier-photo" src="https://images.pexels.com/photos/7365324/pexels-photo-7365324.jpeg?auto=compress&cs=tinysrgb&w=300" alt="Moderately dirty" loading="lazy">
+            <img class="tier-photo" src="/tier-photos/moderately-dirty.jpg" alt="Moderately dirty" loading="lazy">
             <div class="tier-name">Moderately dirty</div>
             <div class="tier-desc">Cleaned occasionally. Visible dust and clutter, light grime in kitchen and bath.</div>
           </div>
           <div class="tier-card" data-tier="decent" data-value="8">
-            <img class="tier-photo" src="https://images.pexels.com/photos/5825380/pexels-photo-5825380.jpeg?auto=compress&cs=tinysrgb&w=300" alt="Decent" loading="lazy">
+            <img class="tier-photo" src="/tier-photos/decent.jpg" alt="Decent" loading="lazy">
             <div class="tier-name">Decent</div>
             <div class="tier-desc">Cleaned regularly. Tidy with everyday clutter and light surface dust.</div>
           </div>

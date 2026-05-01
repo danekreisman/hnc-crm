@@ -202,14 +202,14 @@ body{font-family:'Josefin Sans',sans-serif;color:var(--text);overflow-x:hidden;}
 .condition-wrap{background:#f0f9ff;border:1.5px solid var(--blue4);border-radius:12px;padding:16px 18px;margin-bottom:16px;display:none;}
 .condition-wrap.show{display:block;}
 .condition-label{font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--text-muted);margin-bottom:12px;}
-.tier-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;}
-@media(max-width:640px){.tier-grid{grid-template-columns:repeat(2,1fr);}}
-.tier-card{position:relative;border:1.5px solid var(--border);border-radius:10px;background:#fff;cursor:pointer;overflow:hidden;transition:all .15s ease;text-align:center;}
+.tier-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;}
+.tier-card{position:relative;border:1.5px solid var(--border);border-radius:10px;background:#fff;cursor:pointer;overflow:hidden;transition:all .15s ease;text-align:left;display:flex;flex-direction:column;}
 .tier-card:hover{border-color:var(--blue3);transform:translateY(-1px);}
 .tier-card.selected{border-color:var(--blue);border-width:2px;box-shadow:0 4px 12px rgba(59,184,227,.25);}
 .tier-card.selected::after{content:'✓';position:absolute;top:6px;right:6px;width:20px;height:20px;border-radius:50%;background:var(--blue);color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;}
-.tier-photo{width:100%;aspect-ratio:1/1;object-fit:cover;display:block;background:#e8f4fa;}
-.tier-name{font-size:11px;font-weight:600;letter-spacing:.04em;color:var(--text);padding:8px 4px;line-height:1.2;}
+.tier-photo{width:100%;aspect-ratio:4/3;object-fit:cover;display:block;background:#e8f4fa;}
+.tier-name{font-size:12px;font-weight:600;letter-spacing:.04em;color:var(--text);padding:9px 9px 3px;line-height:1.2;}
+.tier-desc{font-size:11px;color:var(--text-muted);padding:0 9px 10px;line-height:1.4;font-weight:300;flex:1;}
 /* Tier warning modal */
 .tier-warning-overlay{display:none;position:fixed;inset:0;background:rgba(26,46,56,.55);z-index:1000;align-items:center;justify-content:center;padding:20px;animation:fadeIn .2s ease;}
 .tier-warning-overlay.show{display:flex;}
@@ -576,22 +576,27 @@ body{font-family:'Josefin Sans',sans-serif;color:var(--text);overflow-x:hidden;}
           <div class="tier-card" data-tier="extreme" data-value="2">
             <img class="tier-photo" src="https://images.pexels.com/photos/938045/pexels-photo-938045.jpeg?auto=compress&cs=tinysrgb&w=300" alt="Extreme" loading="lazy">
             <div class="tier-name">Extreme</div>
+            <div class="tier-desc">Severe neglect. Trash, caked-on grime, possibly mold throughout.</div>
           </div>
           <div class="tier-card" data-tier="very_dirty" data-value="4">
             <img class="tier-photo" src="https://images.pexels.com/photos/20374786/pexels-photo-20374786.jpeg?auto=compress&cs=tinysrgb&w=300" alt="Very dirty" loading="lazy">
             <div class="tier-name">Very dirty</div>
+            <div class="tier-desc">Hasn't been cleaned in months. Heavy buildup, kitchen and bathroom grime.</div>
           </div>
           <div class="tier-card" data-tier="moderately_dirty" data-value="6">
             <img class="tier-photo" src="https://images.pexels.com/photos/7365324/pexels-photo-7365324.jpeg?auto=compress&cs=tinysrgb&w=300" alt="Moderately dirty" loading="lazy">
             <div class="tier-name">Moderately dirty</div>
+            <div class="tier-desc">Cleaned occasionally. Visible dust and clutter, light grime in kitchen and bath.</div>
           </div>
           <div class="tier-card" data-tier="decent" data-value="8">
             <img class="tier-photo" src="https://images.pexels.com/photos/4044797/pexels-photo-4044797.jpeg?auto=compress&cs=tinysrgb&w=300" alt="Decent" loading="lazy">
             <div class="tier-name">Decent</div>
+            <div class="tier-desc">Cleaned regularly. Tidy with everyday clutter and light surface dust.</div>
           </div>
           <div class="tier-card" data-tier="pristine" data-value="10">
             <img class="tier-photo" src="https://images.pexels.com/photos/4800179/pexels-photo-4800179.jpeg?auto=compress&cs=tinysrgb&w=300" alt="Pristine" loading="lazy">
             <div class="tier-name">Pristine</div>
+            <div class="tier-desc">Cleaned weekly. Almost no visible dust, dirt, or wear.</div>
           </div>
         </div>
         <input type="hidden" id="condition" value="">

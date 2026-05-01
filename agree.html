@@ -74,7 +74,7 @@ body{background:linear-gradient(160deg,#eaf7fb 0%,#f7fbfc 40%,#eaf7fb 100%)}
 .policy-item.checked{border-color:var(--blue);background:var(--blue-light)}
 .policy-item input[type=checkbox]{width:18px;height:18px;accent-color:var(--blue);flex-shrink:0;margin-top:2px;cursor:pointer}
 .pi-title{font-size:13px;font-weight:600;color:var(--text);margin-bottom:2px}
-.pi-detail{font-size:12px;color:var(--muted);line-height:1.5}
+.pi-detail{font-size:12px;color:var(--muted);line-height:1.5;white-space:pre-line}
 
 /* Buttons / states */
 .btn-primary{display:block;width:100%;padding:14px;border:none;border-radius:10px;font-size:15px;font-weight:700;font-family:inherit;cursor:pointer;background:var(--blue);color:#fff;box-shadow:0 4px 16px rgba(59,184,227,.3);transition:all .2s;margin-top:18px}
@@ -121,23 +121,14 @@ if(!CLIENT_ID){
     if (SVC_FILTER.indexOf('moveout') !== -1 && CHECKLISTS.services) {
       var moveout = CHECKLISTS.services.filter(function(s){return s.id==='moveout';})[0];
       if (moveout && moveout.required && moveout.required.length) {
-        var MO_TITLES = [
-          'Property completely empty',
-          'Trash and debris removed',
-          'Fridge and freezer defrosted',
-          'Utilities on during service',
-          'Oven and stovetop operational',
-          'Pest issues disclosed'
-        ];
-        var moPolicies = moveout.required.map(function(item, idx){
-          return {
-            id: 'mo' + (idx+1),
-            title: MO_TITLES[idx] || 'Move-out requirement',
-            detail: item
-          };
-        });
+        var moDetail = 'Before we arrive, the following must be done. If conditions on arrival do not meet these, we may need to reschedule and a trip fee will apply:\n\n• ' + moveout.required.join('\n• ');
+        var moPolicy = {
+          id: 'mo_req',
+          title: 'Move-out preparation requirements',
+          detail: moDetail
+        };
         var lastPolicy = POLICIES[POLICIES.length - 1];
-        POLICIES = POLICIES.slice(0, -1).concat(moPolicies).concat([lastPolicy]);
+        POLICIES = POLICIES.slice(0, -1).concat([moPolicy]).concat([lastPolicy]);
       }
     }
 

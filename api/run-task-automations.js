@@ -17,8 +17,14 @@
  *
  * 3. Post-first-appointment call lives in run-job-completions.js (hourly cron).
  *
+ * 4. Pipeline stage advance: Quoted → Follow-up after 3 days of no reply.
+ *    - Pure DB write, no kill switch (low blast radius).
+ *    - Leads with last_responded_at set are skipped (they're being handled).
+ *
  * TEST MODE GUARD: while TASK_AUTOMATIONS_TEST_MODE = true, ONLY records matching
- * Dane Kreisman's phone or email get tasks created. Flip to false to roll out fully.
+ * Dane Kreisman's phone or email get tasks created. The stage-advance step does
+ * NOT respect TEST_MODE — it's a DB-only operation with no contact side effects.
+ * Flip to false to roll out fully.
  */
 
 import { createClient } from '@supabase/supabase-js';
@@ -229,6 +235,43 @@ export default async function handler(req, res) {
       }
     }
     } // end of day5Enabled block
+
+    // ── 3. Pipeline stage advance: Quoted → Follow-up after 3 days of silence ──
+    // Pure DB write, no SMS/email side effects. Always runs (no kill switch).
+    // Criteria: stage='Quoted' AND quote_sent_at is 3+ days old AND no inbound
+    // reply tracked AND not blacklisted. Leads who replied stay in Quoted (the
+    // VA-task automations handle the human follow-up for them).
+    try {
+      const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString();
+      const { data: stale, error: staleErr } = await db
+        .from('leads')
+        .select('id, name')
+        .eq('stage', 'Quoted')
+        .lt('quote_sent_at', threeDaysAgo)
+        .is('last_responded_at', null)
+        .eq('do_not_contact', false);
+
+      if (staleErr) {
+        console.warn('[run-task-automations] stage-advance query error:', staleErr.message);
+      } else if (stale && stale.length) {
+        const ids = stale.map(r => r.id);
+        const { error: updateErr } = await db
+          .from('leads')
+          .update({ stage: 'Follow-up' })
+          .in('id', ids);
+        if (updateErr) {
+          console.warn('[run-task-automations] stage-advance update error:', updateErr.message);
+        } else {
+          console.log(`[run-task-automations] Advanced ${ids.length} leads from Quoted → Follow-up`);
+          results.stage_advanced_to_followup = ids.length;
+        }
+      } else {
+        results.stage_advanced_to_followup = 0;
+      }
+    } catch (advanceErr) {
+      await logError('run-task-automations:stage-advance', advanceErr, {});
+      results.errors++;
+    }
 
     return res.status(200).json({ success: true, ...results });
 

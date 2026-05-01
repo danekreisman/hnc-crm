@@ -46,6 +46,8 @@ export default async function handler(req, res) {
     sqft:         d.sqft ? parseInt(d.sqft) : null,
     source:       d.referralSource || 'Website form',
     stage:        'New inquiry',
+    segment:      'initial_sequence',
+    segment_moved_at: new Date().toISOString(),
     assigned_to:  'VA',
     booking_token: bookingToken,
     notes:        noteParts.join('\n') || null,
@@ -64,7 +66,7 @@ export default async function handler(req, res) {
   // ── 2.5. Owner notification + OpenPhone contact creation (fire-and-forget) ─
   // We don't await these — if either fails, the lead is still saved and the
   // quote flow still runs. Errors are logged for inspection.
-  const OWNER_EMAIL = 'dane.kreisman@gmail.com';
+  const OWNER_EMAIL = 'dane@hawaiinaturalclean.net';
   const OWNER_PHONE = '+18082697636';
 
   const ownerSummary = `New lead: ${d.name} (${d.serviceType||'cleaning'}) | ${d.phone}${d.island?' | '+d.island:''}${d.beds?' | '+d.beds+'bd':''}${d.baths?'/'+d.baths+'ba':''}${d.sqft?' | '+d.sqft+'sf':''}`;

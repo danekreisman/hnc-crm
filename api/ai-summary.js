@@ -1,67 +1,114 @@
 import { fetchWithTimeout, TIMEOUTS } from './utils/with-timeout.js';
 import { logError } from './utils/error-logger.js';
+import { getOpenPhoneHistory } from './utils/openphone-history.js';
+import { buildSummaryPrompt } from './utils/summary-prompt.js';
 
+/**
+ * POST /api/ai-summary
+ *
+ * Two modes:
+ *
+ * 1) Structured (preferred — what the new front-end uses):
+ *    {
+ *      mode: 'lead' | 'client',
+ *      data: { name, service, stage, beds, baths, sqft, condition, quote_total,
+ *              address, notes, ltv, mrr, last_job, next_job, cleaner, payment,
+ *              properties, recent_jobs, recent_messages, type, status,
+ *              frequency, since, property },
+ *      phone: '+18081234567'  // optional — when present, OpenPhone SMS+call
+ *                                history is fetched server-side and fed in
+ *    }
+ *
+ * 2) Legacy (kept for backwards compat):
+ *    { prompt: '...', clientPhone: '...' }    — runs the prompt as-is.
+ *    { leadId, leadData: {...} }              — auto-builds the old short prompt.
+ *
+ * Always returns: { success: true, summary: '...markdown...', generated_at, model }
+ */
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  var body = req.body || {};
-  var leadId = body.leadId;
-  var leadData = body.leadData;
-  var customPrompt = body.prompt;
+  const body = req.body || {};
+  const { mode, data, phone, prompt: customPrompt, clientPhone, leadId, leadData } = body;
 
-  if (!leadId && !leadData && !customPrompt) {
-    return res.status(400).json({ success: false, error: 'leadId, leadData, or prompt is required' });
+  if (!mode && !data && !customPrompt && !leadId && !leadData) {
+    return res.status(400).json({ success: false, error: 'mode+data, prompt, or leadData is required' });
   }
 
   try {
-    var prompt = customPrompt || '';
+    let finalPrompt = '';
+    let usedHistory = false;
 
-    if (!prompt && leadData) {
-      var name = leadData.name || 'Unknown';
-      var svc = leadData.service || 'Unknown';
-      var propParts = [];
+    if (mode && data) {
+      let history = '';
+      const phoneToFetch = phone || clientPhone;
+      if (phoneToFetch && process.env.QUO_API_KEY) {
+        try {
+          history = await getOpenPhoneHistory(phoneToFetch, {
+            apiKey: process.env.QUO_API_KEY,
+            maxSms: 100,
+            maxCalls: 10,
+          });
+          if (history && history.length) usedHistory = true;
+        } catch (histErr) {
+          console.warn('[ai-summary] OpenPhone history fetch failed:', histErr.message);
+        }
+      }
+      finalPrompt = buildSummaryPrompt({ mode, data, history });
+    } else if (customPrompt) {
+      finalPrompt = customPrompt;
+    } else if (leadData) {
+      const name = leadData.name || 'Unknown';
+      const svc = leadData.service || 'Unknown';
+      const propParts = [];
       if (leadData.beds) propParts.push(leadData.beds + 'br');
       if (leadData.baths) propParts.push(leadData.baths + 'ba');
       if (leadData.sqft) propParts.push(leadData.sqft + ' sqft');
-      var property = propParts.length ? propParts.join('/') : 'Unknown';
-      var price = leadData.quote_total ? '$' + Number(leadData.quote_total).toFixed(2) : (leadData.value || 'TBD');
-
-      prompt = 'Summarize this cleaning lead for a Hawaii Natural Clean sales rep in 2-3 sentences. Be concise and practical. Focus on what they want and the recommended next action.';
-      prompt += ' Name: ' + name + '.';
-      prompt += ' Service: ' + svc + '.';
-      prompt += ' Property: ' + property + '.';
-      if (leadData.condition) prompt += ' Condition: ' + leadData.condition + '/10.';
-      prompt += ' Stage: ' + (leadData.stage || 'Unknown') + '.';
-      prompt += ' Quoted: ' + price + '.';
-      if (leadData.notes) prompt += ' Notes: ' + leadData.notes + '.';
+      const property = propParts.length ? propParts.join('/') : 'Unknown';
+      const price = leadData.quote_total ? '$' + Number(leadData.quote_total).toFixed(2) : (leadData.value || 'TBD');
+      finalPrompt = 'Summarize this cleaning lead for a Hawaii Natural Clean sales rep in 2-3 sentences. Be concise and practical. Focus on what they want and the recommended next action.'
+        + ' Name: ' + name + '.'
+        + ' Service: ' + svc + '.'
+        + ' Property: ' + property + '.'
+        + (leadData.condition ? ' Condition: ' + leadData.condition + '/10.' : '')
+        + ' Stage: ' + (leadData.stage || 'Unknown') + '.'
+        + ' Quoted: ' + price + '.'
+        + (leadData.notes ? ' Notes: ' + leadData.notes + '.' : '');
     }
 
-    if (!prompt) return res.status(400).json({ success: false, error: 'Could not build prompt from lead data' });
+    if (!finalPrompt) return res.status(400).json({ success: false, error: 'Could not build prompt' });
 
-    var aiRes = await fetchWithTimeout('https://api.anthropic.com/v1/messages', {
+    const useSonnet = !!(mode && data);
+    const aiRes = await fetchWithTimeout('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'x-api-key': process.env.ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01'
+        'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 300,
-        messages: [{ role: 'user', content: prompt }]
-      })
+        model: useSonnet ? 'claude-sonnet-4-6' : 'claude-haiku-4-5-20251001',
+        max_tokens: useSonnet ? 1000 : 300,
+        messages: [{ role: 'user', content: finalPrompt }],
+      }),
     }, TIMEOUTS.ANTHROPIC);
 
-    var aiData = await aiRes.json();
-    var summary = aiData.content && aiData.content[0] && aiData.content[0].text;
+    const aiData = await aiRes.json();
+    const summary = aiData.content && aiData.content[0] && aiData.content[0].text;
     if (!summary) throw new Error('No summary returned: ' + JSON.stringify(aiData).slice(0, 200));
 
-    return res.status(200).json({ success: true, summary: summary });
+    return res.status(200).json({
+      success: true,
+      summary,
+      generated_at: new Date().toISOString(),
+      used_openphone_history: usedHistory,
+      model: useSonnet ? 'claude-sonnet-4-6' : 'claude-haiku-4-5-20251001',
+    });
   } catch (err) {
-    await logError('ai-summary', err, { leadId: leadId });
+    await logError('ai-summary', err, { leadId, mode });
     return res.status(500).json({ success: false, error: err.message });
   }
 }

@@ -67,7 +67,7 @@ export default async function handler(req, res) {
   // We don't await these — if either fails, the lead is still saved and the
   // quote flow still runs. Errors are logged for inspection.
   const OWNER_EMAIL = 'dane@hawaiinaturalclean.net';
-  const OWNER_PHONE = '+18082697636';
+  const OWNER_PHONE = '+18084685356';
 
   const ownerSummary = `New lead: ${d.name} (${d.serviceType||'cleaning'}) | ${d.phone}${d.island?' | '+d.island:''}${d.beds?' | '+d.beds+'bd':''}${d.baths?'/'+d.baths+'ba':''}${d.sqft?' | '+d.sqft+'sf':''}`;
 

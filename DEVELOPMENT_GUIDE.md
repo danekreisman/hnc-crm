@@ -447,7 +447,7 @@ Run through this checklist:
 
   Tracking fields used by the pipeline: `quote_sent_at` (set in lead-capture, used by both task automations and stage advance); `last_responded_at` (set by `openphone-webhook.js` on inbound SMS replies, used by stage advance and `days_since_response` trigger); `response_count` (incremented by openphone-webhook); `segment` + `segment_moved_at` (used by run-automations triggers).
 
-  Owner notifications on new lead: `api/lead-capture.js` fires both an email (gated by `new_lead_owner_email_enabled`) to `dane@hawaiinaturalclean.net` and an SMS (gated by `new_lead_owner_sms_enabled`) to `+18082697636`. Both addresses are HARDCODED in `api/lead-capture.js` — change them there if Dane's contact info changes.
+  Owner notifications on new lead: `api/lead-capture.js` fires both an email (gated by `new_lead_owner_email_enabled`) to `dane@hawaiinaturalclean.net` and an SMS (gated by `new_lead_owner_sms_enabled`) to `+18084685356` (the HNC business line). Both addresses are HARDCODED in `api/lead-capture.js` — change them there if Dane's contact info changes. Note: the `DANE_PHONE_DIGITS = '8082697636'` constants in `run-task-automations.js` / `run-job-completions.js` / `index.html` are intentionally left on Dane's personal number — they're TEST_MODE guards that limit automation runs to Dane during rollout, NOT production notification targets.
 
 ## Utilities Reference
 
@@ -692,7 +692,7 @@ Outstanding work tracked across sessions. In rough priority order:
 ### Lead automations rollout — flip-the-switch checklist (this session)
 Audit complete. Three bugs fixed (see `94aef6d` in commits log). Before flipping any toggles in the Automations view, confirm:
 
-1. **Owner contact is right.** `OWNER_PHONE = '+18082697636'`, `OWNER_EMAIL = 'dane@hawaiinaturalclean.net'` — both hardcoded in `api/lead-capture.js`.
+1. **Owner contact is right.** `OWNER_PHONE = '+18084685356'` (business line), `OWNER_EMAIL = 'dane@hawaiinaturalclean.net'` — both hardcoded in `api/lead-capture.js`.
 2. **Toggles to flip ON in the Automations view** for the rollout:
    - `new_lead_owner_sms_enabled` — SMS to Dane on every new lead
    - `new_lead_owner_email_enabled` — email to Dane on every new lead
@@ -702,7 +702,7 @@ Audit complete. Three bugs fixed (see `94aef6d` in commits log). Before flipping
 3. **Pipeline stage advance** to `Follow-up` runs daily at 18:00 UTC via `run-task-automations.js`. No toggle — fires automatically once `auto_quote_enabled` is on (since stage='Quoted' is what makes a lead eligible to advance).
 4. **The `TASK_AUTOMATIONS_TEST_MODE = true` flag** at the top of `api/run-task-automations.js` still limits VA-task creation (Day 1, Day 5) to Dane's own phone/email. Flip to `false` when ready to roll out task creation for all leads. The stage-advance step ignores TEST_MODE (DB-only, no contact side effects).
 5. **Submit a real test lead through `lead-form.html`** with Dane's own phone/email before opening it up, to confirm the full pipeline works end-to-end:
-   - SMS arrives to `+18082697636`
+   - SMS arrives to `+18084685356` (business line)
    - Email arrives at `dane@hawaiinaturalclean.net`
    - Lead appears in CRM with stage = `New inquiry` AND segment = `initial_sequence`
    - Within seconds, customer gets auto-quote SMS + email

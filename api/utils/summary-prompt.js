@@ -26,12 +26,11 @@ export function buildSummaryPrompt({ mode = 'lead', data = {}, history = '' } = 
 
   const rules = [
     'OUTPUT FORMAT IS NON-NEGOTIABLE. Use EXACTLY the six sections below, in this order, with the exact markdown headers shown (including the emoji).',
-    'STRICT LENGTH RULES: Maximum 2 bullets per section. Maximum 10 words per bullet. No exceptions.',
-    'Each bullet starts with "- ". Use "**Label:**" for the field name when helpful (e.g., "- **Last job:** 3/12/26, $180").',
-    'If a section has no data, output a single bullet "- (none)". Do not skip the section.',
-    'Be factual. Quote specific dates and dollar amounts. Do not speculate about emotions, motivations, or causes.',
-    'In FLAGS, surface anything easy to miss: gate codes, access notes, allergies, pets, complaints, competitors, payment issues, scheduling quirks. Most important section.',
-    'In RECOMMENDED NEXT ACTION, give one concrete next step grounded in the data.',
+    'Each section must contain markdown bullet items starting with "- ". Use "**Label:**" inline for the field name when helpful (e.g., "- **Last job:** 3/12/26, $180").',
+    'Aim for 2-4 bullets per section, each one short and scannable. If a section truly has no data, output a single bullet "- (none)".',
+    'Be factual. Quote specific dates, dollar amounts, and message excerpts where relevant. Do not speculate about emotions, motivations, or causes.',
+    'In the FLAGS section, surface anything that could easily be missed: gate codes, access instructions, allergies, pet info, complaints, mentions of competitors, payment issues, special requests, scheduling preferences, or anything unusual in their conversation history. This is the most important section.',
+    'In RECOMMENDED NEXT ACTION, give one concrete, specific next step grounded in the data above.',
     'NO PREAMBLE. NO CODE FENCES. NO TRAILING COMMENTARY. Output starts with "## 👤 Who" and ends with the last bullet.',
   ].join('\n');
 

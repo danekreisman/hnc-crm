@@ -47,13 +47,10 @@ export default async function handler(req, res) {
       const phoneToFetch = phone || clientPhone;
       if (phoneToFetch && process.env.QUO_API_KEY) {
         try {
-          // User-triggered endpoint — keep history bounded for snappy response.
-          // Calls are the slow fetch (per-call summary lookups) so we cap them
-          // hard at 2; SMS is one bulk paginated fetch and is much cheaper.
           history = await getOpenPhoneHistory(phoneToFetch, {
             apiKey: process.env.QUO_API_KEY,
-            maxSms: 20,
-            maxCalls: 2,
+            maxSms: 30,
+            maxCalls: 5,
           });
           if (history && history.length) usedHistory = true;
         } catch (histErr) {
@@ -100,7 +97,7 @@ export default async function handler(req, res) {
       },
       body: JSON.stringify({
         model: 'claude-haiku-4-5-20251001',
-        max_tokens: useStructured ? 500 : 300,
+        max_tokens: useStructured ? 800 : 300,
         messages: [{ role: 'user', content: finalPrompt }],
       }),
     }, aiTimeout);

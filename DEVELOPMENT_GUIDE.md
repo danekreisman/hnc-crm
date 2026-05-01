@@ -424,6 +424,7 @@ Run through this checklist:
 - **`generateLeadSummary` failure mode.** If "Error generating summary" appears with no fetch call to `/api/ai-summary`, an exception is being thrown OUTSIDE the try block (during prompt building). The function should build the prompt synchronously from `leadDB[currentLeadId]` fields with no async calls before the fetch.
 - **AI summary API accepts EITHER `{ prompt }` or `{ leadData }`** but not just `{ leadId }` — it has no Supabase fetch in its current form. Frontend builds the prompt and sends it.
 - **In-memory leadDB after `saveNewLead`.** Even after Supabase save succeeds, the card renders from `leadDB[id]` BEFORE the next `dbLoadLeads()`. So the in-memory object built in `saveNewLead` must include quoteTotal, quoteData, frequency, condition, beds, baths — otherwise the card shows TBD until a hard refresh.
+- **Cleaner pay auto-calc by service type — already built, easy to miss.** The `cleaners` table has `rate_regular_cents`, `rate_deep_cents`, `rate_moveout_cents` columns. `calcCleanerPay()` (`index.html` ~L5141) calls `serviceRateKey()` (~L5118) which matches `"deep"` / `"move"` in the service string and reads the right column. The Settings → Cleaners modal already has all three rate inputs (`#ced2-rate-regular`, `#ced2-rate-deep`, `#ced2-rate-moveout`); the New Cleaner modal has `#ncl-rate-regular` / `-deep` / `-moveout`. **If pay is mis-calculating for deep cleans or move-outs, the bug is almost certainly NULL values in these columns on cleaner records that pre-date the schema change** — the system falls back to `hourly_rate` (~$30) for every job. Backfill SQL: `migrations/2026-04-30-backfill-cleaner-service-rates.sql` (regular = `hourly_rate`, deep = `hourly_rate + 5`, moveout = `hourly_rate + 5`). Don't add new pay-rate logic without checking these columns first — and don't reinvent a "service bonus" system; per-cleaner per-service rates already exist.
 
 ## Utilities Reference
 
@@ -459,6 +460,7 @@ Single source of truth for what landed in the most recent sessions. Most recent 
 
 | Commit | What |
 |---|---|
+| (this session, 2026-04-30) | `migrations/2026-04-30-backfill-cleaner-service-rates.sql` — backfill `rate_regular_cents` / `rate_deep_cents` / `rate_moveout_cents` on cleaners that pre-date these columns. Formula: regular = `hourly_rate`, deep = `hourly_rate + 5`, moveout = `hourly_rate + 5`. Run once in Supabase SQL editor. Also updated DEVELOPMENT_GUIDE Known Gotchas with a note explaining the per-service rate system already exists in `calcCleanerPay()` / `serviceRateKey()` and not to reinvent it. |
 | (this session) | `DEVELOPMENT_GUIDE.md` — document activity log coverage, client profile modal, calendar→client link, browser-editor workflow, new gotchas |
 | `53df3d6` | `index.html` — wire up client profile Stats (Lifetime, Total jobs, Avg, Monthly) from appointments |
 | (in main) | `index.html` — Job History wired up + calendar appointment Client field clickable → opens client profile |

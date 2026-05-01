@@ -198,13 +198,30 @@ body{font-family:'Josefin Sans',sans-serif;color:var(--text);overflow-x:hidden;}
 /* Promo banner */
 .promo-banner{background:linear-gradient(135deg,#fff8e6,#fff3d4);border:1.5px solid #f2c94c;border-radius:10px;padding:12px 16px;margin-bottom:16px;display:none;font-size:13px;color:#7a5c00;line-height:1.5;gap:8px;align-items:flex-start;}
 .promo-banner.show{display:flex;}
-/* Condition slider */
+/* Condition tier picker */
 .condition-wrap{background:#f0f9ff;border:1.5px solid var(--blue4);border-radius:12px;padding:16px 18px;margin-bottom:16px;display:none;}
 .condition-wrap.show{display:block;}
-.condition-val{text-align:center;font-size:26px;font-weight:700;color:var(--blue);font-family:'Josefin Sans',sans-serif;margin-bottom:8px;}
-.condition-slider{width:100%;-webkit-appearance:none;appearance:none;height:6px;border-radius:3px;background:linear-gradient(90deg,#e05c5c,#f2c94c,#3BB8E3);outline:none;cursor:pointer;}
-.condition-slider::-webkit-slider-thumb{-webkit-appearance:none;width:22px;height:22px;border-radius:50%;background:var(--blue);border:3px solid white;box-shadow:0 2px 8px rgba(59,184,227,.4);cursor:pointer;}
-.condition-ends{display:flex;justify-content:space-between;font-size:11px;color:var(--text-muted);margin-top:6px;font-weight:300;}
+.condition-label{font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--text-muted);margin-bottom:12px;}
+.tier-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;}
+@media(max-width:640px){.tier-grid{grid-template-columns:repeat(2,1fr);}}
+.tier-card{position:relative;border:1.5px solid var(--border);border-radius:10px;background:#fff;cursor:pointer;overflow:hidden;transition:all .15s ease;text-align:center;}
+.tier-card:hover{border-color:var(--blue3);transform:translateY(-1px);}
+.tier-card.selected{border-color:var(--blue);border-width:2px;box-shadow:0 4px 12px rgba(59,184,227,.25);}
+.tier-card.selected::after{content:'✓';position:absolute;top:6px;right:6px;width:20px;height:20px;border-radius:50%;background:var(--blue);color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;}
+.tier-photo{width:100%;aspect-ratio:1/1;object-fit:cover;display:block;background:#e8f4fa;}
+.tier-name{font-size:11px;font-weight:600;letter-spacing:.04em;color:var(--text);padding:8px 4px;line-height:1.2;}
+/* Tier warning modal */
+.tier-warning-overlay{display:none;position:fixed;inset:0;background:rgba(26,46,56,.55);z-index:1000;align-items:center;justify-content:center;padding:20px;animation:fadeIn .2s ease;}
+.tier-warning-overlay.show{display:flex;}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+.tier-warning-box{background:#fff;border-radius:14px;padding:24px 24px 20px;max-width:400px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.3);animation:slideUp .25s ease;}
+@keyframes slideUp{from{transform:translateY(20px);opacity:0}to{transform:translateY(0);opacity:1}}
+.tier-warning-icon{width:44px;height:44px;border-radius:50%;background:#fff8e6;display:flex;align-items:center;justify-content:center;font-size:22px;margin-bottom:12px;}
+.tier-warning-title{font-size:18px;font-weight:600;color:var(--text);margin-bottom:8px;}
+.tier-warning-text{font-size:14px;color:var(--text-muted);line-height:1.55;margin-bottom:18px;font-weight:300;}
+.tier-warning-text strong{color:var(--text);font-weight:600;}
+.tier-warning-btn{width:100%;padding:12px;background:var(--blue);color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;font-family:inherit;cursor:pointer;letter-spacing:.04em;}
+.tier-warning-btn:hover{background:#2ea8d4;}
 .svc-icon{font-size:26px;margin-bottom:7px;}
 .svc-name{font-size:12px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--text);margin-bottom:3px;}
 .svc-desc{font-size:11px;color:var(--text-muted);font-weight:300;letter-spacing:.02em;}
@@ -552,12 +569,42 @@ body{font-family:'Josefin Sans',sans-serif;color:var(--text);overflow-x:hidden;}
       <div class="step-sub">How often, and anything we should know?</div>
       <div class="err-banner" id="e3"></div>
 
-      <!-- Condition slider — shown for Deep or Move-out -->
+      <!-- Condition tier picker — shown for Deep or Move-out -->
       <div class="condition-wrap" id="conditionWrap">
-        <div style="font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--text-muted);margin-bottom:10px;">Property condition <span style="color:var(--error)">*</span></div>
-        <div class="condition-val" id="conditionVal">5</div>
-        <input type="range" class="condition-slider" id="condition" min="1" max="10" value="5">
-        <div class="condition-ends"><span>1 — Filthy 😬</span><span>10 — Pristine ✨</span></div>
+        <div class="condition-label">Property condition <span style="color:var(--error)">*</span></div>
+        <div class="tier-grid" id="tierGrid">
+          <div class="tier-card" data-tier="filthy" data-value="2">
+            <img class="tier-photo" src="https://images.pexels.com/photos/5716424/pexels-photo-5716424.jpeg?auto=compress&cs=tinysrgb&w=300" alt="Filthy" loading="lazy">
+            <div class="tier-name">Filthy</div>
+          </div>
+          <div class="tier-card" data-tier="very_dirty" data-value="4">
+            <img class="tier-photo" src="https://images.pexels.com/photos/20374786/pexels-photo-20374786.jpeg?auto=compress&cs=tinysrgb&w=300" alt="Very dirty" loading="lazy">
+            <div class="tier-name">Very dirty</div>
+          </div>
+          <div class="tier-card" data-tier="moderately_dirty" data-value="6">
+            <img class="tier-photo" src="https://images.pexels.com/photos/7365324/pexels-photo-7365324.jpeg?auto=compress&cs=tinysrgb&w=300" alt="Moderately dirty" loading="lazy">
+            <div class="tier-name">Moderately dirty</div>
+          </div>
+          <div class="tier-card" data-tier="decent" data-value="8">
+            <img class="tier-photo" src="https://images.pexels.com/photos/6035357/pexels-photo-6035357.jpeg?auto=compress&cs=tinysrgb&w=300" alt="Decent" loading="lazy">
+            <div class="tier-name">Decent</div>
+          </div>
+          <div class="tier-card" data-tier="pristine" data-value="10">
+            <img class="tier-photo" src="https://images.pexels.com/photos/4800179/pexels-photo-4800179.jpeg?auto=compress&cs=tinysrgb&w=300" alt="Pristine" loading="lazy">
+            <div class="tier-name">Pristine</div>
+          </div>
+        </div>
+        <input type="hidden" id="condition" value="">
+      </div>
+
+      <!-- Tier accuracy warning modal -->
+      <div class="tier-warning-overlay" id="tierWarningOverlay">
+        <div class="tier-warning-box">
+          <div class="tier-warning-icon">⚠️</div>
+          <div class="tier-warning-title">Please choose carefully</div>
+          <div class="tier-warning-text">If your home's actual condition is more involved than what you've selected, your booking may be <strong>moved to a higher-priced tier and billed accordingly</strong> when our cleaner arrives.</div>
+          <button type="button" class="tier-warning-btn" onclick="closeTierWarning()">Got it</button>
+        </div>
       </div>
 
       <div class="field" id="freq-field">
@@ -678,6 +725,13 @@ function validate(s){
     return true;
   }
   if(s===3){
+    var svc=(document.querySelector('input[name="svc"]:checked')||{}).value||'';
+    var needsCondition=(svc==='Deep Cleaning'||svc==='Move-out Cleaning');
+    if(needsCondition && !document.getElementById('condition').value){
+      var cw=document.getElementById('conditionWrap');
+      if(cw){cw.style.borderColor='var(--error)';setTimeout(function(){cw.style.borderColor='';},2500);}
+      return false;
+    }
     // Janitorial doesn't need frequency
     if(!isJanitorial){
       if(!document.querySelector('input[name="freq"]:checked')){se('freq','Please select a frequency');return false;}
@@ -701,12 +755,23 @@ document.getElementById('phone').addEventListener('input', function(e){
   this.value = fmt;
 });
 
-// === CONDITION SLIDER ===
-var conditionSlider = document.getElementById('condition');
-var conditionVal = document.getElementById('conditionVal');
-conditionSlider.addEventListener('input', function(){
-  conditionVal.textContent = this.value;
+// === CONDITION TIER PICKER ===
+var TIER_LABELS = {filthy:'Filthy', very_dirty:'Very dirty', moderately_dirty:'Moderately dirty', decent:'Decent', pristine:'Pristine'};
+var selectedTierKey = '';
+document.querySelectorAll('#tierGrid .tier-card').forEach(function(card){
+  card.addEventListener('click', function(){
+    document.querySelectorAll('#tierGrid .tier-card').forEach(function(c){c.classList.remove('selected');});
+    this.classList.add('selected');
+    var tierKey = this.getAttribute('data-tier');
+    var tierVal = this.getAttribute('data-value');
+    selectedTierKey = tierKey;
+    document.getElementById('condition').value = tierVal;
+    document.getElementById('tierWarningOverlay').classList.add('show');
+  });
 });
+function closeTierWarning(){
+  document.getElementById('tierWarningOverlay').classList.remove('show');
+}
 
 // === SERVICE CARD LOGIC (now on step 2) ===
 var isJanitorial = false;
@@ -782,7 +847,7 @@ async function doSubmit(){
       row('Service',data.serviceType)+
       row('Frequency',data.frequency)+
       row('Island',data.island)+
-      (data.condition?row('Condition',data.condition+'/10'):'')+
+      (data.condition?row('Condition',TIER_LABELS[selectedTierKey]||(data.condition+'/10')):'')+
       (data.referralSource?row('Heard via',data.referralSource):'');
   }catch(err){
     var eb=document.getElementById('e3');
@@ -801,6 +866,9 @@ function resetForm(){
   document.getElementById('successView').classList.remove('show');
   document.querySelectorAll('input[type=text],input[type=email],input[type=tel],input[type=number],textarea,select').forEach(function(el){el.value='';});
   document.getElementById('conditionWrap').classList.remove('show');
+  document.querySelectorAll('#tierGrid .tier-card').forEach(function(c){c.classList.remove('selected');});
+  document.getElementById('condition').value='';
+  selectedTierKey='';
   document.getElementById('promoBanner').classList.remove('show');
   var resFields=document.getElementById('res-fields');
   if(resFields)resFields.style.display='';

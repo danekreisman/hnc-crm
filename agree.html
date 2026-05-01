@@ -141,14 +141,12 @@ function renderAll(){
       : CHECKLISTS.services;
 
     if (visibleServices.length) {
-      var headHtml = visibleServices.length === 1
-        ? '<div class="card-head"><h2>What\'s included \u2728</h2><p>Here\'s exactly what\'s covered in your service.</p></div>'
-        : '<div class="card-head"><h2>What\'s included \u2728</h2><p>Tap any service to see its full checklist.</p></div>';
+      var headHtml = '<div class="card-head"><h2>What\'s included \u2728</h2><p>Tap a service to see what\'s included.</p></div>';
 
       html += '<div class="card">'
         + headHtml
         + '<div class="card-body">'
-        + visibleServices.map(function(s){ return renderService(s, visibleServices.length === 1); }).join('')
+        + visibleServices.map(function(s){ return renderService(s, false); }).join('')
         + '</div></div>';
     }
   }

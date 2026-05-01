@@ -573,9 +573,9 @@ body{font-family:'Josefin Sans',sans-serif;color:var(--text);overflow-x:hidden;}
       <div class="condition-wrap" id="conditionWrap">
         <div class="condition-label">Property condition <span style="color:var(--error)">*</span></div>
         <div class="tier-grid" id="tierGrid">
-          <div class="tier-card" data-tier="filthy" data-value="2">
-            <img class="tier-photo" src="https://images.pexels.com/photos/5716424/pexels-photo-5716424.jpeg?auto=compress&cs=tinysrgb&w=300" alt="Filthy" loading="lazy">
-            <div class="tier-name">Filthy</div>
+          <div class="tier-card" data-tier="extreme" data-value="2">
+            <img class="tier-photo" src="https://images.pexels.com/photos/938045/pexels-photo-938045.jpeg?auto=compress&cs=tinysrgb&w=300" alt="Extreme" loading="lazy">
+            <div class="tier-name">Extreme</div>
           </div>
           <div class="tier-card" data-tier="very_dirty" data-value="4">
             <img class="tier-photo" src="https://images.pexels.com/photos/20374786/pexels-photo-20374786.jpeg?auto=compress&cs=tinysrgb&w=300" alt="Very dirty" loading="lazy">
@@ -586,7 +586,7 @@ body{font-family:'Josefin Sans',sans-serif;color:var(--text);overflow-x:hidden;}
             <div class="tier-name">Moderately dirty</div>
           </div>
           <div class="tier-card" data-tier="decent" data-value="8">
-            <img class="tier-photo" src="https://images.pexels.com/photos/6035357/pexels-photo-6035357.jpeg?auto=compress&cs=tinysrgb&w=300" alt="Decent" loading="lazy">
+            <img class="tier-photo" src="https://images.pexels.com/photos/4044797/pexels-photo-4044797.jpeg?auto=compress&cs=tinysrgb&w=300" alt="Decent" loading="lazy">
             <div class="tier-name">Decent</div>
           </div>
           <div class="tier-card" data-tier="pristine" data-value="10">
@@ -756,7 +756,7 @@ document.getElementById('phone').addEventListener('input', function(e){
 });
 
 // === CONDITION TIER PICKER ===
-var TIER_LABELS = {filthy:'Filthy', very_dirty:'Very dirty', moderately_dirty:'Moderately dirty', decent:'Decent', pristine:'Pristine'};
+var TIER_LABELS = {extreme:'Extreme', very_dirty:'Very dirty', moderately_dirty:'Moderately dirty', decent:'Decent', pristine:'Pristine'};
 var selectedTierKey = '';
 document.querySelectorAll('#tierGrid .tier-card').forEach(function(card){
   card.addEventListener('click', function(){

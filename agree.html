@@ -48,6 +48,21 @@ body{background:linear-gradient(160deg,#eaf7fb 0%,#f7fbfc 40%,#eaf7fb 100%)}
 .checklist-items li::before{content:'';position:absolute;left:6px;top:10px;width:6px;height:10px;border:solid var(--blue);border-width:0 2px 2px 0;transform:rotate(45deg)}
 .service-footnote{margin-top:14px;padding:10px 12px;background:#fff8e6;border:1px solid #f4d35e;border-radius:8px;font-size:12px;color:#7a5c00;line-height:1.5}
 
+/* Required-before-arrival block (move-out only) */
+.required-block{background:#fff8e6;border:1.5px solid #f4d35e;border-radius:10px;padding:14px 16px;margin-bottom:18px}
+.required-heading{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#7a5c00;margin-bottom:10px;display:flex;align-items:center;gap:8px}
+.required-heading::before{content:'!';display:inline-block;width:18px;height:18px;border-radius:50%;background:#f4d35e;color:#4a3700;font-size:12px;text-align:center;line-height:18px}
+.required-list{list-style:none;padding:0}
+.required-list li{padding:5px 0 5px 24px;position:relative;font-size:13px;color:#4a3700;line-height:1.55;font-weight:500}
+.required-list li::before{content:'';position:absolute;left:6px;top:10px;width:7px;height:7px;background:#d4a800;border-radius:50%}
+
+/* Not-included block */
+.not-included-block{margin-top:16px;padding:12px 14px;background:#fafafa;border:1px dashed #d0d6db;border-radius:8px}
+.not-included-heading{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin-bottom:8px}
+.not-included-list{list-style:none;padding:0}
+.not-included-list li{padding:3px 0 3px 22px;position:relative;font-size:12.5px;color:var(--muted);line-height:1.5}
+.not-included-list li::before{content:'\00d7';position:absolute;left:6px;top:1px;color:#b91c1c;font-weight:700;font-size:14px}
+
 /* Before we arrive */
 .prep-list{list-style:none;padding:0}
 .prep-list li{padding:7px 0 7px 26px;position:relative;font-size:13.5px;color:var(--text);line-height:1.55}
@@ -83,6 +98,7 @@ body{background:linear-gradient(160deg,#eaf7fb 0%,#f7fbfc 40%,#eaf7fb 100%)}
 </div>
 <script>
 var CLIENT_ID = new URLSearchParams(location.search).get('c');
+var SVC_FILTER = (new URLSearchParams(location.search).get('svc') || '').split(',').map(function(s){return s.trim();}).filter(Boolean);
 var POLICIES = [];
 var CHECKLISTS = null;
 var SERVICE_EMOJI = { regular:'\uD83E\uDDFA', deep:'\uD83E\uDDFC', moveout:'\uD83D\uDCE6', airbnb:'\uD83C\uDFDD\uFE0F' };
@@ -114,11 +130,21 @@ function renderAll(){
     + '</div></div>';
 
   if (CHECKLISTS && CHECKLISTS.services && CHECKLISTS.services.length) {
-    html += '<div class="card">'
-      + '<div class="card-head"><h2>What\'s included \u2728</h2><p>Tap any service to see its full checklist.</p></div>'
-      + '<div class="card-body">'
-      + CHECKLISTS.services.map(renderService).join('')
-      + '</div></div>';
+    var visibleServices = SVC_FILTER.length
+      ? CHECKLISTS.services.filter(function(s){ return SVC_FILTER.indexOf(s.id) !== -1; })
+      : CHECKLISTS.services;
+
+    if (visibleServices.length) {
+      var headHtml = visibleServices.length === 1
+        ? '<div class="card-head"><h2>What\'s included \u2728</h2><p>Here\'s exactly what\'s covered in your service.</p></div>'
+        : '<div class="card-head"><h2>What\'s included \u2728</h2><p>Tap any service to see its full checklist.</p></div>';
+
+      html += '<div class="card">'
+        + headHtml
+        + '<div class="card-body">'
+        + visibleServices.map(function(s){ return renderService(s, visibleServices.length === 1); }).join('')
+        + '</div></div>';
+    }
   }
 
   if (CHECKLISTS && CHECKLISTS.beforeArrival && CHECKLISTS.beforeArrival.length) {
@@ -145,22 +171,45 @@ function renderAll(){
   $('app').innerHTML = html;
 }
 
-function renderService(svc){
+function renderService(svc, alwaysOpen){
   var emoji = SERVICE_EMOJI[svc.id] || '\u2728';
   var inner = '';
   if (svc.intro) inner += '<div class="service-intro">'+esc(svc.intro)+'</div>';
+
+  if (svc.required && svc.required.length) {
+    inner += '<div class="required-block">'
+      + '<div class="required-heading">Required before we arrive</div>'
+      + '<ul class="required-list">'
+      + svc.required.map(function(it){return '<li>'+esc(it)+'</li>';}).join('')
+      + '</ul></div>';
+  }
+
   inner += (svc.sections || []).map(function(sec){
     return '<div class="section-heading">'+esc(sec.heading)+'</div>'
       + '<ul class="checklist-items">'
       + (sec.items || []).map(function(it){return '<li>'+esc(it)+'</li>';}).join('')
       + '</ul>';
   }).join('');
+
+  if (svc.notIncluded && svc.notIncluded.length) {
+    inner += '<div class="not-included-block">'
+      + '<div class="not-included-heading">Not included</div>'
+      + '<ul class="not-included-list">'
+      + svc.notIncluded.map(function(it){return '<li>'+esc(it)+'</li>';}).join('')
+      + '</ul></div>';
+  }
+
   if (svc.footnote) inner += '<div class="service-footnote">'+esc(svc.footnote)+'</div>';
 
-  return '<div class="service-row" id="svc-row-'+svc.id+'">'
-    + '<button class="service-toggle" onclick="toggleService(\''+svc.id+'\')">'
+  var openClass = alwaysOpen ? ' open' : '';
+  var toggleStyle = alwaysOpen ? ' style="cursor:default;pointer-events:none"' : '';
+  var caretHtml = alwaysOpen ? '' : '<span class="caret">&#x25BE;</span>';
+  var onClick = alwaysOpen ? '' : ' onclick="toggleService(\''+svc.id+'\')"';
+
+  return '<div class="service-row'+openClass+'" id="svc-row-'+svc.id+'">'
+    + '<button class="service-toggle"'+onClick+toggleStyle+'>'
       + '<span class="svc-label"><span class="svc-emoji">'+emoji+'</span><span>'+esc(svc.label)+'</span></span>'
-      + '<span class="caret">&#x25BE;</span>'
+      + caretHtml
     + '</button>'
     + '<div class="service-detail">'+inner+'</div>'
     + '</div>';

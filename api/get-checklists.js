@@ -39,6 +39,13 @@ const DEFAULTS = {
           'Visible cobwebs removed',
           'Mirrors and glass surfaces cleaned'
         ]}
+      ],
+      notIncluded: [
+        'Inside oven, fridge, or cabinets (these are Deep Clean items)',
+        'Carpet shampooing or steam cleaning',
+        'Window interiors or exteriors',
+        'Wall washing or repair (nail holes, scuffs)',
+        'Biohazard cleanup (vomit, blood, feces, pet accidents)'
       ]
     },
     {
@@ -69,12 +76,28 @@ const DEFAULTS = {
           'Light fixtures dusted (accessible)',
           'Behind and under accessible furniture'
         ]}
+      ],
+      notIncluded: [
+        'Carpet shampooing or steam cleaning (separate service)',
+        'Exterior windows',
+        'Post-construction cleanup (drywall dust, grout haze)',
+        'Wall repair, painting, or hole patching',
+        'Biohazard cleanup',
+        'Pest treatment'
       ]
     },
     {
       id: 'moveout',
       label: 'Move-out Cleaning',
       intro: 'Designed to meet landlord and property manager standards. Includes everything in Deep Cleaning, plus:',
+      required: [
+        'All personal possessions must be removed from the property — including garage, lanai, storage closets, and outdoor areas. The unit must be completely empty.',
+        'All trash and debris removed from the premises before our arrival (we are not a junk-haul service)',
+        'Fridge and freezer fully defrosted and emptied (frozen-shut freezers cannot be cleaned)',
+        'Utilities (water and electricity) must remain ON during the cleaning',
+        'Oven and stovetop must be operational',
+        'Any active pest infestations disclosed in advance'
+      ],
       sections: [
         { heading: 'Kitchen', items: [
           'Inside all cabinets and drawers',
@@ -102,7 +125,15 @@ const DEFAULTS = {
           'Floors deep-cleaned'
         ]}
       ],
-      footnote: 'Property must be fully empty for move-out service. Any remaining items will need to be removed before cleaning begins.'
+      notIncluded: [
+        'Wall hole patching, paint touch-ups, or any repair work',
+        'Carpet shampooing or steam cleaning (separate service)',
+        'Exterior pressure washing',
+        'Post-construction debris cleanup',
+        'Hazardous material disposal (paint, chemicals, sharps)',
+        'Junk removal or hauling'
+      ],
+      footnote: 'If conditions on arrival do not meet the requirements above, we may need to reschedule and a trip fee will apply.'
     },
     {
       id: 'airbnb',
@@ -136,6 +167,12 @@ const DEFAULTS = {
           'Welcome items in place (if supplied)',
           'Photos sent if requested'
         ]}
+      ],
+      notIncluded: [
+        'Inventory shopping (toilet paper, soap, etc — host must stock supplies on-site)',
+        'Off-site linen laundering (we strip and replace with provided fresh sets)',
+        'Property damage repairs (we photo-document and report only)',
+        'Deep oven, fridge, or appliance cleaning between turnovers (recommend scheduled Deep Clean)'
       ]
     }
   ],

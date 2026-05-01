@@ -251,7 +251,17 @@ export default async function handler(req, res) {
         .maybeSingle();
 
       if (clientRecord && !clientRecord.policies_agreed_at) {
-        const policyLink = `${BASE_URL}/agree.html?c=${clientId}`;
+        // Map booked service to checklist id so agree.html shows the right scope
+        const svcRaw = String(body.service || '').toLowerCase();
+        let svcId = null;
+        if (svcRaw.indexOf('move') !== -1) svcId = 'moveout';
+        else if (svcRaw.indexOf('deep') !== -1) svcId = 'deep';
+        else if (svcRaw.indexOf('airbnb') !== -1 || svcRaw.indexOf('turnover') !== -1) svcId = 'airbnb';
+        else if (svcRaw.indexOf('regular') !== -1) svcId = 'regular';
+
+        const policyLink = svcId
+          ? `${BASE_URL}/agree.html?c=${clientId}&svc=${svcId}`
+          : `${BASE_URL}/agree.html?c=${clientId}`;
         const policyMsg  = `Hi ${firstName}! Before your first cleaning with Hawaii Natural Clean, please take a moment to review and agree to our service policies: ${policyLink} 🌺`;
         await fetchWithTimeout(`${BASE_URL}/api/send-sms`, {
           method: 'POST',

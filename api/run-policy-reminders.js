@@ -50,7 +50,7 @@ export default async function handler(req, res) {
       .from('clients')
       .select(`
         id, name, phone,
-        appointments ( id, date, status )
+        appointments ( id, date, status, service )
       `)
       .is('policies_agreed_at', null)
       .is('policy_reminder_sent_at', null)
@@ -79,7 +79,21 @@ export default async function handler(req, res) {
       const firstName = (client.name || 'there').split(' ')[0];
       const phone = client.phone.replace(/\D/g, '');
       const e164  = client.phone.startsWith('+') ? client.phone : `+1${phone}`;
-      const agreeLink = `${BASE_URL}/agree.html?c=${client.id}`;
+
+      // Pick the soonest upcoming scheduled/assigned appointment to determine service
+      const upcoming = (client.appointments || [])
+        .filter(a => a.date >= today && ['scheduled', 'assigned'].includes(a.status))
+        .sort((a, b) => a.date.localeCompare(b.date))[0];
+      const svcRaw = String((upcoming && upcoming.service) || '').toLowerCase();
+      let svcId = null;
+      if (svcRaw.indexOf('move') !== -1) svcId = 'moveout';
+      else if (svcRaw.indexOf('deep') !== -1) svcId = 'deep';
+      else if (svcRaw.indexOf('airbnb') !== -1 || svcRaw.indexOf('turnover') !== -1) svcId = 'airbnb';
+      else if (svcRaw.indexOf('regular') !== -1) svcId = 'regular';
+
+      const agreeLink = svcId
+        ? `${BASE_URL}/agree.html?c=${client.id}&svc=${svcId}`
+        : `${BASE_URL}/agree.html?c=${client.id}`;
 
       const message = `Aloha ${firstName}! Before your upcoming cleaning with ${BUSINESS_NAME}, please take a moment to review and agree to our service policies: ${agreeLink} Questions? Call or text us at ${BUSINESS_PHONE}. Mahalo 🌺`;
 

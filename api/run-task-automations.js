@@ -32,6 +32,7 @@ import { logError } from './utils/error-logger.js';
 import { getOpenPhoneHistory } from './utils/openphone-history.js';
 import { fetchWithTimeout, TIMEOUTS } from './utils/with-timeout.js';
 import { isAutomationEnabled } from './utils/automation-gate.js';
+import { buildSummaryPrompt } from './utils/summary-prompt.js';
 
 const ANTHROPIC_API = 'https://api.anthropic.com/v1/messages';
 
@@ -60,22 +61,24 @@ async function generateCallBrief(db, lead, purpose) {
       maxCalls: 10,
     }) : '';
 
-    const purposeLine = purpose === 'reengagement'
-      ? 'This lead got a quote 5 days ago and has not booked. Generate a brief for a re-engagement call. Suggest one open-ended question to surface objections.'
-      : 'Generate a concise pre-call briefing for this lead. Factual only, no speculation.';
+    // Surface the call purpose at the top of the rep's brief by prepending
+    // it to the Notes field — the structured prompt template takes care of
+    // the rest of the format.
+    const purposeNote = purpose === 'reengagement'
+      ? 'CALL PURPOSE: Day-5 re-engagement call. Lead got a quote 5 days ago and has not booked. Surface specific objections and any unanswered questions from their conversation.'
+      : 'CALL PURPOSE: Day-1 follow-up call. Quote went out yesterday — confirm receipt, answer questions, push toward booking.';
 
-    const prompt = [
-      'You are a briefing assistant for Hawaii Natural Clean, a cleaning business in Hawaii.',
-      purposeLine,
-      'Include: who they are, what they need, quote details, and 1-2 specific talking points.',
-      '',
-      `Name: ${lead.name}`,
-      lead.service ? `Service: ${lead.service}` : '',
-      lead.quote_total ? `Quote sent: $${lead.quote_total}` : '',
-      lead.address ? `Address: ${lead.address}` : '',
-      lead.notes ? `Notes: ${lead.notes}` : '',
-      history ? `\nConversation history:\n${history}` : '',
-    ].filter(Boolean).join('\n');
+    const prompt = buildSummaryPrompt({
+      mode: 'va_brief',
+      data: {
+        name: lead.name,
+        service: lead.service,
+        quote_total: lead.quote_total,
+        address: lead.address,
+        notes: lead.notes ? `${purposeNote}\n\n${lead.notes}` : purposeNote,
+      },
+      history,
+    });
 
     const resp = await fetchWithTimeout(ANTHROPIC_API, {
       method: 'POST',
@@ -85,8 +88,8 @@ async function generateCallBrief(db, lead, purpose) {
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 400,
+        model: 'claude-sonnet-4-6',
+        max_tokens: 1000,
         messages: [{ role: 'user', content: prompt }],
       }),
     }, TIMEOUTS.ANTHROPIC);

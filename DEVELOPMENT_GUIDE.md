@@ -688,6 +688,7 @@ Original notes preserved below for context.
 - Visible toggle button to open the login overlay.
 
 ### Other queued items
+- **V2: Auto-attach cleaner-submitted photos to client profiles.** When a cleaner sends MMS via OpenPhone during a job, AI matches sender phone → cleaner record → today's appointment → client record, and saves the photos to that client's profile gallery. Requires: cleaner-to-client active-appointment lookup, photo storage policy (Supabase bucket per client?), gallery UI in client detail panel. Cool feature, not blocking — current manual workflow (cleaner texts office, office handles) is fine at current volume. Revisit when cleaner volume crosses ~5/day or when client-history-by-photos becomes useful for upsell/retention.
 - Native Automations Builder UI inside the CRM (visual "When → If → Do", with toggleable rules and run logs).
 - Google Calendar one-directional sync (CRM pushes to cleaner calendars).
 - Custom website lead capture form triggering automations.

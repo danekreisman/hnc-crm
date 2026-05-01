@@ -12065,7 +12065,19 @@ function _escSummary(s){
 }
 function renderSummaryHtml(md){
   if(!md) return '';
-  var lines = String(md).split(/\r?\n/);
+  var src = String(md);
+
+  // Strip ```markdown / ``` code fences if Haiku wraps the response
+  src = src.replace(/^```[a-z]*\s*\n?/i, '').replace(/\n?```\s*$/, '');
+
+  // Strip any preamble before the first ## header (model occasionally adds
+  // "Here's the briefing:" or similar despite the prompt). If no header found,
+  // render whatever was returned as-is.
+  var firstH = src.indexOf('\n## ');
+  if (firstH === -1 && src.indexOf('## ') === 0) firstH = 0;
+  if (firstH > 0) src = src.slice(firstH).replace(/^\n+/, '');
+
+  var lines = src.split(/\r?\n/);
   var html = [];
   var inList = false;
   for (var i = 0; i < lines.length; i++) {
@@ -12075,23 +12087,19 @@ function renderSummaryHtml(md){
       if (inList) { html.push('</ul>'); inList = false; }
       continue;
     }
-    // ## Header (with emoji + label)
     var hMatch = trimmed.match(/^##\s+(.+)$/);
     if (hMatch) {
       if (inList) { html.push('</ul>'); inList = false; }
       html.push('<div class="ai-sum-h">' + _escSummary(hMatch[1]) + '</div>');
       continue;
     }
-    // - bullet item
     var bMatch = trimmed.match(/^[-*]\s+(.+)$/);
     if (bMatch) {
       if (!inList) { html.push('<ul class="ai-sum-ul">'); inList = true; }
-      // inline **bold** support
       var content = _escSummary(bMatch[1]).replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
       html.push('<li>' + content + '</li>');
       continue;
     }
-    // Fallback: plain paragraph
     if (inList) { html.push('</ul>'); inList = false; }
     html.push('<p class="ai-sum-p">' + _escSummary(trimmed) + '</p>');
   }

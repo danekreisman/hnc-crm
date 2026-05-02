@@ -131,6 +131,16 @@ export default async function handler(req, res) {
       return res.status(200).json({ success: true });
     }
 
+    if (action === 'reopen') {
+      if (!id) return res.status(400).json({ error: 'id required' });
+      const { error } = await db.from('tasks').update({
+        status: 'open',
+        completed_at: null,
+      }).eq('id', id);
+      if (error) throw error;
+      return res.status(200).json({ success: true });
+    }
+
     // ── delete ────────────────────────────────────────────────────────────
     if (action === 'delete') {
       if (!id) return res.status(400).json({ error: 'id required' });

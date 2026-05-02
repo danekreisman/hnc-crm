@@ -2582,6 +2582,104 @@ async function dbLoadInvoices(){
 }
 
 // Load all data on startup
+/* ──────────────────────────────────────────────────────────────────────
+   Rebuild apptData + recurringAppts from a fresh DB result. Used by
+   loadAllData on startup AND by _refreshAppointmentsFromDB after any
+   destructive op (halt-series, bulk delete) to make in-memory match DB.
+   Wipes existing in-memory state before rebuilding — so this is the
+   "DB is source of truth" reset, not a merge.
+   ────────────────────────────────────────────────────────────────────── */
+function _rebuildAppointmentsFromDB(appts){
+  console.log('[rebuildAppts] Rebuilding apptData + recurringAppts from '+appts.length+' DB rows');
+  // Wipe existing in-memory state — full reset, not a merge.
+  Object.keys(apptData).forEach(function(k){ delete apptData[k]; });
+  recurringAppts.length = 0;
+
+  // series_id → name maps for FK fallback
+  var seriesNameMap={}, seriesCleanerMap={};
+  appts.forEach(function(a){
+    if(!a.series_id) return;
+    if(!seriesNameMap[a.series_id]){
+      var n=(a.client_id&&clientDB[a.client_id])?clientDB[a.client_id].name:(a.client_name||null);
+      if(n && n !== 'Unknown') seriesNameMap[a.series_id]=n;
+    }
+    if(!seriesCleanerMap[a.series_id]){
+      var c=(a.cleaner_id&&cleanerDB[a.cleaner_id])?cleanerDB[a.cleaner_id].name:(a.cleaner_name||null);
+      if(c && c !== 'Unassigned') seriesCleanerMap[a.series_id]=c;
+    }
+  });
+
+  appts.forEach(function(a){
+    var d=new Date(a.date+'T12:00:00');
+    var key=d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate();
+    if(!apptData[key])apptData[key]=[];
+    var clientName=(a.client_id&&clientDB[a.client_id])?clientDB[a.client_id].name:(a.client_name||(a.series_id&&seriesNameMap[a.series_id])||'Unknown');
+    var cleanerName=(a.cleaner_id&&cleanerDB[a.cleaner_id])?cleanerDB[a.cleaner_id].name:(a.cleaner_name||(a.series_id&&seriesCleanerMap[a.series_id])||'Unassigned');
+    apptData[key].push({
+      n:clientName, s:a.status||'unassigned',
+      t:a.time||'8am', cleaner:cleanerName,
+      recurring:a.recurring||false, dbId:a.id,
+      client_id:a.client_id||null, cleaner_id:a.cleaner_id||null,
+      service:a.service||'Regular Cleaning',
+      freq:a.frequency||'One-time',
+      address:a.address||'',
+      beds:a.beds||'', baths:a.baths||'',
+      sqft:a.sqft||'',
+      condition:a.condition||7,
+      basePrice:a.base_price||0, tax:a.tax||0, totalPrice:a.total_price||0,
+      cleanerPay:a.cleaner_pay||0,
+      cleanerPayOverride:a.cleaner_pay_override!=null?a.cleaner_pay_override:null,
+      notes:a.notes||'',
+      duration:a.duration_hours||null,
+      seriesId:a.series_id||null,
+      seriesIndex:a.series_index!=null?a.series_index:null
+    });
+  });
+
+  // Rebuild recurringAppts (one entry per unique series)
+  var recurSeen={};
+  appts.forEach(function(a){
+    if(!a.recurring||!a.frequency||a.frequency==='One-time')return;
+    var clientName=(a.client_id&&clientDB[a.client_id])?clientDB[a.client_id].name:(a.client_name||(a.series_id&&seriesNameMap[a.series_id])||'Unknown');
+    var cleanerName=(a.cleaner_id&&cleanerDB[a.cleaner_id])?cleanerDB[a.cleaner_id].name:(a.cleaner_name||(a.series_id&&seriesCleanerMap[a.series_id])||'Unassigned');
+    var rKey=clientName+'|'+a.time+'|'+a.frequency;
+    if(recurSeen[rKey])return;
+    recurSeen[rKey]=true;
+    var d=new Date(a.date+'T12:00:00');
+    recurringAppts.push({
+      name:clientName, freq:a.frequency,
+      startYear:d.getFullYear(), startMonth:d.getMonth()+1, startDay:d.getDate(),
+      dayOfWeek:d.getDay(), timeStr:a.time||'8am',
+      cleaner:cleanerName,
+      client_id:a.client_id||null, cleaner_id:a.cleaner_id||null,
+      status:a.status||'assigned', active:true,
+      service:a.service, duration:a.duration_hours||null,
+      address:a.address||'', beds:a.beds||'', baths:a.baths||'', sqft:a.sqft||'',
+      seriesId:a.series_id||null, excludedDates:[]
+    });
+  });
+  console.log('[rebuildAppts] '+Object.keys(apptData).length+' day-buckets, '+recurringAppts.length+' recurring series');
+}
+
+/* Re-fetch appointments from DB and rebuild in-memory state, then renderCal.
+   Use after destructive ops where in-memory pruning may have been imprecise
+   (halt-series, bulk-delete). Awaits the DB to finish committing the delete
+   before re-fetching, so we read the post-mutation state. */
+async function _refreshAppointmentsFromDB(opts){
+  opts = opts || {};
+  var settleMs = opts.settleMs != null ? opts.settleMs : 600;
+  // Give the DB a moment to commit any pending background mutations
+  if(settleMs > 0) await new Promise(function(r){ setTimeout(r, settleMs); });
+  try {
+    var appts = await dbLoadAppointments();
+    _rebuildAppointmentsFromDB(appts);
+    if(typeof renderCal === 'function') renderCal();
+    console.log('[refreshAppts] reload complete');
+  } catch (err) {
+    console.error('[refreshAppts] failed:', err);
+  }
+}
+
 async function loadAllData(){
   showLoadingState(true);
   try{
@@ -2679,76 +2777,7 @@ async function loadAllData(){
     try { renderLeadsPipeline(); } catch(e) { console.error('[loadAllData] early renderLeadsPipeline failed:', e); }
 
     // ── Process appointments — resolve names via FK now that clientDB/cleanerDB are populated
-    console.log('[loadAllData] Loaded '+appts.length+' real appointments from Supabase');
-    // Build series_id → name maps so spawned occurrences with null client_id/client_name
-    // can recover the name from any sibling row in the same series (legacy populateRecurringMonth bug).
-    var seriesNameMap={}, seriesCleanerMap={};
-    appts.forEach(function(a){
-      if(!a.series_id) return;
-      if(!seriesNameMap[a.series_id]){
-        var n=(a.client_id&&clientDB[a.client_id])?clientDB[a.client_id].name:(a.client_name||null);
-        if(n && n !== 'Unknown') seriesNameMap[a.series_id]=n;
-      }
-      if(!seriesCleanerMap[a.series_id]){
-        var c=(a.cleaner_id&&cleanerDB[a.cleaner_id])?cleanerDB[a.cleaner_id].name:(a.cleaner_name||null);
-        if(c && c !== 'Unassigned') seriesCleanerMap[a.series_id]=c;
-      }
-    });
-    appts.forEach(function(a){
-      const d=new Date(a.date+'T12:00:00');
-      const key=d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate();
-      if(!apptData[key])apptData[key]=[];
-      const exists=apptData[key].some(function(x){return x.dbId===a.id;});
-      if(!exists){
-        // Resolve names from FK — client_name/cleaner_name columns were dropped in Phase 4
-        var clientName=(a.client_id&&clientDB[a.client_id])?clientDB[a.client_id].name:(a.client_name||(a.series_id&&seriesNameMap[a.series_id])||'Unknown');
-        var cleanerName=(a.cleaner_id&&cleanerDB[a.cleaner_id])?cleanerDB[a.cleaner_id].name:(a.cleaner_name||(a.series_id&&seriesCleanerMap[a.series_id])||'Unassigned');
-        apptData[key].push({
-          n:clientName, s:a.status||'unassigned',
-          t:a.time||'8am', cleaner:cleanerName,
-          recurring:a.recurring||false, dbId:a.id,
-          client_id:a.client_id||null, cleaner_id:a.cleaner_id||null,
-          service:a.service||'Regular Cleaning',
-          freq:a.frequency||'One-time',
-          address:a.address||'',
-          beds:a.beds||'', baths:a.baths||'',
-          sqft:a.sqft||'',
-          condition:a.condition||7,
-          basePrice:a.base_price||0, tax:a.tax||0, totalPrice:a.total_price||0,
-          cleanerPay:a.cleaner_pay||0,
-          cleanerPayOverride:a.cleaner_pay_override!=null?a.cleaner_pay_override:null,
-          notes:a.notes||'',
-          duration:a.duration_hours||null,
-          seriesId:a.series_id||null,
-          seriesIndex:a.series_index!=null?a.series_index:null
-        });
-        console.log('[loadAllData] appt loaded: '+clientName+' key='+key+' client_id='+a.client_id+' duration='+a.duration_hours);
-      }
-    });
-
-    // Rebuild recurringAppts using FK-resolved names
-    var recurSeen={};
-    appts.forEach(function(a){
-      if(!a.recurring||!a.frequency||a.frequency==='One-time')return;
-      var clientName=(a.client_id&&clientDB[a.client_id])?clientDB[a.client_id].name:(a.client_name||(a.series_id&&seriesNameMap[a.series_id])||'Unknown');
-      var cleanerName=(a.cleaner_id&&cleanerDB[a.cleaner_id])?cleanerDB[a.cleaner_id].name:(a.cleaner_name||(a.series_id&&seriesCleanerMap[a.series_id])||'Unassigned');
-      var rKey=clientName+'|'+a.time+'|'+a.frequency;
-      if(recurSeen[rKey])return;
-      recurSeen[rKey]=true;
-      var d=new Date(a.date+'T12:00:00');
-      recurringAppts.push({
-        name:clientName, freq:a.frequency,
-        startYear:d.getFullYear(), startMonth:d.getMonth()+1, startDay:d.getDate(),
-        dayOfWeek:d.getDay(), timeStr:a.time||'8am',
-        cleaner:cleanerName,
-        client_id:a.client_id||null, cleaner_id:a.cleaner_id||null,
-        status:a.status||'assigned', active:true,
-        service:a.service, duration:a.duration_hours||null,
-        address:a.address||'', beds:a.beds||'', baths:a.baths||'', sqft:a.sqft||'',
-        seriesId:a.series_id||null, excludedDates:[]
-      });
-    });
-    console.log('[loadAllData] total recurringAppts rebuilt: '+recurringAppts.length);
+    _rebuildAppointmentsFromDB(appts);
 
     // (Leads were already processed and pipeline rendered earlier — see above.)
 
@@ -4264,8 +4293,12 @@ function deleteEntireSeries(){
       var isClicked = !!(clickedDbId && e.dbId === clickedDbId);
       // Other occurrences are only removed if future (past completed appts stay as records).
       if(!isFutureOrToday && !isClicked) return true;
+      // Match logic: if we have a series_id, ONLY match by series_id. Falling
+      // back to byNameTime here would over-match when a client has multiple
+      // series at the same time (e.g. duplicate series from old buggy edits)
+      // and halt-one would visually wipe ALL of them. (Bug 2026-05-01.)
       var bySeries = !!(targetSeriesId && e.seriesId === targetSeriesId);
-      var byNameTime = (e.n === targetName && _normTime(e.t) === targetTimeNorm);
+      var byNameTime = !targetSeriesId && (e.n === targetName && _normTime(e.t) === targetTimeNorm);
       var matches = isClicked || bySeries || byNameTime;
       if(matches && e.dbId) futureDbIds.push(e.dbId);
       return !matches;
@@ -4276,6 +4309,7 @@ function deleteEntireSeries(){
   if(targetSeriesId){
     recurringAppts = recurringAppts.filter(function(r){ return r.seriesId !== targetSeriesId; });
   } else {
+    // Only fall back to name+time when we have no series_id (legacy data)
     recurringAppts = recurringAppts.filter(function(r){
       return !(r.name === targetName && _normTime(r.timeStr) === targetTimeNorm);
     });
@@ -4298,9 +4332,17 @@ function deleteEntireSeries(){
       q = db.from('appointments').delete().eq('client_name', targetName).eq('recurring', true).gte('date', todayISO);
     }
   }
-  q.then(function(res){
-    if(res.error) console.error('[deleteEntireSeries] Supabase delete error:', res.error);
-    else console.log('[deleteEntireSeries] SUCCESS — '+futureDbIds.length+' future rows deleted from Supabase');
+  q.then(async function(res){
+    if(res.error) {
+      console.error('[deleteEntireSeries] Supabase delete error:', res.error);
+      // Pull from DB to undo any over-aggressive in-memory pruning
+      _refreshAppointmentsFromDB({settleMs: 0});
+      return;
+    }
+    console.log('[deleteEntireSeries] SUCCESS — '+futureDbIds.length+' future rows deleted from Supabase');
+    // Re-sync in-memory state from DB. Our in-memory filter could over-match
+    // (same name+time across multiple series) — DB is source of truth.
+    _refreshAppointmentsFromDB({settleMs: 200});
   });
   // Also hard-delete the clicked appt's row even if it's in the past — user clicked it,
   // user halted the series, user expects this specific appt gone.

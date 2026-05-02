@@ -13631,6 +13631,24 @@ Your total will update automatically when you select a payment method.</textarea
           // Fire input/change events so the app's save logic sees the new value
           el.dispatchEvent(new Event('input', {bubbles:true}));
           el.dispatchEvent(new Event('change', {bubbles:true}));
+          // Force-hide all .pac-container dropdowns. Google's widget sometimes
+          // leaves the dropdown stuck visible after fast clicks — known glitch
+          // of the legacy Autocomplete API. We also blur the input on the next
+          // tick to nudge the widget into its expected dismiss path.
+          setTimeout(function(){
+            document.querySelectorAll('.pac-container').forEach(function(pc){
+              pc.style.display = 'none';
+            });
+          }, 0);
+        });
+        // Also hide stuck .pac-container when the input loses focus.
+        el.addEventListener('blur', function(){
+          // Defer past Google's own blur handler (which might re-show)
+          setTimeout(function(){
+            document.querySelectorAll('.pac-container').forEach(function(pc){
+              pc.style.display = 'none';
+            });
+          }, 150);
         });
         // Prevent form submit on Enter while a suggestion is open
         el.addEventListener('keydown', function(e){
@@ -13655,6 +13673,16 @@ Your total will update automatically when you select a payment method.</textarea
   document.addEventListener('focusin', function(e){
     if(e.target && e.target.id && window.HNC_ADDRESS_IDS.indexOf(e.target.id) !== -1){
       window.hncScheduleMapsAttach();
+    } else {
+      // Focus moved to a non-address field. Force-hide any stuck Google Places
+      // dropdown so the user can interact with other form fields cleanly.
+      // Google's legacy Autocomplete sometimes leaves the dropdown visible
+      // after the input loses focus — this is the suspenders to that belt.
+      try {
+        document.querySelectorAll('.pac-container').forEach(function(pc){
+          pc.style.display = 'none';
+        });
+      } catch(_) {}
     }
   }, true);
   // CSS tweak so .pac-container shows above modals (which use high z-index)

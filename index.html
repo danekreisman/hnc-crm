@@ -678,6 +678,74 @@ textarea{font-family:inherit;}
         </div>
       </div>
 
+      <!-- AI Follow-up modal -->
+      <div id="lf-modal-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1100;align-items:center;justify-content:center;padding:20px;" onclick="if(event.target===this)closeLeadFollowupModal();">
+        <div style="background:#fff;border-radius:16px;padding:24px;width:100%;max-width:560px;max-height:92vh;overflow-y:auto;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;">
+            <div>
+              <div style="font-size:18px;font-weight:700;">&#x2728; AI follow-up</div>
+              <div id="lf-lead-info" style="font-size:12px;color:var(--text-muted);margin-top:2px;"></div>
+            </div>
+            <button onclick="closeLeadFollowupModal()" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--text-muted);line-height:1;">&times;</button>
+          </div>
+
+          <!-- Step 1: pick channels -->
+          <div id="lf-step-channels">
+            <div style="font-size:13px;color:var(--text);margin-bottom:10px;">Which channels?</div>
+            <label style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1.5px solid var(--border);border-radius:10px;margin-bottom:8px;cursor:pointer;">
+              <input type="checkbox" id="lf-ch-sms" checked style="width:18px;height:18px;cursor:pointer;">
+              <div>
+                <div style="font-weight:600;font-size:14px;">SMS</div>
+                <div id="lf-ch-sms-detail" style="font-size:11px;color:var(--text-muted);">to phone on file</div>
+              </div>
+            </label>
+            <label style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1.5px solid var(--border);border-radius:10px;margin-bottom:14px;cursor:pointer;">
+              <input type="checkbox" id="lf-ch-email" style="width:18px;height:18px;cursor:pointer;">
+              <div>
+                <div style="font-weight:600;font-size:14px;">Email</div>
+                <div id="lf-ch-email-detail" style="font-size:11px;color:var(--text-muted);">to email on file</div>
+              </div>
+            </label>
+            <button id="lf-generate-btn" onclick="lfGenerate()" style="width:100%;padding:12px;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;">&#x2728; Generate message</button>
+          </div>
+
+          <!-- Step 2: loading -->
+          <div id="lf-step-loading" style="display:none;text-align:center;padding:30px 0;">
+            <div style="display:inline-block;width:32px;height:32px;border:3px solid #e9d8fd;border-top-color:#764ba2;border-radius:50%;animation:aispin .8s linear infinite;"></div>
+            <div style="margin-top:14px;font-size:13px;color:var(--text-muted);">Drafting personalized follow-up&hellip;</div>
+          </div>
+
+          <!-- Step 3: preview + edit -->
+          <div id="lf-step-preview" style="display:none;">
+            <div style="font-size:12px;color:var(--text-muted);margin-bottom:10px;">Review and edit before sending. These will go to the lead exactly as written below.</div>
+
+            <div id="lf-sms-block" style="display:none;margin-bottom:14px;border:1.5px solid #e9d8fd;border-radius:10px;padding:12px;">
+              <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:#553c9a;margin-bottom:6px;letter-spacing:.04em;">SMS &mdash; <span id="lf-sms-to" style="font-weight:500;text-transform:none;color:var(--text-muted);"></span></div>
+              <textarea id="lf-sms-body" style="width:100%;min-height:90px;padding:10px;border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:13px;line-height:1.5;resize:vertical;" placeholder="SMS message"></textarea>
+              <div id="lf-sms-counter" style="font-size:11px;color:var(--text-muted);margin-top:4px;text-align:right;"></div>
+            </div>
+
+            <div id="lf-email-block" style="display:none;margin-bottom:14px;border:1.5px solid #e9d8fd;border-radius:10px;padding:12px;">
+              <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:#553c9a;margin-bottom:6px;letter-spacing:.04em;">Email &mdash; <span id="lf-email-to" style="font-weight:500;text-transform:none;color:var(--text-muted);"></span></div>
+              <input type="text" id="lf-email-subject" placeholder="Subject" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:13px;font-weight:600;margin-bottom:8px;">
+              <textarea id="lf-email-body" style="width:100%;min-height:140px;padding:10px;border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:13px;line-height:1.55;resize:vertical;" placeholder="Email body"></textarea>
+            </div>
+
+            <div style="display:flex;gap:10px;">
+              <button onclick="lfBackToChannels()" style="flex:1;padding:11px;border:1.5px solid var(--border);border-radius:10px;background:none;font-size:14px;font-weight:600;cursor:pointer;">&larr; Regenerate</button>
+              <button id="lf-send-btn" onclick="lfSend()" style="flex:2;padding:11px;background:linear-gradient(135deg,#10b981 0%,#059669 100%);color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;">Send now</button>
+            </div>
+          </div>
+
+          <!-- Step 4: success/error -->
+          <div id="lf-step-result" style="display:none;text-align:center;padding:20px 0;">
+            <div id="lf-result-icon" style="font-size:42px;margin-bottom:10px;"></div>
+            <div id="lf-result-msg" style="font-size:14px;color:var(--text);margin-bottom:14px;"></div>
+            <button onclick="closeLeadFollowupModal()" style="padding:10px 24px;background:var(--brand-500);color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;">Close</button>
+          </div>
+        </div>
+      </div>
+
       <!-- MESSAGING -->
       <div id="view-messaging" class="vc">
         <div class="inbox-layout">
@@ -1920,6 +1988,7 @@ Mahalo 🌺</textarea>
         </div>
         <div class="action-grid" style="margin-top:14px;">
           <button class="action-btn green full" onclick="scheduleLeadAppointment()">Book appointment</button>
+          <button class="action-btn blue full" onclick="openLeadFollowupModal()" style="background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:#fff;">&#x2728; AI follow-up</button>
           <button class="action-btn blue" onclick="openMsgFromLead()">Message lead</button>
           <button class="action-btn amber" onclick="showLeadEdit()">Edit lead</button>
           <button class="action-btn amber" onclick="markLeadLost()">Mark as lost</button>
@@ -15002,6 +15071,158 @@ async function populateClientDropdown() {
     opt.value = cl.id; opt.textContent = cl.name;
     sel.appendChild(opt);
   });
+}
+
+/* ==========================================================================
+   AI FOLLOW-UP MODAL — generates and sends a personalized SMS/email/both
+   to the currently-open lead. Two-step flow: pick channels → preview → send.
+   Backend endpoints: /api/lead-followup-generate, /api/lead-followup-send.
+   ========================================================================== */
+function openLeadFollowupModal(){
+  if(!currentLeadId){ if(typeof showToast==='function') showToast('No lead selected', true); return; }
+  var lead = leadDB[currentLeadId];
+  if(!lead){ showToast('Lead not found', true); return; }
+
+  // Update lead-info header + channel labels with what we have
+  var info = document.getElementById('lf-lead-info');
+  if(info) info.textContent = (lead.name || 'Lead') + ' \u00b7 ' + (lead.stage || 'New inquiry');
+  var smsDetail = document.getElementById('lf-ch-sms-detail');
+  if(smsDetail) smsDetail.textContent = lead.phone && lead.phone !== '\u2014' ? 'to ' + lead.phone : 'no phone on file';
+  var emailDetail = document.getElementById('lf-ch-email-detail');
+  if(emailDetail) emailDetail.textContent = lead.email && lead.email !== '\u2014' ? 'to ' + lead.email : 'no email on file';
+
+  // Default-check SMS if available, default-uncheck if not. Disable each
+  // channel's checkbox when there's no contact for it.
+  var smsChk = document.getElementById('lf-ch-sms');
+  var emailChk = document.getElementById('lf-ch-email');
+  var hasPhone = !!(lead.phone && lead.phone !== '\u2014');
+  var hasEmail = !!(lead.email && lead.email !== '\u2014');
+  if(smsChk){ smsChk.checked = hasPhone; smsChk.disabled = !hasPhone; }
+  if(emailChk){ emailChk.checked = false; emailChk.disabled = !hasEmail; }
+
+  _lfShowStep('channels');
+  document.getElementById('lf-modal-overlay').style.display = 'flex';
+}
+
+function closeLeadFollowupModal(){
+  var ov = document.getElementById('lf-modal-overlay');
+  if(ov) ov.style.display = 'none';
+}
+
+function _lfShowStep(step){
+  ['channels','loading','preview','result'].forEach(function(s){
+    var el = document.getElementById('lf-step-'+s);
+    if(el) el.style.display = (s===step) ? (s==='channels' ? 'block' : (s==='preview' ? 'block' : 'block')) : 'none';
+  });
+}
+
+async function lfGenerate(){
+  var smsChk = document.getElementById('lf-ch-sms');
+  var emailChk = document.getElementById('lf-ch-email');
+  var channels = [];
+  if(smsChk && smsChk.checked) channels.push('sms');
+  if(emailChk && emailChk.checked) channels.push('email');
+  if(!channels.length){ alert('Pick at least one channel.'); return; }
+
+  _lfShowStep('loading');
+  try {
+    var sess = await db.auth.getSession();
+    var tok = sess.data.session ? sess.data.session.access_token : '';
+    var resp = await fetch('/api/lead-followup-generate', {
+      method:'POST',
+      headers:{'Content-Type':'application/json', 'Authorization':'Bearer '+tok},
+      body: JSON.stringify({ leadId: currentLeadId, channels: channels }),
+    });
+    var data = await resp.json();
+    if(!data.success) throw new Error(data.error || 'Generation failed');
+
+    // Populate preview
+    var smsBlock = document.getElementById('lf-sms-block');
+    var emailBlock = document.getElementById('lf-email-block');
+    if(channels.indexOf('sms')!==-1 && data.sms){
+      document.getElementById('lf-sms-to').textContent = 'to ' + data.phone;
+      document.getElementById('lf-sms-body').value = data.sms;
+      _lfUpdateSmsCounter();
+      smsBlock.style.display = 'block';
+    } else { smsBlock.style.display = 'none'; }
+    if(channels.indexOf('email')!==-1 && data.email){
+      document.getElementById('lf-email-to').textContent = 'to ' + data.email_addr;
+      document.getElementById('lf-email-subject').value = data.email.subject || '';
+      document.getElementById('lf-email-body').value = data.email.body || '';
+      emailBlock.style.display = 'block';
+    } else { emailBlock.style.display = 'none'; }
+
+    _lfShowStep('preview');
+  } catch (err){
+    document.getElementById('lf-result-icon').textContent = '\u26A0\uFE0F';
+    document.getElementById('lf-result-msg').textContent = 'Generation failed: ' + err.message;
+    _lfShowStep('result');
+  }
+}
+
+function lfBackToChannels(){
+  _lfShowStep('channels');
+}
+
+function _lfUpdateSmsCounter(){
+  var ta = document.getElementById('lf-sms-body');
+  var ctr = document.getElementById('lf-sms-counter');
+  if(!ta || !ctr) return;
+  var len = ta.value.length;
+  var seg = len <= 160 ? 1 : Math.ceil(len / 153);
+  ctr.textContent = len + ' chars \u00b7 ' + seg + ' SMS segment' + (seg>1?'s':'');
+}
+document.addEventListener('input', function(e){
+  if(e.target && e.target.id === 'lf-sms-body') _lfUpdateSmsCounter();
+});
+
+async function lfSend(){
+  var smsBody = (document.getElementById('lf-sms-body').value || '').trim();
+  var emailSubject = (document.getElementById('lf-email-subject').value || '').trim();
+  var emailBody = (document.getElementById('lf-email-body').value || '').trim();
+  var smsBlockVisible = document.getElementById('lf-sms-block').style.display !== 'none';
+  var emailBlockVisible = document.getElementById('lf-email-block').style.display !== 'none';
+
+  var payload = { leadId: currentLeadId };
+  if(smsBlockVisible && smsBody) payload.sms = smsBody;
+  if(emailBlockVisible && (emailSubject || emailBody)) payload.email = { subject: emailSubject, body: emailBody };
+
+  if(!payload.sms && !payload.email){ alert('Nothing to send. Add SMS or email content.'); return; }
+
+  var btn = document.getElementById('lf-send-btn');
+  btn.disabled = true;
+  btn.textContent = 'Sending\u2026';
+
+  try {
+    var sess = await db.auth.getSession();
+    var tok = sess.data.session ? sess.data.session.access_token : '';
+    var resp = await fetch('/api/lead-followup-send', {
+      method:'POST',
+      headers:{'Content-Type':'application/json', 'Authorization':'Bearer '+tok},
+      body: JSON.stringify(payload),
+    });
+    var data = await resp.json();
+    if(!data.success){
+      throw new Error((data.errors && data.errors.length ? data.errors.join('; ') : (data.error || 'Send failed')));
+    }
+    // Success
+    var parts = [];
+    if(data.smsSent) parts.push('SMS');
+    if(data.emailSent) parts.push('Email');
+    document.getElementById('lf-result-icon').textContent = '\u2705';
+    document.getElementById('lf-result-msg').innerHTML = parts.join(' + ') + ' sent.<br>'
+      + '<span style="font-size:12px;color:var(--text-muted);">Logged to lead notes.</span>'
+      + (data.errors && data.errors.length ? '<br><br><span style="font-size:12px;color:#c53030;">Partial errors: '+data.errors.join('; ')+'</span>' : '');
+    _lfShowStep('result');
+    if(typeof logActivity==='function') logActivity('lead_followup_sent', 'AI follow-up sent: '+parts.join(' + '), {leadId: currentLeadId, channels: parts});
+  } catch (err){
+    document.getElementById('lf-result-icon').textContent = '\u26A0\uFE0F';
+    document.getElementById('lf-result-msg').textContent = 'Send failed: ' + err.message;
+    _lfShowStep('result');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Send now';
+  }
 }
 
 async function submitTask() {

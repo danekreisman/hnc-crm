@@ -1986,6 +1986,15 @@ Mahalo 🌺</textarea>
             <div id="sug-error" style="background:#fee;border:1px solid #fca;border-radius:6px;padding:8px 10px;margin-top:10px;font-size:11px;color:#c5192d;display:none;"></div>
           </div>
         </div>
+        <!-- Automation exclusion toggle. When ON, this lead is blacklisted from all
+             cron-driven follow-ups and the AI follow-up button refuses to send. -->
+        <div id="lead-dnc-row" style="margin-top:14px;display:flex;align-items:center;gap:10px;padding:10px 12px;border:1.5px solid var(--border);border-radius:10px;background:var(--bg-soft);">
+          <div style="flex:1;">
+            <div style="font-size:13px;font-weight:600;color:var(--text);">Exclude from automations</div>
+            <div id="lead-dnc-status" style="font-size:11px;color:var(--text-muted);margin-top:1px;">No follow-up SMS, email, or AI nudges will be sent to this lead.</div>
+          </div>
+          <button id="lead-dnc-toggle" onclick="toggleLeadDoNotContact()" style="border:none;cursor:pointer;padding:6px 14px;border-radius:14px;font-size:12px;font-weight:600;font-family:inherit;min-width:64px;">OFF</button>
+        </div>
         <div class="action-grid" style="margin-top:14px;">
           <button class="action-btn green full" onclick="scheduleLeadAppointment()">Book appointment</button>
           <button class="action-btn blue full" onclick="openLeadFollowupModal()" style="background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:#fff;">&#x2728; AI follow-up</button>
@@ -2840,6 +2849,10 @@ async function loadAllData(){
         baths:     l.baths!=null?l.baths:((l.notes&&/Baths:\s*(\S+)/.exec(l.notes))?/Baths:\s*(\S+)/.exec(l.notes)[1]:null),
         frequency: l.frequency||((l.notes&&/Frequency:\s*([^\n]+)/.exec(l.notes))?/Frequency:\s*([^\n]+)/.exec(l.notes)[1].trim():null),
         condition: l.condition!=null?l.condition:((l.notes&&/Condition:\s*(\d+)/.exec(l.notes))?/Condition:\s*(\d+)/.exec(l.notes)[1]:null),
+        // Automation exclusion flag — when true, all crons (Quoted→Follow-up,
+        // days_since_response, broadcasts) and the AI follow-up button skip
+        // this lead. Toggleable via the pill on the lead profile.
+        doNotContact: !!l.do_not_contact,
       };
     });
     // Pipeline can render NOW. Don't make the user wait for appointments.
@@ -4716,6 +4729,66 @@ function saveClientEdit(){
   showToast('Client updated successfully.');
 }
 
+/* ──────────────────────────────────────────────────────────────────────
+   Per-lead automation-exclusion toggle. Sets do_not_contact=true on the
+   lead row, which all crons (run-task-automations, run-automations,
+   send-broadcast) ALREADY check. Also gates the AI follow-up button so
+   you can't manually bypass the exclusion.
+   ────────────────────────────────────────────────────────────────────── */
+function _renderLeadDncPill(){
+  if(!currentLeadId) return;
+  var lead = leadDB[currentLeadId];
+  if(!lead) return;
+  var btn = document.getElementById('lead-dnc-toggle');
+  var status = document.getElementById('lead-dnc-status');
+  if(!btn || !status) return;
+  if(lead.doNotContact){
+    btn.textContent = 'ON';
+    btn.style.background = '#dc2626';
+    btn.style.color = '#fff';
+    status.textContent = 'Excluded. No follow-up SMS, email, or AI nudges will be sent.';
+    status.style.color = '#991b1b';
+  } else {
+    btn.textContent = 'OFF';
+    btn.style.background = 'var(--bg)';
+    btn.style.color = 'var(--text-muted)';
+    btn.style.border = '1.5px solid var(--border-strong)';
+    status.textContent = 'Automations active. Toggle ON to silence all follow-ups for this lead.';
+    status.style.color = 'var(--text-muted)';
+  }
+}
+
+async function toggleLeadDoNotContact(){
+  if(!currentLeadId){ showToast('No lead selected', true); return; }
+  var lead = leadDB[currentLeadId];
+  if(!lead){ showToast('Lead not found', true); return; }
+  var btn = document.getElementById('lead-dnc-toggle');
+  if(btn) btn.disabled = true;
+  var newValue = !lead.doNotContact;
+  // Optimistic UI flip
+  lead.doNotContact = newValue;
+  _renderLeadDncPill();
+  // Persist to DB
+  try {
+    var res = await db.from('leads').update({do_not_contact: newValue}).eq('id', currentLeadId);
+    if(res && res.error){
+      // Revert
+      lead.doNotContact = !newValue;
+      _renderLeadDncPill();
+      showToast('Could not save: ' + (res.error.message || 'database error'), true);
+      return;
+    }
+    showToast(newValue ? 'Lead excluded from automations' : 'Lead re-enabled for automations');
+    if(typeof logActivity==='function') logActivity('lead_dnc_toggled', (newValue?'Excluded':'Re-enabled')+' '+lead.name+' from automations', {leadId: currentLeadId, value: newValue});
+  } catch(e) {
+    lead.doNotContact = !newValue;
+    _renderLeadDncPill();
+    showToast('Toggle failed: ' + e.message, true);
+  } finally {
+    if(btn) btn.disabled = false;
+  }
+}
+
 function openLead(id){
   var d=leadDB[id];if(!d)return;
   currentLeadName=d.name;
@@ -4743,6 +4816,8 @@ function openLead(id){
   if(condEl) condEl.textContent = (d.condition!=null && d.condition!=='') ? (d.condition+'/10') : '—';
   document.getElementById('quote-price') && (document.getElementById('quote-price').value = d.value||'');
   document.getElementById('quote-success') && document.getElementById('quote-success').classList.remove('show');
+  // Render the do_not_contact pill state for this lead
+  _renderLeadDncPill();
   hideLeadEdit();
   // Reset summary button — new lead means stale summary should be cleared
   var leadSumBtn = document.getElementById('lead-ai-btn');

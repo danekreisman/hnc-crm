@@ -36,6 +36,11 @@ export default async function handler(req, res) {
   ].filter(Boolean);
 
   // ── 2. Insert lead ──────────────────────────────────────────────────────
+  // Janitorial leads land in their own segment ('janitorial_walkthrough') so
+  // the daily 3-day-since-response automation (which targets initial_sequence)
+  // doesn't follow up with them like a normal price-quoted lead. Janitorial
+  // is a walkthrough flow — they're waiting for an in-person meeting, not a
+  // text-based price reply.
   const { data: insertData, error: insertError } = await db.from('leads').insert([{
     name:         d.name.trim(),
     contact_name: d.name.trim(),
@@ -46,7 +51,7 @@ export default async function handler(req, res) {
     sqft:         d.sqft ? parseInt(d.sqft) : null,
     source:       d.referralSource || 'Website form',
     stage:        'New inquiry',
-    segment:      'initial_sequence',
+    segment:      isJanitorial ? 'janitorial_walkthrough' : 'initial_sequence',
     segment_moved_at: new Date().toISOString(),
     assigned_to:  'VA',
     booking_token: bookingToken,
@@ -214,11 +219,23 @@ export default async function handler(req, res) {
       console.log('[lead-capture] janitorial SMS sent:', smsRes.status);
     } catch(err) { console.error('[lead-capture] janitorial SMS failed:', err.message); }
 
-    // Mark quote_sent_at so we know something was sent + advance stage to Quoted
-    await db.from('leads').update({
-      quote_sent_at: new Date().toISOString(),
-      stage: 'Quoted'
-    }).eq('id', leadId);
+    // Park them in their own stage so the Quoted→Follow-up cron (which
+    // targets stage='Quoted') doesn't sweep them into the regular follow-up
+    // flow. Janitorial leads convert via in-person walkthrough, not text
+    // follow-up. Try to record walkthrough_request_sent_at if the column
+    // exists; fall back to just updating stage if the migration hasn't run.
+    try {
+      const upd = await db.from('leads').update({
+        walkthrough_request_sent_at: new Date().toISOString(),
+        stage: 'Walkthrough requested'
+      }).eq('id', leadId);
+      if (upd.error) {
+        console.warn('[lead-capture] walkthrough_request_sent_at column may be missing — falling back to stage-only update:', upd.error.message);
+        await db.from('leads').update({ stage: 'Walkthrough requested' }).eq('id', leadId);
+      }
+    } catch (updErr) {
+      console.error('[lead-capture] janitorial stage update failed:', updErr.message);
+    }
 
     return res.status(200).json({ success: true, leadId });
   }

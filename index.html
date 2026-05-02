@@ -1936,7 +1936,7 @@ Mahalo 🌺</textarea>
         <div class="form-row"><label>Address</label><input type="text" id="led-address"></div>
         <div class="form-row"><label>Est. monthly value ($)</label><input type="number" id="led-value"></div>
         <div class="form-row"><label>Service type</label><select id="led-service"><option>Regular Clean</option><option>Deep Clean</option><option>Move Out Clean</option><option>Airbnb Turnover</option><option>Janitorial Clean</option></select></div>
-        <div class="form-row"><label>Stage</label><select id="led-stage"><option>New inquiry</option><option>Quoted</option><option>Follow-up</option></select></div>
+        <div class="form-row"><label>Stage</label><select id="led-stage"><option>New inquiry</option><option>Quoted</option><option>Walkthrough requested</option><option>Follow-up</option></select></div>
         <div class="form-row"><label>Lead source</label><select id="led-source"><option>Google SEO</option><option>Referral</option><option>Cold outreach</option><option>Walk-in</option><option>Social media</option></select></div>
         <div class="form-row"><label>Next action</label><input type="text" id="led-action"></div>
         <div class="form-row"><label>Due date</label><input type="date" id="led-due"></div>
@@ -2942,7 +2942,7 @@ function renderLeadsPipeline(){
     if(!view)return;
     view.querySelectorAll('.pipe-col .deal-card').forEach(function(c){c.remove();});
   });
-  var stageMap={'New inquiry':0,'Quoted':1,'Follow-up':2};
+  var stageMap={'New inquiry':0,'Quoted':1,'Walkthrough requested':1,'Follow-up':2};
   leadEntries.forEach(function(entry){
     var id=entry[0];var l=entry[1];
     var colIdx=stageMap[l.stage];
@@ -4480,7 +4480,7 @@ function openLead(id){
   document.getElementById('lead-name').textContent=d.name;
   document.getElementById('lead-type-line').textContent=d.service+' · '+d.sqft;
   var sb=document.getElementById('lead-stage-badge');sb.textContent=d.stage;
-  var stageColors={'New inquiry':'background:#ebf5ff;color:#2b6cb0;','Quoted':'background:#fffbeb;color:#b7791f;','Follow-up':'background:#fff5f5;color:#c53030;','Closed won':'background:var(--brand-50);color:#276749;','Closed lost':'background:var(--bg-soft);color:var(--text-muted);'};
+  var stageColors={'New inquiry':'background:#ebf5ff;color:#2b6cb0;','Quoted':'background:#fffbeb;color:#b7791f;','Walkthrough requested':'background:#f0fff4;color:#276749;','Follow-up':'background:#fff5f5;color:#c53030;','Closed won':'background:var(--brand-50);color:#276749;','Closed lost':'background:var(--bg-soft);color:var(--text-muted);'};
   sb.style.cssText=stageColors[d.stage]||'';
   ['contact','phone','email','address','service','sqft','source','date','action','due','assigned','notes'].forEach(function(f){
     var el=document.getElementById('lead-'+f);if(el)el.textContent=d[f]||'—';
@@ -6602,7 +6602,7 @@ function saveNewLead(){
     quoteSentAt:null
   };
   // Add card to correct pipeline column in both dashboard and pipeline views
-  var stageMap={'New inquiry':0,'Quoted':1,'Follow-up':2};
+  var stageMap={'New inquiry':0,'Quoted':1,'Walkthrough requested':1,'Follow-up':2};
   var colIdx=stageMap[stage]||0;
   ['view-dashboard','view-pipeline'].forEach(function(viewId){
     var view=document.getElementById(viewId);

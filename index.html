@@ -449,7 +449,7 @@ textarea{font-family:inherit;}
           <svg style="position:absolute;left:9px;top:50%;transform:translateY(-50%);opacity:.4;" width="13" height="13" viewBox="0 0 16 16" fill="none"><circle cx="6.5" cy="6.5" r="5" stroke="var(--text)" stroke-width="1.5"/><path d="M10.5 10.5l3 3" stroke="var(--text)" stroke-width="1.5" stroke-linecap="round"/></svg>
           <div id="search-results" style="display:none;position:absolute;top:36px;right:0;background:#fff;border:1px solid var(--border-strong);border-radius:10px;box-shadow:0 4px 16px rgba(0,0,0,.1);width:300px;max-height:320px;overflow-y:auto;z-index:999;"></div>
         </div>
-        <button class="btn" id="sec-btn">Month view</button>
+        <button class="btn" id="sec-btn" onclick="handleSecBtn()">Today</button>
         <button class="btn btn-primary" id="top-cta" onclick="handleTopCta()">+ New appointment</button>
       </div>
     </div>
@@ -3069,7 +3069,10 @@ function updateDashboardStats(){
 }
 
 var MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
-var curYear=2026,curMonth=4;
+// Default calendar to today's month/year — previously hardcoded to 2026/4 which
+// meant the calendar landed on April 2026 every time the page loaded.
+var _today = new Date();
+var curYear = _today.getFullYear(), curMonth = _today.getMonth() + 1;
 var currentView=(function(){try{var v=sessionStorage.getItem('hnc_currentView');return v||'calendar';}catch(e){return 'calendar';}})();
 var activeChatId=null;
 var currentClientName='';
@@ -5860,6 +5863,22 @@ function populateRecurringMonth(yr,mo){
   });
 }
 
+function handleSecBtn(){
+  // On calendar view: jump to today's month + day, switch to month view if not already.
+  // For other views ("Export"/"Filter"), the secondary CTA isn't wired to any
+  // specific action yet — left as a no-op for those, so this only does the
+  // Today behavior for now.
+  if(currentView==='calendar'){
+    var n = new Date();
+    curYear = n.getFullYear();
+    curMonth = n.getMonth() + 1;
+    curDay = n.getDate();
+    var btnMonth = document.getElementById('btn-month');
+    if(btnMonth) setCalView('month', btnMonth);
+    else renderCal();
+  }
+}
+
 function handleTopCta(){
   if(currentView==='calendar'){
     var _psel=document.getElementById('na-property-select');
@@ -5894,7 +5913,7 @@ function sv(view,el){
   if(el)el.classList.add('active');
   var titles={dashboard:'Dashboard',calendar:'Calendar',pipeline:'Pipeline',clients:'Clients',tasks:'VA Tasks',messaging:'Messaging',cleaners:'Cleaners',payroll:'Payroll',reporting:'Reporting',automations:'Automations',broadcasts:'Broadcasts',payments:'Payments',settings:'Settings',agent:'AI Agent'};
   var ctas={dashboard:'+ New lead',calendar:'+ New appointment',pipeline:'+ New lead',clients:'+ Add client',tasks:'+ Add task',messaging:'+ New message',cleaners:'+ Add cleaner',payroll:'Log hours',reporting:'Export',automations:'+ New automation',broadcasts:'+ New broadcast',payments:'+ New invoice',settings:'',agent:''};
-  var secs={calendar:'',payroll:'Export',reporting:'Export',automations:'Filter',payments:'Filter',settings:''};
+  var secs={calendar:'Today',payroll:'Export',reporting:'Export',automations:'Filter',payments:'Filter',settings:''};
   document.getElementById('page-title').textContent=titles[view]||view;
   document.getElementById('top-cta').textContent=ctas[view]||'+ New';
   document.getElementById('top-cta').style.display=(view==='agent'||view==='settings')?'none':'block';

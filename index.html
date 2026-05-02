@@ -2585,8 +2585,21 @@ async function dbLoadInvoices(){
 async function loadAllData(){
   showLoadingState(true);
   try{
-    // Load clients and cleaners FIRST so FK lookups work when loading appointments
-    const clients=await dbLoadClients();
+    // Fire all four DB fetches in parallel. Previously these ran serially:
+    // clients → cleaners → appointments → leads = 4× round-trip latency.
+    // Now they hit the network simultaneously; we still process them in
+    // dependency order below (appointments needs clientDB/cleanerDB populated
+    // to resolve FK names).
+    const _t0 = Date.now();
+    const [clients, cleaners, appts, leads] = await Promise.all([
+      dbLoadClients(),
+      dbLoadCleaners(),
+      dbLoadAppointments(),
+      dbLoadLeads(),
+    ]);
+    console.log('[loadAllData] All 4 fetches completed in ' + (Date.now() - _t0) + 'ms');
+
+    // ── Process clients (independent) ────────────────────────────────────
     clients.forEach(function(c){
       const id=c.id;
       clientDB[id]={
@@ -2611,7 +2624,7 @@ async function loadAllData(){
       };
     });
 
-    const cleaners=await dbLoadCleaners();
+    // ── Process cleaners (independent) ───────────────────────────────────
     cleaners.forEach(function(c){
       const initials=c.name.split(' ').map(function(w){return w[0]||'';}).join('').slice(0,2).toUpperCase();
       const colors=[['var(--brand-200)','var(--brand-700)'],['#B5D4F4','#0C447C'],['#CECBF6','#3C3489'],['#FAC775','#633806'],['#F5C4B3','#712B13'],['#F4C0D1','#72243E']];
@@ -2634,8 +2647,38 @@ async function loadAllData(){
       };
     });
 
-    // Load appointments — resolve names via FK now that clientDB/cleanerDB are populated
-    const appts=await dbLoadAppointments();
+    // ── Process leads first so the pipeline view can render before
+    // appointments processing (which is the expensive part). leadDB is
+    // independent of clientDB/cleanerDB; we render the pipeline immediately
+    // after to unblock the view the user is most likely watching.
+    leads.forEach(function(l){
+      leadDB[l.id]={
+        name:l.name, contact:l.contact_name||l.name,
+        phone:l.phone||'—', email:l.email||'—',
+        address:l.address||'—', value:l.estimated_value||'TBD',
+        service:l.service||'—', sqft:l.sqft||'—',
+        source:l.source||'—',
+        date:new Date(l.created_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}),
+        stage:l.stage||'New inquiry',
+        action:l.next_action||'Follow up',
+        due:l.due_date||'TBD',
+        assigned:l.assigned_to||'VA',
+        notes:l.notes||'—',
+        // Quote data from auto-quote flow
+        quoteData: l.quote_data||null,
+        quoteTotal: l.quote_total||null,
+        quoteSentAt: l.quote_sent_at||null,
+        // Parse beds/baths/frequency/condition from notes for manual leads
+        beds:      l.beds!=null?l.beds:((l.notes&&/Beds:\s*(\S+)/.exec(l.notes))?/Beds:\s*(\S+)/.exec(l.notes)[1]:null),
+        baths:     l.baths!=null?l.baths:((l.notes&&/Baths:\s*(\S+)/.exec(l.notes))?/Baths:\s*(\S+)/.exec(l.notes)[1]:null),
+        frequency: l.frequency||((l.notes&&/Frequency:\s*([^\n]+)/.exec(l.notes))?/Frequency:\s*([^\n]+)/.exec(l.notes)[1].trim():null),
+        condition: l.condition!=null?l.condition:((l.notes&&/Condition:\s*(\d+)/.exec(l.notes))?/Condition:\s*(\d+)/.exec(l.notes)[1]:null),
+      };
+    });
+    // Pipeline can render NOW. Don't make the user wait for appointments.
+    try { renderLeadsPipeline(); } catch(e) { console.error('[loadAllData] early renderLeadsPipeline failed:', e); }
+
+    // ── Process appointments — resolve names via FK now that clientDB/cleanerDB are populated
     console.log('[loadAllData] Loaded '+appts.length+' real appointments from Supabase');
     // Build series_id → name maps so spawned occurrences with null client_id/client_name
     // can recover the name from any sibling row in the same series (legacy populateRecurringMonth bug).
@@ -2707,32 +2750,7 @@ async function loadAllData(){
     });
     console.log('[loadAllData] total recurringAppts rebuilt: '+recurringAppts.length);
 
-    // Load leads into leadDB
-    const leads=await dbLoadLeads();
-    leads.forEach(function(l){
-      leadDB[l.id]={
-        name:l.name, contact:l.contact_name||l.name,
-        phone:l.phone||'—', email:l.email||'—',
-        address:l.address||'—', value:l.estimated_value||'TBD',
-        service:l.service||'—', sqft:l.sqft||'—',
-        source:l.source||'—',
-        date:new Date(l.created_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}),
-        stage:l.stage||'New inquiry',
-        action:l.next_action||'Follow up',
-        due:l.due_date||'TBD',
-        assigned:l.assigned_to||'VA',
-        notes:l.notes||'—',
-        // Quote data from auto-quote flow
-        quoteData: l.quote_data||null,
-        quoteTotal: l.quote_total||null,
-        quoteSentAt: l.quote_sent_at||null,
-        // Parse beds/baths/frequency/condition from notes for manual leads
-        beds:      l.beds!=null?l.beds:((l.notes&&/Beds:\s*(\S+)/.exec(l.notes))?/Beds:\s*(\S+)/.exec(l.notes)[1]:null),
-        baths:     l.baths!=null?l.baths:((l.notes&&/Baths:\s*(\S+)/.exec(l.notes))?/Baths:\s*(\S+)/.exec(l.notes)[1]:null),
-        frequency: l.frequency||((l.notes&&/Frequency:\s*([^\n]+)/.exec(l.notes))?/Frequency:\s*([^\n]+)/.exec(l.notes)[1].trim():null),
-        condition: l.condition!=null?l.condition:((l.notes&&/Condition:\s*(\d+)/.exec(l.notes))?/Condition:\s*(\d+)/.exec(l.notes)[1]:null),
-      };
-    });
+    // (Leads were already processed and pipeline rendered earlier — see above.)
 
     renderCal();
     renderClientsTable();

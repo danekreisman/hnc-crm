@@ -4289,38 +4289,53 @@ function deleteAppointment(){
   }
   if(!confirm('DELETE this appointment for '+currentAppt.n+'?\n\nThis will permanently remove it from the CRM, the client portal, and Google Calendar. The record will NOT be preserved.\n\nUse Cancel (grey out) if you want to keep a record.')) return;
 
-  // Remove from in-memory apptData
+  var dbId = currentAppt.dbId;
+  var clientName = currentAppt.n;
+
+  // Remove from in-memory apptData by dbId ONLY. Previously the filter also
+  // matched by (name + time), which would wipe BOTH copies of a duplicate
+  // appointment from the calendar in-memory — even though the DB delete
+  // (correctly) only removes one row. After refresh, the survivor would
+  // reappear and confuse the user. (Bug 2026-05-01.)
   var keyEntries = apptData[currentApptKey];
   if(keyEntries){
-    apptData[currentApptKey] = keyEntries.filter(function(e){
-      return !(e === currentAppt || (e.n === currentAppt.n && e.t === currentAppt.t));
-    });
+    if(dbId){
+      apptData[currentApptKey] = keyEntries.filter(function(e){ return e.dbId !== dbId; });
+    } else {
+      // No dbId means optimistic-only entry never persisted — drop the exact
+      // object reference, NOT name+time matches.
+      apptData[currentApptKey] = keyEntries.filter(function(e){ return e !== currentAppt; });
+    }
   }
 
-  // Hard-delete from Supabase. We mark status='deleted' first (which triggers gcal delete via existing filters), then delete the row.
-  var dbId = currentAppt.dbId;
+  // Hard-delete from Supabase by ID only. We require a dbId — refusing to
+  // fall back to name+date+time because that would happily delete both
+  // duplicates of a doppelganger appointment.
   if(dbId){
-    // Fire gcal delete (via existing wrapper, it listens to status 'cancelled' / event delete). We'll use hncSyncGcal directly with 'delete' action.
     try { if(typeof window.hncSyncGcal === 'function') window.hncSyncGcal(dbId, 'delete'); } catch(e){ console.warn('[deleteAppointment] gcal sync failed', e); }
     db.from('appointments').delete().eq('id', dbId).then(function(res){
-      if(res.error) console.error('[deleteAppointment] Supabase delete error:', res.error);
-      else console.log('[deleteAppointment] Supabase deleted dbId '+dbId);
+      if(res.error){
+        console.error('[deleteAppointment] Supabase delete error:', res.error);
+        if(typeof showToast==='function') showToast('Delete failed: ' + res.error.message, true);
+        // Pull from DB to undo the optimistic in-memory removal
+        if(typeof _refreshAppointmentsFromDB==='function') _refreshAppointmentsFromDB({settleMs: 0});
+        return;
+      }
+      console.log('[deleteAppointment] Supabase deleted dbId '+dbId);
+      // Re-sync from DB so any drift between in-memory and DB self-corrects.
+      // Cheaper than chasing every edge case in the optimistic filter logic.
+      if(typeof _refreshAppointmentsFromDB==='function') _refreshAppointmentsFromDB({settleMs: 200});
     });
   } else {
-    // No dbId — fallback: match by client_name + date
-    var kp = currentApptKey.split('-');
-    var dateStr = kp[0]+'-'+String(kp[1]).padStart(2,'0')+'-'+String(kp[2]).padStart(2,'0');
-    db.from('appointments').delete().eq('client_name', currentAppt.n).eq('date', dateStr).eq('time', currentAppt.t).then(function(res){
-      if(res.error) console.error('[deleteAppointment] Supabase delete (fallback) error:', res.error);
-      else console.log('[deleteAppointment] Supabase deleted (fallback) for '+currentAppt.n+' '+dateStr);
-    });
+    // No dbId: optimistic-only row that never persisted. Nothing to delete in DB.
+    console.log('[deleteAppointment] no dbId — in-memory only removal for '+clientName);
   }
 
   var bar = document.getElementById('appt-action-success');
   if(bar){ bar.textContent=''; }
   renderCal();
   closeOverlay('appt-overlay');
-  logActivity('appointment_deleted','Appt deleted: '+((currentAppt&&currentAppt.n)||'Unknown'),'appointment',(currentAppt&&currentAppt.dbId)||'',{date:currentApptKey,dbId:(currentAppt&&currentAppt.dbId)||null});
+  logActivity('appointment_deleted','Appt deleted: '+(clientName||'Unknown'),'appointment',dbId||'',{date:currentApptKey,dbId:dbId||null});
   showToast('Appointment deleted');
 }
 

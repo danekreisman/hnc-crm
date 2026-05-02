@@ -4385,10 +4385,10 @@ function sendPolicyAgreement(){
   fetch('/api/send-sms',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({to:phone,message:msg})})
     .then(function(r){return r.json();})
     .then(function(j){
-      if(j.success){ showToast('client-overlay','Policy agreement link sent via SMS.'); }
-      else { showToast('client-overlay','SMS failed — copy link manually: '+link); }
+      if(j.success){ showToast('Policy agreement link sent via SMS.'); }
+      else { showToast('SMS failed — copy link manually: '+link, true); }
     })
-    .catch(function(){ showToast('client-overlay','Error sending SMS.'); });
+    .catch(function(){ showToast('Error sending SMS.', true); });
 }
 
 function showClientEdit(){
@@ -4469,7 +4469,7 @@ function saveClientEdit(){
   hideClientEdit();
   // Refresh the panel with updated data
   if(currentClientId)openClient(currentClientId);
-  showToast('client-overlay','Client updated successfully.');
+  showToast('Client updated successfully.');
 }
 
 function openLead(id){
@@ -4578,7 +4578,7 @@ function saveLeadEdit(){
 
   hideLeadEdit();
   if(currentLeadId)openLead(currentLeadId);
-  showToast('lead-overlay','Lead updated successfully.');
+  showToast('Lead updated successfully.');
 }
 
 function sendQuote(channel){
@@ -4761,7 +4761,7 @@ function saveCleanerEdit(){
   hideCleanerEdit();
   if(currentCleanerId)openCleaner(currentCleanerId);
   try{ if(typeof renderCleanersGrid==='function') renderCleanersGrid(); }catch(e){ console.warn('renderCleanersGrid failed',e); }
-  showToast('cleaner-overlay','Cleaner updated successfully.');
+  showToast('Cleaner updated successfully.');
 }
 
 function closeOverlay(id){
@@ -4795,17 +4795,7 @@ function openOverlay(id){
   }
 }
 
-function showToast(overlayId,msg){
-  var t=document.createElement('div');
-  t.className='hnc-toast';
-  t.style.cssText='position:fixed;top:24px;right:24px;background:linear-gradient(135deg,#10b981 0%,#059669 100%);color:#fff;padding:14px 20px;border-radius:12px;box-shadow:0 20px 25px -5px rgba(0,0,0,0.15),0 10px 10px -5px rgba(0,0,0,0.08);font-size:14px;font-weight:500;display:flex;align-items:center;gap:10px;z-index:10000;max-width:360px;';
-  t.innerHTML='<svg width="20" height="20" viewBox="0 0 20 20" fill="none" style="flex-shrink:0"><circle cx="10" cy="10" r="10" fill="rgba(255,255,255,0.2)"/><path d="M6 10l3 3 5-5" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span>'+msg+'</span>';
-  document.body.appendChild(t);
-  setTimeout(function(){
-    t.classList.add('toast-exit');
-    setTimeout(function(){if(t.parentNode)t.remove();},320);
-  },4000);
-}
+// (showToast definition lives further down — single canonical (msg, isError) signature)
 
 /* MESSAGING */
 function renderInbox(){

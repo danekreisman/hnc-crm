@@ -3791,6 +3791,39 @@ async function saveApptEdit(mode){
   var editCond=a.condition||7;
   var dateVal=document.getElementById('edit-date').value;
   var timeVal=document.getElementById('edit-time').value;
+
+  // ── Day-of-week shift detection (only matters for 'all' on a recurring series) ──
+  // If the user changed the anchor's date in 'all' mode for a recurring series,
+  // compute the day delta (e.g. Friday→Thursday = -1, Monday→Wednesday = +2).
+  // We'll later run a date += interval 'N days' UPDATE against every future
+  // occurrence in the series. Day deltas of ±7 or more are treated as a
+  // straight shift to a different day of week (week ±N is just N days). We
+  // confirm with the user before applying this since it touches many rows.
+  var dayShift = 0;
+  var origDateForShift = window._editOrigDate || '';
+  if(mode === 'all' && a && a.recurring && origDateForShift && dateVal && origDateForShift !== dateVal){
+    try {
+      var _od = new Date(origDateForShift + 'T12:00:00');
+      var _nd = new Date(dateVal + 'T12:00:00');
+      dayShift = Math.round((_nd.getTime() - _od.getTime()) / 86400000);
+      if(dayShift !== 0){
+        var origDow = _od.toLocaleDateString('en-US', {weekday: 'long'});
+        var newDow = _nd.toLocaleDateString('en-US', {weekday: 'long'});
+        var direction = dayShift > 0 ? 'forward' : 'back';
+        var absShift = Math.abs(dayShift);
+        var msg = 'You changed the date by ' + absShift + ' day' + (absShift===1?'':'s') + ' (' + origDow + ' → ' + newDow + ').\n\n'
+                + 'For this entire recurring series, this will shift every FUTURE appointment ' + direction + ' by ' + absShift + ' day' + (absShift===1?'':'s') + ' (so they all move from ' + origDow + 's to ' + newDow + 's).\n\n'
+                + 'Past completed appointments stay where they are. Paid appointments are skipped.\n\nContinue?';
+        if(!confirm(msg)){
+          return; // user backed out
+        }
+      }
+    } catch(_dsErr){
+      console.warn('[saveApptEdit] day-shift detection error:', _dsErr);
+      dayShift = 0;
+    }
+  }
+
   var cleanerVal=document.getElementById('edit-cleaner').value||'Unassigned';
   // Status is system-managed — never user-editable
   var statusVal=a.s||'unassigned';
@@ -3900,20 +3933,29 @@ async function saveApptEdit(mode){
       });
     });
     console.log('[saveApptEdit] all-series: '+seriesCount+' additional in-memory instances updated'+(curSeriesId?' series_id='+curSeriesId:' (fallback: client_name)'));
-    // Update recurringAppts template so future month navigation uses new values
+    // Update recurringAppts template so future month navigation uses new values.
+    // If we're shifting day-of-week, also flip dayOfWeek + startYear/Month/Day.
     var rUpdated=0;
+    var newAnchorDate = (dayShift !== 0 && dateVal) ? new Date(dateVal+'T12:00:00') : null;
     recurringAppts.forEach(function(r,ri){
       var rMatches=curSeriesId?(r.seriesId===curSeriesId):(r.name===a.n&&r.freq===a.freq);
       if(rMatches){
-        recurringAppts[ri]=Object.assign({},r,{
+        var fields = {
           timeStr:newTimeStr, cleaner:cleanerVal, service:svcText,
           address:editAddr, beds:editBeds, baths:editBaths, sqft:editSqft,
           duration:editDuration
-        });
+        };
+        if(newAnchorDate){
+          fields.dayOfWeek = newAnchorDate.getDay();
+          fields.startYear = newAnchorDate.getFullYear();
+          fields.startMonth = newAnchorDate.getMonth() + 1;
+          fields.startDay = newAnchorDate.getDate();
+        }
+        recurringAppts[ri]=Object.assign({},r,fields);
         rUpdated++;
       }
     });
-    console.log('[saveApptEdit] recurringAppts updated: '+rUpdated+' entries');
+    console.log('[saveApptEdit] recurringAppts updated: '+rUpdated+' entries' + (dayShift!==0?' (with day-of-week shift '+dayShift+')':''));
   }
 
   // === Tail regeneration ===
@@ -4134,6 +4176,55 @@ async function saveApptEdit(mode){
       }
       sbAllQuery=sbAllQuery.neq('status','paid');sbAllQuery.then(function(res){
         console.log('[saveApptEdit] Supabase all-series sync complete, error:',res.error||'none');
+
+        // ── Day-of-week shift: shift future occurrences by dayShift days ──
+        // Done after the field-update ack so all rows have correct field values
+        // before we re-bucket apptData by the new dates.
+        if(dayShift !== 0 && a.seriesId){
+          var todayISO = new Date().toISOString().split('T')[0];
+          // Postgres date arithmetic: date = date + interval 'N days'
+          // Supabase JS doesn't expose raw expressions in update(), so we use rpc
+          // OR fetch + per-row update. We'll use the PostgREST rpc-style via raw
+          // SQL through .rpc() if available, else fall back to per-row.
+          // Simplest safe approach: fetch future rows, update each individually.
+          db.from('appointments')
+            .select('id,date')
+            .eq('series_id', a.seriesId)
+            .gte('date', todayISO)
+            .neq('status', 'paid')
+            .neq('status', 'completed')
+            .then(function(fetchRes){
+              if(fetchRes.error){
+                console.error('[saveApptEdit] day-shift fetch error:', fetchRes.error);
+                if(typeof showToast==='function') showToast('Day-shift fetch failed: '+fetchRes.error.message, true);
+                return;
+              }
+              var rows = fetchRes.data || [];
+              if(!rows.length){
+                console.log('[saveApptEdit] day-shift: no future rows to shift');
+                if(typeof _refreshAppointmentsFromDB==='function') _refreshAppointmentsFromDB({settleMs:200});
+                return;
+              }
+              console.log('[saveApptEdit] day-shift: shifting '+rows.length+' future rows by '+dayShift+' days');
+              var pending = rows.length;
+              var failed = 0;
+              rows.forEach(function(row){
+                var d = new Date(row.date + 'T12:00:00');
+                d.setDate(d.getDate() + dayShift);
+                var newISO = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+                db.from('appointments').update({date:newISO}).eq('id', row.id).then(function(updRes){
+                  if(updRes.error){ failed++; console.error('[saveApptEdit] day-shift row '+row.id+' failed:', updRes.error); }
+                  pending--;
+                  if(pending === 0){
+                    console.log('[saveApptEdit] day-shift complete: '+(rows.length-failed)+'/'+rows.length+' rows updated');
+                    if(failed > 0 && typeof showToast==='function') showToast(failed+' of '+rows.length+' rows failed to shift — check console', true);
+                    // Refresh from DB to re-bucket apptData with new date keys
+                    if(typeof _refreshAppointmentsFromDB==='function') _refreshAppointmentsFromDB({settleMs:200});
+                  }
+                });
+              });
+            });
+        }
       });
     } else {
       // Single: also clear series_id to break series link

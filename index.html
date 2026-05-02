@@ -14696,9 +14696,11 @@ async function completeTaskById(id) {
 
   // Sync to API in background
   try {
+    var sess = await db.auth.getSession();
+    var tok = sess.data.session ? sess.data.session.access_token : '';
     await fetch('/api/tasks', {
       method: 'POST',
-      headers: {'Content-Type':'application/json'},
+      headers: {'Content-Type':'application/json', 'Authorization': 'Bearer ' + tok},
       body: JSON.stringify({ action: 'complete', id }),
     });
   } catch(e) {
@@ -14714,9 +14716,11 @@ async function deleteTaskById(id) {
   showToast('Task deleted');
   // Sync to API in background
   try {
+    var sess = await db.auth.getSession();
+    var tok = sess.data.session ? sess.data.session.access_token : '';
     await fetch('/api/tasks', {
       method: 'POST',
-      headers: {'Content-Type':'application/json'},
+      headers: {'Content-Type':'application/json', 'Authorization': 'Bearer ' + tok},
       body: JSON.stringify({ action: 'delete', id }),
     });
   } catch(e) { console.error('Delete sync failed', e); }
@@ -14790,9 +14794,11 @@ async function submitTask() {
   btn.textContent = isCall ? 'Generating AI brief...' : 'Creating...';
 
   try {
+    var sess = await db.auth.getSession();
+    var tok = sess.data.session ? sess.data.session.access_token : '';
     var resp = await fetch('/api/tasks', {
       method: 'POST',
-      headers: {'Content-Type':'application/json'},
+      headers: {'Content-Type':'application/json', 'Authorization': 'Bearer ' + tok},
       body: JSON.stringify({
         action: 'create', title, type, description: desc,
         priority, due_date: due || null,

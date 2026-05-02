@@ -1986,12 +1986,13 @@ Mahalo 🌺</textarea>
             <div id="sug-error" style="background:#fee;border:1px solid #fca;border-radius:6px;padding:8px 10px;margin-top:10px;font-size:11px;color:#c5192d;display:none;"></div>
           </div>
         </div>
-        <!-- Automation exclusion toggle. When ON, this lead is blacklisted from all
-             cron-driven follow-ups and the AI follow-up button refuses to send. -->
+        <!-- Automation exclusion toggle. When ON, scheduled cron automations
+             (Day-3 follow-up sweeper, nurture sweepers, broadcasts) skip this
+             lead. The AI follow-up button is a manual override and still works. -->
         <div id="lead-dnc-row" style="margin-top:14px;display:flex;align-items:center;gap:10px;padding:10px 12px;border:1.5px solid var(--border);border-radius:10px;background:var(--bg-soft);">
           <div style="flex:1;">
-            <div style="font-size:13px;font-weight:600;color:var(--text);">Exclude from automations</div>
-            <div id="lead-dnc-status" style="font-size:11px;color:var(--text-muted);margin-top:1px;">No follow-up SMS, email, or AI nudges will be sent to this lead.</div>
+            <div style="font-size:13px;font-weight:600;color:var(--text);">Exclude from scheduled automations</div>
+            <div id="lead-dnc-status" style="font-size:11px;color:var(--text-muted);margin-top:1px;">No cron-driven follow-ups will fire. The AI follow-up button still works as your manual nudge.</div>
           </div>
           <button id="lead-dnc-toggle" onclick="toggleLeadDoNotContact()" style="border:none;cursor:pointer;padding:6px 14px;border-radius:14px;font-size:12px;font-weight:600;font-family:inherit;min-width:64px;">OFF</button>
         </div>
@@ -4746,14 +4747,14 @@ function _renderLeadDncPill(){
     btn.textContent = 'ON';
     btn.style.background = '#dc2626';
     btn.style.color = '#fff';
-    status.textContent = 'Excluded. No follow-up SMS, email, or AI nudges will be sent.';
+    status.textContent = 'Cron automations skip this lead. AI follow-up button still works for manual outreach.';
     status.style.color = '#991b1b';
   } else {
     btn.textContent = 'OFF';
     btn.style.background = 'var(--bg)';
     btn.style.color = 'var(--text-muted)';
     btn.style.border = '1.5px solid var(--border-strong)';
-    status.textContent = 'Automations active. Toggle ON to silence all follow-ups for this lead.';
+    status.textContent = 'Cron automations active. Toggle ON to silence scheduled follow-ups for this lead.';
     status.style.color = 'var(--text-muted)';
   }
 }

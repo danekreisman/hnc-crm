@@ -69,14 +69,12 @@ export default async function handler(req, res) {
       .maybeSingle();
     if (leadErr || !lead) return res.status(404).json({ error: 'Lead not found' });
 
-    // Respect the per-lead automation-exclusion flag. Set via the toggle pill
-    // on the lead profile. When true, every cron-driven follow-up AND the
-    // manual AI follow-up button refuse to send.
-    if (lead.do_not_contact === true) {
-      return res.status(403).json({
-        error: 'This lead is excluded from automations (do_not_contact = true). Toggle the pill on the lead profile OFF to send.',
-      });
-    }
+    // NOTE: do_not_contact is intentionally NOT checked here. That flag means
+    // "exclude from scheduled automations" (cron-driven Day-3 follow-up,
+    // nurture sweepers, broadcasts) — NOT "never contact". The AI follow-up
+    // button is a manual override the user explicitly clicks, so it bypasses
+    // this flag. If a lead truly needs "never contact" semantics, delete the
+    // lead or unsubscribe via the public unsubscribe link.
 
     if (!_isTestSafeContact(lead.phone, lead.email)) {
       return res.status(403).json({

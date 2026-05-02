@@ -3815,14 +3815,18 @@ async function saveApptEdit(mode){
     console.log('[saveApptEdit] recurringAppts updated: '+rUpdated+' entries');
   }
 
-  // === Tail regeneration (only in 'all' mode) ===
-  // If the user set a recurring frequency, forward-generate missing future occurrences
-  // for this client starting from the edited appointment's date. Protects paid rows
-  // and avoids duplicates by checking for existing bookings per client/date.
-  // NOTE: In 'single' mode, series is broken and no tail regeneration occurs.
+  // === Tail regeneration ===
+  // Forward-generates missing future occurrences ONLY when the user is
+  // converting a one-time appointment into a recurring one. For an edit
+  // of an EXISTING series ('all' mode with a.seriesId already set), the
+  // all-series DB UPDATE below handles updating the existing rows — there
+  // is nothing to regenerate. Previously this block ran on every 'all'
+  // save and duplicated entire series each time. (Bug fixed 2026-05-01.)
   try{
     var _isRecurFreq = (freq && freq!=='One-time');
-    if(_isRecurFreq && mode==='all'){
+    var _isExistingSeries = !!(a && a.seriesId);
+    var _shouldRegen = _isRecurFreq && mode==='all' && !_isExistingSeries;
+    if(_shouldRegen){
       var _kp = (currentApptKey||'').split('-');
       if(_kp.length===3){
         var _yr = parseInt(_kp[0],10), _mo = parseInt(_kp[1],10), _dy = parseInt(_kp[2],10);
@@ -3875,9 +3879,11 @@ async function saveApptEdit(mode){
             }catch(_dberr){ console.warn('[saveApptEdit] dbSaveAppointment failed for '+_oKey, _dberr); }
           });
           if(a && !a.seriesId){ a.seriesId = _ensureSid; a.recurring = true; }
-          console.log('[saveApptEdit] tail-regen: inserted '+_inserted+' future occurrences, skipped '+_skipped+' (freq='+freq+', mode='+mode+', from '+currentApptKey+')');
+          console.log('[saveApptEdit] tail-regen (NEW series): inserted '+_inserted+' future occurrences, skipped '+_skipped+' (freq='+freq+', mode='+mode+', from '+currentApptKey+')');
         }
       }
+    } else if(_isRecurFreq && mode==='all' && _isExistingSeries) {
+      console.log('[saveApptEdit] tail-regen SKIPPED — existing series '+a.seriesId+' will be updated in-place by all-series DB UPDATE');
     }
   }catch(_tailErr){ console.warn('[saveApptEdit] tail-regen error', _tailErr); }
 

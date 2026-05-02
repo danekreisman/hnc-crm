@@ -4525,7 +4525,7 @@ function showLeadEdit(){
   document.getElementById('lead-edit').style.display='block';
 }
 function hideLeadEdit(){document.getElementById('lead-view').style.display='block';document.getElementById('lead-edit').style.display='none';}
-function saveLeadEdit(){
+async function saveLeadEdit(){
   var name=document.getElementById('led-name').value;
   var contact=document.getElementById('led-contact').value;
   var phone=document.getElementById('led-phone').value;
@@ -4558,7 +4558,7 @@ function saveLeadEdit(){
 
   // Save to Supabase
   if(currentLeadId&&currentLeadId.length>20){
-    db.from('leads').update({
+    var saveRes = await db.from('leads').update({
       name:name||undefined,
       contact_name:contact||undefined,
       phone:phone||undefined,
@@ -4571,9 +4571,12 @@ function saveLeadEdit(){
       next_action:action||undefined,
       due_date:due||undefined,
       notes:notes||undefined
-    }).eq('id',currentLeadId).then(function(res){
-      if(res.error)console.error('Update lead error:',res.error);
-    });
+    }).eq('id',currentLeadId);
+    if(saveRes && saveRes.error){
+      console.error('Update lead error:',saveRes.error);
+      showToast('Could not save: ' + (saveRes.error.message || 'database error'), true);
+      return;
+    }
   }
 
   hideLeadEdit();
@@ -11660,7 +11663,7 @@ function scheduleLeadAppointment(){
   }, 300);
 }
 
-function convertLeadToClient(){
+async function convertLeadToClient(){
   var lead = currentLeadId ? leadDB[currentLeadId] : null;
   if(!lead) return;
   if(!confirm('Convert "'+lead.name+'" to a client? They will be removed from the pipeline and added to your client list.')) return;
@@ -11700,7 +11703,12 @@ function convertLeadToClient(){
 
   // Update lead stage to won in Supabase
   if(currentLeadId && currentLeadId.length > 20){
-    db.from('leads').update({stage:'Closed won'}).eq('id',currentLeadId);
+    var wonRes = await db.from('leads').update({stage:'Closed won'}).eq('id',currentLeadId);
+    if(wonRes && wonRes.error){
+      console.error('[markLeadWon] DB update failed:', wonRes.error);
+      showToast('Could not mark as won: ' + (wonRes.error.message || 'database error'), true);
+      return;
+    }
   }
 
   // Remove lead card from pipeline
@@ -11741,23 +11749,34 @@ function convertLeadToClient(){
 }
 
 
-function markLeadLost(){
+async function markLeadLost(){
   var lead = currentLeadId ? leadDB[currentLeadId] : null;
   if(!lead) return;
   var reason = prompt('Reason for losing this lead (optional):') || 'No reason given';
   if(reason === null) return; // cancelled
 
-  // Remove from pipeline
+  // Update in Supabase FIRST so we don't show optimistic UI that the DB
+  // doesn't actually back. Previously this was fire-and-forget: the UI
+  // flipped to Lost but DB updates that failed (RLS, length limits, etc.)
+  // silently reverted on the next reload.
+  if(currentLeadId && currentLeadId.length > 20){
+    var updRes = await db.from('leads').update({
+      stage:'Closed lost',
+      notes:(lead.notes||'') + ' Lost: ' + reason
+    }).eq('id', currentLeadId);
+    if(updRes && updRes.error){
+      console.error('[markLeadLost] DB update failed:', updRes.error);
+      showToast('Could not save: ' + (updRes.error.message || 'database error') + '. Reload and try again.', true);
+      return;
+    }
+  }
+  lead.stage = 'Closed lost';
+
+  // Remove from pipeline (only after successful DB write)
   document.querySelectorAll('.deal-card').forEach(function(card){
     var nameEl = card.querySelector('.deal-name');
     if(nameEl && nameEl.textContent.trim() === lead.name) card.remove();
   });
-
-  // Update in Supabase
-  if(currentLeadId && currentLeadId.length > 20){
-    db.from('leads').update({stage:'Closed lost', notes:(lead.notes||'') + ' Lost: ' + reason}).eq('id', currentLeadId);
-  }
-  lead.stage = 'Closed lost';
 
   // Add to lost table
   var tbody = document.getElementById('lost-leads-tbody');
@@ -11782,15 +11801,20 @@ function markLeadLost(){
   showPaymentToast(lead.name + ' marked as lost.', null, 'error');
 }
 
-function reactivateLead(id){
+async function reactivateLead(id){
   var lead = leadDB[id];
   if(!lead) return;
-  lead.stage = 'Follow-up';
 
-  // Update in Supabase
+  // Update in Supabase FIRST so optimistic UI doesn't get out of sync
   if(id && id.length > 20){
-    db.from('leads').update({stage:'Follow-up'}).eq('id', id);
+    var reactRes = await db.from('leads').update({stage:'Follow-up'}).eq('id', id);
+    if(reactRes && reactRes.error){
+      console.error('[reactivateLead] DB update failed:', reactRes.error);
+      showToast('Could not reactivate: ' + (reactRes.error.message || 'database error'), true);
+      return;
+    }
   }
+  lead.stage = 'Follow-up';
 
   // Remove from lost table row
   document.querySelectorAll('#lost-leads-tbody tr').forEach(function(row){
@@ -12614,7 +12638,9 @@ function _markLeadWonOnBook(lid, leadObj, clientName){
   if((leadObj.stage||'').toLowerCase().indexOf('won') >= 0) return; // already won
   leadObj.stage = 'Closed won';
   if(lid && lid.length > 20 && typeof db !== 'undefined' && db){
-    try{ db.from('leads').update({stage:'Closed won'}).eq('id', lid); }catch(e){console.warn('[markLeadWon] supabase update error:',e);}
+    db.from('leads').update({stage:'Closed won'}).eq('id', lid).then(function(res){
+      if(res && res.error) console.error('[_markLeadWonOnBook] DB update failed:', res.error);
+    }).catch(function(e){ console.error('[_markLeadWonOnBook] DB update threw:', e); });
   }
   document.querySelectorAll('.deal-card').forEach(function(card){
     var el = card.querySelector('.deal-name');

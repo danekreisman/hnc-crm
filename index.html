@@ -5879,8 +5879,57 @@ function handleSecBtn(){
   }
 }
 
+function resetNewApptForm(){
+  // Clear all input/textarea fields to a known clean state every time the
+  // user opens the New Appointment overlay. Previously, whatever was last
+  // typed stayed there and looked confusing.
+  function _set(id, val){ var el = document.getElementById(id); if(el) el.value = val; }
+  function _check(id, on){ var el = document.getElementById(id); if(el) el.checked = !!on; }
+  // Contact
+  _set('na-name', '');
+  _set('na-phone', '');
+  _set('na-email', '');
+  _check('na-existing-client', false);
+  // Service
+  _set('na-service', 'standard');
+  _set('na-freq', 'Biweekly');
+  _set('na-commercial-hrs', '');
+  // Date/time — date blank (user picks), time defaults to 08:00 like markup
+  _set('na-date', '');
+  _set('na-time', '08:00');
+  _set('na-cleaner', 'unassigned');
+  _set('na-notes', '');
+  // Property
+  var propSel = document.getElementById('na-property-select');
+  if(propSel) propSel.innerHTML = '<option value="new">+ Create New Property</option>';
+  _set('na-address', '');
+  _set('na-beds', '3');
+  _set('na-baths', '2');
+  _set('na-sqft', '');
+  _set('na-cond', '7');
+  _check('na-save-property', false);
+  // Quote overrides
+  _check('na-price-override-chk', false);
+  _set('na-price-override-val', '');
+  _check('na-cleaner-pay-override-chk', false);
+  _set('na-cleaner-pay-override-val', '');
+  _check('na-hours-override-chk', false);
+  _set('na-hours-override-val', '');
+  // Hide override numeric inputs (their visibility is toggled by the chk)
+  var po = document.getElementById('na-price-override-val'); if(po) po.style.display = 'none';
+  var co = document.getElementById('na-cleaner-pay-override-val'); if(co) co.style.display = 'none';
+  var ho = document.getElementById('na-hours-override-val'); if(ho) ho.style.display = 'none';
+  // Clear any cached lat/lng/place_id from previous Google Places selection
+  var addrEl = document.getElementById('na-address');
+  if(addrEl){ delete addrEl.dataset.lat; delete addrEl.dataset.lng; delete addrEl.dataset.placeId; }
+  // Hide commercial-hours sub-block (only visible for janitorial)
+  var commercialFields = document.getElementById('na-commercial-fields');
+  if(commercialFields) commercialFields.style.display = 'none';
+}
+
 function handleTopCta(){
   if(currentView==='calendar'){
+    resetNewApptForm();
     var _psel=document.getElementById('na-property-select');
     if(_psel){_psel.innerHTML='<option value="new">+ Create New Property</option>';}
     document.getElementById('na-address-row').style.display='';

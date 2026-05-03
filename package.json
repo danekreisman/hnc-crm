@@ -4,6 +4,7 @@
     "description": "Hawaii Natural Clean CRM",
     "dependencies": {
         "@supabase/supabase-js": "^2.104.0",
-        "stripe": "^14.25.0"
+        "stripe": "^14.25.0",
+        "web-push": "^3.6.7"
     }
 }

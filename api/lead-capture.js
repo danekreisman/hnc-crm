@@ -120,6 +120,26 @@ export default async function handler(req, res) {
       body: JSON.stringify({ to: OWNER_PHONE, message: ownerSummary })
     }).then(r => console.log('[lead-capture] owner sms:', r.status))
       .catch(err => console.error('[lead-capture] owner sms failed:', err.message));
+
+    // Push fan-out to all subscribed PWA devices. Same flag gate as the SMS
+    // so toggling the automation off silences both channels. Fire-and-forget
+    // so the lead-capture response isn't blocked on push delivery.
+    import('./utils/send-push.js').then(({ sendPushToAllSubscribed }) => {
+      const pushBody = [
+        d.serviceType || 'Cleaning',
+        d.phone,
+        d.island,
+        d.beds ? d.beds + 'bd' + (d.baths ? '/' + d.baths + 'ba' : '') : null,
+        d.sqft ? d.sqft + 'sf' : null,
+      ].filter(Boolean).join(' \u00B7 ');
+      return sendPushToAllSubscribed({
+        title: '\u{1F195} New lead: ' + d.name,
+        body: pushBody,
+        url: '/?lead=' + leadId,
+        tag: 'new-lead-' + leadId,
+      });
+    }).then(r => r && console.log('[lead-capture] owner push:', JSON.stringify(r)))
+      .catch(err => console.warn('[lead-capture] owner push failed:', err.message));
   } else {
     console.log('[lead-capture] new_lead_owner_sms disabled — skipping');
   }

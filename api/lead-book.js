@@ -235,6 +235,18 @@ export default async function handler(req, res) {
     } catch (err) {
       await logError('lead-book:admin-sms', err, { leadId: lead.id });
     }
+    // Push fan-out alongside the admin SMS — same flag gate. Fire-and-forget.
+    import('./utils/send-push.js').then(({ sendPushToAllSubscribed }) => {
+      return sendPushToAllSubscribed({
+        title: '\u2705 Auto-booked: ' + lead.name,
+        body: (lead.service || 'Cleaning') + ' \u00B7 ' + prettyDate + ' at ' + time
+              + (totalWithTax ? ' \u00B7 $' + totalWithTax : '')
+              + (rushFee > 0 ? ' (incl. $' + rushFee + ' rush)' : ''),
+        url: '/?lead=' + lead.id,
+        tag: 'auto-book-' + lead.id,
+      });
+    }).then(r => r && console.log('[lead-book] admin push:', JSON.stringify(r)))
+      .catch(err => console.warn('[lead-book] admin push failed:', err.message));
     } else {
       console.log('[lead-book] auto_book_admin_sms disabled — skipping');
     }

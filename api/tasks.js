@@ -231,6 +231,19 @@ export default async function handler(req, res) {
       } catch(_smsErr) {
         await logError("tasks-sms", _smsErr.message, { task: body });
       }
+      // Push fan-out — same flag gate as the SMS. Fire-and-forget so the
+      // POST /api/tasks response isn't blocked on push delivery.
+      import('./utils/send-push.js').then(({ sendPushToAllSubscribed }) => {
+        const _title = body.title || body.task_title || 'Untitled';
+        const _due = body.due_date ? ' (due ' + new Date(body.due_date).toLocaleDateString('en-US',{month:'short',day:'numeric'}) + ')' : '';
+        return sendPushToAllSubscribed({
+          title: '\u{1F4DD} New task: ' + _title,
+          body: 'Tap to view in the CRM' + _due,
+          url: '/#tasks',
+          tag: 'new-task-' + (task && task.id ? task.id : Date.now()),
+        });
+      }).then(r => r && console.log('[tasks] owner push:', JSON.stringify(r)))
+        .catch(err => console.warn('[tasks] owner push failed:', err.message));
       } else { console.log('[tasks] task_created_sms disabled — skipping'); }
       return res.status(200).json({ success: true, task });
     }

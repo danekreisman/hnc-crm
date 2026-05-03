@@ -4179,13 +4179,18 @@ async function saveApptEdit(mode){
   // 'all' mode: update ALL appointments in the series (past + future)
   if(mode==='all'&&a.recurring){
     var curSeriesId=a.seriesId||null;
+    // Status (s) is intentionally OMITTED here for the same reason as the
+    // DB-side fix below: status is per-instance, not per-series. If you
+    // included it, marking one appointment in a recurring series as
+    // 'completed' and then editing-all would mark every appointment in
+    // the series as completed — past, present, and future — which is wrong.
     var seriesFields={
       t:newTimeStr, cleaner:cleanerVal, service:svcText, freq:freq,
       address:editAddr, beds:editBeds, baths:editBaths, sqft:editSqft,
       condition:editCond, duration:editDuration,
       basePrice:editBase, tax:editTax, totalPrice:editTotal,
       base:'$'+editBase.toFixed(2), cleanerPay:editCleanerPay,
-      cleanerPayOverride:editCleanerPayOverride, notes:editNotes, s:statusVal
+      cleanerPayOverride:editCleanerPayOverride, notes:editNotes
     };
     var seriesCount=0;
     Object.keys(apptData).forEach(function(k){
@@ -4433,17 +4438,37 @@ async function saveApptEdit(mode){
       sbBasePayload.cleaner_id=Object.keys(cleanerDB).find(function(_id){return cleanerDB[_id]&&cleanerDB[_id].name===cleanerVal;})||null;
     }
     if(mode==='all'&&a.recurring){
-      // Update all appointments in the series
-      var sbAllQuery=db.from('appointments').update(sbBasePayload);
+      // Update all appointments in the series.
+      // CRITICAL: status is per-instance, NOT per-series. Without this guard,
+      // editing a recurring appointment that's already been auto-completed
+      // (or that the user marked completed) and choosing "edit all" used to
+      // propagate 'completed' status to every appointment in the series —
+      // including future ones that hadn't happened yet. This silently broke
+      // an entire year's worth of Jan Kunst appointments. Strip status from
+      // the bulk payload, then update the current row's status separately
+      // so the user's edit to THIS specific appointment's status is preserved.
+      var sbBulkPayload = Object.assign({}, sbBasePayload);
+      delete sbBulkPayload.status;
+
+      var sbAllQuery=db.from('appointments').update(sbBulkPayload);
       if(a.seriesId){
         sbAllQuery=sbAllQuery.eq('series_id',a.seriesId);
-        console.log('[saveApptEdit] Supabase all-series update by series_id='+a.seriesId);
+        console.log('[saveApptEdit] Supabase all-series update by series_id='+a.seriesId+' (status excluded)');
       } else {
         sbAllQuery=sbAllQuery.eq('client_id',a.client_id).eq('recurring',true);
-        console.log('[saveApptEdit] Supabase all-series update by client_id='+a.client_id);
+        console.log('[saveApptEdit] Supabase all-series update by client_id='+a.client_id+' (status excluded)');
       }
       sbAllQuery=sbAllQuery.neq('status','paid');sbAllQuery.then(function(res){
         console.log('[saveApptEdit] Supabase all-series sync complete, error:',res.error||'none');
+
+        // Now update THIS appointment's status separately. Without this the
+        // user's status edit on the current row would silently be lost.
+        if(a.dbId && statusVal){
+          db.from('appointments').update({status:statusVal}).eq('id', a.dbId).then(function(stRes){
+            if(stRes.error) console.warn('[saveApptEdit] current-row status update error:', stRes.error);
+            else console.log('[saveApptEdit] current-row status updated to '+statusVal);
+          });
+        }
 
         // ── Day-of-week shift: shift future occurrences by dayShift days ──
         // Done after the field-update ack so all rows have correct field values

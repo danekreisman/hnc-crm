@@ -1693,6 +1693,32 @@ Mahalo 🌺</textarea>
               <option value="unassigned">Leave unassigned</option>
             </select>
           </div>
+          <!-- Pair cleaners: tag-team mode. Up to 3 cleaners can be assigned
+               to one appointment to halve wall-clock time. Default pay
+               splits evenly (50/50 with 2 cleaners, 33/33/33 with 3) and
+               each share is individually editable. The DURATION input is
+               left to the user — they manually halve hours when pairing
+               since wall-clock time is what's being split, not labor hours. -->
+          <div class="form-row" id="na-pair-row-toggle" style="margin-top:-2px;">
+            <label></label>
+            <a href="javascript:void(0)" id="na-pair-add-link" onclick="naAddPairedCleaner()" style="font-size:12px;color:var(--brand-500);text-decoration:none;font-weight:600;">+ Pair with another cleaner</a>
+          </div>
+          <div class="form-row" id="na-pair-row-2" style="display:none;">
+            <label>Paired cleaner</label>
+            <div style="display:flex;gap:6px;align-items:center;">
+              <select id="na-cleaner-2" onchange="naSyncPairedPay()" style="flex:1;"><option value="unassigned">Select...</option></select>
+              <input type="number" id="na-cleaner-pay-2" placeholder="$pay" min="0" step="0.01" style="width:90px;" oninput="naMarkPayManual(2)">
+              <button type="button" onclick="naRemovePairedCleaner(2)" style="background:none;border:none;color:#e53e3e;cursor:pointer;font-size:18px;line-height:1;padding:0 4px;" title="Remove">\u00D7</button>
+            </div>
+          </div>
+          <div class="form-row" id="na-pair-row-3" style="display:none;">
+            <label>Third cleaner</label>
+            <div style="display:flex;gap:6px;align-items:center;">
+              <select id="na-cleaner-3" onchange="naSyncPairedPay()" style="flex:1;"><option value="unassigned">Select...</option></select>
+              <input type="number" id="na-cleaner-pay-3" placeholder="$pay" min="0" step="0.01" style="width:90px;" oninput="naMarkPayManual(3)">
+              <button type="button" onclick="naRemovePairedCleaner(3)" style="background:none;border:none;color:#e53e3e;cursor:pointer;font-size:18px;line-height:1;padding:0 4px;" title="Remove">\u00D7</button>
+            </div>
+          </div>
           <div class="form-row"><label>Notes</label><textarea id="na-notes" style="min-height:60px;" placeholder="Any special instructions or notes..."></textarea></div>
         </div>
       </details>
@@ -1822,6 +1848,11 @@ Mahalo 🌺</textarea>
         <div class="info-block">
           <div class="info-row"><span class="info-label">Assigned cleaner</span><span class="info-val" id="ai-cleaner">—</span></div>
           <div class="info-row"><span class="info-label">Cleaner pay</span><span class="info-val" id="ai-cpay">—</span></div>
+          <!-- Paired cleaner rows: hidden by default, shown by openAppt when set -->
+          <div class="info-row" id="ai-cleaner-2-row" style="display:none;"><span class="info-label">Paired cleaner</span><span class="info-val" id="ai-cleaner-2">—</span></div>
+          <div class="info-row" id="ai-cpay-2-row" style="display:none;"><span class="info-label">Paired cleaner pay</span><span class="info-val" id="ai-cpay-2">—</span></div>
+          <div class="info-row" id="ai-cleaner-3-row" style="display:none;"><span class="info-label">Third cleaner</span><span class="info-val" id="ai-cleaner-3">—</span></div>
+          <div class="info-row" id="ai-cpay-3-row" style="display:none;"><span class="info-label">Third cleaner pay</span><span class="info-val" id="ai-cpay-3">—</span></div>
         </div>
         <div class="panel-section">Pricing</div>
         <div class="info-block">
@@ -1900,6 +1931,27 @@ Mahalo 🌺</textarea>
           <select id="edit-cleaner" onchange="calcEditPrice()">
             <option value="Unassigned">Unassigned</option>
           </select>
+        </div>
+        <!-- Pair cleaners on edit: same model as new-appointment form. -->
+        <div class="form-row" id="edit-pair-row-toggle" style="margin-top:-2px;">
+          <label></label>
+          <a href="javascript:void(0)" id="edit-pair-add-link" onclick="editAddPairedCleaner()" style="font-size:12px;color:var(--brand-500);text-decoration:none;font-weight:600;">+ Pair with another cleaner</a>
+        </div>
+        <div class="form-row" id="edit-pair-row-2" style="display:none;">
+          <label>Paired cleaner</label>
+          <div style="display:flex;gap:6px;align-items:center;">
+            <select id="edit-cleaner-2" onchange="editSyncPairedPay()" style="flex:1;"><option value="Unassigned">Select...</option></select>
+            <input type="number" id="edit-cleaner-pay-2" placeholder="$pay" min="0" step="0.01" style="width:90px;" oninput="editMarkPayManual(2)">
+            <button type="button" onclick="editRemovePairedCleaner(2)" style="background:none;border:none;color:#e53e3e;cursor:pointer;font-size:18px;line-height:1;padding:0 4px;" title="Remove">\u00D7</button>
+          </div>
+        </div>
+        <div class="form-row" id="edit-pair-row-3" style="display:none;">
+          <label>Third cleaner</label>
+          <div style="display:flex;gap:6px;align-items:center;">
+            <select id="edit-cleaner-3" onchange="editSyncPairedPay()" style="flex:1;"><option value="Unassigned">Select...</option></select>
+            <input type="number" id="edit-cleaner-pay-3" placeholder="$pay" min="0" step="0.01" style="width:90px;" oninput="editMarkPayManual(3)">
+            <button type="button" onclick="editRemovePairedCleaner(3)" style="background:none;border:none;color:#e53e3e;cursor:pointer;font-size:18px;line-height:1;padding:0 4px;" title="Remove">\u00D7</button>
+          </div>
         </div>
         <!-- Legacy price hint on edit: same purpose as on new-appointment form,
              but for the case where the user has already manually created
@@ -2668,9 +2720,25 @@ async function dbLoadCleaners(){
   };
   if(data.seriesId) row.series_id=data.seriesId;
   if(data.seriesIndex!=null) row.series_index=data.seriesIndex;
+  // Paired cleaners (2nd and 3rd). Resolve names to IDs via cleanerDB.
+  // Only writes columns when actually paired — solo jobs leave these null.
+  if(data.cleanerName2){
+    var _id2 = _cleanerNameToId ? _cleanerNameToId(data.cleanerName2) : null;
+    if(_id2){
+      row.cleaner_id_2 = _id2;
+      row.cleaner_pay_2 = parseFloat(data.cleanerPay2) || 0;
+    }
+  }
+  if(data.cleanerName3 && row.cleaner_id_2){
+    var _id3 = _cleanerNameToId ? _cleanerNameToId(data.cleanerName3) : null;
+    if(_id3){
+      row.cleaner_id_3 = _id3;
+      row.cleaner_pay_3 = parseFloat(data.cleanerPay3) || 0;
+    }
+  }
   var res=await db.from('appointments').insert([row]).select();
   if(res.error)console.error('Save appointment error:',res.error);
-  else console.log('[dbSaveAppointment] saved client_id='+clientId+' client_name='+data.clientName+' duration_hours='+data.duration+(data.seriesId?' series_id='+data.seriesId:''));
+  else console.log('[dbSaveAppointment] saved client_id='+clientId+' client_name='+data.clientName+' duration_hours='+data.duration+(data.seriesId?' series_id='+data.seriesId:'')+(row.cleaner_id_2?' paired with '+(data.cleanerName2||'')+(row.cleaner_id_3?'+'+(data.cleanerName3||''):''):''));
   return res;
 }
 
@@ -2858,6 +2926,9 @@ function _rebuildAppointmentsFromDB(appts){
     if(!apptData[key])apptData[key]=[];
     var clientName=(a.client_id&&clientDB[a.client_id])?clientDB[a.client_id].name:(a.client_name||(a.series_id&&seriesNameMap[a.series_id])||'Unknown');
     var cleanerName=(a.cleaner_id&&cleanerDB[a.cleaner_id])?cleanerDB[a.cleaner_id].name:(a.cleaner_name||(a.series_id&&seriesCleanerMap[a.series_id])||'Unassigned');
+    // Paired cleaner names: resolve from cleanerDB (FK), fall back to null
+    var cleaner2Name=(a.cleaner_id_2&&cleanerDB[a.cleaner_id_2])?cleanerDB[a.cleaner_id_2].name:null;
+    var cleaner3Name=(a.cleaner_id_3&&cleanerDB[a.cleaner_id_3])?cleanerDB[a.cleaner_id_3].name:null;
     apptData[key].push({
       n:clientName, s:a.status||'unassigned',
       t:a.time||'8am', cleaner:cleanerName,
@@ -2875,7 +2946,12 @@ function _rebuildAppointmentsFromDB(appts){
       notes:a.notes||'',
       duration:a.duration_hours||null,
       seriesId:a.series_id||null,
-      seriesIndex:a.series_index!=null?a.series_index:null
+      seriesIndex:a.series_index!=null?a.series_index:null,
+      // Paired cleaners
+      cleaner_id_2:a.cleaner_id_2||null, cleaner2:cleaner2Name,
+      cleanerPay2:a.cleaner_pay_2!=null?parseFloat(a.cleaner_pay_2):null,
+      cleaner_id_3:a.cleaner_id_3||null, cleaner3:cleaner3Name,
+      cleanerPay3:a.cleaner_pay_3!=null?parseFloat(a.cleaner_pay_3):null
     });
   });
 
@@ -3524,7 +3600,12 @@ function renderMonth(){
     daSorted.forEach(function(a){
       var btn=document.createElement('button');
       btn.className='appt '+(function(st){if(!st)return 'au';if(st==='cancelled')return 'ax';if(st==='scheduled')return 'aa';if(st==='unassigned')return 'au';if(st==='completed')return 'ac';if(st==='paid')return 'ap';return 'aa';})(a.s);
-      btn.textContent=(a.recurring?'\u21bb ':'')+a.t+' '+a.n;
+      // Paired cleaner badge: '+1' for 2 cleaners, '+2' for 3. Uses cleaner_id_2/3
+      // (the FK columns) so we don't show a stale badge if names get out of sync.
+      var _pairBadge = '';
+      if(a.cleaner_id_3) _pairBadge = ' \u202f+2';
+      else if(a.cleaner_id_2) _pairBadge = ' \u202f+1';
+      btn.textContent=(a.recurring?'\u21bb ':'')+a.t+' '+a.n+_pairBadge;
       btn.dataset.appt=JSON.stringify(a);
       btn.dataset.key=k;
       btn.addEventListener('click',function(ev){ev.stopPropagation();openAppt(JSON.parse(this.dataset.appt),this.dataset.key);});
@@ -3675,12 +3756,23 @@ function calLayoutAppts(appts,dateKey,col,compact){
       var startStr=calFormatTime((CAL_START_HOUR*60)+appt.startMin);
 
       if(compact){
-        block.innerHTML='<div style="font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+a.n+'</div>'
+        var _pairCompact = a.cleaner_id_3 ? ' \u202f+2' : (a.cleaner_id_2 ? ' \u202f+1' : '');
+        block.innerHTML='<div style="font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+a.n+_pairCompact+'</div>'
           +'<div style="opacity:.75;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+a.t+'</div>';
       } else {
-        block.innerHTML='<div style="font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+a.n+'</div>'
+        // For week/day non-compact: name + +N badge in title row, cleaner row
+        // shows ALL paired cleaners separated by " + " so the user can read
+        // who's on the job at a glance.
+        var _cleanerLine = '';
+        if(a.cleaner && a.cleaner !== 'Unassigned'){
+          _cleanerLine = a.cleaner;
+          if(a.cleaner2) _cleanerLine += ' + ' + a.cleaner2;
+          if(a.cleaner3) _cleanerLine += ' + ' + a.cleaner3;
+        }
+        var _pairFull = a.cleaner_id_3 ? ' \u202f+2' : (a.cleaner_id_2 ? ' \u202f+1' : '');
+        block.innerHTML='<div style="font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+a.n+_pairFull+'</div>'
           +'<div style="font-size:10px;opacity:.75;margin-top:1px;">'+startStr+' \u2013 '+endStr+'</div>'
-          +(a.cleaner&&a.cleaner!=='Unassigned'?'<div style="font-size:10px;opacity:.7;margin-top:1px;">'+a.cleaner+'</div>':'');
+          +(_cleanerLine?'<div style="font-size:10px;opacity:.7;margin-top:1px;">'+_cleanerLine+'</div>':'');
       }
 
       (function(appt,key){block.addEventListener('click',function(ev){ev.stopPropagation();openAppt(appt,key);});})(a,dateKey);
@@ -3851,6 +3943,29 @@ function _openApptInner(a,dateKey){
   document.getElementById('ai-bedbath').textContent=bedbath;
   document.getElementById('ai-cond').textContent=a.condition?('Condition '+a.condition+'/10'):'—';
   document.getElementById('ai-cpay').textContent=fmtPrice(a.cleanerPay);
+  // Paired cleaner rows: show only when set on this appointment
+  var _ai2Row = document.getElementById('ai-cleaner-2-row');
+  var _aiP2Row = document.getElementById('ai-cpay-2-row');
+  var _ai3Row = document.getElementById('ai-cleaner-3-row');
+  var _aiP3Row = document.getElementById('ai-cpay-3-row');
+  if(a.cleaner2){
+    if(_ai2Row) _ai2Row.style.display = '';
+    if(_aiP2Row) _aiP2Row.style.display = '';
+    var _ai2 = document.getElementById('ai-cleaner-2'); if(_ai2) _ai2.textContent = a.cleaner2;
+    var _aiP2 = document.getElementById('ai-cpay-2'); if(_aiP2) _aiP2.textContent = (a.cleanerPay2 != null) ? fmtPrice(a.cleanerPay2) : '\u2014';
+  } else {
+    if(_ai2Row) _ai2Row.style.display = 'none';
+    if(_aiP2Row) _aiP2Row.style.display = 'none';
+  }
+  if(a.cleaner3){
+    if(_ai3Row) _ai3Row.style.display = '';
+    if(_aiP3Row) _aiP3Row.style.display = '';
+    var _ai3 = document.getElementById('ai-cleaner-3'); if(_ai3) _ai3.textContent = a.cleaner3;
+    var _aiP3 = document.getElementById('ai-cpay-3'); if(_aiP3) _aiP3.textContent = (a.cleanerPay3 != null) ? fmtPrice(a.cleanerPay3) : '\u2014';
+  } else {
+    if(_ai3Row) _ai3Row.style.display = 'none';
+    if(_aiP3Row) _aiP3Row.style.display = 'none';
+  }
   document.getElementById('ai-base').textContent=fmtPrice(a.base||a.basePrice);
   document.getElementById('ai-disc').textContent='$0';
   document.getElementById('ai-tax').textContent=fmtPrice(a.tax);
@@ -3972,12 +4087,35 @@ function showApptEdit(){
   document.getElementById('appt-view').style.display='none';
   document.getElementById('appt-edit').style.display='block';
   populateEditPropertySelector(currentClientName);
-  // Reset edit-side legacy state and populate hint asynchronously. Same flow
-  // as the new-appointment form: looks up the client's MOST RECENT paid /
-  // completed appointment and offers a one-click button to lock that price
-  // in for THIS appointment + persist to the property as a default.
-  // Skips itself (hint stays hidden) if the client has no past completed
-  // appointments or if currentAppt has no client_id linkage.
+
+  // Reset paired cleaner UI to a clean slate before populating from currentAppt.
+  // Otherwise stale state from a previous edit could leak in (e.g., a row
+  // visible from the last appointment's pair).
+  resetPairedCleanersUi('edit');
+  if(currentAppt && currentAppt.cleaner2){
+    // Show row 2, populate dropdown with all cleaners, select the paired one
+    var row2El = document.getElementById('edit-pair-row-2');
+    if(row2El) row2El.style.display = '';
+    populateCleanerDropdown('edit-cleaner-2', currentAppt.cleaner2);
+    var pay2El = document.getElementById('edit-cleaner-pay-2');
+    if(pay2El && currentAppt.cleanerPay2 != null) pay2El.value = parseFloat(currentAppt.cleanerPay2).toFixed(2);
+    // Update add-link state
+    var linkEl = document.getElementById('edit-pair-add-link');
+    if(linkEl) linkEl.textContent = '+ Add third cleaner';
+    if(currentAppt.cleaner3){
+      var row3El = document.getElementById('edit-pair-row-3');
+      if(row3El) row3El.style.display = '';
+      populateCleanerDropdown('edit-cleaner-3', currentAppt.cleaner3);
+      var pay3El = document.getElementById('edit-cleaner-pay-3');
+      if(pay3El && currentAppt.cleanerPay3 != null) pay3El.value = parseFloat(currentAppt.cleanerPay3).toFixed(2);
+      if(linkEl) linkEl.style.display = 'none';
+    }
+    // Mark pay fields as manual so auto-resplit doesn't overwrite the
+    // user's previously-saved values when they tweak something else.
+    _editPayManual = {2: true, 3: !!currentAppt.cleaner3};
+  }
+
+  // Reset edit-side legacy state and populate hint asynchronously.
   _editLegacyPriceLocked = false;
   _editLegacyPriceData = null;
   var _editLegHint = document.getElementById('edit-legacy-hint');
@@ -4096,6 +4234,14 @@ async function saveApptEdit(mode){
     _editLegacyPriceLocked = false;
     _editLegacyPriceData = null;
   }
+  // Read paired-cleaner state ONCE up front so both the tail-regen path
+  // (recurring 'all' edits that need to insert new future occurrences) and
+  // the sbBasePayload UPDATE path can use the same values. Solo jobs leave
+  // these null so the columns get cleared on save.
+  var _editPair = readPairedCleanersFromForm('edit');
+  var _editPid2 = _cleanerNameToId(_editPair.name2);
+  var _editPid3 = _editPid2 ? _cleanerNameToId(_editPair.name3) : null;
+
   var editClient=document.getElementById('edit-client').value||a.n;
   // Service, freq, beds, baths, sqft, condition are property-level — read from current appointment
   var _editSvcEl=document.getElementById('edit-service');
@@ -4214,7 +4360,14 @@ async function saveApptEdit(mode){
     cleanerPayOverride:editCleanerPayOverride,
     seriesId:newSeriesId,
     seriesIndex:newSeriesIndex,
-    recurring: mode==='all' ? true : (mode==='single' ? false : a.recurring)
+    recurring: mode==='all' ? true : (mode==='single' ? false : a.recurring),
+    // Paired cleaners on this single appt (for calendar/overlay rendering)
+    cleaner2: _editPair.name2 || null,
+    cleanerPay2: _editPair.name2 ? (parseFloat(_editPair.pay2) || 0) : null,
+    cleaner_id_2: _editPid2,
+    cleaner3: _editPair.name3 || null,
+    cleanerPay3: _editPair.name3 ? (parseFloat(_editPair.pay3) || 0) : null,
+    cleaner_id_3: _editPid3
   });
   // Always update the selected appointment in-memory
   var dayArr=apptData[currentApptKey];
@@ -4239,7 +4392,15 @@ async function saveApptEdit(mode){
       condition:editCond, duration:editDuration,
       basePrice:editBase, tax:editTax, totalPrice:editTotal,
       base:'$'+editBase.toFixed(2), cleanerPay:editCleanerPay,
-      cleanerPayOverride:editCleanerPayOverride, notes:editNotes
+      cleanerPayOverride:editCleanerPayOverride, notes:editNotes,
+      // Paired cleaners propagate across the series too. Solo edits set
+      // these to null which clears existing pairings on every instance.
+      cleaner2: _editPair.name2 || null,
+      cleanerPay2: _editPair.name2 ? (parseFloat(_editPair.pay2) || 0) : null,
+      cleaner_id_2: _editPid2,
+      cleaner3: _editPair.name3 || null,
+      cleanerPay3: _editPair.name3 ? (parseFloat(_editPair.pay3) || 0) : null,
+      cleaner_id_3: _editPid3
     };
     var seriesCount=0;
     Object.keys(apptData).forEach(function(k){
@@ -4338,7 +4499,9 @@ async function saveApptEdit(mode){
                   basePrice: editBase, tax: editTax, totalPrice: editTotal,
                   cleanerPay: editCleanerPay, cleanerPayOverride: editCleanerPayOverride,
                   duration: editDuration, notes: editNotes,
-                  recurring: true, seriesId: _ensureSid
+                  recurring: true, seriesId: _ensureSid,
+                  cleanerName2: _editPair.name2, cleanerPay2: _editPair.pay2,
+                  cleanerName3: _editPair.name3, cleanerPay3: _editPair.pay3
                 });
               }
             }catch(_dberr){ console.warn('[saveApptEdit] dbSaveAppointment failed for '+_oKey, _dberr); }
@@ -4480,7 +4643,13 @@ async function saveApptEdit(mode){
       base_price:editBase, tax:editTax, total_price:editTotal,
       cleaner_pay:editCleanerPay,
       cleaner_pay_override:editCleanerPayOverride!=null?editCleanerPayOverride:null,
-      notes:editNotes||null, duration_hours:editDuration||null
+      notes:editNotes||null, duration_hours:editDuration||null,
+      // Paired cleaners — explicit nulls so removing a pairing actually clears it.
+      // Uses _editPair / _editPid2 / _editPid3 hoisted at top of saveApptEdit.
+      cleaner_id_2: _editPid2,
+      cleaner_pay_2: _editPid2 ? (parseFloat(_editPair.pay2) || 0) : null,
+      cleaner_id_3: _editPid3,
+      cleaner_pay_3: _editPid3 ? (parseFloat(_editPair.pay3) || 0) : null
     };
     // Add cleaner_id lookup
     if(typeof cleanerDB!=='undefined'&&cleanerVal&&cleanerVal!=='Unassigned'){
@@ -5674,6 +5843,249 @@ function populateCleanerDropdown(selectId, currentValue){
   }
 }
 
+/* ─── PAIRED CLEANERS ──────────────────────────────────────────────────
+   Tag-team mode: up to 3 cleaners can be assigned to one appointment.
+   Wall-clock duration is left to the user (they halve it manually when
+   pairing, since splitting the labor doesn't reduce total work — it just
+   compresses it in time).
+
+   Total cleaner pay is split EVENLY by default. If the auto-computed pay
+   (or current override) is $130 and the user adds a 2nd cleaner, both
+   get $65. If they add a 3rd, all three get ~$43.33. User can manually
+   override any of the three pay fields afterward and the value sticks.
+
+   Data model: appointments table now has cleaner_id_2/cleaner_pay_2 +
+   cleaner_id_3/cleaner_pay_3 nullable columns. Solo jobs leave them null.
+
+   The "naX" / "editX" pairs below are duplicated rather than DRY-factored
+   because the existing booking and edit forms already use distinct id
+   prefixes (na-* vs edit-*) and have subtle behavioural differences in
+   their override flows. Mirroring the logic keeps changes surgical. */
+
+function _readPrimaryCleanerPay(prefix){
+  // Returns the current primary cleaner_pay value: the override input if
+  // checked, else the auto-computed value displayed in the cleaner-pay-val
+  // span. Used as the basis for splitting evenly when pairing changes.
+  var ovrChk = document.getElementById(prefix + '-cleaner-pay-override-chk');
+  var ovrVal = document.getElementById(prefix + '-cleaner-pay-override-val');
+  if(ovrChk && ovrChk.checked && ovrVal && parseFloat(ovrVal.value) > 0){
+    return parseFloat(ovrVal.value);
+  }
+  var disp = document.getElementById(prefix + '-cleaner-pay-val');
+  if(disp){
+    var n = parseFloat((disp.textContent || '').replace(/[^0-9.]/g, ''));
+    if(!isNaN(n) && n > 0) return n;
+  }
+  return 0;
+}
+
+/* Active paired count (primary + visible secondaries that the user has
+   actually selected — not still on "unassigned"). Used for split math. */
+function _pairedCount(prefix){
+  var count = 1;
+  var row2 = document.getElementById(prefix + '-pair-row-2');
+  var row3 = document.getElementById(prefix + '-pair-row-3');
+  if(row2 && row2.style.display !== 'none') count++;
+  if(row3 && row3.style.display !== 'none') count++;
+  return count;
+}
+
+function _splitPayEvenly(prefix){
+  var n = _pairedCount(prefix);
+  if(n === 1) return; // no pairing, leave alone
+  var totalIfSolo = _readPrimaryCleanerPay(prefix);
+  // If primary pay is 0/missing, use the displayed price's labor share or
+  // bail. We already preserve user-typed values via _payManual flags below
+  // so the most common case (user paired AFTER pricing was computed) works.
+  if(!totalIfSolo) return;
+  var per = Math.round((totalIfSolo / n) * 100) / 100;
+  // Force primary's override on with the split value, so cleaner_pay
+  // saved to DB matches what's displayed for the primary cleaner.
+  var ovrChk = document.getElementById(prefix + '-cleaner-pay-override-chk');
+  var ovrVal = document.getElementById(prefix + '-cleaner-pay-override-val');
+  if(ovrChk && ovrVal){
+    ovrChk.checked = true;
+    ovrVal.style.display = '';
+    ovrVal.value = per.toFixed(2);
+  }
+  // Set paired pay fields ONLY where the user hasn't manually edited.
+  // That way once they tweak a number, our auto-resplit doesn't blow it
+  // away on a later add/remove.
+  var manual = (prefix === 'na' ? _naPayManual : _editPayManual);
+  if(n >= 2 && !manual[2]){
+    var p2 = document.getElementById(prefix + '-cleaner-pay-2');
+    if(p2) p2.value = per.toFixed(2);
+  }
+  if(n >= 3 && !manual[3]){
+    var p3 = document.getElementById(prefix + '-cleaner-pay-3');
+    if(p3) p3.value = per.toFixed(2);
+  }
+  // Recompute price preview so the displayed cleaner pay line reflects
+  // the new primary value (existing flow already handles override input).
+  if(prefix === 'na' && typeof calcPrice === 'function') calcPrice();
+  if(prefix === 'edit' && typeof calcEditPrice === 'function') calcEditPrice();
+}
+
+/* ── BOOKING FORM (na-*) handlers ── */
+
+var _naPayManual = {2: false, 3: false};
+
+function naAddPairedCleaner(){
+  var row2 = document.getElementById('na-pair-row-2');
+  var row3 = document.getElementById('na-pair-row-3');
+  var link = document.getElementById('na-pair-add-link');
+  if(row2.style.display === 'none'){
+    row2.style.display = '';
+    populateCleanerDropdown('na-cleaner-2', '');
+    if(link) link.textContent = '+ Add third cleaner';
+    _splitPayEvenly('na');
+  } else if(row3.style.display === 'none'){
+    row3.style.display = '';
+    populateCleanerDropdown('na-cleaner-3', '');
+    if(link) link.style.display = 'none'; // hard cap at 3
+    _splitPayEvenly('na');
+  }
+}
+
+function naRemovePairedCleaner(idx){
+  var row = document.getElementById('na-pair-row-' + idx);
+  if(row) row.style.display = 'none';
+  var sel = document.getElementById('na-cleaner-' + idx);
+  if(sel) sel.value = 'unassigned';
+  var pay = document.getElementById('na-cleaner-pay-' + idx);
+  if(pay) pay.value = '';
+  _naPayManual[idx] = false;
+  // Removing 2 also collapses 3 (CHECK constraint won't allow 3 without 2)
+  if(idx === 2){
+    var row3 = document.getElementById('na-pair-row-3');
+    if(row3 && row3.style.display !== 'none'){
+      row3.style.display = 'none';
+      var s3 = document.getElementById('na-cleaner-3'); if(s3) s3.value = 'unassigned';
+      var p3 = document.getElementById('na-cleaner-pay-3'); if(p3) p3.value = '';
+      _naPayManual[3] = false;
+    }
+  }
+  // Restore the add-link to the right state
+  var link = document.getElementById('na-pair-add-link');
+  if(link){
+    link.style.display = '';
+    var hasTwo = document.getElementById('na-pair-row-2').style.display !== 'none';
+    link.textContent = hasTwo ? '+ Add third cleaner' : '+ Pair with another cleaner';
+  }
+  _splitPayEvenly('na');
+}
+
+function naSyncPairedPay(){ _splitPayEvenly('na'); }
+function naMarkPayManual(idx){ _naPayManual[idx] = true; }
+
+/* ── EDIT FORM (edit-*) handlers ── */
+
+var _editPayManual = {2: false, 3: false};
+
+function editAddPairedCleaner(){
+  var row2 = document.getElementById('edit-pair-row-2');
+  var row3 = document.getElementById('edit-pair-row-3');
+  var link = document.getElementById('edit-pair-add-link');
+  if(row2.style.display === 'none'){
+    row2.style.display = '';
+    populateCleanerDropdown('edit-cleaner-2', '');
+    if(link) link.textContent = '+ Add third cleaner';
+    _splitPayEvenly('edit');
+  } else if(row3.style.display === 'none'){
+    row3.style.display = '';
+    populateCleanerDropdown('edit-cleaner-3', '');
+    if(link) link.style.display = 'none';
+    _splitPayEvenly('edit');
+  }
+}
+
+function editRemovePairedCleaner(idx){
+  var row = document.getElementById('edit-pair-row-' + idx);
+  if(row) row.style.display = 'none';
+  var sel = document.getElementById('edit-cleaner-' + idx);
+  if(sel) sel.value = 'Unassigned';
+  var pay = document.getElementById('edit-cleaner-pay-' + idx);
+  if(pay) pay.value = '';
+  _editPayManual[idx] = false;
+  if(idx === 2){
+    var row3 = document.getElementById('edit-pair-row-3');
+    if(row3 && row3.style.display !== 'none'){
+      row3.style.display = 'none';
+      var s3 = document.getElementById('edit-cleaner-3'); if(s3) s3.value = 'Unassigned';
+      var p3 = document.getElementById('edit-cleaner-pay-3'); if(p3) p3.value = '';
+      _editPayManual[3] = false;
+    }
+  }
+  var link = document.getElementById('edit-pair-add-link');
+  if(link){
+    link.style.display = '';
+    var hasTwo = document.getElementById('edit-pair-row-2').style.display !== 'none';
+    link.textContent = hasTwo ? '+ Add third cleaner' : '+ Pair with another cleaner';
+  }
+  _splitPayEvenly('edit');
+}
+
+function editSyncPairedPay(){ _splitPayEvenly('edit'); }
+function editMarkPayManual(idx){ _editPayManual[idx] = true; }
+
+/* Reset both forms' pair state. Call when opening a fresh booking form
+   or when entering edit on a non-paired appointment so stale values from
+   a previous edit don't leak in. */
+function resetPairedCleanersUi(prefix){
+  ['2','3'].forEach(function(i){
+    var row = document.getElementById(prefix + '-pair-row-' + i);
+    if(row) row.style.display = 'none';
+    var sel = document.getElementById(prefix + '-cleaner-' + i);
+    if(sel) sel.value = (prefix === 'na' ? 'unassigned' : 'Unassigned');
+    var pay = document.getElementById(prefix + '-cleaner-pay-' + i);
+    if(pay) pay.value = '';
+  });
+  if(prefix === 'na') _naPayManual = {2: false, 3: false};
+  else _editPayManual = {2: false, 3: false};
+  var link = document.getElementById(prefix + '-pair-add-link');
+  if(link){ link.style.display = ''; link.textContent = '+ Pair with another cleaner'; }
+}
+
+/* Read the current pair state out of the form. Returns:
+     { id2: <cleanerName|null>, pay2: <number|null>,
+       id3: <cleanerName|null>, pay3: <number|null> }
+   Use these strings to look up cleaner_id from cleanerDB before saving. */
+function readPairedCleanersFromForm(prefix){
+  var out = { name2: null, pay2: null, name3: null, pay3: null };
+  var row2 = document.getElementById(prefix + '-pair-row-2');
+  if(row2 && row2.style.display !== 'none'){
+    var sel2 = document.getElementById(prefix + '-cleaner-2');
+    var pay2 = document.getElementById(prefix + '-cleaner-pay-2');
+    var v2 = sel2 ? sel2.value : '';
+    if(v2 && v2 !== 'unassigned' && v2 !== 'Unassigned'){
+      out.name2 = v2;
+      out.pay2 = pay2 ? (parseFloat(pay2.value) || 0) : 0;
+    }
+  }
+  var row3 = document.getElementById(prefix + '-pair-row-3');
+  if(row3 && row3.style.display !== 'none' && out.name2){ // 3rd requires 2nd
+    var sel3 = document.getElementById(prefix + '-cleaner-3');
+    var pay3 = document.getElementById(prefix + '-cleaner-pay-3');
+    var v3 = sel3 ? sel3.value : '';
+    if(v3 && v3 !== 'unassigned' && v3 !== 'Unassigned'){
+      out.name3 = v3;
+      out.pay3 = pay3 ? (parseFloat(pay3.value) || 0) : 0;
+    }
+  }
+  return out;
+}
+
+/* Resolve a cleaner NAME (as displayed in the dropdowns) to a cleaner_id
+   from cleanerDB. Returns null if unknown or "unassigned". */
+function _cleanerNameToId(name){
+  if(!name || name === 'unassigned' || name === 'Unassigned') return null;
+  // Dropdown values are just the cleaner name (no rate suffix)
+  var entry = Object.entries(cleanerDB || {}).find(function(e){
+    return e[1] && e[1].name === name;
+  });
+  return entry ? entry[0] : null;
+}
+
 /* === HNC Pricing — synced with BookingKoala "Pricing Parameters" page ===
    Regular cleaning: ADDITIVE bath_lookup + bedroom_lookup. $65/hr implied.
    Deep / Move-out:  ADDITIVE sqft_lookup + condition_adder. $70/hr implied.
@@ -6190,6 +6602,11 @@ async function saveNewAppt(){
   var cpOvrChk=document.getElementById('na-cleaner-pay-override-chk');
   var cpOvrValEl=document.getElementById('na-cleaner-pay-override-val');
   var apptCleanerPay=(cpOvrChk&&cpOvrChk.checked&&cpOvrValEl&&cpOvrValEl.value)?parseFloat(cpOvrValEl.value):calcCleanerPay(apptDuration,cleanerName,naServiceText);
+
+  // Read paired-cleaner state (2nd / 3rd cleaner). Solo jobs leave these
+  // null and the DB columns stay null too.
+  var _naPair = readPairedCleanersFromForm('na');
+
   // Build full appointment object
   var apptObj={
     n:name, s:apptStatus, t:timeStr, cleaner:cleanerName,
@@ -6198,7 +6615,14 @@ async function saveNewAppt(){
     base:'$'+apptBase.toFixed(2), tax:'$'+apptTax.toFixed(2), total:'$'+total.toFixed(2),
     basePrice:apptBase, taxAmt:apptTax, totalPrice:total,
     cleanerPay:apptCleanerPay, notes:apptNotes,
-    duration:apptDuration
+    duration:apptDuration,
+    // Paired cleaners attached so calendar / overlay / portal can render them.
+    cleaner2: _naPair.name2 || null,
+    cleanerPay2: _naPair.pay2 || null,
+    cleaner_id_2: _cleanerNameToId(_naPair.name2),
+    cleaner3: _naPair.name3 || null,
+    cleanerPay3: _naPair.pay3 || null,
+    cleaner_id_3: _cleanerNameToId(_naPair.name3)
   };
   console.log('[saveNewAppt] appointment object with duration='+apptDuration+':', apptObj);
   // ── STEP 1: Insert into apptData immediately so UI updates without waiting for Supabase ──
@@ -6283,7 +6707,9 @@ async function saveNewAppt(){
       address:apptAddress,
       beds:apptBeds, baths:apptBaths, sqft:apptSqft, condition:apptCond,
       cleanerName:cleanerName, basePrice:apptBase, tax:apptTax, totalPrice:total,
-      cleanerPay:apptCleanerPay, notes:apptNotes, recurring:false, duration:apptDuration
+      cleanerPay:apptCleanerPay, notes:apptNotes, recurring:false, duration:apptDuration,
+      cleanerName2:_naPair.name2, cleanerPay2:_naPair.pay2,
+      cleanerName3:_naPair.name3, cleanerPay3:_naPair.pay3
     }).then(function(sbRes){
       if(!sbRes.error&&sbRes.data&&sbRes.data[0]){
         apptObj.dbId=sbRes.data[0].id;
@@ -6309,6 +6735,9 @@ async function saveNewAppt(){
       if(typeof cleanerDB!=='undefined'&&cleanerName&&cleanerName!=='Unassigned'){
         _cleanerId=Object.keys(cleanerDB).find(function(_id){return cleanerDB[_id]&&cleanerDB[_id].name===cleanerName;})||null;
       }
+      // Paired cleaners — same on every instance of the recurring series
+      var _pid2 = _cleanerNameToId(_naPair.name2);
+      var _pid3 = _pid2 ? _cleanerNameToId(_naPair.name3) : null;
       return {
         client_id:_clientId,
         client_name:(name&&String(name).trim())||null,
@@ -6317,6 +6746,10 @@ async function saveNewAppt(){
         beds:parseInt(apptBeds)||null, baths:parseFloat(apptBaths)||null,
         sqft:parseInt(apptSqft)||null, condition:parseInt(apptCond)||7,
         cleaner_id:_cleanerId,
+        cleaner_id_2:_pid2,
+        cleaner_pay_2: _pid2 ? (parseFloat(_naPair.pay2) || 0) : null,
+        cleaner_id_3:_pid3,
+        cleaner_pay_3: _pid3 ? (parseFloat(_naPair.pay3) || 0) : null,
         status:cleanerName!=='Unassigned'?'assigned':'unassigned',
         base_price:apptBase, tax:apptTax, total_price:total,
         cleaner_pay:apptCleanerPay,
@@ -6525,6 +6958,8 @@ function resetNewApptForm(){
   // Hide commercial-hours sub-block (only visible for janitorial)
   var commercialFields = document.getElementById('na-commercial-fields');
   if(commercialFields) commercialFields.style.display = 'none';
+  // Reset paired cleaner rows (hide row 2 + row 3, restore "+ Pair" link)
+  if(typeof resetPairedCleanersUi === 'function') resetPairedCleanersUi('na');
 }
 
 function handleTopCta(){

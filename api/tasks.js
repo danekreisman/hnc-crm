@@ -36,26 +36,58 @@ async function generateAiBrief(db, task) {
 
     if (!subject) return null;
 
-    // Pull OpenPhone history
+    // Pull OpenPhone history. Cap at 30 SMS / 5 calls — earlier code pulled
+    // 100/10 which inflated the prompt and pushed the model toward verbose
+    // output that wouldn't fit in max_tokens. The most-recent 30 messages
+    // contain virtually all the relevant call-prep context.
     const history = phone ? await getOpenPhoneHistory(phone, {
       apiKey: process.env.QUO_API_KEY,
-      maxSms: 100,
-      maxCalls: 10,
+      maxSms: 30,
+      maxCalls: 5,
     }) : '';
 
-    const prompt = [
-      `You are a briefing assistant for Hawaii Natural Clean, a cleaning business in Hawaii.`,
-      `Generate a concise pre-call briefing for the following ${task.related_lead_id ? 'lead' : 'client'}.`,
-      `Rules: factual only, no speculation. Include: who they are, what they need, relevant history, any open issues or preferences. End with 1-2 specific talking points for the call.`,
-      ``,
+    // Tight prompt. The previous version was open-ended ('include who they
+    // are, what they need, history, open issues, preferences, talking points')
+    // which produced rambling output that hit max_tokens=400 mid-sentence.
+    // This version forces a fixed structure with hard limits so the brief
+    // is scannable in 5 seconds and never truncates.
+    const subjectKind = task.related_lead_id ? 'lead' : 'client';
+    const knownFields = [
       `Name: ${subject.name}`,
-      subject.service ? `Service interest: ${subject.service}` : '',
+      subject.service ? `Service: ${subject.service}` : '',
       subject.quote_total ? `Quote: $${subject.quote_total}` : '',
-      subject.stage ? `Lead stage: ${subject.stage}` : '',
+      subject.stage ? `Stage: ${subject.stage}` : '',
       subject.frequency ? `Frequency: ${subject.frequency}` : '',
       subject.address ? `Address: ${subject.address}` : '',
       subject.notes ? `Notes: ${subject.notes}` : '',
-      history ? `\nConversation history:\n${history}` : '',
+    ].filter(Boolean).join('\n');
+
+    const prompt = [
+      `You are a pre-call briefing assistant for Hawaii Natural Clean (a cleaning business in Hawaii).`,
+      `The rep is about to call this ${subjectKind}. Generate a brief that they can read in 5 seconds.`,
+      ``,
+      `OUTPUT FORMAT (exact structure, nothing else):`,
+      `📋 Quick read`,
+      `- (one short sentence: who they are + what they want + where they are in the funnel)`,
+      `- (most recent thing that happened — date + what)`,
+      `- (open thread or issue, if any)`,
+      ``,
+      `🚩 Watch for`,
+      `- (one specific thing to mention or be careful about — preferences, complaints, access notes, allergies, pets, schedule constraints. If nothing buried, write "Nothing unusual.")`,
+      ``,
+      `💡 Try this`,
+      `- (one concrete opening line or next step, grounded in the data above)`,
+      ``,
+      `RULES:`,
+      `- Maximum 5 bullets total across all sections.`,
+      `- Each bullet under 15 words. No filler.`,
+      `- Quote specific dates and dollar amounts when relevant.`,
+      `- Do not restate fields the rep already sees on the screen (name, address, quote total) unless the bullet says something new about them.`,
+      `- No preamble, no closing remarks, no code fences. Output starts with "📋 Quick read".`,
+      ``,
+      `=== KNOWN FIELDS ===`,
+      knownFields || '(none)',
+      history ? `\n=== RECENT SMS / CALL HISTORY ===\n${history}` : '',
     ].filter(Boolean).join('\n');
 
     const resp = await fetchWithTimeout(ANTHROPIC_API, {
@@ -67,7 +99,10 @@ async function generateAiBrief(db, task) {
       },
       body: JSON.stringify({
         model: 'claude-haiku-4-5-20251001',
-        max_tokens: 400,
+        // 500 tokens is plenty for the structured 5-bullet output. Leaves
+        // headroom so the response can't be truncated mid-bullet even if
+        // the model exceeds the bullet count slightly.
+        max_tokens: 500,
         messages: [{ role: 'user', content: prompt }],
       }),
     }, TIMEOUTS.ANTHROPIC);

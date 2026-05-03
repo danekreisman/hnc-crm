@@ -2944,6 +2944,10 @@ async function loadAllData(){
         // days_since_response, broadcasts) and the AI follow-up button skip
         // this lead. Toggleable via the pill on the lead profile.
         doNotContact: !!l.do_not_contact,
+        // Raw updated_at timestamp — used by the closed-leads tables to show
+        // an accurate "Date lost" / "Date won" column. The `date` field above
+        // is created_at, which is wrong for closed-lead views.
+        updatedAt: l.updated_at || null,
       };
     });
     // Pipeline can render NOW. Don't make the user wait for appointments.
@@ -3208,6 +3212,91 @@ function renderLeadsPipeline(){
   var ci = document.getElementById('count-inquiry');  if(ci) ci.textContent = counts[0];
   var cq = document.getElementById('count-quoted');   if(cq) cq.textContent = counts[1];
   var cf = document.getElementById('count-followup'); if(cf) cf.textContent = counts[2];
+
+  // Always keep the won/lost tables in sync with leadDB. Without this call,
+  // the closed-lead tbodies stay empty on page load — they were originally
+  // only populated by markLeadLost/convertLeadToClient during the active
+  // session, so any lead marked closed in a previous session was invisible.
+  renderClosedLeadsTables();
+}
+
+/**
+ * Populate the won-leads-tbody and lost-leads-tbody from leadDB. Called from
+ * renderLeadsPipeline so the closed-lead views always reflect what's actually
+ * in the database, not just what was changed in the current session.
+ *
+ * Won leads are most often shown via clientDB elsewhere (after conversion to
+ * client), so the won table here only covers leads still in stage='Closed won'
+ * that have not yet been converted. Lost leads have no such fallback view, so
+ * the lost table is the only place they appear after a reload.
+ */
+function renderClosedLeadsTables(){
+  var leadEntries = Object.entries(leadDB).filter(function(e){ return e[0].length >= 30; });
+
+  // Sort by updated_at (or created date as fallback) descending — most
+  // recently closed first. updatedAt is an ISO string when present.
+  function sortKey(l){
+    if(l.updatedAt) return new Date(l.updatedAt).getTime();
+    if(l.date)      return new Date(l.date).getTime();
+    return 0;
+  }
+  var sorted = leadEntries.slice().sort(function(a,b){ return sortKey(b[1]) - sortKey(a[1]); });
+
+  var lostTbody = document.getElementById('lost-leads-tbody');
+  var wonTbody  = document.getElementById('won-leads-tbody');
+
+  if(lostTbody){
+    var lostHtml = '';
+    sorted.forEach(function(entry){
+      var id = entry[0]; var l = entry[1];
+      if(l.stage !== 'Closed lost') return;
+      var reason = '\u2014';
+      // Parse "Lost: <reason>" out of notes. Both markLeadLost and
+      // reviewTaskMarkLost write this format; older entries may not have it.
+      if(l.notes && l.notes !== '\u2014'){
+        var m = /Lost:\s*([^\n]+?)(?:\.|$)/.exec(l.notes);
+        if(m && m[1]) reason = m[1].trim().slice(0, 80);
+      }
+      var dateStr = l.updatedAt
+        ? new Date(l.updatedAt).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})
+        : (l.date || '\u2014');
+      lostHtml += '<tr style="border-top:1px solid var(--border);">'
+        + '<td style="padding:9px 14px;font-size:12px;font-weight:600;">' + esc(l.name||'\u2014') + '</td>'
+        + '<td style="padding:9px 14px;font-size:12px;color:var(--text-muted);">' + esc(l.service||'\u2014') + '</td>'
+        + '<td style="padding:9px 14px;font-size:12px;color:var(--text-muted);">' + esc(l.value||'\u2014') + '</td>'
+        + '<td style="padding:9px 14px;font-size:12px;color:var(--text-muted);">' + esc(reason) + '</td>'
+        + '<td style="padding:9px 14px;font-size:12px;color:var(--text-muted);">' + esc(dateStr) + '</td>'
+        + '<td style="padding:9px 14px;display:flex;gap:4px;">'
+          + '<button class="btn" style="font-size:11px;padding:3px 9px;" data-id="' + id + '" onclick="openLead(this.dataset.id)">View</button>'
+          + '<button class="btn" style="font-size:11px;padding:3px 9px;background:var(--brand-50);color:#276749;border-color:#9ae6b4;" data-id="' + id + '" onclick="reactivateLead(this.dataset.id)">Reactivate</button>'
+        + '</td></tr>';
+    });
+    lostTbody.innerHTML = lostHtml;
+  }
+
+  if(wonTbody){
+    // Most won leads are converted to clients (and live in clientDB), but
+    // some may sit in stage='Closed won' without conversion. Render those
+    // here so they don't fall off the radar.
+    var wonHtml = '';
+    sorted.forEach(function(entry){
+      var id = entry[0]; var l = entry[1];
+      if(l.stage !== 'Closed won') return;
+      var dateStr = l.updatedAt
+        ? new Date(l.updatedAt).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})
+        : (l.date || '\u2014');
+      wonHtml += '<tr style="border-top:1px solid var(--border);">'
+        + '<td style="padding:9px 14px;font-size:12px;font-weight:600;">' + esc(l.name||'\u2014') + '</td>'
+        + '<td style="padding:9px 14px;font-size:12px;color:var(--text-muted);">' + esc(l.service||'\u2014') + '</td>'
+        + '<td style="padding:9px 14px;font-size:12px;color:var(--text-muted);">' + esc(l.value||'\u2014') + '</td>'
+        + '<td style="padding:9px 14px;font-size:12px;color:var(--text-muted);">' + esc(l.source||'\u2014') + '</td>'
+        + '<td style="padding:9px 14px;font-size:12px;color:var(--text-muted);">' + esc(dateStr) + '</td>'
+        + '<td style="padding:9px 14px;">'
+          + '<button class="btn" style="font-size:11px;padding:3px 9px;" data-id="' + id + '" onclick="openLead(this.dataset.id)">View</button>'
+        + '</td></tr>';
+    });
+    wonTbody.innerHTML = wonHtml;
+  }
 }
 
 function updateDashboardStats(){

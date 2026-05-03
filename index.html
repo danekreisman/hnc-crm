@@ -1747,6 +1747,18 @@ Mahalo 🌺</textarea>
       <details class="booking-section booking-quote" open ontoggle="if(!this.open) this.open=true">
         <summary>Quote</summary>
         <div class="booking-section-body">
+          <!-- Legacy price hint: shown when a known returning client is selected.
+               Fetches their most recent completed/paid appointment, displays the
+               total + hours, and offers a one-click "Use this price" button that
+               also locks the values into the property's flatRate + durationHours
+               on save (so future bookings auto-fill). -->
+          <div id="na-legacy-hint" style="display:none;background:#FFF8E1;border:1px solid #F2D680;border-radius:10px;padding:10px 12px;margin-bottom:10px;font-size:12px;color:#7A5A00;">
+            <div id="na-legacy-hint-label" style="margin-bottom:6px;"></div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+              <button type="button" class="btn" style="background:#F2D680;color:#7A5A00;border:none;padding:6px 12px;font-size:12px;font-weight:600;border-radius:6px;cursor:pointer;" onclick="applyLegacyPriceToBooking()">Use this price</button>
+              <span id="na-legacy-locked" style="display:none;color:#0F7A4A;font-weight:600;align-self:center;">\u2713 Locked in — will save as default for this property</span>
+            </div>
+          </div>
           <div class="price-preview" id="price-preview">
             <div class="price-preview-label">Estimated price</div>
             <div class="price-preview-val" id="price-val">$238.22</div>
@@ -6205,6 +6217,26 @@ async function saveNewAppt(){
       _markLeadWonOnBook(_matchedLead.id, _matchedLead.data, name);
     }
   }catch(_leadLinkErr){ console.warn('[saveNewAppt] lead auto-link error:', _leadLinkErr); }
+
+  // ── STEP 2.6: If user clicked "Use last price" earlier, persist the
+  // locked-in flatRate + durationHours to the property (or client) so
+  // future bookings show this as the default. Fire-and-forget — failure
+  // doesn't undo the booking. See persistLegacyPriceLockIn for details.
+  try {
+    var _propSelEl = document.getElementById('na-property-select');
+    var _propIdxNum = _propSelEl ? parseInt(_propSelEl.value, 10) : NaN;
+    var _legacyClientId = _existingClient ? _existingClient.id : null;
+    if(_naLegacyPriceLocked && _legacyClientId){
+      persistLegacyPriceLockIn(
+        _legacyClientId,
+        isNaN(_propIdxNum) ? null : _propIdxNum,
+        apptAddress
+      );
+    }
+    // Reset state so the next booking starts fresh
+    _naLegacyPriceLocked = false;
+    _naLegacyPriceData = null;
+  } catch(_legErr){ console.warn('[saveNewAppt] legacy-price persist error:', _legErr); }
 
   // ── STEP 3: Persist to Supabase in background (UI already updated) ──
   if(freq==='One-time'){
@@ -14028,6 +14060,178 @@ function populatePropertySelector(clientName){
     document.getElementById('na-residential-fields').style.display = '';
     document.getElementById('na-save-prop-row').style.display = '';
   }
+
+  // After the selector is populated, kick off the legacy-price lookup so
+  // we can show the "Use last price" hint for returning clients. Async so
+  // it doesn't block the selector render.
+  populateLegacyPriceHint(found.id, clientName);
+}
+
+/* ── LEGACY PRICE LOCK-IN ───────────────────────────────────────────────
+   The CRM has a long history of pricing-formula tweaks, so most existing
+   clients have legacy prices that no longer match what calcPrice would
+   compute. Solution: at booking time, surface their MOST RECENT paid/
+   completed appointment total + duration. One click to use it for this
+   appointment, AND it gets persisted to the property's flatRate +
+   durationHours so subsequent bookings (with that property selected)
+   show the locked-in values automatically. No upfront migration; it
+   migrates organically as the user books each client.
+
+   Data flow:
+     1. populateLegacyPriceHint() runs when a known client is picked.
+        Queries appointments for the most recent completed/paid row.
+        If found, shows the hint banner with $price + Xhr.
+     2. User clicks "Use this price" → applyLegacyPriceToBooking() flips
+        the price-override + hours-override checkboxes, populates their
+        values, and sets _naLegacyPriceLocked=true.
+     3. saveNewAppt sees the flag at save time and writes flatRate +
+        durationHours into the selected property (or creates a property
+        record from the booking address if none exists, or falls back to
+        clients.flat_rate as a last resort).
+     4. Future bookings: applyPropertyToBooking() reads property.flatRate
+        + property.durationHours and pre-fills the form with the locked
+        values. calcPrice's existing flat-rate path picks them up. */
+
+var _naLegacyPriceLocked = false;
+var _naLegacyPriceData   = null;  // { totalPrice, durationHours, sourceApptId }
+
+async function populateLegacyPriceHint(clientId, clientName){
+  var hintBox = document.getElementById('na-legacy-hint');
+  var lockedBadge = document.getElementById('na-legacy-locked');
+  if(!hintBox) return;
+
+  // Reset state for fresh lookup
+  hintBox.style.display = 'none';
+  if(lockedBadge) lockedBadge.style.display = 'none';
+  _naLegacyPriceLocked = false;
+  _naLegacyPriceData = null;
+
+  if(!clientId || clientId.length <= 20){
+    // No real client (new or unknown) — nothing to look up.
+    return;
+  }
+
+  try {
+    var res = await db.from('appointments')
+      .select('id, total_price, duration_hours, date, status')
+      .eq('client_id', clientId)
+      .in('status', ['paid', 'completed'])
+      .gt('total_price', 0)
+      .order('date', { ascending: false })
+      .limit(1);
+    if(res.error){ console.warn('[legacyPrice] lookup error:', res.error); return; }
+    var rows = res.data || [];
+    if(!rows.length) return;
+
+    var last = rows[0];
+    var price = parseFloat(last.total_price || 0);
+    var hours = parseFloat(last.duration_hours || 0);
+    if(!price) return;
+
+    _naLegacyPriceData = {
+      totalPrice: price,
+      durationHours: hours || null,
+      sourceApptId: last.id,
+      sourceDate: last.date,
+    };
+
+    var label = document.getElementById('na-legacy-hint-label');
+    if(label){
+      var hoursStr = hours ? ' \u00B7 ' + hours + ' hr' + (hours === 1 ? '' : 's') : '';
+      label.innerHTML = '<strong>Last booked at $' + price.toFixed(2) + hoursStr + '</strong>'
+                     + ' (' + last.date + '). Click below to use this price for the booking and save it as the default for this property.';
+    }
+    hintBox.style.display = 'block';
+  } catch(err){
+    console.warn('[legacyPrice] populate error:', err);
+  }
+}
+
+function applyLegacyPriceToBooking(){
+  if(!_naLegacyPriceData){ return; }
+  // Flip price-override on with the legacy total
+  var priceChk = document.getElementById('na-price-override-chk');
+  var priceVal = document.getElementById('na-price-override-val');
+  if(priceChk && priceVal){
+    priceChk.checked = true;
+    priceVal.style.display = '';  // unhide the input
+    priceVal.value = _naLegacyPriceData.totalPrice.toFixed(2);
+  }
+  // Flip hours-override on if we have hours data
+  if(_naLegacyPriceData.durationHours){
+    var hrsChk = document.getElementById('na-hours-override-chk');
+    var hrsVal = document.getElementById('na-hours-override-val');
+    if(hrsChk && hrsVal){
+      hrsChk.checked = true;
+      hrsVal.style.display = '';
+      hrsVal.value = _naLegacyPriceData.durationHours;
+    }
+  }
+  _naLegacyPriceLocked = true;
+  var lockedBadge = document.getElementById('na-legacy-locked');
+  if(lockedBadge) lockedBadge.style.display = 'inline-block';
+  // Recompute the price preview to reflect the override
+  if(typeof calcPrice === 'function') calcPrice();
+  if(typeof showToast === 'function') showToast('Legacy price loaded \u2713');
+}
+
+/* Persist the legacy-locked price to the property (or client) so future
+   bookings auto-fill. Called from saveNewAppt AFTER the appointment is
+   saved. Best-effort — failures don't block the booking, just log. */
+async function persistLegacyPriceLockIn(clientId, propIdx, address){
+  if(!_naLegacyPriceLocked || !_naLegacyPriceData) return;
+  if(!clientId || clientId.length <= 20) return;
+  var price = _naLegacyPriceData.totalPrice;
+  var hours = _naLegacyPriceData.durationHours;
+
+  try {
+    var client = clientDB[clientId];
+    if(!client){
+      // Refetch in case clientDB is stale
+      var fetchRes = await db.from('clients').select('id, properties, flat_rate').eq('id', clientId).maybeSingle();
+      if(fetchRes.error || !fetchRes.data){ console.warn('[legacyPrice] persist: client fetch failed'); return; }
+      client = { properties: fetchRes.data.properties || [], flatRate: fetchRes.data.flat_rate || '' };
+    }
+    var props = Array.isArray(client.properties) ? client.properties.slice() : [];
+
+    if(propIdx != null && propIdx >= 0 && props[propIdx]){
+      // A specific property was selected — write into that one
+      props[propIdx] = Object.assign({}, props[propIdx], {
+        flatRate: String(price),
+        durationHours: hours ? String(hours) : (props[propIdx].durationHours || ''),
+      });
+    } else if(address){
+      // No property selected but we have an address — append a new property
+      // so future bookings can pick it from the dropdown.
+      props.push({
+        address: address,
+        beds: (document.getElementById('na-beds')||{}).value || '',
+        baths: (document.getElementById('na-baths')||{}).value || '',
+        sqft: (document.getElementById('na-sqft')||{}).value || '',
+        condition: (document.getElementById('na-cond')||{}).value || '7',
+        flatRate: String(price),
+        durationHours: hours ? String(hours) : '',
+        notes: '',
+      });
+    }
+
+    // Update DB. If we changed properties, write that. If no property path
+    // was usable (no address, no propIdx), fall back to client-level flat_rate.
+    if(props.length){
+      var upd = await db.from('clients').update({ properties: props }).eq('id', clientId);
+      if(upd.error){ console.warn('[legacyPrice] persist properties error:', upd.error); return; }
+      // Mirror in-memory
+      if(clientDB[clientId]) clientDB[clientId].properties = props;
+      console.log('[legacyPrice] saved flatRate=$'+price+' to property for client '+clientId);
+    } else {
+      var upd2 = await db.from('clients').update({ flat_rate: price }).eq('id', clientId);
+      if(upd2.error){ console.warn('[legacyPrice] persist client flat_rate error:', upd2.error); return; }
+      if(clientDB[clientId]) clientDB[clientId].flatRate = String(price);
+      console.log('[legacyPrice] saved flat_rate=$'+price+' to client '+clientId);
+    }
+  } catch(err){
+    console.warn('[legacyPrice] persist error:', err);
+  }
 }
 
 function applyPropertyToBooking(){
@@ -14083,7 +14287,33 @@ function applyPropertyToBooking(){
   document.getElementById('na-address-row').style.display = 'none';
   document.getElementById('na-residential-fields').style.display = 'none';
   document.getElementById('na-save-prop-row').style.display = 'none';
-  console.log('[applyPropertyToBooking] addr='+prop.address+' beds='+prop.beds+' baths='+prop.baths+' sqft='+prop.sqft+' service='+prop.service+' freq='+prop.frequency);
+
+  // ── Auto-fill the legacy lock-in if this property has saved values ──
+  // calcPrice already short-circuits on prop.flatRate, but the override
+  // checkboxes also need to be visually set so the user sees what's
+  // happening AND so saveNewAppt's price-override path captures it.
+  var pFlat = parseFloat(prop.flatRate || 0);
+  if(pFlat > 0){
+    var pChk = document.getElementById('na-price-override-chk');
+    var pVal = document.getElementById('na-price-override-val');
+    if(pChk && pVal){
+      pChk.checked = true;
+      pVal.style.display = '';
+      pVal.value = pFlat.toFixed(2);
+    }
+  }
+  var pHrs = parseFloat(prop.durationHours || 0);
+  if(pHrs > 0){
+    var hChk = document.getElementById('na-hours-override-chk');
+    var hVal = document.getElementById('na-hours-override-val');
+    if(hChk && hVal){
+      hChk.checked = true;
+      hVal.style.display = '';
+      hVal.value = pHrs;
+    }
+  }
+
+  console.log('[applyPropertyToBooking] addr='+prop.address+' beds='+prop.beds+' baths='+prop.baths+' sqft='+prop.sqft+' service='+prop.service+' freq='+prop.frequency+' flatRate='+(pFlat||'none')+' durationHours='+(pHrs||'none'));
   calcPrice();
 }
 

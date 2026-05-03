@@ -14149,8 +14149,13 @@ async function populateLegacyPriceHint(clientId, clientName){
   }
 
   try {
+    // IMPORTANT: select BOTH base_price (pre-tax) and total_price (post-tax).
+    // The hint label shows the total (what the user recognizes), but the
+    // override input gets populated with the BASE — because the override
+    // path in calcPrice treats its value as pre-tax and adds Hawaii GET
+    // (4.712%) on top. Putting total_price in there caused double-taxing.
     var res = await db.from('appointments')
-      .select('id, total_price, duration_hours, date, status')
+      .select('id, total_price, base_price, duration_hours, date, status')
       .eq('client_id', clientId)
       .in('status', ['paid', 'completed'])
       .gt('total_price', 0)
@@ -14161,12 +14166,18 @@ async function populateLegacyPriceHint(clientId, clientName){
     if(!rows.length) return;
 
     var last = rows[0];
-    var price = parseFloat(last.total_price || 0);
+    var total = parseFloat(last.total_price || 0);
+    var base = parseFloat(last.base_price || 0);
     var hours = parseFloat(last.duration_hours || 0);
-    if(!price) return;
+    if(!total) return;
+    // Fallback: legacy rows may not have base_price set. Back it out from total.
+    if(!base || base >= total){
+      base = Math.round((total / 1.04712) * 100) / 100;
+    }
 
     _naLegacyPriceData = {
-      totalPrice: price,
+      basePrice: base,           // pre-tax — what to put in override input
+      totalPrice: total,         // post-tax — what to display to user
       durationHours: hours || null,
       sourceApptId: last.id,
       sourceDate: last.date,
@@ -14175,7 +14186,7 @@ async function populateLegacyPriceHint(clientId, clientName){
     var label = document.getElementById('na-legacy-hint-label');
     if(label){
       var hoursStr = hours ? ' \u00B7 ' + hours + ' hr' + (hours === 1 ? '' : 's') : '';
-      label.innerHTML = '<strong>Last booked at $' + price.toFixed(2) + hoursStr + '</strong>'
+      label.innerHTML = '<strong>Last booked at $' + total.toFixed(2) + ' total' + hoursStr + '</strong>'
                      + ' (' + last.date + '). Click below to use this price for the booking and save it as the default for this property.';
     }
     hintBox.style.display = 'block';
@@ -14186,13 +14197,16 @@ async function populateLegacyPriceHint(clientId, clientName){
 
 function applyLegacyPriceToBooking(){
   if(!_naLegacyPriceData){ return; }
-  // Flip price-override on with the legacy total
+  // Use BASE (pre-tax) for the override input — calcPrice adds 4.712% tax on
+  // top of whatever's in this field, so passing the post-tax total would
+  // double-tax. The user still sees the correct final total in the price
+  // preview because calcPrice computes it as base + tax.
   var priceChk = document.getElementById('na-price-override-chk');
   var priceVal = document.getElementById('na-price-override-val');
   if(priceChk && priceVal){
     priceChk.checked = true;
     priceVal.style.display = '';  // unhide the input
-    priceVal.value = _naLegacyPriceData.totalPrice.toFixed(2);
+    priceVal.value = _naLegacyPriceData.basePrice.toFixed(2);
   }
   // Flip hours-override on if we have hours data
   if(_naLegacyPriceData.durationHours){
@@ -14218,7 +14232,11 @@ function applyLegacyPriceToBooking(){
 async function persistLegacyPriceLockIn(clientId, propIdx, address){
   if(!_naLegacyPriceLocked || !_naLegacyPriceData) return;
   if(!clientId || clientId.length <= 20) return;
-  var price = _naLegacyPriceData.totalPrice;
+  // CRITICAL: save the PRE-TAX base, not the total. calcPrice's flat-rate
+  // path (both property and client level) treats the stored value as the
+  // pre-tax base and adds Hawaii GET (4.712%) on top. Storing total_price
+  // here would double-tax on every future booking.
+  var price = _naLegacyPriceData.basePrice;
   var hours = _naLegacyPriceData.durationHours;
 
   try {
@@ -14310,11 +14328,11 @@ async function populateEditLegacyPriceHint(clientId, clientName, currentApptDbId
   if(!clientId || clientId.length <= 20) return;
 
   try {
-    // Pull the most recent two so we can skip the current appointment if
-    // its dbId matches the most recent (avoid pointing the user at the
-    // appointment they're editing).
+    // Pull both base_price (pre-tax) and total_price (post-tax). Hint label
+    // shows total; override field gets populated with base. See
+    // populateLegacyPriceHint for the double-taxing rationale.
     var res = await db.from('appointments')
-      .select('id, total_price, duration_hours, date, status')
+      .select('id, total_price, base_price, duration_hours, date, status')
       .eq('client_id', clientId)
       .in('status', ['paid', 'completed'])
       .gt('total_price', 0)
@@ -14324,12 +14342,18 @@ async function populateEditLegacyPriceHint(clientId, clientName, currentApptDbId
     var rows = (res.data || []).filter(function(r){ return r.id !== currentApptDbId; });
     if(!rows.length) return;
     var last = rows[0];
-    var price = parseFloat(last.total_price || 0);
+    var total = parseFloat(last.total_price || 0);
+    var base = parseFloat(last.base_price || 0);
     var hours = parseFloat(last.duration_hours || 0);
-    if(!price) return;
+    if(!total) return;
+    if(!base || base >= total){
+      // Legacy row missing base_price — back it out from the total.
+      base = Math.round((total / 1.04712) * 100) / 100;
+    }
 
     _editLegacyPriceData = {
-      totalPrice: price,
+      basePrice: base,
+      totalPrice: total,
       durationHours: hours || null,
       sourceApptId: last.id,
       sourceDate: last.date,
@@ -14338,7 +14362,7 @@ async function populateEditLegacyPriceHint(clientId, clientName, currentApptDbId
     var label = document.getElementById('edit-legacy-hint-label');
     if(label){
       var hoursStr = hours ? ' \u00B7 ' + hours + ' hr' + (hours === 1 ? '' : 's') : '';
-      label.innerHTML = '<strong>Most recent paid: $' + price.toFixed(2) + hoursStr + '</strong>'
+      label.innerHTML = '<strong>Most recent paid: $' + total.toFixed(2) + ' total' + hoursStr + '</strong>'
                      + ' (' + last.date + '). Click to apply this price to the current edit AND save it as the property\u2019s default for future bookings.';
     }
     hintBox.style.display = 'block';
@@ -14349,12 +14373,13 @@ async function populateEditLegacyPriceHint(clientId, clientName, currentApptDbId
 
 function applyLegacyPriceToEdit(){
   if(!_editLegacyPriceData) return;
+  // Use base (pre-tax) for the override field — calcEditPrice adds tax on top.
   var priceChk = document.getElementById('edit-price-override-chk');
   var priceVal = document.getElementById('edit-price-override-val');
   if(priceChk && priceVal){
     priceChk.checked = true;
     priceVal.style.display = '';
-    priceVal.value = _editLegacyPriceData.totalPrice.toFixed(2);
+    priceVal.value = _editLegacyPriceData.basePrice.toFixed(2);
   }
   if(_editLegacyPriceData.durationHours){
     var hrsChk = document.getElementById('edit-hours-override-chk');
@@ -14385,7 +14410,8 @@ async function persistEditLegacyPriceLockIn(){
   }
   if(!clientId || clientId.length <= 20) return;
 
-  var price = _editLegacyPriceData.totalPrice;
+  // Save pre-tax base, not total — see populateLegacyPriceHint comment for why.
+  var price = _editLegacyPriceData.basePrice;
   var hours = _editLegacyPriceData.durationHours;
 
   // Determine target property index. Edit form has its own selector.

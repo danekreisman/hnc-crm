@@ -68,7 +68,7 @@ export default async function handler(req, res) {
         const phoneE164 = lead.phone.startsWith('+') ? lead.phone : '+1' + lead.phone.replace(/\D/g, '');
         history = await getOpenPhoneHistory(phoneE164, {
           apiKey: process.env.QUO_API_KEY,
-          maxSms: 30,
+          maxSms: 100,
           maxCalls: 5,
         });
       } catch (histErr) {
@@ -146,7 +146,7 @@ export default async function handler(req, res) {
       '- BANNED PHRASES (these are CRM-speak, not how locals talk): "just checking in", "checking in on", "following up on that", "wanted to follow up", "wanted to reach out", "circling back", "touching base", "I hope this finds you well", "I hope this email finds you well", "per our last conversation".',
       '- BANNED OPENERS: "Hey", "Hi", "Hello", "Dear", "Hi there". Always open with "Aloha [firstName],".',
       '- Do NOT make up details that aren\'t in the data above. If you don\'t have a specific hook, keep it short and warm — better a 2-sentence message that feels real than a 5-sentence message stuffed with invented context.',
-      '- Do NOT include a price unless one is provided in CONTEXT — never invent numbers.',
+      '- PRICES: it is GOOD to reference a price when one is available. Look in two places: (1) the structured CONTEXT block at the top, and (2) the SMS conversation history (Dane often quotes via SMS). If you find a price in either, reference it naturally — e.g. "the $385 we talked about" or "the $179 estimate". Never invent a price that does not appear anywhere in the data — if no price is mentioned in CONTEXT or the conversation history, skip it entirely and say something like "the estimate I sent" or "your quote" instead.',
       '- Do NOT mention "the quote" or "your quote" robotically. If you reference price, do it like a person would: "the $179 we talked about" or "the move-out estimate".',
       '',
       'CHECKLIST before you write the message:',

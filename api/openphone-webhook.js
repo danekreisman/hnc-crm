@@ -70,6 +70,75 @@ export default async function handler(req, res) {
     return leads.find(l => l.phone && l.phone.replace(/\D/g, '').slice(-10) === digits) || null;
   }
 
+  /**
+   * Classify a lead's inbound SMS using Claude Haiku to detect lost-intent.
+   * Cheap (~$0.001/call) and fast. Returns { intent, confidence, reasoning }
+   * where intent is 'lost' | 'engaged' | 'deferred' | 'unclear' and
+   * confidence is 'high' | 'medium' | 'low'. We only act on 'lost' with
+   * non-low confidence — everything else just goes to the inbox. False
+   * positives are worse than false negatives (we'd hide a real customer),
+   * so the prompt is intentionally conservative.
+   */
+  async function classifyLeadResponse(messageBody, leadName) {
+    const prompt = [
+      'You are classifying a single inbound SMS reply from a sales lead.',
+      'The lead may be telling us they chose another company, lost interest, no longer need the service, or are deferring.',
+      '',
+      `Lead name: ${leadName || 'Unknown'}`,
+      `Their reply: "${messageBody}"`,
+      '',
+      'Classify the intent into ONE of these categories:',
+      '  - "lost": clearly indicates they will not use our service. Examples: "we went with someone else", "we ended up choosing another company", "no longer need it", "we hired a different cleaner", "we are not interested", "please remove me from your list".',
+      '  - "engaged": positive interest, asking questions, wanting to schedule. Examples: "yes lets do it", "what time works", "can we book Tuesday", "i have a question about pricing".',
+      '  - "deferred": want service eventually but not now. Examples: "we are going to wait", "maybe next month", "still thinking about it", "after the move", "let me get back to you".',
+      '  - "unclear": ambiguous, off-topic, or neutral. Default to this if uncertain.',
+      '',
+      'Confidence levels:',
+      '  - "high": clear, unambiguous lost signal',
+      '  - "medium": likely lost but some interpretation involved',
+      '  - "low": might be lost, might be deferred — coin flip',
+      '',
+      'Be CONSERVATIVE. False positives are worse than false negatives — we only auto-create a task for "lost" intent at medium or high confidence. When in doubt, classify as "unclear" or "deferred".',
+      '',
+      'Return ONLY a JSON object — first character must be { and last must be }. No preamble, no postamble, no markdown.',
+      'Format: {"intent": "lost"|"engaged"|"deferred"|"unclear", "confidence": "high"|"medium"|"low", "reasoning": "<one short sentence>"}',
+    ].join('\n');
+
+    const aiResp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': process.env.ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 200,
+        messages: [{ role: 'user', content: prompt }],
+      }),
+    });
+    if (!aiResp.ok) throw new Error('Anthropic API HTTP ' + aiResp.status);
+    const data = await aiResp.json();
+    const text = data?.content?.[0]?.text || '';
+    if (!text) throw new Error('AI returned empty response');
+
+    // Brace-tracking JSON extractor — same pattern used in lead-followup-generate.
+    // Avoids indexOf/lastIndexOf brittleness when the model adds preamble or postamble.
+    const start = text.indexOf('{');
+    if (start === -1) throw new Error('No JSON in AI response');
+    let depth = 0, inString = false, escape = false, jsonStr = null;
+    for (let i = start; i < text.length; i++) {
+      const ch = text[i];
+      if (escape) { escape = false; continue; }
+      if (inString) { if (ch === '\\') { escape = true; continue; } if (ch === '"') inString = false; continue; }
+      if (ch === '"') { inString = true; continue; }
+      if (ch === '{') depth++;
+      else if (ch === '}') { depth--; if (depth === 0) { jsonStr = text.slice(start, i + 1); break; } }
+    }
+    if (!jsonStr) throw new Error('Unbalanced JSON in AI response');
+    return JSON.parse(jsonStr);
+  }
+
   try {
     const event = req.body;
     const type = event.type;
@@ -127,6 +196,37 @@ export default async function handler(req, res) {
           })
         });
         console.log('Lead response tracked:', lead.id, updateRes.status);
+
+        // ── AI classification: does this reply suggest the lead is lost? ──
+        // If Haiku returns 'lost' with reasonable confidence, create a VA
+        // task for Dane to review. We do NOT auto-flip the stage — the
+        // boundary between 'lost' and 'cold/deferred' is fuzzy and
+        // false positives would silently lose customers.
+        if (body && body.trim() && process.env.ANTHROPIC_API_KEY) {
+          try {
+            const verdict = await classifyLeadResponse(body, lead.name);
+            console.log('[openphone-webhook] AI verdict for lead', lead.id, ':', JSON.stringify(verdict));
+            if (verdict && verdict.intent === 'lost' && verdict.confidence !== 'low') {
+              // Create a VA task — surfaces in the Tasks view with Yes/No buttons
+              const leadFirstName = (lead.name || 'Lead').split(' ')[0];
+              const today = new Date().toISOString().split('T')[0];
+              const truncatedReply = body.length > 200 ? body.slice(0, 197) + '...' : body;
+              await supabaseInsert('tasks', {
+                title: `${leadFirstName} responded — mark as lost?`,
+                type: 'review_lead_response',
+                priority: verdict.confidence === 'high' ? 'high' : 'medium',
+                due_date: today,
+                description: `Reply: "${truncatedReply}"\n\nAI read: ${verdict.reasoning || 'lead appears lost'} (confidence: ${verdict.confidence})`,
+                related_lead_id: lead.id,
+                status: 'open',
+              });
+              console.log('[openphone-webhook] Created review_lead_response task for', lead.id);
+            }
+          } catch (aiErr) {
+            // Never fail the webhook on AI errors — classification is bonus
+            console.warn('[openphone-webhook] AI classification failed:', aiErr.message);
+          }
+        }
       }
     }
 

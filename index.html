@@ -15252,8 +15252,8 @@ function renderTasks() {
 function renderTaskCard(t, done) {
   var today = new Date().toISOString().split('T')[0];
   var isOverdue = !done && t.due_date && t.due_date < today;
-  var typeLabel = {invoice:'Invoice',call_lead:'Call lead',call_client:'Call client',project:'Project',other:'Task'}[t.type] || 'Task';
-  var typeColor = {invoice:'#3b82f6',call_lead:'#f59e0b',call_client:'#8b5cf6',project:'#10b981',other:'#6b7280'}[t.type] || '#6b7280';
+  var typeLabel = {invoice:'Invoice',call_lead:'Call lead',call_client:'Call client',project:'Project',other:'Task',review_lead_response:'Lead reply'}[t.type] || 'Task';
+  var typeColor = {invoice:'#3b82f6',call_lead:'#f59e0b',call_client:'#8b5cf6',project:'#10b981',other:'#6b7280',review_lead_response:'#dc2626'}[t.type] || '#6b7280';
   var priorityDot = {high:'\uD83D\uDD34',medium:'\uD83D\uDFE1',low:'\uD83D\uDFE2'}[t.priority] || '';
   var relName = (t.leads && t.leads.name) || (t.clients && t.clients.name) || '';
   var dueStr = t.due_date ? new Date(t.due_date + 'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'}) : '';
@@ -15273,6 +15273,18 @@ function renderTaskCard(t, done) {
     ? '<details style="margin-top:8px;"><summary style="font-size:11px;font-weight:600;color:var(--brand-500);cursor:pointer;">\u2728 AI brief</summary><div style="font-size:12px;line-height:1.6;margin-top:6px;padding:10px;background:var(--bg-soft);border-radius:8px;white-space:pre-wrap;">' + esc(t.ai_brief) + '</div></details>'
     : '';
 
+  // For review_lead_response tasks: inline Yes/No buttons. "Mark as lost"
+  // calls existing markLeadLost flow + completes the task. "Not lost" just
+  // completes the task. Only show on open tasks (not done) and only when
+  // there's a related lead to act on.
+  var reviewActions = '';
+  if (!done && t.type === 'review_lead_response' && t.related_lead_id) {
+    reviewActions = '<div style="display:flex;gap:8px;margin-top:10px;">'
+      + '<button data-task-id="' + t.id + '" data-lead-id="' + t.related_lead_id + '" onclick="reviewTaskMarkLost(this.dataset.taskId, this.dataset.leadId)" style="flex:1;padding:7px 12px;background:#dc2626;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;">Mark as lost</button>'
+      + '<button data-task-id="' + t.id + '" onclick="reviewTaskNotLost(this.dataset.taskId)" style="flex:1;padding:7px 12px;background:#fff;color:var(--text);border:1.5px solid var(--border);border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;">Not lost</button>'
+      + '</div>';
+  }
+
   return '<div class="card" style="padding:14px 16px;margin-bottom:8px;' + borderStyle + '">'
     + '<div style="display:flex;align-items:flex-start;gap:12px;">'
     + checkCol
@@ -15284,13 +15296,94 @@ function renderTaskCard(t, done) {
     + (isOverdue ? '<span style="font-size:10px;color:var(--red);font-weight:600;">OVERDUE</span>' : '')
     + '</div>'
     + (relName ? '<div style="font-size:11px;color:var(--text-muted);margin-top:2px;">&rarr; ' + esc(relName) + '</div>' : '')
-    + (t.description ? '<div style="font-size:12px;color:var(--text-muted);margin-top:4px;">' + esc(t.description) + '</div>' : '')
+    + (t.description ? '<div style="font-size:12px;color:var(--text-muted);margin-top:4px;white-space:pre-wrap;">' + esc(t.description) + '</div>' : '')
     + brief
+    + reviewActions
     + '</div>'
     + '<div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">'
     + (dueStr ? '<span style="font-size:11px;color:' + dueColor + ';">' + dueStr + '</span>' : '')
     + deleteBtn
     + '</div></div></div>';
+}
+
+/* ── review_lead_response task actions ────────────────────────────────
+   Called from the inline buttons on a "Stephanie responded — mark as lost?"
+   task. Mark-as-lost flips the lead's stage to Closed lost in the DB and
+   completes the task. Not-lost just completes the task. Both optimistic
+   with revert-on-error. */
+
+async function reviewTaskMarkLost(taskId, leadId) {
+  if (!leadId) { showToast('Task is missing a lead ID', true); return; }
+  // 1. Update the lead's stage in DB. Match markLeadLost's pattern: DB first,
+  //    optimistic UI only after the DB write succeeds.
+  var lead = leadDB[leadId] || null;
+  var existingNotes = (lead && lead.notes) || '';
+  var updRes = await db.from('leads').update({
+    stage: 'Closed lost',
+    notes: existingNotes + (existingNotes ? ' ' : '') + 'Lost: lead replied indicating they went elsewhere',
+  }).eq('id', leadId);
+  if (updRes && updRes.error) {
+    console.error('[reviewTaskMarkLost] DB update failed:', updRes.error);
+    showToast('Could not mark lost: ' + (updRes.error.message || 'database error'), true);
+    return;
+  }
+  // 2. Update local leadDB + repaint pipeline.
+  if (lead) {
+    lead.stage = 'Closed lost';
+    if (typeof renderLeadsPipeline === 'function') {
+      try { renderLeadsPipeline(); } catch (e) { console.warn('[reviewTaskMarkLost] pipeline render failed:', e); }
+    }
+  }
+  // 3. Complete the task.
+  await completeTaskById(taskId);
+  showToast('Lead marked as lost \u2713');
+}
+
+async function reviewTaskNotLost(taskId) {
+  // No DB lead update needed — just close the task. The lead stays in
+  // whatever stage it was already in (Quoted, Follow-up, etc).
+  await completeTaskById(taskId);
+}
+
+/* ──────────────────────────────────────────────────────────────────────
+   review_lead_response task actions — Yes/No buttons on tasks created by
+   the OpenPhone webhook when the AI classifies an inbound SMS as lost-intent.
+   ────────────────────────────────────────────────────────────────────── */
+
+async function reviewTaskMarkLost(taskId, leadId) {
+  if (!taskId || !leadId) return;
+  var lead = leadDB[leadId];
+  var leadName = (lead && lead.name) || 'this lead';
+  if (!confirm('Mark ' + leadName + ' as Closed lost?\n\nThis flips their stage in the pipeline.')) return;
+
+  // 1. Update the lead's stage in DB. Awaited + error-checked — same
+  //    pattern as markLeadLost. We don't prompt for a reason here (the
+  //    task description already has the AI's read of the SMS).
+  var updRes = await db.from('leads').update({
+    stage: 'Closed lost',
+    notes: ((lead && lead.notes) || '') + ' Lost: per SMS reply (auto-detected)',
+  }).eq('id', leadId);
+  if (updRes && updRes.error) {
+    console.error('[reviewTaskMarkLost] DB update failed:', updRes.error);
+    showToast('Could not mark as lost: ' + (updRes.error.message || 'database error'), true);
+    return;
+  }
+
+  // 2. Mirror in-memory so the pipeline view re-renders correctly.
+  if (lead) lead.stage = 'Closed lost';
+  try { renderLeadsPipeline(); } catch (e) { /* best-effort */ }
+
+  // 3. Complete the task. Reuses the existing flow (handles UI move + API sync).
+  await completeTaskById(taskId);
+
+  showToast(leadName + ' marked as lost', false);
+}
+
+async function reviewTaskNotLost(taskId) {
+  if (!taskId) return;
+  // Just complete the task — leaves the lead in its current stage.
+  // The AI was wrong (or the user disagrees with its read); no harm done.
+  await completeTaskById(taskId);
 }
 
 async function completeTaskById(id) {

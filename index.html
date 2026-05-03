@@ -4227,6 +4227,30 @@ function showApptEdit(){
       calcEditPrice();
     }
   }
+
+  // Same pre-check for HOURS override. Without this, opening the edit form
+  // for an appointment that previously had hours overridden (e.g. duration_hours=2
+  // for Jan Kunst, despite calc saying 8) would display the auto-computed 8
+  // and quietly revert the saved 2 on next Save. Mirroring the price-override
+  // pre-check fixes both display and persistence in one shot.
+  // Note: must run AFTER calcEditPrice() above. The first calcEditPrice call
+  // ran with override checkbox unchecked (set just before in this function),
+  // so _lastEditCalcHrs holds the AUTO-computed hours — exactly what we want
+  // to diff against the saved duration.
+  var savedDuration = currentAppt ? parseFloat(currentAppt.duration) : 0;
+  var hoursChk = document.getElementById('edit-hours-override-chk');
+  var hoursVal = document.getElementById('edit-hours-override-val');
+  var calcHrs = (typeof _lastEditCalcHrs === 'number' && _lastEditCalcHrs > 0)
+                  ? _lastEditCalcHrs
+                  : (hoursVal ? parseFloat(hoursVal.value) : 0);
+  if(savedDuration > 0 && hoursChk && hoursVal){
+    hoursVal.value = savedDuration;
+    if(Math.abs(savedDuration - calcHrs) > 0.01){
+      hoursChk.checked = true;
+      hoursVal.style.display = '';
+      calcEditPrice();
+    }
+  }
 }
 function hideApptEdit(){document.getElementById('appt-view').style.display='block';document.getElementById('appt-edit').style.display='none';}
 async function saveApptEdit(mode){

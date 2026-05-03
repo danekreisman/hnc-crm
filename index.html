@@ -441,7 +441,7 @@ textarea{font-family:inherit;}
 .panel-entering{animation:panelSlideIn .28s cubic-bezier(.34,1.06,.64,1) forwards!important;}
 /* === SECTION FADE === */
 @keyframes sectionFadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
-.vc.active{animation:sectionFadeIn .22s cubic-bezier(.4,0,.2,1);}
+.vc.active{animation:sectionFadeIn .1s cubic-bezier(.4,0,.2,1);}
 /* === BUTTON PULSE GLOW === */
 @keyframes hncPulseGlow{0%{box-shadow:0 0 0 0 rgba(59,184,227,.5)}70%{box-shadow:0 0 0 11px rgba(59,184,227,0)}100%{box-shadow:0 0 0 0 rgba(59,184,227,0)}}
 @keyframes hncPulseGlowGreen{0%{box-shadow:0 0 0 0 rgba(16,185,129,.5)}70%{box-shadow:0 0 0 11px rgba(16,185,129,0)}100%{box-shadow:0 0 0 0 rgba(16,185,129,0)}}
@@ -7027,6 +7027,42 @@ renderCal();
 loadAllData();
 // Restore last view from session (so browser refresh keeps user where they were)
 try{var _sv=sessionStorage.getItem('hnc_currentView'); if(_sv && _sv!=='calendar'){var _navItem=Array.from(document.querySelectorAll('.nav-item')).find(function(n){return (n.textContent||'').trim().toLowerCase().indexOf(_sv)>=0;}); sv(_sv, _navItem||null); if(_sv==='payments' && typeof renderPaymentsSection==='function'){setTimeout(renderPaymentsSection, 200);}}}catch(e){console.warn('restore view',e);}
+
+/* ============================================================
+   Background prefetch of secondary view data
+   ------------------------------------------------------------
+   Without this, clicking Tasks/Automations/Broadcasts/Settings
+   shows a blank screen for 0.5–2s while the load function fetches
+   from Supabase. Each view's static DOM is already in the page
+   (just hidden behind .vc:not(.active)), so we can populate the
+   hidden DOM in the background — by the time the user navigates,
+   content is already rendered and the click feels instant.
+
+   Runs 1.2s after initial render so it doesn't compete with the
+   primary loadAllData() fetches for network bandwidth. Each load
+   function is best-effort — failures are logged but don't crash.
+   The on-click handlers in sv() still fire as a "freshness" pass
+   so data stays current; that fetch happens in background while
+   the prefetched content is already visible.
+   ============================================================ */
+setTimeout(function() {
+  var prefetchTargets = [
+    ['loadTasks', loadTasks],
+    ['loadLeadAutomations', typeof loadLeadAutomations === 'function' ? loadLeadAutomations : null],
+    ['loadBroadcasts', typeof loadBroadcasts === 'function' ? loadBroadcasts : null],
+    ['loadSettings', typeof loadSettings === 'function' ? loadSettings : null],
+  ].filter(function(p) { return typeof p[1] === 'function'; });
+
+  console.log('[prefetch] starting secondary data prefetch:', prefetchTargets.map(function(p){return p[0];}).join(', '));
+  var t0 = Date.now();
+  Promise.all(prefetchTargets.map(function(p) {
+    return Promise.resolve().then(function() { return p[1](); }).catch(function(err) {
+      console.warn('[prefetch] ' + p[0] + ' failed:', err && err.message);
+    });
+  })).then(function() {
+    console.log('[prefetch] secondary data complete in ' + (Date.now() - t0) + 'ms');
+  });
+}, 1200);
 
 /* ============================================================
    PWA bootstrap — service worker registration + install hint

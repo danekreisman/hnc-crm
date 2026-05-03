@@ -837,4 +837,109 @@ Original notes preserved below for context.
 
 ---
 
+## 2026-05-03 Session — Legacy pricing, paired cleaners, color-drift fix, quick-assign, edit override fixes
+
+### Legacy price lock-in (commits a9f7be9, d3b2909, 3ed894e)
+
+Problem: 519 clients, 0 with `flat_rate` set, 34 with property records but no rate. The CRM has been through multiple pricing-formula changes; most existing clients have legacy prices that don't match what `calcPrice` would compute today. Existing infrastructure (calcPrice short-circuiting on `prop.flatRate` or `client.flat_rate`) was already in place but had nothing feeding values in.
+
+Solution: yellow hint banner on both the booking form and the appt edit form, anchored to the price preview. When a known returning client is picked, queries the most recent paid/completed appointment and offers a "Use this price" button. Click → flips the price-override + hours-override checkboxes to the past appointment's values. On save, persists `flatRate` + `durationHours` into the property's JSONB record (creates a new property from the booking address if none exists, or falls back to `clients.flat_rate`).
+
+Both `populateLegacyPriceHint` (booking) and `populateEditLegacyPriceHint` (edit) follow the same pattern; the edit-side also de-dupes by address before appending property records and skips the appointment currently being edited.
+
+**Critical gotcha — double-tax:** The override input field is treated as **pre-tax base** by calcPrice, which adds Hawaii GET (4.712%) on top. First version stored `total_price` (post-tax) into the override → double-tax (e.g., $87.72 → $91.85). Fixed by querying both `base_price` and `total_price`, displaying the post-tax total in the hint label, but populating the override input with the pre-tax base. For legacy rows missing `base_price`, back it out: `base = total / 1.04712`. Same fix applied to `persistLegacyPriceLockIn` so `property.flatRate` saves the pre-tax value.
+
+### Paired cleaners feature (commits b68b473, 0b359b8)
+
+Up to 3 cleaners can be assigned to one appointment ("tag-team mode"): they all work in parallel, halving the wall-clock time. Each cleaner gets paid for the full wall-clock duration at THEIR own hourly rate.
+
+Migration: `migrations/2026-05-03-pair-cleaners-on-appointment.sql` adds `cleaner_id_2` / `cleaner_pay_2` / `cleaner_id_3` / `cleaner_pay_3` (all nullable) + partial indices on `cleaner_id_2/3` + a `CHECK` constraint enforcing `cleaner_id_3 IS NOT NULL → cleaner_id_2 IS NOT NULL → cleaner_id IS NOT NULL`. Solo jobs leave all three pair columns null — zero schema cost for the common case.
+
+UI: "+ Pair with another cleaner" link below the primary cleaner dropdown in BOTH the booking form (`na-pair-row-2/3`) and the edit form (`edit-pair-row-2/3`). Each row is just a cleaner dropdown + remove (×) button. **No pay input field** — pay is auto-computed at save time via `calcCleanerPay(duration, name, service)` using each cleaner's own hourly rate from cleanerDB.
+
+Initial implementation had per-row pay inputs and force-flipped the primary's `cleaner-pay-override-chk` to half-split the displayed pay. Both were confusing. Removed in commit 0b359b8 — the user just picks names, system does the math.
+
+Wire-up touches: `dbSaveAppointment` accepts `cleanerName2/cleanerPay2/cleanerName3/cleanerPay3`, `saveNewAppt` (one-time + recurring batch) and `saveApptEdit` (single + 'all' series + tail-regen + `seriesFields` + `updatedAppt`) all read paired data from the form and persist. `_rebuildAppointmentsFromDB` resolves `cleaner_id_2/3` to display names via cleanerDB. Calendar shows " +1" / " +2" badges on month/week/day views; appt overlay has dedicated rows for paired cleaners + their individual pay.
+
+**Known gap shipping at end of session**: paired hours splitting. User specified the model: "a 4 hour job should be split 2 hours for one cleaner, 2 for the other." That's the intended behaviour. Initial implementation left wall-clock duration to the user (they manually halve hours when pairing). Fix in this session: when pairing changes, auto-divide the displayed wall-clock duration evenly across paired cleaners. Each cleaner's pay then computes from `(total_duration / N) × their_rate`, not full duration. Search comments for "_pairedHoursMode = split" if revisiting.
+
+**Pending in a follow-up**: cleaner portal needs to surface jobs where the cleaner is `cleaner_id_2` or `cleaner_id_3` (currently only filters by `cleaner_id`). Payroll period-totals query needs to sum `cleaner_pay_2` where `cleaner_id_2 = X` and `cleaner_pay_3` where `cleaner_id_3 = X`. Both touch separate code paths and warrant their own commits.
+
+### Calendar color-drift architectural fix (commit 0621503)
+
+Symptom: appointments rendering red despite having a cleaner assigned. Hit three times in this session — May 12 (Jan Kunst), Diana Mahoney May 27 (different cause: actually unassigned in DB), and the 754-row backfill from earlier.
+
+Root cause: calendar color was keyed off the `status` field via inline ternaries duplicated in month-view (line 3607) and week/day view (`calLayoutAppts` line 3734). Multiple code paths update `cleaner_id` and `status` independently — `saveApptEdit`, `dbSaveAppointment` insert, automation 'assign' action, bulk imports, direct SQL, the cleaner-portal accept-job flow. Any drift between the two fields, calendar lies.
+
+Fix: extracted `_apptColorClass(appt)` (multi-char for month) and `_apptColorChar(appt)` (single-char for week/day colorMap) helpers above CAL_COLORS. Both implement the SAME rule, with `cleaner_id` as source of truth:
+
+  status === 'paid'      → green (terminal)
+  status === 'completed' → yellow (terminal)
+  status === 'cancelled' → gray (terminal)
+  cleaner_id is set       → blue (active assignment)
+  cleaner name resolves
+    to non-'Unassigned'   → blue (in-memory fallback for freshly loaded pages
+                                   where cleaner_id hasn't been backfilled)
+  else                    → red (truly unassigned)
+
+Both renderers now call the helpers — no duplicated logic, no risk of one diverging later.
+
+**Lesson codified**: status field is for terminal lifecycle states only (paid/completed/cancelled). Active assignment status is derived from `cleaner_id` presence, period. When adding new states or new code paths that touch appointments, never key UI off the status field for assignment indication — always derive from cleaner_id.
+
+### Tail-regen cleaner-key bug (commit 21e64a6)
+
+`saveApptEdit`'s tail-regen path (creates future occurrences when "Edit all in series" forces a NEW series) was calling `dbSaveAppointment({cleaner: cleanerVal, status: 'unassigned'})`. But `dbSaveAppointment` reads `data.cleanerName` for the cleaner_id lookup, not `data.cleaner`. Result: every generated row had `cleaner_id=NULL` and a hardcoded `status='unassigned'` → 754 future recurring rows accumulated this way. 
+
+Fix: pass `cleanerName: cleanerVal` and let `dbSaveAppointment` derive status from cleaner presence.
+
+Production data backfill: 434 of the 754 broken rows had high-confidence cleaner inference (≥80% agreement on ≥2 same-client + same-day-of-week past completed/paid rows in the last 90 days). Backfilled with `cleaner_id` + `status='assigned'` via direct DB update. The remaining 320 had insufficient or inconsistent past data — left for user to assign manually via Edit > Edit all in series.
+
+### Automation-engine status drift (commit 6ac7867)
+
+Found during the May 12 diagnostic: automation engine's "assign cleaner" action only updated `cleaner_id`, never `status`. Code was `update({cleaner_id: cid})` — which left rows with cleaner attached but `status='unassigned'`, hence red on calendar.
+
+Fix: `update({cleaner_id: cid, status: 'assigned'})` matching the dbSaveAppointment INSERT logic. 59 stale rows in production were cleaned up (forward drift) along with 5 ghost rows (backward drift: cleaner_id NULL but status='assigned'/'scheduled'). The architectural fix above means future drift won't be visually misleading even if it occurs in fields elsewhere.
+
+### Duplicate Kelley remap (one-shot DB op, no commit)
+
+User had two Kelley records in DB: inactive `f2046882-...` (created 2026-04-19) and active `ba2f0f8f-...` (created 2026-05-03). 52 future appointments still referenced the inactive record. Remapped to the active record via single SQL update. Past completed/paid Kelley rows left alone (correct for payroll history).
+
+User's tab also had stale `cleanerDB` (104 entries when DB had 109) because the active Kelley was created mid-session — live-patched the in-memory copy too.
+
+### Quick-assign button on appt overlay (commit a7fc4a5)
+
+User: "Can you make an assign button when I click on an unassigned appointment?"
+
+Blue "Assign cleaner" button at the top of the action grid in the appt overlay. Hidden by default; shown by `_openApptInner` only when the row has no `cleaner_id` AND no resolved cleaner name. Opens a small overlay (modeled after appt-dup-overlay) with client/date/time/service info + active-cleaners-only dropdown. `confirmApptAssign` updates BOTH `cleaner_id` AND `status='assigned'` in one DB write (lesson from May 12), auto-computes `cleaner_pay` if missing. Mirrors the change into apptData so the calendar re-renders blue immediately.
+
+Doesn't replace Edit — that's still the path for changing an existing assignment, since reassignment carries more implications (payroll attribution, SMS, etc.).
+
+### Edit form hours-override pre-check (commit 56212f7)
+
+User: "I created Jan kunsts appointment and I overrided hours from 8 to 2. If I tried to edit job, the screen would go back to defaulting to the 8 hours even though we had overrided it to 2 hours."
+
+`_openApptInner` had a smart pre-check for the **price**-override checkbox: if `savedTotal` differs from `calcTotal` by > $0.01, auto-check the override box. Hours-override never got the same treatment — the checkbox was unconditionally forced unchecked, so the form rendered the auto-computed hours, and saving silently reverted the user's saved override.
+
+Fix: mirror the price-override pre-check exactly. Diff `savedDuration` against `_lastEditCalcHrs` (the auto-computed hours that calcEditPrice landed on). If they differ by > 0.01, auto-check the override box and call `calcEditPrice()` again to apply.
+
+Must run AFTER the first `calcEditPrice()` in `_openApptInner` so `_lastEditCalcHrs` holds the AUTO value, not the override value.
+
+### Pattern reminders (codified this session)
+
+1. **Calendar color is derived from cleaner_id, not status.** Don't reintroduce status-keyed color logic anywhere. Use `_apptColorClass(a)` / `_apptColorChar(a)`.
+
+2. **Any DB write that sets cleaner_id must also set status='assigned'.** Pair them in one update statement. Don't trust that status will catch up later — multiple consumers read both fields independently.
+
+3. **Override input fields and stored flatRate values are pre-tax base.** Hawaii GET (4.712%) gets added on top by calcPrice. Never store `total_price` (post-tax) into either.
+
+4. **dbSaveAppointment expects `cleanerName`, not `cleaner`.** Same property-name trap exists for `cleanerName2` / `cleanerName3`. When wiring new save paths (recurring tails, automation-driven inserts), match the function's signature exactly — don't infer.
+
+5. **Series bulk updates exclude per-instance fields.** `status`, `paid_at`, `invoice_sent` are per-instance, not per-series. Only `cleaner`, `time`, `service`, `pricing`, etc. should propagate via the bulk UPDATE; status drives lifecycle and stays specific to each occurrence.
+
+6. **Edit-form pre-checks must run AFTER initial calcEditPrice().** That's the only way the auto-computed value (in `_lastEditCalcHrs`, etc.) is set so we can diff against the saved value to decide whether to auto-check the override.
+
+7. **In-memory state can lag DB by minutes.** When new cleaners/clients are added in another tab or via direct SQL, the user's open tab still has the stale data. For diagnostics, always cross-check the DB directly, then patch in-memory if needed.
+
+---
+
 *Last updated: May 2, 2026 — Two long sessions, ~30 commits. Major: AI follow-up button shipped (manual lead nurture, generates personalized SMS/email per lead, two-step preview-before-send), then evolved across the day with brand voice tuning (Aloha opener, "— Dane from Hawaii Natural Clean" sign-off, banned-phrase list, brand voice paragraph). Bulk multi-select on pipeline added so 46+ leads can be handled in minutes via parallel generate + preview gallery + send. Per-lead Comms log panel with full DB-backed timeline (lead_comms_log table). Per-lead `do_not_contact` toggle (cron-only, doesn't gate manual sends). All 5 user-defined automations disabled — system is in fully manual mode for lead outreach. 64 leads bulk-imported from March/April spreadsheet. AI prompt tuned through 6 iterations to fix: CRM-bot tone (Aloha rewrite), missing prices (SMS history detection + server-side regex scan), JSON-with-postamble parser failure (brace-depth tracker), past dates (today-date injection + ban), fabricated estimates (hasStructuredQuote evidence flag), creepy street addresses (city-only extraction). Backend bugs fixed: VERCEL_URL → BASE_URL routing (Vercel deployment-protection HTML response), Supabase silent UPDATE failures (.update doesn't throw, must check res.error), temporal dead zone in derived flag ordering. Scheduling: day-of-week shift for recurring series (Bobby Nikkhoo Friday→Thursday), duplicate-delete bug (Susanna DeSantos), halt-series cross-contamination, Google Places stuck dropdown. UX wins: parallelized startup (4 DB fetches simultaneous, pipeline renders 1-2s sooner), calendar defaults to current month + Today button, new-appt form starts blank, task undo + reopen + daily 8am Hawaii deadline SMS digest, SMS counter wording clarified. Lead form launch checklist documented at top of Pending. **Patterns codified**: Supabase ops must check `res.error`; never use VERCEL_URL for inter-function calls; use brace-depth parser for LLM JSON; destructive ops on appointments end with `_refreshAppointmentsFromDB` for DB-source-of-truth.*

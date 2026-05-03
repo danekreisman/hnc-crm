@@ -4263,6 +4263,17 @@ function showApptEdit(){
   // so _lastEditCalcHrs holds the AUTO-computed hours — exactly what we want
   // to diff against the saved duration.
   var savedDuration = currentAppt ? parseFloat(currentAppt.duration) : 0;
+  // If this appt was saved with paired cleaners, savedDuration is WALL-CLOCK
+  // (already divided by N at last save). Multiply back to LABOR hours so the
+  // override field shows what the user originally typed for the whole job.
+  // The save flow will re-divide when persisting, so the round-trip preserves
+  // the saved values exactly when no pairing changes are made.
+  var _existingPairN = 1
+    + (currentAppt && currentAppt.cleaner2 ? 1 : 0)
+    + (currentAppt && currentAppt.cleaner3 ? 1 : 0);
+  if(_existingPairN > 1 && savedDuration > 0){
+    savedDuration = Math.round(savedDuration * _existingPairN * 100) / 100;
+  }
   var hoursChk = document.getElementById('edit-hours-override-chk');
   var hoursVal = document.getElementById('edit-hours-override-val');
   var calcHrs = (typeof _lastEditCalcHrs === 'number' && _lastEditCalcHrs > 0)
@@ -4306,13 +4317,30 @@ async function saveApptEdit(mode){
   var _editPair = readPairedCleanersFromForm('edit');
   var _editPid2 = _cleanerNameToId(_editPair.name2);
   var _editPid3 = _editPid2 ? _cleanerNameToId(_editPair.name3) : null;
-  // Pre-compute paired pay using the edit form's current duration + service.
-  // editDuration is established a few lines below from a.duration; we read
-  // a.duration directly here since editDuration isn't declared yet.
-  var _editPairDuration = (a && a.duration) ? parseFloat(a.duration) : 0;
+  var _editPairN = 1 + (_editPair.name2 ? 1 : 0) + (_editPair.name3 ? 1 : 0);
+  // Read the LABOR hours from the override field (or fall back to calc).
+  // If the user has the hours override on, that field represents what
+  // they typed — total labor for the job before splitting. If override
+  // off, labor hours = the auto-computed _lastEditCalcHrs.
+  // For an EXISTING paired job being re-saved, a.duration is already
+  // wall-clock — we need to multiply back to labor hours so the divide
+  // produces the right result.
+  var _editHrsOvrEl = document.getElementById('edit-hours-override-val');
+  var _editHrsChkEl = document.getElementById('edit-hours-override-chk');
+  var _editHrsFromForm = (_editHrsChkEl && _editHrsChkEl.checked && _editHrsOvrEl && parseFloat(_editHrsOvrEl.value) > 0)
+    ? parseFloat(_editHrsOvrEl.value)
+    : ((typeof _lastEditCalcHrs === 'number' && _lastEditCalcHrs > 0) ? _lastEditCalcHrs : (parseFloat(a.duration) || 0));
+  // If the appointment was previously saved with N paired cleaners, its
+  // a.duration is wall-clock (labor / N). When loading the form we
+  // multiplied back so the override field shows labor — see showApptEdit.
+  // Therefore _editHrsFromForm here is always LABOR hours.
+  var _editLaborHrs = _editHrsFromForm;
+  var _editWallClockHrs = _editPairN > 1
+    ? Math.round((_editLaborHrs / _editPairN) * 100) / 100
+    : _editLaborHrs;
   var _editPairSvcText = (document.getElementById('edit-service') && document.getElementById('edit-service').value) || (a && a.service) || 'Regular Cleaning';
-  var _editPair2Pay = _editPair.name2 ? calcCleanerPay(_editPairDuration, _editPair.name2, _editPairSvcText) : null;
-  var _editPair3Pay = _editPair.name3 ? calcCleanerPay(_editPairDuration, _editPair.name3, _editPairSvcText) : null;
+  var _editPair2Pay = _editPair.name2 ? calcCleanerPay(_editWallClockHrs, _editPair.name2, _editPairSvcText) : null;
+  var _editPair3Pay = _editPair.name3 ? calcCleanerPay(_editWallClockHrs, _editPair.name3, _editPairSvcText) : null;
 
   var editClient=document.getElementById('edit-client').value||a.n;
   // Service, freq, beds, baths, sqft, condition are property-level — read from current appointment
@@ -4366,13 +4394,23 @@ async function saveApptEdit(mode){
   else{if(statusVal==='unassigned')statusVal='assigned';}
   var editAddr=(document.getElementById('edit-address')||{}).value||a.address||'';
   var editNotes=(document.getElementById('edit-notes')||{}).value||a.notes||'';
-  // Use hours override value if checked, else use calcEditPrice result
+  // Use hours override value if checked, else use calcEditPrice result.
+  // editDuration starts as LABOR hours (what the user typed, or auto-calc).
+  // If pairing, we'll divide it down to wall-clock below.
   var editHoursChk=document.getElementById('edit-hours-override-chk');
   var editHoursVal=document.getElementById('edit-hours-override-val');
   var editDuration=(editHoursChk&&editHoursChk.checked&&editHoursVal&&editHoursVal.value)
     ?parseFloat(editHoursVal.value)||_lastEditCalcHrs
     :_lastEditCalcHrs;
-  console.log('[saveApptEdit] duration='+editDuration+' (override='+(editHoursChk&&editHoursChk.checked)+')');
+  // PAIR DIVIDE: when 2 or 3 cleaners are assigned, the saved duration_hours
+  // is wall-clock per cleaner — labor hours / N. So a 4-hour solo job paired
+  // with one cleaner becomes 2 hours wall-clock. Calendar block end-time,
+  // cleaner-portal display, payroll all use wall-clock as the "real" length.
+  // _editPairN was computed at top of saveApptEdit.
+  if(_editPairN > 1){
+    editDuration = Math.round((editDuration / _editPairN) * 100) / 100;
+  }
+  console.log('[saveApptEdit] duration='+editDuration+' (override='+(editHoursChk&&editHoursChk.checked)+', pairN='+_editPairN+')');
   // Resolve price
   var overrideChk=document.getElementById('edit-price-override-chk');
   var overrideValEl=document.getElementById('edit-price-override-val');
@@ -6581,18 +6619,35 @@ async function saveNewAppt(){
   if(priceEl){total=parseFloat(priceEl.textContent.replace('$','').replace(',',''))||0;}
   var apptTax=Math.round((total-total/1.04712)*100)/100;
   var apptBase=Math.round((total-apptTax)*100)/100;
-  var apptDuration=_lastCalcHrs; // from calcPrice()
+  var apptDuration=_lastCalcHrs; // from calcPrice() — initially total LABOR hours
   var cpOvrChk=document.getElementById('na-cleaner-pay-override-chk');
   var cpOvrValEl=document.getElementById('na-cleaner-pay-override-val');
   var apptCleanerPay=(cpOvrChk&&cpOvrChk.checked&&cpOvrValEl&&cpOvrValEl.value)?parseFloat(cpOvrValEl.value):calcCleanerPay(apptDuration,cleanerName,naServiceText);
 
   // Read paired-cleaner state (2nd / 3rd cleaner). Solo jobs leave these
-  // null and the DB columns stay null too. Pay for each paired cleaner
-  // is auto-computed from THEIR hourly rate × wall-clock duration —
-  // matching the primary cleaner's pay logic. No manual pay entry.
+  // null and the DB columns stay null too.
+  // Tag-team model: total LABOR hours (apptDuration above) divides
+  // evenly across N cleaners as wall-clock per cleaner. So a 4-hour
+  // solo job becomes a 2-hour wall-clock job for 2 cleaners, or
+  // ~1.33 hours for 3. Each cleaner gets paid for THEIR share at
+  // THEIR own hourly rate. The appointment's saved duration_hours
+  // reflects wall-clock so the calendar block shows the actual end
+  // time of the job.
   var _naPair = readPairedCleanersFromForm('na');
-  var _naPair2Pay = _naPair.name2 ? calcCleanerPay(apptDuration, _naPair.name2, naServiceText) : null;
-  var _naPair3Pay = _naPair.name3 ? calcCleanerPay(apptDuration, _naPair.name3, naServiceText) : null;
+  var _naPairN = 1 + (_naPair.name2 ? 1 : 0) + (_naPair.name3 ? 1 : 0);
+  var _naWallClockHrs = _naPairN > 1 ? Math.round((apptDuration / _naPairN) * 100) / 100 : apptDuration;
+  var _naPair2Pay = _naPair.name2 ? calcCleanerPay(_naWallClockHrs, _naPair.name2, naServiceText) : null;
+  var _naPair3Pay = _naPair.name3 ? calcCleanerPay(_naWallClockHrs, _naPair.name3, naServiceText) : null;
+  if(_naPairN > 1){
+    // Recompute primary's pay against wall-clock share, unless the user
+    // has explicitly overridden cleaner pay.
+    if(!(cpOvrChk && cpOvrChk.checked)){
+      apptCleanerPay = calcCleanerPay(_naWallClockHrs, cleanerName, naServiceText);
+    }
+    // Save wall-clock as the appointment duration so calendar end-time,
+    // payroll, cleaner-portal display all reflect the real job length.
+    apptDuration = _naWallClockHrs;
+  }
 
   // Build full appointment object
   var apptObj={

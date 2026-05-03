@@ -453,6 +453,7 @@ textarea{font-family:inherit;}
 /* === HNC AUTH === */
 #hnc-login-overlay{position:fixed;inset:0;background:#fff;z-index:9999;display:flex;align-items:center;justify-content:center;}
 .hnc-va-user #nav-reports-section,.hnc-va-user #nav-reporting{display:none!important;}
+.hnc-va-user .admin-only-tip{display:none!important;}
 /* === END HNC AUTH === */
 </style>
 </head>
@@ -1851,7 +1852,7 @@ Mahalo 🌺</textarea>
           <div class="info-row" id="ai-cpay-2-row" style="display:none;"><span class="info-label">Paired cleaner pay</span><span class="info-val" id="ai-cpay-2">—</span></div>
           <div class="info-row" id="ai-cleaner-3-row" style="display:none;"><span class="info-label">Third cleaner</span><span class="info-val" id="ai-cleaner-3">—</span></div>
           <div class="info-row" id="ai-cpay-3-row" style="display:none;"><span class="info-label">Third cleaner pay</span><span class="info-val" id="ai-cpay-3">—</span></div>
-          <div class="info-row" id="ai-tip-row"><span class="info-label">Tip</span><span class="info-val" id="ai-tip-val" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end;"><span id="ai-tip">—</span><button type="button" class="btn" id="ai-tip-edit-btn" onclick="editApptTip()" style="font-size:11px;padding:3px 10px;min-height:0;">Add tip</button></span></div>
+          <div class="info-row" id="ai-tip-row"><span class="info-label">Tip</span><span class="info-val" id="ai-tip-val" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end;"><span id="ai-tip">—</span><button type="button" class="btn" id="ai-tip-edit-btn" onclick="editApptTip()" style="font-size:11px;padding:3px 10px;min-height:0;">Add tip</button><button type="button" class="btn admin-only-tip" id="ai-tip-link-btn" onclick="sendTipLink()" style="font-size:11px;padding:3px 10px;min-height:0;background:#e6f4f4;color:#146060;border-color:#1f8a8a;">Send link</button></span></div>
         </div>
         <div class="panel-section">Pricing</div>
         <div class="info-block">
@@ -11874,6 +11875,53 @@ async function editApptTip(){
   if(typeof renderPayroll === 'function'){ try { renderPayroll(); } catch(e){} }
   if(typeof showToast === 'function') showToast(amt > 0 ? ('Tip saved: \$' + amt.toFixed(2)) : 'Tip cleared');
   if(typeof logActivity === 'function') logActivity('appointment_tip_updated', 'Tip set to \$'+amt.toFixed(2)+' for '+(currentAppt.n||'appt'), {apptId: currentAppt.dbId, amount: amt});
+}
+
+// ── Generate a client-facing tip link (phase 2 of tipping feature, 2026-05-03) ──
+// Admin-only. Calls /api/generate-tip-link with the user's auth token, gets a
+// signed URL back, and copies it to the clipboard so the admin can paste into
+// SMS or email. Token is HMAC-signed and expires in 30 days.
+async function sendTipLink(){
+  if(!currentAppt){ if(typeof showToast === 'function') showToast('No appointment selected', true); return; }
+  var apptId = currentAppt.dbId;
+  if(!apptId){ if(typeof showToast === 'function') showToast('Appointment id missing', true); return; }
+  var btn = document.getElementById('ai-tip-link-btn');
+  var origLabel = btn ? btn.textContent : '';
+  if(btn){ btn.disabled = true; btn.textContent = 'Generating\u2026'; }
+  try {
+    var sess = await db.auth.getSession();
+    var tok = sess.data.session ? sess.data.session.access_token : '';
+    if(!tok){ if(typeof showToast === 'function') showToast('Sign in expired \u2014 reload the page.', true); return; }
+    var resp = await fetch('/api/generate-tip-link', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + tok },
+      body: JSON.stringify({ appointmentId: apptId })
+    });
+    var data = await resp.json();
+    if(!resp.ok || !data || !data.url){
+      var msg = (data && (data.message || data.error)) || ('HTTP '+resp.status);
+      if(typeof showToast === 'function') showToast('Could not generate link: '+msg, true);
+      return;
+    }
+    var url = data.url;
+    // Try modern clipboard API first; fall back to prompt() so the user can copy manually
+    var copied = false;
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      try { await navigator.clipboard.writeText(url); copied = true; } catch(_){ copied = false; }
+    }
+    if(copied){
+      if(typeof showToast === 'function') showToast('Tip link copied to clipboard \u2713');
+    } else {
+      // Fallback: show the URL in a prompt so the user can long-press → Select All → Copy
+      window.prompt('Tip link \u2014 copy this and send to the client:', url);
+    }
+    if(typeof logActivity === 'function') logActivity('tip_link_generated', 'Tip link generated for '+(currentAppt.n||'appt'), {apptId: apptId});
+  } catch(err){
+    console.error('[sendTipLink] error:', err);
+    if(typeof showToast === 'function') showToast('Could not generate link: '+(err.message||'error'), true);
+  } finally {
+    if(btn){ btn.disabled = false; btn.textContent = origLabel || 'Send link'; }
+  }
 }
 
 function openApptDuplicate(){

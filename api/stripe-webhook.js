@@ -159,6 +159,99 @@ export default async function handler(req, res) {
       console.log('[stripe-webhook] Customer deleted:', data.id);
     }
 
+    // ── Tipping feature (phase 2, 2026-05-03) ───────────────────────────────
+    // Stripe Checkout Sessions for tips carry metadata.purpose='tip' plus the
+    // appointment_id. On successful completion we increment tip_amount on the
+    // appointment row. Idempotency is provided by the existing isWebhookProcessed
+    // gate at the top of this handler — re-deliveries of the same event won't
+    // double-increment. tip_amount accumulates because a customer may legitimately
+    // tip more than once across separate sessions (rare but possible).
+    if (eventType === 'checkout.session.completed') {
+      const md = (data && data.metadata) || {};
+      if (md.purpose === 'tip' && md.appointment_id) {
+        const apptId = md.appointment_id;
+        const tipDollars = (data.amount_total || 0) / 100;
+        const piId = data.payment_intent || null;
+
+        if (tipDollars > 0) {
+          // Read current tip_amount, then PATCH the new sum. Two-step is fine
+          // here because webhook idempotency upstream prevents duplicate runs.
+          try {
+            const readRes = await fetch(
+              `${SUPABASE_URL}/rest/v1/appointments?select=id,tip_amount&id=eq.${encodeURIComponent(apptId)}`,
+              {
+                headers: {
+                  'apikey': process.env.SUPABASE_SERVICE_ROLE_KEY,
+                  'Authorization': 'Bearer ' + process.env.SUPABASE_SERVICE_ROLE_KEY
+                }
+              }
+            );
+            if (readRes.ok) {
+              const rows = await readRes.json();
+              const existing = (rows && rows[0] && +rows[0].tip_amount) || 0;
+              const newTotal = +(existing + tipDollars).toFixed(2);
+              const updRes = await fetch(
+                `${SUPABASE_URL}/rest/v1/appointments?id=eq.${encodeURIComponent(apptId)}`,
+                {
+                  method: 'PATCH',
+                  headers: {
+                    'apikey': process.env.SUPABASE_SERVICE_ROLE_KEY,
+                    'Authorization': 'Bearer ' + process.env.SUPABASE_SERVICE_ROLE_KEY,
+                    'Content-Type': 'application/json',
+                    'Prefer': 'return=minimal'
+                  },
+                  body: JSON.stringify({ tip_amount: newTotal })
+                }
+              );
+              if (!updRes.ok) {
+                const errTxt = await updRes.text().catch(() => '');
+                console.error('[stripe-webhook] tip update failed:', updRes.status, errTxt.slice(0, 200));
+              } else {
+                console.log('[stripe-webhook] tip recorded: appt=' + apptId + ' +$' + tipDollars + ' total=$' + newTotal);
+              }
+            } else {
+              console.error('[stripe-webhook] tip lookup failed:', readRes.status);
+            }
+          } catch (tipErr) {
+            console.error('[stripe-webhook] tip processing error:', tipErr && tipErr.message);
+          }
+
+          // Audit trail — same shape as _hncRecordCharge in stripe-invoice.js
+          // so forensic queries against error_logs surface tip events too.
+          try {
+            await fetch(`${SUPABASE_URL}/rest/v1/error_logs`, {
+              method: 'POST',
+              headers: {
+                apikey: process.env.SUPABASE_SERVICE_ROLE_KEY,
+                Authorization: 'Bearer ' + process.env.SUPABASE_SERVICE_ROLE_KEY,
+                'Content-Type': 'application/json',
+                Prefer: 'return=minimal'
+              },
+              body: JSON.stringify({
+                source: 'stripe-tip-success',
+                message: 'tip_succeeded ' + (data.id || ''),
+                context: {
+                  checkout_session_id: data.id || null,
+                  payment_intent_id: piId,
+                  appointment_id: apptId,
+                  amount: tipDollars,
+                  cleaner_name: md.cleaner_name || null,
+                  client_name: md.client_name || null,
+                  customer_email: data.customer_details && data.customer_details.email || null
+                }
+              })
+            });
+          } catch (auditErr) {
+            console.error('[stripe-webhook] tip audit log failed:', auditErr && auditErr.message);
+          }
+
+          await logActivity('tip_paid', 'Tip received: $' + tipDollars + ' for ' + apptId, {
+            appointmentId: apptId, amount: tipDollars, sessionId: data.id, paymentIntentId: piId
+          });
+        }
+      }
+    }
+
     // Record the webhook as processed
     if (eventId) {
       try {

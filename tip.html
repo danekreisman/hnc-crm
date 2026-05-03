@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
+<title>Tip your cleaner — Hawaii Natural Clean</title>
+<meta name="theme-color" content="#1f8a8a" />
+<style>
+  :root {
+    --brand: #1f8a8a;
+    --brand-dark: #146060;
+    --brand-tint: #e6f4f4;
+    --text: #1a1a1a;
+    --text-muted: #666;
+    --border: #e0e0e0;
+    --bg: #f7f7f7;
+    --card: #ffffff;
+    --danger: #c0392b;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    -webkit-font-smoothing: antialiased;
+    min-height: 100vh;
+    line-height: 1.45;
+  }
+  .wrap {
+    max-width: 480px;
+    margin: 0 auto;
+    padding: 20px 16px 80px;
+  }
+  .brand {
+    text-align: center;
+    margin: 16px 0 28px;
+    color: var(--brand-dark);
+    font-weight: 600;
+    font-size: 14px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+  .brand .logo {
+    display: block;
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: 0;
+    text-transform: none;
+    color: var(--brand-dark);
+    margin-bottom: 4px;
+  }
+  .card {
+    background: var(--card);
+    border-radius: 14px;
+    padding: 24px 20px;
+    box-shadow: 0 2px 12px rgba(0,0,0,.04);
+    border: 1px solid var(--border);
+  }
+  h1 {
+    font-size: 24px;
+    margin: 0 0 8px;
+    line-height: 1.2;
+  }
+  .sub {
+    color: var(--text-muted);
+    font-size: 15px;
+    margin: 0 0 22px;
+  }
+  .preset-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+  .preset-btn {
+    appearance: none;
+    border: 1.5px solid var(--border);
+    background: #fff;
+    border-radius: 10px;
+    padding: 18px 12px;
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text);
+    cursor: pointer;
+    transition: all 0.12s;
+    -webkit-tap-highlight-color: transparent;
+    font-family: inherit;
+  }
+  .preset-btn:hover, .preset-btn:focus {
+    border-color: var(--brand);
+    outline: none;
+  }
+  .preset-btn.active {
+    background: var(--brand-tint);
+    border-color: var(--brand);
+    color: var(--brand-dark);
+  }
+  .custom-row {
+    display: flex;
+    align-items: center;
+    border: 1.5px solid var(--border);
+    border-radius: 10px;
+    padding: 0 14px;
+    background: #fff;
+    margin-bottom: 20px;
+  }
+  .custom-row.active {
+    border-color: var(--brand);
+  }
+  .custom-row span {
+    color: var(--text-muted);
+    font-size: 18px;
+    margin-right: 6px;
+  }
+  .custom-row input {
+    flex: 1;
+    border: none;
+    outline: none;
+    font-size: 18px;
+    padding: 14px 0;
+    font-family: inherit;
+    background: transparent;
+    min-width: 0;
+  }
+  .pay-btn {
+    appearance: none;
+    width: 100%;
+    background: var(--brand);
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    padding: 16px;
+    font-size: 17px;
+    font-weight: 600;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    font-family: inherit;
+    transition: background 0.12s;
+  }
+  .pay-btn:hover, .pay-btn:focus { background: var(--brand-dark); outline: none; }
+  .pay-btn:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+  .footer-note {
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 12px;
+    margin-top: 18px;
+    padding: 0 8px;
+  }
+  .footer-note a { color: var(--brand); text-decoration: none; }
+  .err {
+    background: #fff3f2;
+    border: 1px solid #f5c2bd;
+    color: var(--danger);
+    border-radius: 10px;
+    padding: 14px 16px;
+    font-size: 14px;
+    margin-top: 16px;
+  }
+  .success-card {
+    text-align: center;
+    padding: 40px 24px;
+  }
+  .success-card .check {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    background: var(--brand-tint);
+    color: var(--brand);
+    font-size: 36px;
+    line-height: 64px;
+    margin: 0 auto 18px;
+    font-weight: 600;
+  }
+  .success-card h1 { font-size: 22px; margin-bottom: 8px; }
+  .success-card p { color: var(--text-muted); margin: 6px 0; }
+  .skel {
+    color: transparent;
+    background: linear-gradient(90deg, #eee 25%, #f5f5f5 37%, #eee 63%);
+    background-size: 400% 100%;
+    border-radius: 4px;
+    animation: skel 1.4s ease infinite;
+    display: inline-block;
+    min-width: 80px;
+  }
+  @keyframes skel { 0%{background-position:100% 50%} 100%{background-position:0 50%} }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="brand">
+    <span class="logo">Hawaii Natural Clean 🌺</span>
+    <span>Mahalo for choosing us</span>
+  </div>
+
+  <!-- ─────────── Tip entry view ─────────── -->
+  <div class="card" id="entry-view">
+    <h1 id="hdr-title">Tip your cleaner</h1>
+    <p class="sub" id="hdr-sub"><span class="skel">Loading…</span></p>
+
+    <div class="preset-grid" id="preset-grid">
+      <button type="button" class="preset-btn" data-amt="10">$10</button>
+      <button type="button" class="preset-btn" data-amt="15">$15</button>
+      <button type="button" class="preset-btn" data-amt="20">$20</button>
+      <button type="button" class="preset-btn" data-amt="25">$25</button>
+    </div>
+
+    <div class="custom-row" id="custom-row">
+      <span>$</span>
+      <input id="custom-amt" type="number" inputmode="decimal" step="0.01" min="1" max="500" placeholder="Custom amount" />
+    </div>
+
+    <button type="button" class="pay-btn" id="pay-btn" disabled>Continue to payment</button>
+    <div class="err hidden" id="err-box"></div>
+    <div class="footer-note">
+      Secure payment by Stripe. Tips go directly to your cleaner's payroll.
+    </div>
+  </div>
+
+  <!-- ─────────── Success view ─────────── -->
+  <div class="card success-card hidden" id="success-view">
+    <div class="check">✓</div>
+    <h1>Mahalo for the tip!</h1>
+    <p id="success-detail">Your cleaner will see this on their next paycheck.</p>
+    <p style="margin-top:18px;font-size:13px;">— The team at Hawaii Natural Clean 🌺</p>
+  </div>
+
+  <!-- ─────────── Cancelled view ─────────── -->
+  <div class="card hidden" id="cancel-view">
+    <h1>Payment cancelled</h1>
+    <p class="sub">No worries — nothing was charged. You can try again any time using the same link.</p>
+    <button type="button" class="pay-btn" onclick="location.search='?token='+encodeURIComponent(_token);">Try again</button>
+  </div>
+</div>
+
+<script>
+(function(){
+  'use strict';
+  var qs = new URLSearchParams(location.search);
+  var _token = qs.get('token') || '';
+  var _status = qs.get('status') || '';
+  window._token = _token; // exposed for the cancel-view retry button
+
+  // Status views skip the entry flow entirely
+  if (_status === 'success') {
+    document.getElementById('entry-view').classList.add('hidden');
+    document.getElementById('success-view').classList.remove('hidden');
+    return;
+  }
+  if (_status === 'cancelled') {
+    document.getElementById('entry-view').classList.add('hidden');
+    document.getElementById('cancel-view').classList.remove('hidden');
+    return;
+  }
+
+  if (!_token) {
+    showErr('Missing or invalid tip link. Please check the link from your text/email.');
+    setHeader('Tip your cleaner', '');
+    return;
+  }
+
+  var selectedAmt = null;
+  var presets = document.querySelectorAll('.preset-btn');
+  var customInput = document.getElementById('custom-amt');
+  var customRow = document.getElementById('custom-row');
+  var payBtn = document.getElementById('pay-btn');
+  var errBox = document.getElementById('err-box');
+
+  function setHeader(title, sub){
+    document.getElementById('hdr-title').textContent = title;
+    document.getElementById('hdr-sub').textContent = sub || '';
+  }
+  function showErr(msg){
+    errBox.textContent = msg;
+    errBox.classList.remove('hidden');
+  }
+  function clearErr(){
+    errBox.classList.add('hidden');
+  }
+  function syncPay(){
+    var amt = selectedAmt;
+    if (amt && amt >= 1 && amt <= 500) {
+      payBtn.disabled = false;
+      payBtn.textContent = 'Tip $' + amt.toFixed(2);
+    } else {
+      payBtn.disabled = true;
+      payBtn.textContent = 'Continue to payment';
+    }
+  }
+
+  // Preset selection
+  presets.forEach(function(btn){
+    btn.addEventListener('click', function(){
+      presets.forEach(function(b){ b.classList.remove('active'); });
+      btn.classList.add('active');
+      customRow.classList.remove('active');
+      customInput.value = '';
+      selectedAmt = parseFloat(btn.getAttribute('data-amt'));
+      syncPay();
+      clearErr();
+    });
+  });
+
+  // Custom amount
+  customInput.addEventListener('input', function(){
+    presets.forEach(function(b){ b.classList.remove('active'); });
+    customRow.classList.add('active');
+    var v = parseFloat(customInput.value);
+    selectedAmt = (v && isFinite(v)) ? Math.round(v * 100) / 100 : null;
+    syncPay();
+    clearErr();
+  });
+
+  // Load tip context (cleaner name, date, etc.)
+  fetch('/api/get-tip-context?token=' + encodeURIComponent(_token))
+    .then(function(r){ return r.json().then(function(j){ return { ok: r.ok, body: j }; }); })
+    .then(function(p){
+      if (!p.ok) {
+        var msg = 'This tip link is no longer valid.';
+        if (p.body && p.body.reason === 'expired') msg = 'This tip link has expired. Please ask Hawaii Natural Clean for a new one.';
+        if (p.body && p.body.error === 'appointment_unavailable') msg = 'This appointment is no longer available for tipping.';
+        if (p.body && p.body.error === 'appointment_not_found') msg = 'We couldn\u2019t find that appointment. Please double-check the link.';
+        setHeader('Tip your cleaner', '');
+        showErr(msg);
+        return;
+      }
+      var b = p.body || {};
+      var who = (b.cleanerNames && b.cleanerNames.length) ? b.cleanerNames.join(' & ') : 'your cleaner';
+      var dateStr = b.date ? (' on ' + b.date) : '';
+      var greeting = b.clientFirstName ? ('Aloha ' + b.clientFirstName + ' \u2014 ') : '';
+      setHeader(
+        'Tip ' + who,
+        greeting + 'thank you for letting Hawaii Natural Clean care for your home' + dateStr + '. 100% of the tip goes to ' + who + '.'
+      );
+      if (b.alreadyTipped && b.currentTipAmount > 0) {
+        // Don't block re-tipping (sometimes happens for separate occasions),
+        // but make it visible so the customer doesn't double-tip by accident.
+        var note = document.createElement('div');
+        note.style.cssText = 'background:#fffbe6;border:1px solid #f0e0a3;border-radius:10px;padding:12px 14px;font-size:13px;color:#7a5a00;margin-bottom:16px;';
+        note.textContent = 'Heads up: a tip of $' + b.currentTipAmount.toFixed(2) + ' is already recorded for this appointment.';
+        var grid = document.getElementById('preset-grid');
+        grid.parentNode.insertBefore(note, grid);
+      }
+    })
+    .catch(function(err){
+      setHeader('Tip your cleaner', '');
+      showErr('We had trouble loading this page. Please try again, or contact Hawaii Natural Clean.');
+      console.error('[tip] context fetch failed:', err);
+    });
+
+  // Pay click — create checkout session, then redirect
+  payBtn.addEventListener('click', function(){
+    if (!selectedAmt || selectedAmt < 1 || selectedAmt > 500) return;
+    payBtn.disabled = true;
+    payBtn.textContent = 'Redirecting…';
+    clearErr();
+    fetch('/api/create-tip-checkout', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: _token, amount: selectedAmt })
+    })
+    .then(function(r){ return r.json().then(function(j){ return { ok: r.ok, status: r.status, body: j }; }); })
+    .then(function(p){
+      if (!p.ok || !p.body || !p.body.checkoutUrl) {
+        var msg = (p.body && p.body.message) || 'We couldn\u2019t start the payment. Please try again.';
+        if (p.status === 503) msg = 'Tipping is temporarily unavailable. Please try again later or contact Hawaii Natural Clean.';
+        if (p.status === 403 && p.body && p.body.error === 'test_mode_active') msg = 'Tipping is currently in test mode. Please contact Hawaii Natural Clean directly to leave a tip.';
+        if (p.status === 401) msg = 'This tip link is no longer valid. Please ask Hawaii Natural Clean for a new one.';
+        showErr(msg);
+        payBtn.disabled = false;
+        syncPay();
+        return;
+      }
+      // Redirect to Stripe Checkout
+      window.location.href = p.body.checkoutUrl;
+    })
+    .catch(function(err){
+      console.error('[tip] checkout failed:', err);
+      showErr('We had trouble starting the payment. Please try again.');
+      payBtn.disabled = false;
+      syncPay();
+    });
+  });
+})();
+</script>
+</body>
+</html>

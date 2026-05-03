@@ -65,7 +65,11 @@ export default async function handler(req, res) {
   async function findLeadByPhone(phone) {
     if (!phone) return null;
     const digits = phone.replace(/\D/g, '').slice(-10);
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/leads?select=id,phone&limit=100`, {
+    // Pull name + response_count too — task title needs the name, and the
+    // PATCH that increments response_count needs the current value
+    // (otherwise (undefined || 0) + 1 = 1 every single time, which means
+    // the counter never goes above 1 even after multiple replies).
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/leads?select=id,name,phone,response_count&limit=200`, {
       headers: {
         'apikey': SUPABASE_KEY,
         'Authorization': `Bearer ${SUPABASE_KEY}`

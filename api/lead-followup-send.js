@@ -58,7 +58,11 @@ export default async function handler(req, res) {
   const wantEmail = email && (email.subject || email.body);
   if (!wantSms && !wantEmail) return res.status(400).json({ error: 'Provide sms or email content' });
 
-  const baseUrl = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://hnc-crm.vercel.app';
+  // Hardcoded production URL — process.env.VERCEL_URL points to the
+  // deployment-specific hostname which can hit deployment-protection
+  // auth walls and return HTML instead of JSON. Match the pattern used
+  // by api/run-automations.js + api/run-task-deadline-reminders.js.
+  const BASE_URL = 'https://hnc-crm.vercel.app';
 
   try {
     const db = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY);
@@ -95,12 +99,21 @@ export default async function handler(req, res) {
         errors.push('Lead has no phone number');
       } else {
         try {
-          const smsRes = await fetchWithTimeout(`${baseUrl}/api/send-sms`, {
+          const smsRes = await fetchWithTimeout(`${BASE_URL}/api/send-sms`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ to: phoneE164, message: String(sms).trim() }),
-          }, TIMEOUTS.QUO || 10000);
-          const smsData = await smsRes.json();
+          }, TIMEOUTS.OPENPHONE);
+          // Read body as text first so we can give a useful error when the
+          // response is HTML (e.g. Vercel auth wall) instead of the cryptic
+          // "Unexpected token '<'" JSON parse error.
+          const smsRaw = await smsRes.text();
+          let smsData;
+          try { smsData = JSON.parse(smsRaw); }
+          catch (parseErr) {
+            const preview = smsRaw.slice(0, 120);
+            throw new Error(`/api/send-sms returned non-JSON (HTTP ${smsRes.status}): ${preview}`);
+          }
           if (smsData?.success) smsSent = true;
           else errors.push('SMS failed: ' + (smsData?.error || `HTTP ${smsRes.status}`));
         } catch (smsErr) {
@@ -115,7 +128,7 @@ export default async function handler(req, res) {
         errors.push('Lead has no email address');
       } else {
         try {
-          const emailRes = await fetchWithTimeout(`${baseUrl}/api/send-email`, {
+          const emailRes = await fetchWithTimeout(`${BASE_URL}/api/send-email`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -129,8 +142,14 @@ export default async function handler(req, res) {
               cleaner: '',
               notes: String(email.body || '').trim(),
             }),
-          }, 15000);
-          const emailData = await emailRes.json();
+          }, TIMEOUTS.RESEND || 15000);
+          const emailRaw = await emailRes.text();
+          let emailData;
+          try { emailData = JSON.parse(emailRaw); }
+          catch (parseErr) {
+            const preview = emailRaw.slice(0, 120);
+            throw new Error(`/api/send-email returned non-JSON (HTTP ${emailRes.status}): ${preview}`);
+          }
           if (emailData?.success) emailSent = true;
           else errors.push('Email failed: ' + (emailData?.error || `HTTP ${emailRes.status}`));
         } catch (emailErr) {

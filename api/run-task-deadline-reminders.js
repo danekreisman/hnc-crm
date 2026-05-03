@@ -94,6 +94,38 @@ export default async function handler(req, res) {
       TIMEOUTS.QUO || 10000
     );
 
+    // Fan out push notifications to every subscribed device. Best-effort —
+    // wrapped in try so a missing VAPID config doesn't break the SMS path.
+    let pushResult = { sent: 0, removed: 0, errors: ['skipped'] };
+    try {
+      const { sendPushToAllSubscribed } = await import('./utils/send-push.js');
+      // Build a tighter title + body for the small notification surface.
+      const totalCount = overdue.length + dueToday.length;
+      const titleParts = [];
+      if (overdue.length) titleParts.push(`${overdue.length} overdue`);
+      if (dueToday.length) titleParts.push(`${dueToday.length} due today`);
+      const title = totalCount === 1
+        ? '1 task needs your attention'
+        : `${titleParts.join(' \u00B7 ')} \u2014 ${totalCount} tasks`;
+      // Body: list up to 4 task titles to fit in the notification body.
+      const bodyTasks = [...overdue, ...dueToday].slice(0, 4);
+      const bodyLines = bodyTasks.map(t => '\u2022 ' + (t.title || 'Untitled task'));
+      if (totalCount > 4) bodyLines.push('\u2026 +' + (totalCount - 4) + ' more');
+      const body = bodyLines.join('\n');
+      // High priority if any overdue OR any high-priority items
+      const hasHigh = tasks.some(t => t.priority === 'high');
+      pushResult = await sendPushToAllSubscribed({
+        title,
+        body,
+        url: '/#tasks',
+        tag: 'task-digest-' + todayHawaii,  // dedupe per day
+        requireInteraction: hasHigh || overdue.length > 0,
+      });
+    } catch (pushErr) {
+      console.warn('[run-task-deadline-reminders] push fanout failed:', pushErr.message);
+      pushResult = { sent: 0, removed: 0, errors: [pushErr.message] };
+    }
+
     return res.status(200).json({
       success: true,
       sent: 1,
@@ -101,6 +133,7 @@ export default async function handler(req, res) {
       overdue: overdue.length,
       due_today: dueToday.length,
       sms_status: smsRes.status,
+      push: pushResult,
     });
   } catch (err) {
     await logError('run-task-deadline-reminders', err, {});

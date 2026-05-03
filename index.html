@@ -66,6 +66,22 @@ body{font-family:'Inter','SF Pro Text',-apple-system,BlinkMacSystemFont,'Segoe U
   /* Older iOS Safari fallback */
   body.standalone-ios { padding-top: env(safe-area-inset-top); }
 }
+
+/* Mobile sidebar must respect safe areas too. Without this, on iPhone the
+ * top of the sidebar (header + first nav items) is hidden under the notch,
+ * the bottom items are hidden under the home indicator, and touch scrolling
+ * inside the sidebar feels broken because users can't see the items they're
+ * supposed to scroll to. position:fixed ignores body padding so we apply
+ * inset padding directly. -webkit-overflow-scrolling:touch ensures smooth
+ * momentum scrolling on iOS Safari. */
+@media all and (display-mode: standalone) and (max-width:900px){
+  .sidebar {
+    padding-top: calc(env(safe-area-inset-top) + 8px);
+    padding-bottom: calc(env(safe-area-inset-bottom) + 8px);
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+  }
+}
 .crm{display:flex;height:100vh;overflow:hidden;}
 .sidebar{width:220px;background:var(--panel-glass);backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;overflow-y:auto;}
 .sidebar-logo{padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;}

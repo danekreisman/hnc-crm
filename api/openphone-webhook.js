@@ -211,7 +211,7 @@ export default async function handler(req, res) {
               const leadFirstName = (lead.name || 'Lead').split(' ')[0];
               const today = new Date().toISOString().split('T')[0];
               const truncatedReply = body.length > 200 ? body.slice(0, 197) + '...' : body;
-              await supabaseInsert('tasks', {
+              const taskInsertRes = await supabaseInsert('tasks', {
                 title: `${leadFirstName} responded — mark as lost?`,
                 type: 'review_lead_response',
                 priority: verdict.confidence === 'high' ? 'high' : 'medium',
@@ -220,7 +220,15 @@ export default async function handler(req, res) {
                 related_lead_id: lead.id,
                 status: 'open',
               });
-              console.log('[openphone-webhook] Created review_lead_response task for', lead.id);
+              if (!taskInsertRes.ok) {
+                // supabaseInsert is fetch-based and won't throw on 4xx — read the
+                // body so the failure is visible in logs. Previously this fell
+                // through silently when CHECK constraints rejected the type.
+                const errBody = await taskInsertRes.text().catch(() => '<unreadable>');
+                console.error('[openphone-webhook] Task insert FAILED status=' + taskInsertRes.status + ' body=' + errBody.slice(0, 500));
+              } else {
+                console.log('[openphone-webhook] Created review_lead_response task for', lead.id);
+              }
             }
           } catch (aiErr) {
             // Never fail the webhook on AI errors — classification is bonus

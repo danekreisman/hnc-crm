@@ -238,6 +238,24 @@ export default async function handler(req, res) {
                 console.error('[openphone-webhook] Task insert FAILED status=' + taskInsertRes.status + ' body=' + errBody.slice(0, 500));
               } else {
                 console.log('[openphone-webhook] Created review_lead_response task for', lead.id);
+
+                // Fire push notification to all subscribed admins/VAs. Done as a
+                // dynamic import so a missing web-push module / VAPID config
+                // doesn't take the webhook offline — push is bonus on top of
+                // the task creation, not a blocker.
+                try {
+                  const { sendPushToAllSubscribed } = await import('./utils/send-push.js');
+                  const pushRes = await sendPushToAllSubscribed({
+                    title: `${leadFirstName} replied — mark as lost?`,
+                    body: `AI flagged this as likely lost (${verdict.confidence} confidence). "${truncatedReply.slice(0, 80)}${truncatedReply.length > 80 ? '...' : ''}"`,
+                    url: '/#tasks',
+                    tag: 'review-' + lead.id,
+                    requireInteraction: verdict.confidence === 'high',
+                  });
+                  console.log('[openphone-webhook] Push fanout:', JSON.stringify(pushRes));
+                } catch (pushErr) {
+                  console.warn('[openphone-webhook] Push notification failed:', pushErr.message);
+                }
               }
             }
           } catch (aiErr) {

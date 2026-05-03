@@ -48,7 +48,16 @@ export default async function handler(req, res) {
 
   // 2) Send SMS via Quo (OpenPhone API)
   const greeting = cleaner.name ? `Hi ${cleaner.name},` : 'Hi,';
-  const smsBody = `${greeting} you've been invited to your Hawaii Natural Clean cleaner portal. Sign in here: ${PORTAL_URL}`;
+  // SMS includes install instructions so the cleaner installs the portal as
+  // a PWA on their phone. Once installed they can grant push notification
+  // permission, which lets us alert them about new jobs, schedule changes,
+  // and same-day bookings.
+  const smsBody =
+    `${greeting} you've been invited to your Hawaii Natural Clean cleaner portal. ` +
+    `Sign in here: ${PORTAL_URL}\n\n` +
+    `To install on your phone (highly recommended for notifications):\n` +
+    `iPhone: open the link in Safari → tap Share → Add to Home Screen\n` +
+    `Android: open the link in Chrome → tap menu → Install app`;
 
   const tMed = (TIMEOUTS && TIMEOUTS.medium) || 12000;
   const smsRes = await fetchWithTimeout(

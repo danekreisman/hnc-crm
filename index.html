@@ -559,6 +559,7 @@ textarea{font-family:inherit;}
         <div id="closed-leads-section" style="display:none;margin-top:24px;">
 
           <!-- WON -->
+          <div id="won-section">
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
             <div style="width:10px;height:10px;border-radius:50%;background:var(--brand-500);"></div>
             <div style="font-size:13px;font-weight:600;color:var(--text);">Closed won</div>
@@ -578,8 +579,10 @@ textarea{font-family:inherit;}
               </tbody>
             </table>
           </div>
+          </div>
 
           <!-- LOST -->
+          <div id="lost-section">
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
             <div style="width:10px;height:10px;border-radius:50%;background:#e53e3e;"></div>
             <div style="font-size:13px;font-weight:600;color:var(--text);">Closed lost</div>
@@ -598,6 +601,7 @@ textarea{font-family:inherit;}
               <tbody id="lost-leads-tbody">
               </tbody>
             </table>
+          </div>
           </div>
         </div>
 
@@ -12451,24 +12455,32 @@ scheduleLeadAppointment = function(){
 function filterLeads(view, btn){
   document.querySelectorAll('#view-pipeline .template-tab').forEach(function(b){b.classList.remove('active');});
   btn.classList.add('active');
-  var board = document.getElementById('pipe-board');
-  var closed = document.getElementById('closed-leads-section');
+  var board    = document.getElementById('pipe-board');
+  var closed   = document.getElementById('closed-leads-section');
+  var wonSec   = document.getElementById('won-section');
+  var lostSec  = document.getElementById('lost-section');
+  // Each filter independently controls (a) whether the active pipeline board
+  // is visible, and (b) which of the closed sections (won, lost, both) are
+  // visible. Previously won and lost were shown together, which made
+  // the Won and Lost tabs functionally identical.
   if(view === 'pipeline'){
     if(board) board.style.display='flex';
     if(closed) closed.style.display='none';
   } else if(view === 'all'){
     if(board) board.style.display='flex';
     if(closed) closed.style.display='block';
+    if(wonSec)  wonSec.style.display='block';
+    if(lostSec) lostSec.style.display='block';
   } else if(view === 'won'){
     if(board) board.style.display='none';
-    if(closed){ closed.style.display='block'; closed.scrollIntoView({behavior:'smooth'}); }
+    if(closed) closed.style.display='block';
+    if(wonSec)  wonSec.style.display='block';
+    if(lostSec) lostSec.style.display='none';
   } else if(view === 'lost'){
     if(board) board.style.display='none';
-    if(closed){
-      closed.style.display='block';
-      var lostEl=document.getElementById('lost-leads-tbody');
-      if(lostEl) lostEl.scrollIntoView({behavior:'smooth'});
-    }
+    if(closed) closed.style.display='block';
+    if(wonSec)  wonSec.style.display='none';
+    if(lostSec) lostSec.style.display='block';
   }
 }
 

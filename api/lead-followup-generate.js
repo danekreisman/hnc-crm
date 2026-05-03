@@ -156,8 +156,8 @@ export default async function handler(req, res) {
       '  ✓ If you stripped the lead\'s name out, would it still feel like ME wrote it (vs. any cleaning company)?',
       '',
       history && history.trim() ? '\n=== CONVERSATION HISTORY (most recent first) ===\n' + history + '\n=== END HISTORY ===\n' : '',
-      'OUTPUT FORMAT:',
-      'Return a JSON object with exactly the fields requested below. No markdown code fences, no preamble, just the JSON.',
+      'OUTPUT FORMAT (STRICT):',
+      'Return ONLY a JSON object — nothing else. No "Here\'s the message:" preamble. No "Note:" or "Hope this helps" postamble. No markdown code fences (```). No commentary about your choices. The very first character of your response must be `{` and the very last character must be `}`.',
       wantSms && wantEmail ? '{"sms": "<sms text>", "email": {"subject": "<subject>", "body": "<body>"}}' : '',
       wantSms && !wantEmail ? '{"sms": "<sms text>"}' : '',
       !wantSms && wantEmail ? '{"email": {"subject": "<subject>", "body": "<body>"}}' : '',
@@ -181,18 +181,46 @@ export default async function handler(req, res) {
     const text = aiData?.content?.[0]?.text || '';
     if (!text) throw new Error('AI returned empty response');
 
-    // Parse JSON, tolerant of code fences and preamble
-    let cleaned = text.trim();
-    cleaned = cleaned.replace(/^```(?:json)?\s*/, '').replace(/\s*```\s*$/, '');
-    const firstBrace = cleaned.indexOf('{');
-    if (firstBrace > 0) cleaned = cleaned.slice(firstBrace);
-    const lastBrace = cleaned.lastIndexOf('}');
-    if (lastBrace > 0 && lastBrace < cleaned.length - 1) cleaned = cleaned.slice(0, lastBrace + 1);
+    // Parse JSON, robust against:
+    //   - leading/trailing prose ("Here's the message:" before, "Note:" after)
+    //   - markdown code fences
+    //   - the AI returning multiple JSON objects back-to-back
+    //   - braces inside string values (e.g. literal {}'s in the SMS text)
+    // Strategy: walk forward from the first '{', tracking brace depth and
+    // string boundaries, return the first balanced {...} block. This is way
+    // more reliable than indexOf/lastIndexOf which gets confused by braces
+    // inside strings or trailing content.
+    function _extractFirstJsonObject(s) {
+      const start = s.indexOf('{');
+      if (start === -1) return null;
+      let depth = 0;
+      let inString = false;
+      let escape = false;
+      for (let i = start; i < s.length; i++) {
+        const ch = s[i];
+        if (escape) { escape = false; continue; }
+        if (inString) {
+          if (ch === '\\') { escape = true; continue; }
+          if (ch === '"') inString = false;
+          continue;
+        }
+        if (ch === '"') { inString = true; continue; }
+        if (ch === '{') depth++;
+        else if (ch === '}') {
+          depth--;
+          if (depth === 0) return s.slice(start, i + 1);
+        }
+      }
+      return null; // unbalanced
+    }
+
+    const stripped = text.trim().replace(/^```(?:json)?\s*/, '').replace(/\s*```\s*$/, '');
+    const cleaned = _extractFirstJsonObject(stripped) || stripped;
 
     let parsed;
     try { parsed = JSON.parse(cleaned); }
     catch (e) {
-      console.error('[lead-followup-generate] JSON parse failed. Raw text:', text);
+      console.error('[lead-followup-generate] JSON parse failed.\n  Raw:', text, '\n  Cleaned:', cleaned);
       throw new Error('AI response was not valid JSON: ' + e.message);
     }
 

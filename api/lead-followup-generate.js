@@ -76,6 +76,23 @@ export default async function handler(req, res) {
       }
     }
 
+    // Scan SMS history for quoted dollar amounts. Catches both formats:
+    //   "$385" / "$385.00" / "$ 385" / "385 dollars"
+    // Filter for amounts that look like cleaning quotes (>= $50, <= $5000)
+    // so we don't pick up phone numbers, zip codes, or stray small numbers.
+    const _priceRegex = /\$\s?(\d{2,4}(?:\.\d{1,2})?)\b/g;
+    const pricesInHistory = [];
+    if (history) {
+      let m;
+      while ((m = _priceRegex.exec(history)) !== null) {
+        const num = parseFloat(m[1]);
+        if (num >= 50 && num <= 5000 && pricesInHistory.length < 5) {
+          pricesInHistory.push('$' + m[1]);
+        }
+      }
+    }
+    const hasPriceEvidence = hasStructuredQuote || pricesInHistory.length > 0;
+
     // Build the prompt
     const firstName = (lead.name || lead.contact_name || '').split(' ')[0] || 'there';
     const stage = lead.stage || 'New inquiry';
@@ -92,6 +109,34 @@ export default async function handler(req, res) {
     // history (also visible in the prompt below), in which case it's free to
     // reference it. This flag only controls the structured CONTEXT signal.
     const hasStructuredQuote = !!(lead.quote_total || lead.quote_sent_at);
+
+    // Extract just the city/town from a full street address. The AI shouldn't
+    // mention "100 Malia Uli Pl" — that's creepy. But "your house in Kula" is
+    // helpful context. Hawaii addresses typically end with ", <City>, HI <zip>"
+    // so we walk backwards from the state to find the city.
+    function _extractCity(addr) {
+      if (!addr) return null;
+      const parts = String(addr).split(',').map(s => s.trim()).filter(Boolean);
+      if (!parts.length) return null;
+      // Find the part that looks like state ('HI' or 'Hawaii' or 'HI 96789')
+      for (let i = parts.length - 1; i > 0; i--) {
+        const p = parts[i].toUpperCase();
+        if (p === 'HI' || p === 'HAWAII' || /^HI\s+\d{5}/.test(p) || /^HI$/.test(p)) {
+          return parts[i - 1] || null;
+        }
+      }
+      // Fallback: if multi-part address, second-to-last is usually city
+      if (parts.length >= 2) return parts[parts.length - 2];
+      // Single-part: probably already a city name
+      return parts[0];
+    }
+    const city = _extractCity(lead.address);
+
+    // Scan the SMS conversation history for dollar amounts. If the AI has
+    // hard evidence a price was quoted (even without a structured DB record),
+    // it should be allowed to reference it naturally. Without this signal
+    // the AI was over-anchoring on the "Quote on record: NO" line and
+    // refusing to reference prices that ARE in the SMS thread.
 
     const channelInstructions = [];
     if (wantSms) {
@@ -123,9 +168,10 @@ export default async function handler(req, res) {
       if (stage === 'New inquiry') return 'They submitted a lead form but have not received a quote yet. Acknowledge their inquiry and confirm you got their request. Aim is to get them to engage so you can follow up with a quote.';
       if (stage === 'Quoted' && hasStructuredQuote && !hasReplied && daysSinceQuote && daysSinceQuote >= 1) return `They got a quote ${daysSinceQuote} days ago and have not responded. Friendly nudge to see if they have questions or want to book.`;
       if (stage === 'Quoted' && hasStructuredQuote && hasReplied) return 'They got a quote and replied at some point. Look at the conversation history for what they actually said and respond to it. Don\'t pretend you haven\'t talked.';
-      if (stage === 'Quoted' && !hasStructuredQuote) return 'Marked Quoted in the system but I do NOT have a record of an actual estimate being sent — quote may have been verbal/by phone, or just imported from a spreadsheet. DO NOT claim to have sent an estimate or reference a specific quote. Look at the conversation history for any actual prices mentioned. Otherwise be open-ended: "wanted to make sure you had everything you need to decide", "let me know if any questions came up", "happy to walk through pricing again whenever". Aim is to re-engage without making up history.';
-      if (stage === 'Follow-up' && hasStructuredQuote) return 'Cold lead — got a quote but went silent. Light, no-pressure check-in. Don\'t guilt them. The aim is to leave the door open without being pushy.';
-      if (stage === 'Follow-up' && !hasStructuredQuote) return 'Cold lead, but I do NOT have a record of a structured estimate being sent. May have been a phone-only conversation. DO NOT claim to have sent an estimate. Open-ended re-engagement only: "wanted to circle back about your cleaning needs", "let me know if there\'s anything I can help you sort out". Reference details from the SMS/call history if any exist; otherwise keep it short and general.';
+      if (stage === 'Quoted' && !hasStructuredQuote && pricesInHistory.length > 0) return 'Marked Quoted, no structured DB record but prices ARE visible in the SMS history above (and listed in CONTEXT). Reference those prices naturally — they were really quoted to this lead. Friendly nudge to see if they have questions or want to book.';
+      if (stage === 'Quoted' && !hasStructuredQuote) return 'Marked Quoted in the system, but I have NO record of an actual estimate being sent — quote may have been verbal/by phone, or just imported from a spreadsheet. DO NOT claim to have sent an estimate or reference a specific quote. Be open-ended: "wanted to make sure you had everything you need to decide", "let me know if any questions came up", "happy to walk through pricing again whenever". Aim is to re-engage without making up history.';
+      if (stage === 'Follow-up' && hasPriceEvidence) return 'Cold lead — they got a quote (or prices were discussed by SMS) but went silent. Light, no-pressure check-in. If a price is on record or visible in SMS history, you may reference it. Don\'t guilt them. The aim is to leave the door open without being pushy.';
+      if (stage === 'Follow-up' && !hasPriceEvidence) return 'Cold lead, but I do NOT have a record of a structured estimate being sent and no prices appear in SMS history. May have been a phone-only conversation. DO NOT claim to have sent an estimate. Open-ended re-engagement only: "wanted to circle back about your cleaning needs", "let me know if there\'s anything I can help you sort out". Reference details from the SMS/call history if any exist; otherwise keep it short and general.';
       if (stage === 'Closed lost') return 'This was marked lost — try to re-engage gently. Maybe they had a reason that\'s no longer true.';
       return 'Generic follow-up. Be friendly and specific.';
     })();
@@ -147,10 +193,12 @@ export default async function handler(req, res) {
       `- Lead: ${lead.name || 'Unknown'}`,
       `- Stage: ${stage}`,
       `- Service interested in: ${service}`,
-      lead.address ? `- Address: ${lead.address}` : '',
+      city ? `- General area: ${city} (you may reference this — e.g. "your home in ${city}". Do NOT mention any street name, street number, or apartment.)` : '',
       hasStructuredQuote
         ? `- Quote on record: ${quote || 'yes (amount not stored)'}`
-        : '- Quote on record: NO — there is no structured record of an estimate being sent. If you reference an estimate, it MUST come from a price actually visible in the SMS/call history below — never invent one or claim one was sent.',
+        : (pricesInHistory.length > 0
+          ? `- Quote on record: not in our database, BUT prices visible in SMS history: ${pricesInHistory.join(', ')}. These were quoted to this lead by SMS — you may reference them naturally.`
+          : '- Quote on record: NO — no structured quote AND no prices in the SMS history. Do NOT claim to have sent an estimate or invent any price.'),
       daysSinceQuote != null ? `- Days since quote: ${daysSinceQuote}` : '',
       hasReplied ? `- They have replied at some point (see conversation)` : '- They have NOT replied since the quote was sent',
       lead.notes ? `- Notes: ${lead.notes}` : '',
@@ -172,6 +220,7 @@ export default async function handler(req, res) {
       '- NEVER invent a price. Never make up a dollar amount.',
       '- DATES — CRITICAL: Today\'s date is at the top of this prompt. NEVER suggest, confirm, or invite the lead to book on a date that has already passed. If the SMS history contains a proposed date (e.g. "Are you available May 5th?") and that date is in the past, treat it as expired — DO NOT reference that specific date as bookable. You can say "the date we discussed didn\'t work out" or "wanted to try and reschedule" or just leave dates out entirely. Future dates and open-ended phrasing ("whenever works for you", "this week", "anytime soon") are fine.',
       '- Do NOT invent any specific date the lead never proposed. "Are you free Tuesday?" is invented if Tuesday wasn\'t mentioned in the conversation history.',
+      '- ADDRESSES — IMPORTANT: You may reference the city, town, or general area (e.g. "your home in Kula", "your place in Mililani"). Cities are friendly local context. You may NOT mention any street number, street name, apartment number, building name, or zip code. NEVER write something like "100 Malia Uli Pl" or "your place on Kalakaua Ave" — that\'s creepy and inappropriate. If only a full address is available and you want to reference location, fall back to the city/town only.',
       '',
       'CHECKLIST before you write the message:',
       '  ✓ Does it open with "Aloha"?',
@@ -180,6 +229,7 @@ export default async function handler(req, res) {
       '  ✓ If you stripped the lead\'s name out, would it still feel like ME wrote it (vs. any cleaning company)?',
       '  ✓ If the message references any specific date, is that date today or in the future (NEVER in the past)?',
       '  ✓ If the message references "the estimate I sent" or "your quote" or any specific dollar amount — is that supported by the CONTEXT block or the SMS history? If not, REWRITE without that claim.',
+      '  ✓ Does the message mention any street number, street name, apartment number, or zip code? If yes, REWRITE — only use the city/town if location matters.',
       '',
       history && history.trim() ? '\n=== CONVERSATION HISTORY (most recent first) ===\n' + history + '\n=== END HISTORY ===\n' : '',
       'OUTPUT FORMAT (STRICT):',

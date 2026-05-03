@@ -1803,6 +1803,12 @@ Mahalo 🌺</textarea>
               <input type="number" id="na-cleaner-pay-override-val" placeholder="Custom pay $" min="0" step="0.01" style="width:130px;display:none;" oninput="calcPrice()">
             </div>
             <div style="margin-top:6px;display:flex;align-items:center;gap:10px;">
+              <label for="na-tip" style="font-size:13px;color:var(--text-muted);font-weight:normal;display:flex;align-items:center;gap:6px;cursor:pointer;">
+                💵 Tip (optional)
+              </label>
+              <input type="number" id="na-tip" placeholder="$0.00" min="0" step="0.01" style="width:120px;" oninput="calcPrice()">
+            </div>
+            <div style="margin-top:6px;display:flex;align-items:center;gap:10px;">
               <label style="font-size:13px;color:var(--text-muted);font-weight:normal;display:flex;align-items:center;gap:6px;cursor:pointer;">
                 <input type="checkbox" id="na-hours-override-chk" onchange="calcPrice()"> Override estimated hours
               </label>
@@ -1983,6 +1989,12 @@ Mahalo 🌺</textarea>
               <input type="checkbox" id="edit-cleaner-pay-override-chk" onchange="calcEditPrice()"> Override cleaner pay
             </label>
             <input type="number" id="edit-cleaner-pay-override-val" placeholder="Custom pay $" min="0" step="0.01" style="width:130px;display:none;" oninput="calcEditPrice()">
+          </div>
+          <div style="margin-top:6px;display:flex;align-items:center;gap:10px;">
+            <label for="edit-tip" style="font-size:13px;color:var(--text-muted);font-weight:normal;display:flex;align-items:center;gap:6px;cursor:pointer;">
+              💵 Tip (optional)
+            </label>
+            <input type="number" id="edit-tip" placeholder="$0.00" min="0" step="0.01" style="width:120px;" oninput="calcEditPrice()">
           </div>
           <div style="margin-top:6px;display:flex;align-items:center;gap:10px;">
             <label style="font-size:13px;color:var(--text-muted);font-weight:normal;display:flex;align-items:center;gap:6px;cursor:pointer;">
@@ -4063,6 +4075,9 @@ function _openApptInner(a,dateKey){
   var editOverrideVal=document.getElementById('edit-price-override-val');
   if(editOverrideChk) editOverrideChk.checked=false;
   if(editOverrideVal) editOverrideVal.style.display='none';
+  // Pre-fill tip from saved tip_amount; empty field if no tip
+  var editTipEl=document.getElementById('edit-tip');
+  if(editTipEl){ editTipEl.value=(parseFloat(a.tipAmount)||0)>0?(parseFloat(a.tipAmount).toFixed(2)):''; }
   hideApptEdit();
   currentClientName=a.n;
   currentAppt=a;
@@ -4405,6 +4420,9 @@ async function saveApptEdit(mode){
   else{if(statusVal==='unassigned')statusVal='assigned';}
   var editAddr=(document.getElementById('edit-address')||{}).value||a.address||'';
   var editNotes=(document.getElementById('edit-notes')||{}).value||a.notes||'';
+  // Tip — always per-instance. Even if user is in 'all' (series) mode, the tip
+  // applies only to this one occurrence (matches how status is handled).
+  var editTip=Math.max(0,parseFloat((document.getElementById('edit-tip')||{}).value)||0);
   // Use hours override value if checked, else use calcEditPrice result.
   // editDuration starts as LABOR hours (what the user typed, or auto-calc).
   // If pairing, we'll divide it down to wall-clock below.
@@ -4816,6 +4834,17 @@ async function saveApptEdit(mode){
           });
         }
 
+        // Tip is per-instance, not per-series — mirror status's pattern. Only
+        // write when the value actually changed so we don't churn the row for
+        // no-op edits.
+        if(a.dbId && editTip !== (parseFloat(a.tipAmount)||0)){
+          db.from('appointments').update({tip_amount: editTip}).eq('id', a.dbId).then(function(tpRes){
+            if(tpRes.error) console.warn('[saveApptEdit] current-row tip update error:', tpRes.error);
+            else console.log('[saveApptEdit] current-row tip updated to $'+editTip.toFixed(2));
+          });
+          a.tipAmount = editTip;
+        }
+
         // ── Day-of-week shift: shift future occurrences by dayShift days ──
         // Done after the field-update ack so all rows have correct field values
         // before we re-bucket apptData by the new dates.
@@ -4881,7 +4910,8 @@ async function saveApptEdit(mode){
         cleanerName:cleanerVal, status:statusVal,
         basePrice:editBase, tax:editTax, totalPrice:editTotal,
         cleanerPay:editCleanerPay, cleanerPayOverride:editCleanerPayOverride,
-        notes:editNotes, duration:editDuration
+        notes:editNotes, duration:editDuration,
+        tipAmount:editTip
       }).then(function(sbUpdate){
         if(!sbUpdate.error && mode==='single'&&a.recurring&&a.dbId){
           // Break the series link for this specific occurrence in DB
@@ -4889,6 +4919,7 @@ async function saveApptEdit(mode){
             console.log('[saveApptEdit] series link broken for dbId='+a.dbId+', error:',r.error||'none');
           });
         }
+        if(!sbUpdate.error) a.tipAmount = editTip;
         console.log('[saveApptEdit] Supabase single sync complete, error:',sbUpdate.error||'none');
       });
     }
@@ -6270,6 +6301,27 @@ function _updateBookingFormVisibility(svcType){
   }
 }
 
+// Tip post-pass for the booking-form price preview. Each path inside calcPrice
+// renders the pre-tip total to #price-val + breakdown to #price-breakdown.
+// This helper reads what was just rendered, adds the tip from #na-tip, and
+// re-writes both elements. Calling it from every exit point in calcPrice
+// avoids duplicating tip math across the property-flat / client-flat /
+// standard branches. No-op when the tip field is empty or zero.
+function _applyNaTipToDisplay(){
+  var tipEl=document.getElementById('na-tip');
+  var tip=Math.max(0,parseFloat((tipEl||{}).value)||0);
+  if(tip<=0) return;
+  var pvEl=document.getElementById('price-val');
+  var pbEl=document.getElementById('price-breakdown');
+  if(pvEl){
+    var cur=parseFloat((pvEl.textContent||'').replace(/[^0-9.\-]/g,''))||0;
+    pvEl.textContent='$'+(Math.round((cur+tip)*100)/100).toFixed(2);
+  }
+  if(pbEl){
+    pbEl.textContent=(pbEl.textContent||'')+' + tip $'+tip.toFixed(2);
+  }
+}
+
 function calcPrice(){
   // Check for property/client flat rate overrides first
   var _propSelForFlat=document.getElementById('na-property-select');
@@ -6290,6 +6342,7 @@ function calcPrice(){
       _lastCalcHrs=_propFlat/65;
       document.getElementById('price-val').textContent='$'+_total2.toFixed(2);
       document.getElementById('price-breakdown').textContent='Property flat rate $'+_propFlat.toFixed(2)+(_fqDisc2>0?' − '+(_fqDisc2*100)+'% discount':'')+' + tax $'+_tax2.toFixed(2);
+      _applyNaTipToDisplay();
       return;
     }
   }
@@ -6312,6 +6365,7 @@ function calcPrice(){
     if(_permDisc>0) _bp+=' − '+(_permDisc*100)+'% client discount';
     _bp+=' + tax $'+_tax3.toFixed(2);
     document.getElementById('price-breakdown').textContent=_bp;
+    _applyNaTipToDisplay();
     return;
   }
 
@@ -6407,6 +6461,7 @@ function calcPrice(){
   var _cpEntry=_findClientByName((document.getElementById('na-name')||{}).value||'');
   var _cpData=_cpEntry?clientDB[_cpEntry.id]:null;
   showClientPricingRules(_cpData);
+  _applyNaTipToDisplay();
 }
 
 function showClientPricingRules(clientData){
@@ -6449,6 +6504,23 @@ function showClientPricingRules(clientData){
   } else {
     el.innerHTML='';
     el.style.display='none';
+  }
+}
+
+// Tip post-pass for the edit-form price preview. See _applyNaTipToDisplay
+// for rationale; this is the same pattern adapted to #edit-tip / #edit-price-val.
+function _applyEditTipToDisplay(){
+  var tipEl=document.getElementById('edit-tip');
+  var tip=Math.max(0,parseFloat((tipEl||{}).value)||0);
+  if(tip<=0) return;
+  var pvEl=document.getElementById('edit-price-val');
+  var pbEl=document.getElementById('edit-price-breakdown');
+  if(pvEl){
+    var cur=parseFloat((pvEl.textContent||'').replace(/[^0-9.\-]/g,''))||0;
+    pvEl.textContent='$'+(Math.round((cur+tip)*100)/100).toFixed(2);
+  }
+  if(pbEl){
+    pbEl.textContent=(pbEl.textContent||'')+' + tip $'+tip.toFixed(2);
   }
 }
 
@@ -6539,6 +6611,7 @@ function calcEditPrice(){
       else{ecpVal.textContent='$'+ecp.toFixed(2)+' ('+hrs+'h × $'+ecpRate+'/hr)';}
     } else {ecpLine.style.display='none';}
   }
+  _applyEditTipToDisplay();
 }
 
 var recurringAppts=[];
@@ -6582,6 +6655,9 @@ async function saveNewAppt(){
   var overrideValEl=document.getElementById('na-price-override-val');
   var apptPriceOverride=(overrideChk&&overrideChk.checked&&overrideValEl&&overrideValEl.value)?overrideValEl.value:'';
   var apptNotes=(document.getElementById('na-notes')||{}).value||'';
+  // Tip (optional, customer-arranged at booking time). Per-occurrence — for
+  // recurring bookings, applied only to the FIRST occurrence (sidx===0) below.
+  var apptTip=Math.max(0,parseFloat((document.getElementById('na-tip')||{}).value)||0);
   // Auto-create client if name not in clientDB (booked from calendar with new name)
   var _existingClient=_findClientByName(name);
   if(!_existingClient){
@@ -6675,7 +6751,10 @@ async function saveNewAppt(){
     cleaner_id_2: _cleanerNameToId(_naPair.name2),
     cleaner3: _naPair.name3 || null,
     cleanerPay3: _naPair3Pay,
-    cleaner_id_3: _cleanerNameToId(_naPair.name3)
+    cleaner_id_3: _cleanerNameToId(_naPair.name3),
+    // Tip set at booking time (per-occurrence). For recurring series, only
+    // the FIRST occurrence carries this tip; subsequent occurrences default to 0.
+    tipAmount: apptTip
   };
   console.log('[saveNewAppt] appointment object with duration='+apptDuration+':', apptObj);
   // ── STEP 1: Insert into apptData immediately so UI updates without waiting for Supabase ──
@@ -6762,7 +6841,8 @@ async function saveNewAppt(){
       cleanerName:cleanerName, basePrice:apptBase, tax:apptTax, totalPrice:total,
       cleanerPay:apptCleanerPay, notes:apptNotes, recurring:false, duration:apptDuration,
       cleanerName2:_naPair.name2, cleanerPay2:_naPair2Pay,
-      cleanerName3:_naPair.name3, cleanerPay3:_naPair3Pay
+      cleanerName3:_naPair.name3, cleanerPay3:_naPair3Pay,
+      tipAmount:apptTip
     }).then(function(sbRes){
       if(!sbRes.error&&sbRes.data&&sbRes.data[0]){
         apptObj.dbId=sbRes.data[0].id;
@@ -6808,6 +6888,10 @@ async function saveNewAppt(){
         cleaner_pay:apptCleanerPay,
         notes:apptNotes||null, recurring:true,
         duration_hours:apptDuration||null,
+        // Tip (booking-form input) only applies to the FIRST occurrence of the
+        // recurring series. Subsequent occurrences start with 0 — the customer
+        // can add a tip per-instance via the appointment overlay's tip controls.
+        tip_amount: sidx===0 ? apptTip : 0,
         series_id:apptSeriesId,
         series_index:sidx
       };
@@ -7001,6 +7085,8 @@ function resetNewApptForm(){
   _set('na-cleaner-pay-override-val', '');
   _check('na-hours-override-chk', false);
   _set('na-hours-override-val', '');
+  // Tip field
+  _set('na-tip', '');
   // Hide override numeric inputs (their visibility is toggled by the chk)
   var po = document.getElementById('na-price-override-val'); if(po) po.style.display = 'none';
   var co = document.getElementById('na-cleaner-pay-override-val'); if(co) co.style.display = 'none';

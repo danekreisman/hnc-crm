@@ -76,9 +76,24 @@ export default async function handler(req, res) {
       }
     }
 
-    // Scan SMS history for quoted dollar amounts. Catches both formats:
-    //   "$385" / "$385.00" / "$ 385" / "385 dollars"
-    // Filter for amounts that look like cleaning quotes (>= $50, <= $5000)
+    // ── Derive all the flags + signals used by the prompt ────────────────
+    // Order matters here — earlier consts feed later ones.
+
+    const firstName = (lead.name || lead.contact_name || '').split(' ')[0] || 'there';
+    const stage = lead.stage || 'New inquiry';
+    const service = lead.service || 'a cleaning';
+    const quote = lead.quote_total ? `$${Number(lead.quote_total).toFixed(2)}` : null;
+    const daysSinceQuote = lead.quote_sent_at
+      ? Math.floor((Date.now() - new Date(lead.quote_sent_at).getTime()) / (1000 * 60 * 60 * 24))
+      : null;
+    const hasReplied = !!lead.last_responded_at;
+    // Do we have ANY structured evidence in our records that a quote was sent?
+    // Sheet-imported leads with phone-quoted prices have this = false even
+    // though prices may still appear in SMS history (handled below).
+    const hasStructuredQuote = !!(lead.quote_total || lead.quote_sent_at);
+
+    // Scan SMS history for quoted dollar amounts. Catches "$385", "$385.00",
+    // "$ 385". Filter for amounts that look like cleaning quotes ($50-$5000)
     // so we don't pick up phone numbers, zip codes, or stray small numbers.
     const _priceRegex = /\$\s?(\d{2,4}(?:\.\d{1,2})?)\b/g;
     const pricesInHistory = [];
@@ -91,24 +106,8 @@ export default async function handler(req, res) {
         }
       }
     }
+    // Combined evidence flag — true if ANY price source exists.
     const hasPriceEvidence = hasStructuredQuote || pricesInHistory.length > 0;
-
-    // Build the prompt
-    const firstName = (lead.name || lead.contact_name || '').split(' ')[0] || 'there';
-    const stage = lead.stage || 'New inquiry';
-    const service = lead.service || 'a cleaning';
-    const quote = lead.quote_total ? `$${Number(lead.quote_total).toFixed(2)}` : null;
-    const daysSinceQuote = lead.quote_sent_at
-      ? Math.floor((Date.now() - new Date(lead.quote_sent_at).getTime()) / (1000 * 60 * 60 * 24))
-      : null;
-    const hasReplied = !!lead.last_responded_at;
-    // Do we have ANY evidence in our records that a quote/estimate was sent?
-    // The AI should NOT claim 'the estimate I sent' without evidence — happens
-    // a lot for sheet-imported leads where the quote was given verbally over
-    // the phone with no SMS trail. The AI may still find a price in the SMS
-    // history (also visible in the prompt below), in which case it's free to
-    // reference it. This flag only controls the structured CONTEXT signal.
-    const hasStructuredQuote = !!(lead.quote_total || lead.quote_sent_at);
 
     // Extract just the city/town from a full street address. The AI shouldn't
     // mention "100 Malia Uli Pl" — that's creepy. But "your house in Kula" is

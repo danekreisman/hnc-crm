@@ -1867,6 +1867,11 @@ Mahalo 🌺</textarea>
         </div>
         <div class="panel-section">Actions</div>
         <div class="action-grid">
+          <!-- Assign cleaner: hidden by default, revealed by _openApptInner when
+               status='unassigned'. Quick path to assign without going through
+               the full Edit form — common for the user who has many unassigned
+               recurring rows that need a cleaner picked. -->
+          <button class="action-btn blue full" id="appt-assign-btn" style="display:none;background:#3BB8E3;color:#fff;border-color:#2DA1CC;" onclick="openApptAssign()">Assign cleaner</button>
           <button class="action-btn green" id="appt-invoice-btn" onclick="openApptInvoice()">Invoice client</button>
           <button class="action-btn green" id="appt-charge-btn" onclick="openApptCharge()">Charge card on file</button>
           <button class="action-btn blue full" onclick="openApptDuplicate()">Duplicate to another date</button>
@@ -4028,6 +4033,15 @@ function _openApptInner(a,dateKey){
   openOverlay('appt-overlay');
   // Disable Charge button if client has no card on file
   try { updateApptChargeButtonState(); } catch(e){}
+  // Show the quick "Assign cleaner" button only when this appointment has no
+  // cleaner yet. The full Edit form remains available for other tweaks; this
+  // button is the one-tap path for the most common follow-up action on a
+  // red appointment.
+  var _assignBtn = document.getElementById('appt-assign-btn');
+  if(_assignBtn){
+    var _isUnassigned = !a.cleaner_id && (!a.cleaner || a.cleaner === 'Unassigned');
+    _assignBtn.style.display = _isUnassigned ? '' : 'none';
+  }
 }
 
 function updateApptChargeButtonState(){
@@ -11641,6 +11655,98 @@ function openApptEditProperty(){
    appointment except the date, forces frequency to One-time so we
    don't accidentally duplicate a recurring series, and writes a fresh
    row to the appointments table. The original appointment is untouched. */
+/* ── ASSIGN CLEANER (quick path from appt overlay) ──────────────────────
+   When the user clicks an unassigned appointment they get an "Assign
+   cleaner" button at the top of the actions list. This opens a small
+   overlay with a cleaner dropdown — pick one, hit Assign, done.
+
+   Updates BOTH cleaner_id AND status='assigned' in a single DB write
+   (we learned the hard way that updating one without the other leaves
+   the row red on the calendar — see the May 12 diagnostic). Also writes
+   cleaner_pay if missing, computed from current duration + cleaner rate
+   so payroll has a value to work with. */
+
+function openApptAssign(){
+  if(!currentAppt){ if(typeof showToast==='function') showToast('No appointment selected', true); return; }
+  // Populate info block: who, when, what
+  var info = document.getElementById('appt-assign-info');
+  if(info){
+    info.innerHTML =
+      '<div class="info-row"><span class="info-label">Client</span><span class="info-val">'+(currentAppt.n||'\u2014')+'</span></div>'+
+      '<div class="info-row"><span class="info-label">Date</span><span class="info-val">'+(currentApptKey||'\u2014')+'</span></div>'+
+      '<div class="info-row"><span class="info-label">Time</span><span class="info-val">'+(currentAppt.t||'\u2014')+'</span></div>'+
+      '<div class="info-row"><span class="info-label">Service</span><span class="info-val">'+(currentAppt.service||'\u2014')+'</span></div>';
+  }
+  // Build cleaner dropdown from active cleaners only — re-uses the existing
+  // populateCleanerDropdown which filters by status='Active'.
+  populateCleanerDropdown('appt-assign-cleaner', '');
+  // Replace the "Leave unassigned" first option with a placeholder
+  var sel = document.getElementById('appt-assign-cleaner');
+  if(sel && sel.options.length && sel.options[0].value === 'unassigned'){
+    sel.options[0].textContent = 'Select cleaner...';
+    sel.options[0].value = '';
+  }
+  openOverlay('appt-assign-overlay');
+}
+
+async function confirmApptAssign(){
+  if(!currentAppt){ return; }
+  var sel = document.getElementById('appt-assign-cleaner');
+  var cleanerName = sel ? sel.value : '';
+  if(!cleanerName || cleanerName === ''){
+    var sb = document.getElementById('appt-assign-success');
+    if(sb){ sb.textContent = 'Pick a cleaner first.'; sb.classList.add('show'); setTimeout(function(){ sb.classList.remove('show'); }, 2500); }
+    return;
+  }
+  // Resolve cleaner_id from cleanerDB
+  var cleanerId = _cleanerNameToId(cleanerName);
+  if(!cleanerId){
+    if(typeof showToast === 'function') showToast('Could not resolve cleaner. Try refreshing.', true);
+    return;
+  }
+  // Compute cleaner_pay if not already set (uses calcCleanerPay if available)
+  var pay = parseFloat(currentAppt.cleanerPay) || 0;
+  if(!pay && typeof calcCleanerPay === 'function' && currentAppt.duration){
+    try { pay = calcCleanerPay(currentAppt.duration, cleanerName, currentAppt.service || 'Regular Cleaning') || 0; }
+    catch(e){ console.warn('[assign] calcCleanerPay error:', e); }
+  }
+  // Update DB — both cleaner_id and status (and pay if newly computed)
+  var update = { cleaner_id: cleanerId, status: 'assigned' };
+  if(pay && !currentAppt.cleanerPay) update.cleaner_pay = pay;
+  try {
+    var res = await db.from('appointments').update(update).eq('id', currentAppt.dbId);
+    if(res.error){
+      console.error('[assign] DB error:', res.error);
+      if(typeof showToast === 'function') showToast('Assign failed: '+(res.error.message||'database error'), true);
+      return;
+    }
+  } catch(err){
+    console.error('[assign] error:', err);
+    if(typeof showToast === 'function') showToast('Assign failed: '+(err.message||'error'), true);
+    return;
+  }
+  // Update in-memory
+  currentAppt.cleaner = cleanerName;
+  currentAppt.cleaner_id = cleanerId;
+  currentAppt.s = 'assigned';
+  if(update.cleaner_pay) currentAppt.cleanerPay = update.cleaner_pay;
+  // Mirror into apptData so calendar re-renders without a full DB refresh
+  if(currentApptKey && apptData[currentApptKey]){
+    var idx = apptData[currentApptKey].findIndex(function(x){ return x.dbId === currentAppt.dbId; });
+    if(idx >= 0){
+      apptData[currentApptKey][idx] = Object.assign({}, apptData[currentApptKey][idx], {
+        cleaner: cleanerName, cleaner_id: cleanerId, s: 'assigned',
+        cleanerPay: update.cleaner_pay || apptData[currentApptKey][idx].cleanerPay
+      });
+    }
+  }
+  if(typeof renderCal === 'function') renderCal();
+  closeOverlay('appt-assign-overlay');
+  closeOverlay('appt-overlay');
+  if(typeof showToast === 'function') showToast(cleanerName + ' assigned \u2713');
+  if(typeof logActivity === 'function') logActivity('appointment_assigned', cleanerName + ' assigned to ' + (currentAppt.n||'appt'), {apptId: currentAppt.dbId, cleanerId: cleanerId});
+}
+
 function openApptDuplicate(){
   if(!currentAppt){
     showToast && showToast('No appointment selected', true);
@@ -15553,6 +15659,24 @@ Your total will update automatically when you select a payment method.</textarea
         <button class="action-btn blue full" id="appt-dup-confirm-btn" onclick="confirmApptDuplicate()">Duplicate</button>
       </div>
       <div class="success-bar" id="appt-dup-success" style="margin-top:10px;"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ASSIGN CLEANER OVERLAY — quick assign without opening full Edit form -->
+<div class="overlay hidden" id="appt-assign-overlay" onclick="closeOverlay('appt-assign-overlay')">
+  <div class="panel" onclick="event.stopPropagation()">
+    <div class="panel-header"><div class="panel-title">Assign cleaner</div><button class="close-btn" onclick="closeOverlay('appt-assign-overlay')">&#x2715;</button></div>
+    <div class="panel-body">
+      <div class="info-block" id="appt-assign-info" style="margin-bottom:14px;"></div>
+      <div class="form-row"><label>Cleaner</label>
+        <select id="appt-assign-cleaner" style="width:100%;"><option value="">Select cleaner...</option></select>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:14px;">
+        <button class="action-btn full" onclick="closeOverlay('appt-assign-overlay')" style="background:#EEF2F4;color:#5B7683;border-color:#CFE3EA;">Cancel</button>
+        <button class="action-btn blue full" id="appt-assign-confirm-btn" onclick="confirmApptAssign()">Assign</button>
+      </div>
+      <div class="success-bar" id="appt-assign-success" style="margin-top:10px;"></div>
     </div>
   </div>
 </div>

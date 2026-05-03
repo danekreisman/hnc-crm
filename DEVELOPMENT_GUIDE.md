@@ -978,6 +978,103 @@ A first slice of the cleaner-tipping feature: **manual tip entry on the appointm
 
 ---
 
-*Last updated: May 3, 2026 — Tipping feature phase 1 shipped (commit 481799a): tip_amount column on appointments, manual entry on appointment overlay via prompt(), automatic payroll integration (Tips column between Gross and Bonus, even-split across paired cleaners). Migration must be run in Supabase. Phase 2 (client-driven Stripe-hosted tip page + webhook) deferred — needs token-based auth, can't reuse admin-gated /api/stripe-invoice. Previous session notes preserved below.*
+## 2026-05-03 Session — Tipping feature, phase 2 (commit fcda836)
+
+### What shipped
+
+Client-driven Stripe Checkout tipping flow. Customer taps a signed link → Stripe-hosted page → enters amount → pays → webhook records the tip on the appointment → tip flows into payroll automatically (phase 1 already wired this).
+
+### Files
+
+| Path | Purpose |
+|---|---|
+| `api/utils/tip-token.js` | HMAC-SHA256 token helpers. No default secret — refuses to operate without `TIP_TOKEN_SECRET`. Constant-time comparison. Default 30-day TTL. |
+| `api/get-tip-context.js` | Public, token-gated. Returns `{clientFirstName, cleanerNames, date, service, alreadyTipped, currentTipAmount}` for tip.html to render. |
+| `api/create-tip-checkout.js` | Public, token-gated. Creates a Stripe Checkout Session. Three gates stack: kill switch → test mode → token verify. Idempotent on `(token, amount, day)`. |
+| `api/generate-tip-link.js` | Admin-only (`requireAdmin`). Mints signed URLs. |
+| `api/stripe-webhook.js` | Now handles `checkout.session.completed` with `metadata.purpose='tip'` — increments `tip_amount` on the appointment, writes audit to `error_logs` with `source='stripe-tip-success'`, logs `tip_paid` activity. |
+| `tip.html` | Mobile-first hosted tip page. Preset $10/$15/$20/$25 + custom. Shows already-tipped warning. Success/cancelled views from Stripe redirect. |
+| `index.html` | "Send link" button next to "Add tip" on appointment overlay. Admin-only via `.admin-only-tip` CSS class. Copies URL to clipboard (falls back to `prompt()` if clipboard API blocked). |
+
+### Required env vars in Vercel
+
+Phase 2 will not function until these are set in Vercel Production env:
+
+- **`TIP_TOKEN_SECRET`** — 32+ char random hex. Generate with `openssl rand -hex 32`. No default; the helpers throw `tip_token_secret_missing` if missing. Add it BEFORE relying on phase 2.
+- **`ALLOW_STRIPE_CHARGES=true`** — already required for `stripe-invoice`. Tipping respects the same kill switch.
+- **`TIP_TEST_MODE`** — defaults to `'on'` (any value other than `'false'`). When on, `create-tip-checkout` refuses to create a Checkout Session unless the appointment's client email matches `TIP_TEST_EMAIL`. **Currently restricting tipping to Dane only for initial testing.**
+- **`TIP_TEST_EMAIL`** — defaults to `dane.kreisman@gmail.com`. Override here if Dane wants to add other test emails.
+- **`BASE_URL`** — used for Stripe success/cancel URLs and the URL returned by generate-tip-link. Defaults to `https://hnc-crm.vercel.app` if unset.
+
+After adding env vars, Vercel does NOT redeploy automatically — push an empty commit to force a fresh build:
+```
+git commit --allow-empty -m "Force redeploy" && git push origin main
+```
+
+### Required Stripe Dashboard config
+
+The existing Stripe webhook (`/api/stripe-webhook`) must be subscribed to **`checkout.session.completed`** events in addition to whatever it currently receives. In Stripe Dashboard → Developers → Webhooks → click the existing endpoint → "Select events" → add `checkout.session.completed`. Without this, payments will go through (customer's card gets charged) but `tip_amount` will never update on the appointment.
+
+### Test mode boundary — what's protected
+
+The `TIP_TEST_MODE` gate is enforced **server-side in `create-tip-checkout.js`** after looking up the appointment's client email. This means:
+- A customer could click another customer's tip link, but the create-checkout endpoint will return 403 unless that other customer's email matches `TIP_TEST_EMAIL`.
+- The test-mode block is invisible to anyone but Dane (admins still generate links freely; only the actual Stripe charge step refuses).
+- To open tipping up to all clients: set `TIP_TEST_MODE=false` in Vercel and push an empty commit to redeploy.
+
+### Token security model
+
+- Format: `<appt_uuid>.<exp_unix>.<32_hex_chars_hmac>`. Total ~80 chars, SMS-friendly.
+- HMAC-SHA256 keyed by `TIP_TOKEN_SECRET`. First 16 bytes (32 hex chars) of the digest. Computationally infeasible to forge.
+- Token authorizes "this appointment can receive a tip until `exp_unix`" — does NOT bind amount. Customer can pick any amount on the page; the server sanity-checks it's in `[$1, $500]`.
+- Constant-time signature comparison to defend against timing attacks.
+- Default expiry: 30 days. Override via the second arg to `generateTipToken()`.
+
+### Webhook idempotency for tips
+
+Two layers protect against double-counting tips:
+1. **Existing `isWebhookProcessed()` gate at the top of `stripe-webhook.js`** — prevents reprocessing the same Stripe event ID on retries (Stripe re-delivers events on 5xx responses).
+2. **Cumulative addition** — the handler reads current `tip_amount`, adds the new tip, writes the sum back. Two-step is acceptable because layer 1 prevents double-runs. If layer 1 ever fails, the audit log in `error_logs` (`source='stripe-tip-success'` rows) will surface the duplicate via the `checkout_session_id` field for manual reconciliation.
+
+### Forensic queries
+
+```sql
+-- All recent tip events
+SELECT occurred_at, context->>'amount' AS amount,
+       context->>'appointment_id' AS appt,
+       context->>'cleaner_name' AS cleaner,
+       context->>'customer_email' AS email
+FROM error_logs WHERE source = 'stripe-tip-success'
+ORDER BY occurred_at DESC LIMIT 50;
+
+-- Tips by cleaner over a window
+SELECT context->>'cleaner_name' AS cleaner,
+       SUM((context->>'amount')::numeric) AS total_tips
+FROM error_logs WHERE source = 'stripe-tip-success'
+  AND occurred_at >= now() - interval '30 days'
+GROUP BY 1 ORDER BY 2 DESC;
+```
+
+### Test plan (after env vars + Stripe webhook event are configured)
+
+1. Visit any appointment in the CRM where you (`dane.kreisman@gmail.com`) are the client.
+2. Click the green "Send link" button on the Tip row → URL copies to clipboard. Toast confirms.
+3. Open the URL in a fresh browser/incognito tab. Tip page loads showing cleaner name + service date.
+4. Tap any preset (e.g. $10) → "Tip $10.00" button enables → tap → redirected to Stripe Checkout.
+5. Pay with a real card (live mode). $1 minimum. After payment, Stripe redirects back to `tip.html?status=success` showing the mahalo screen.
+6. Open the appointment in the CRM → Tip row now shows the amount. Open Payroll → cleaner's row has the tip in the new Tips column.
+7. Try the same link from another browser logged in as a non-Dane client (or just test by changing the appointment via SQL temporarily). The `create-tip-checkout` endpoint should return 403 `test_mode_active`.
+
+### Phase 2 boundaries (intentionally not built)
+
+- **No automated post-completion SMS yet.** When you mark a job completed, the system does NOT auto-text the client a tip link. Admin sends manually via copy-paste for now. When ready: layer this on as a new automation in `run-job-completions.js` modeled after the policy-first-booking-sms pattern.
+- **No tip-amount distribution UI for paired jobs.** Tip is split evenly across assigned cleaners at payroll-aggregation time. Per-cleaner tip allocation (e.g., "$30 to Maria, $0 to her partner") is deferred until there's a real workflow demand.
+- **No customer "save card on file for next tip" flow.** Each tip is a one-shot Checkout Session.
+
+---
+
+*Last updated: May 3, 2026 — Tipping feature phase 2 shipped (commit fcda836): client-driven Stripe Checkout flow with HMAC token auth, three-layer security (kill switch + Dane-only test mode + token verify), webhook handler updates tip_amount on payment, audit trail in error_logs. Required env vars: TIP_TOKEN_SECRET, ALLOW_STRIPE_CHARGES, optionally TIP_TEST_MODE/TIP_TEST_EMAIL/BASE_URL. Stripe Dashboard must be subscribed to checkout.session.completed. Currently in test mode — only dane.kreisman@gmail.com can complete a tip charge until TIP_TEST_MODE=false.*
+
+*Phase 1 (commit 481799a, same day): tip_amount column on appointments + manual entry on appt overlay + automatic payroll integration (Tips column between Gross and Bonus, even-split across paired cleaners). Migration must be run in Supabase.*
 
 *Previous: May 2, 2026 — Two long sessions, ~30 commits. Major: AI follow-up button shipped (manual lead nurture, generates personalized SMS/email per lead, two-step preview-before-send), then evolved across the day with brand voice tuning (Aloha opener, "— Dane from Hawaii Natural Clean" sign-off, banned-phrase list, brand voice paragraph). Bulk multi-select on pipeline added so 46+ leads can be handled in minutes via parallel generate + preview gallery + send. Per-lead Comms log panel with full DB-backed timeline (lead_comms_log table). Per-lead `do_not_contact` toggle (cron-only, doesn't gate manual sends). All 5 user-defined automations disabled — system is in fully manual mode for lead outreach. 64 leads bulk-imported from March/April spreadsheet. AI prompt tuned through 6 iterations to fix: CRM-bot tone (Aloha rewrite), missing prices (SMS history detection + server-side regex scan), JSON-with-postamble parser failure (brace-depth tracker), past dates (today-date injection + ban), fabricated estimates (hasStructuredQuote evidence flag), creepy street addresses (city-only extraction). Backend bugs fixed: VERCEL_URL → BASE_URL routing (Vercel deployment-protection HTML response), Supabase silent UPDATE failures (.update doesn't throw, must check res.error), temporal dead zone in derived flag ordering. Scheduling: day-of-week shift for recurring series (Bobby Nikkhoo Friday→Thursday), duplicate-delete bug (Susanna DeSantos), halt-series cross-contamination, Google Places stuck dropdown. UX wins: parallelized startup (4 DB fetches simultaneous, pipeline renders 1-2s sooner), calendar defaults to current month + Today button, new-appt form starts blank, task undo + reopen + daily 8am Hawaii deadline SMS digest, SMS counter wording clarified. Lead form launch checklist documented at top of Pending. **Patterns codified**: Supabase ops must check `res.error`; never use VERCEL_URL for inter-function calls; use brace-depth parser for LLM JSON; destructive ops on appointments end with `_refreshAppointmentsFromDB` for DB-source-of-truth.*

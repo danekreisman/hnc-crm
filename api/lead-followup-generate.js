@@ -93,10 +93,10 @@ export default async function handler(req, res) {
           'For SMS:',
           '- OPEN with "Aloha [firstName]," — this is the brand voice, not optional. Never "Hey", "Hi", "Hello".',
           '- 1-3 short sentences. Sound like a local Hawaii business owner texting a neighbor, not a sales CRM.',
-          '- Sign off "— Dane, Hawaii Natural Clean" or "— Dane 🌺" (pick whichever fits the message length).',
+          '- Sign off "— Dane from Hawaii Natural Clean". Always the full sign-off — do NOT shorten to just "— Dane".',
           '- A 🌺 somewhere is welcome but not required. Do NOT stuff multiple emojis.',
           '- Tone reference (do NOT copy literally — match the warmth, not the words):',
-          '   "Aloha Sharon! Hope your move is going smooth. Whenever you\'re ready to lock in that move-out clean, just shoot me a text. — Dane 🌺"',
+          '   "Aloha Sharon! Hope your move is going smooth. Whenever you\'re ready to lock in that move-out clean, just shoot me a text. — Dane from Hawaii Natural Clean"',
         ].join('\n')
       );
     }
@@ -107,7 +107,7 @@ export default async function handler(req, res) {
           '- OPEN with "Aloha [firstName]," — never "Dear", never "Hi there", never "Hope this email finds you well".',
           '- 3-5 short paragraphs. Warmer and slightly more thorough than SMS, but still feels like the owner personally wrote it — NOT marketing copy.',
           '- Subject line: short, specific to them. Avoid generic "Following up" / "Checking in" / "Just touching base".',
-          '- Sign off with two lines: "— Dane" then "Hawaii Natural Clean".',
+          '- Sign off with "— Dane from Hawaii Natural Clean" on its own line at the end.',
         ].join('\n')
       );
     }

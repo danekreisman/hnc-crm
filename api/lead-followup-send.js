@@ -204,17 +204,21 @@ export default async function handler(req, res) {
       const stamp = new Date().toLocaleString('en-US', { timeZone: 'Pacific/Honolulu', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
       const noteLine = `[${stamp}] AI follow-up sent (${channelLabel})`;
       const newNotes = lead.notes ? `${lead.notes}\n${noteLine}` : noteLine;
-      try {
-        await db.from('leads').update({
-          notes: newNotes,
-          last_followup_sent_at: new Date().toISOString(),
-        }).eq('id', leadId);
-      } catch (updErr) {
-        // Fallback if last_followup_sent_at column doesn't exist yet
-        try {
-          await db.from('leads').update({ notes: newNotes }).eq('id', leadId);
-        } catch (_) {}
-        console.warn('[lead-followup-send] update error (likely missing column):', updErr.message);
+
+      // PostgREST/Supabase returns {error} on schema/constraint failures —
+      // it does NOT throw. So we have to check res.error explicitly. Earlier
+      // versions of this code used try/catch and silently lost every notes
+      // update when last_followup_sent_at column was missing.
+      const fullPayload = { notes: newNotes, last_followup_sent_at: new Date().toISOString() };
+      const res1 = await db.from('leads').update(fullPayload).eq('id', leadId);
+      if (res1.error) {
+        // Most likely: last_followup_sent_at column doesn't exist. Retry
+        // with notes-only so at least the audit trail in notes works.
+        console.warn('[lead-followup-send] full update failed, retrying notes-only:', res1.error.message);
+        const res2 = await db.from('leads').update({ notes: newNotes }).eq('id', leadId);
+        if (res2.error) {
+          console.error('[lead-followup-send] notes-only update ALSO failed:', res2.error.message);
+        }
       }
     }
 

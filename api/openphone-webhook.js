@@ -12,7 +12,13 @@ export default async function handler(req, res) {
   }
 
   const SUPABASE_URL = 'https://hehfecnjmgsthxjxlvpz.supabase.co';
-  const SUPABASE_KEY = process.env.SUPABASE_ANON_KEY;
+  // Use the service role key — this is a server-side webhook with no user
+  // context. The anon key was getting blocked by RLS on the tasks table
+  // (and could hit similar issues on other tables in the future). Service
+  // role bypasses RLS, which is the correct security model for trusted
+  // server-side endpoints. Falls back to anon key if service role isn't
+  // set so an env-var typo doesn't take the webhook completely offline.
+  const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
 
   async function supabaseInsert(table, data) {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}`, {

@@ -3487,8 +3487,17 @@ function renderMonth(){
     dn.textContent=d;el.appendChild(dn);
     var k=curYear+'-'+curMonth+'-'+d;
     var da=apptData[k]||[];
+    // Sort chronologically (5am → 9am → 6pm) before rendering. apptData stores
+    // them in insertion order, which is effectively random — without this sort,
+    // a 6pm appointment can appear above a 5am one in the same day cell.
+    // .slice() so we don't mutate the source-of-truth apptData[k].
+    var daSorted = da.slice().sort(function(x, y){
+      var xMin = (parseApptHour(x.t) * 60) + parseApptMinute(x.t);
+      var yMin = (parseApptHour(y.t) * 60) + parseApptMinute(y.t);
+      return xMin - yMin;
+    });
     // Show all appointments - no limit
-    da.forEach(function(a){
+    daSorted.forEach(function(a){
       var btn=document.createElement('button');
       btn.className='appt '+(function(st){if(!st)return 'au';if(st==='cancelled')return 'ax';if(st==='scheduled')return 'aa';if(st==='unassigned')return 'au';if(st==='completed')return 'ac';if(st==='paid')return 'ap';return 'aa';})(a.s);
       btn.textContent=(a.recurring?'\u21bb ':'')+a.t+' '+a.n;

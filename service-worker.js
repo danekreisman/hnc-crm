@@ -13,7 +13,7 @@
  * manually here when we change the SW).
  */
 
-const SW_VERSION = '2026-05-03-v1';
+const SW_VERSION = '2026-05-03-v2';
 
 self.addEventListener('install', (event) => {
   // skipWaiting forces this worker to take over from any older active SW
@@ -82,18 +82,25 @@ self.addEventListener('notificationclick', (event) => {
   event.notification.close();
   const targetUrl = (event.notification.data && event.notification.data.url) || '/';
   event.waitUntil((async () => {
-    // If a CRM tab is already open, focus it and navigate. Otherwise open new.
+    // If a CRM tab is already open: focus it, then postMessage the URL
+    // so the page can handle the intent without a full reload. Reload
+    // would re-bootstrap the entire CRM (clientDB, calendar, listeners,
+    // sw register) which takes 8-10 seconds — exactly the lag the user
+    // saw when tapping a task notification. PostMessage path is sub-200ms
+    // because the existing tab just switches view and refetches tasks.
     const allClients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
     const existing = allClients.find((c) => c.url && c.url.includes(self.location.origin));
     if (existing) {
       try { await existing.focus(); } catch (e) {}
-      try { existing.navigate(targetUrl); } catch (e) {
-        // navigate() can fail if cross-origin or in some Safari versions —
-        // post a message and let the page handle the URL change.
-        existing.postMessage({ type: 'navigate', url: targetUrl });
+      try { existing.postMessage({ type: 'deep-link', url: targetUrl }); }
+      catch (e) {
+        // Fallback to navigate if postMessage fails for some reason
+        try { existing.navigate(targetUrl); } catch (e2) {}
       }
       return;
     }
+    // No existing tab — open a new window. This will go through the
+    // full bootstrap path, which is unavoidable for a cold start.
     await self.clients.openWindow(targetUrl);
   })());
 });

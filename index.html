@@ -7667,8 +7667,36 @@ setTimeout(function() {
 
   // Listen for messages from SW (e.g., navigate after notification click)
   navigator.serviceWorker.addEventListener('message', function(ev){
-    if (ev.data && ev.data.type === 'navigate' && ev.data.url) {
-      try { window.location.href = ev.data.url; } catch(e){}
+    if (ev.data && (ev.data.type === 'navigate' || ev.data.type === 'deep-link') && ev.data.url) {
+      // Try to handle the URL in-page first — switching view via sv() is
+      // sub-200ms vs. ~8-10s for a full window.location.href reload that
+      // re-bootstraps clientDB/calendar/listeners.
+      try {
+        var url = ev.data.url;
+        // Hash-based routes ('/#tasks', '/#leads', etc.) just switch view
+        var hashIdx = url.indexOf('#');
+        if (hashIdx >= 0) {
+          var route = url.slice(hashIdx + 1);
+          if (route && typeof sv === 'function') {
+            // Find the nav-item for this route and click it (sv expects
+            // the 2nd arg to be the clicked element)
+            var navItem = document.querySelector('.nav-item[onclick*="\'' + route + '\'"]');
+            if (navItem) {
+              sv(route, navItem);
+              // Force-refresh tasks if we just switched into the tasks view
+              if (route === 'tasks' && typeof loadTasks === 'function') {
+                loadTasks();
+              }
+              return;
+            }
+          }
+        }
+        // Fallback to full navigation if the URL isn't a hash route we
+        // can handle in-page (e.g., '/' or some other path).
+        window.location.href = url;
+      } catch(e){
+        try { window.location.href = ev.data.url; } catch(e2){}
+      }
     }
   });
 
@@ -16882,12 +16910,28 @@ async function loadTasks() {
   // Render cached state immediately while data loads
   renderTasks();
   try {
+    // SPEED: Drop the leads(name,phone) + clients(name,phone) joins from
+    // these queries. The PostgREST embedded resource feature triggers a
+    // separate JOIN per row that adds ~700-900ms even for small task
+    // counts (the row count is in single digits, but the planner still
+    // JOINs the entire leads + clients tables). We already have leadDB
+    // and clientDB loaded in memory — enrich the lead/client names
+    // client-side after the fetch completes.
     var [openRes, doneRes] = await Promise.all([
-      db.from('tasks').select('*, leads(name,phone), clients(name,phone)').eq('status','open').order('due_date', {ascending:true, nullsFirst:false}),
-      db.from('tasks').select('*, leads(name,phone), clients(name,phone)').eq('status','completed').order('completed_at', {ascending:false}).limit(20),
+      db.from('tasks').select('*').eq('status','open').order('due_date', {ascending:true, nullsFirst:false}),
+      db.from('tasks').select('*').eq('status','completed').order('completed_at', {ascending:false}).limit(20),
     ]);
-    _tasks.open = openRes.data  || [];
-    _tasks.done = doneRes.data  || [];
+    var enrich = function(t){
+      if(t.related_lead_id && typeof leadDB !== 'undefined' && leadDB[t.related_lead_id]){
+        t.leads = { name: leadDB[t.related_lead_id].name, phone: leadDB[t.related_lead_id].phone };
+      }
+      if(t.related_client_id && typeof clientDB !== 'undefined' && clientDB[t.related_client_id]){
+        t.clients = { name: clientDB[t.related_client_id].name, phone: clientDB[t.related_client_id].phone };
+      }
+      return t;
+    };
+    _tasks.open = (openRes.data || []).map(enrich);
+    _tasks.done = (doneRes.data || []).map(enrich);
     renderTasks();
   } catch(e) {
     console.error('loadTasks error', e);

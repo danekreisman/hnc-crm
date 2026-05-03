@@ -10002,7 +10002,12 @@ async function autoRunAction(act, ctx, rule){
     } else if(act.type==='assign'){
       var cid = autoTemplate(act.cleaner_id, ctx);
       if(ctx.appointment_id && typeof supabase !== 'undefined' && supabase){
-        try{ await supabase.from('appointments').update({cleaner_id:cid}).eq('id',ctx.appointment_id); }catch(e){}
+        // Update both cleaner_id AND status in one write — without the
+        // status update, the calendar rendered the appointment red even
+        // though a cleaner was assigned. Same drift bit users on May 12
+        // when cleaner_id was set externally but status stayed
+        // 'unassigned' from the row's original creation.
+        try{ await supabase.from('appointments').update({cleaner_id:cid, status:'assigned'}).eq('id',ctx.appointment_id); }catch(e){}
       }
       autoLogRun(rule, ctx, 'assign:'+cid);
     } else if(act.type==='task'){

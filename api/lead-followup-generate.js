@@ -121,8 +121,18 @@ export default async function handler(req, res) {
       return 'Generic follow-up. Be friendly and specific.';
     })();
 
+    // Today's date in Hawaii time, formatted readably for the AI. Without this
+    // the model can hallucinate that a date mentioned in old SMS history is
+    // still upcoming when it has actually passed.
+    const todayHawaii = new Date().toLocaleDateString('en-US', {
+      timeZone: 'Pacific/Honolulu',
+      weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+    });
+
     const prompt = [
       'You are writing a personalized follow-up message from Dane, owner of Hawaii Natural Clean (a cleaning business in Hawaii) to a sales lead.',
+      '',
+      `TODAY'S DATE: ${todayHawaii} (Hawaii time)`,
       '',
       'CONTEXT:',
       `- Lead: ${lead.name || 'Unknown'}`,
@@ -148,12 +158,15 @@ export default async function handler(req, res) {
       '- Do NOT make up details that aren\'t in the data above. If you don\'t have a specific hook, keep it short and warm — better a 2-sentence message that feels real than a 5-sentence message stuffed with invented context.',
       '- PRICES: it is GOOD to reference a price when one is available. Look in two places: (1) the structured CONTEXT block at the top, and (2) the SMS conversation history (Dane often quotes via SMS). If you find a price in either, reference it naturally — e.g. "the $385 we talked about" or "the $179 estimate". Never invent a price that does not appear anywhere in the data — if no price is mentioned in CONTEXT or the conversation history, skip it entirely and say something like "the estimate I sent" or "your quote" instead.',
       '- Do NOT mention "the quote" or "your quote" robotically. If you reference price, do it like a person would: "the $179 we talked about" or "the move-out estimate".',
+      '- DATES — CRITICAL: Today\'s date is at the top of this prompt. NEVER suggest, confirm, or invite the lead to book on a date that has already passed. If the SMS history contains a proposed date (e.g. "Are you available May 5th?") and that date is in the past, treat it as expired — DO NOT reference that specific date as bookable. You can say "the date we discussed didn\'t work out" or "wanted to try and reschedule" or just leave dates out entirely. Future dates and open-ended phrasing ("whenever works for you", "this week", "anytime soon") are fine.',
+      '- Do NOT invent any specific date the lead never proposed. "Are you free Tuesday?" is invented if Tuesday wasn\'t mentioned in the conversation history.',
       '',
       'CHECKLIST before you write the message:',
       '  ✓ Does it open with "Aloha"?',
       '  ✓ Does it AVOID every banned phrase?',
       '  ✓ Would it feel natural coming from a small business owner who knows the islands?',
       '  ✓ If you stripped the lead\'s name out, would it still feel like ME wrote it (vs. any cleaning company)?',
+      '  ✓ If the message references any specific date, is that date today or in the future (NEVER in the past)?',
       '',
       history && history.trim() ? '\n=== CONVERSATION HISTORY (most recent first) ===\n' + history + '\n=== END HISTORY ===\n' : '',
       'OUTPUT FORMAT (STRICT):',

@@ -1901,6 +1901,17 @@ Mahalo 🌺</textarea>
             <option value="Unassigned">Unassigned</option>
           </select>
         </div>
+        <!-- Legacy price hint on edit: same purpose as on new-appointment form,
+             but for the case where the user has already manually created
+             appointments and now wants to lock pricing in via the edit overlay.
+             Populated by populateEditLegacyPriceHint() when showApptEdit opens. -->
+        <div id="edit-legacy-hint" style="display:none;background:#FFF8E1;border:1px solid #F2D680;border-radius:10px;padding:10px 12px;margin-bottom:10px;font-size:12px;color:#7A5A00;">
+          <div id="edit-legacy-hint-label" style="margin-bottom:6px;"></div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button type="button" class="btn" style="background:#F2D680;color:#7A5A00;border:none;padding:6px 12px;font-size:12px;font-weight:600;border-radius:6px;cursor:pointer;" onclick="applyLegacyPriceToEdit()">Use this price</button>
+            <span id="edit-legacy-locked" style="display:none;color:#0F7A4A;font-weight:600;align-self:center;">\u2713 Locked in \u2014 will save as default for this property</span>
+          </div>
+        </div>
         <div class="price-preview" id="edit-price-preview">
           <div class="price-preview-label">Estimated price</div>
           <div class="price-preview-val" id="edit-price-val">—</div>
@@ -3961,6 +3972,19 @@ function showApptEdit(){
   document.getElementById('appt-view').style.display='none';
   document.getElementById('appt-edit').style.display='block';
   populateEditPropertySelector(currentClientName);
+  // Reset edit-side legacy state and populate hint asynchronously. Same flow
+  // as the new-appointment form: looks up the client's MOST RECENT paid /
+  // completed appointment and offers a one-click button to lock that price
+  // in for THIS appointment + persist to the property as a default.
+  // Skips itself (hint stays hidden) if the client has no past completed
+  // appointments or if currentAppt has no client_id linkage.
+  _editLegacyPriceLocked = false;
+  _editLegacyPriceData = null;
+  var _editLegHint = document.getElementById('edit-legacy-hint');
+  var _editLegLocked = document.getElementById('edit-legacy-locked');
+  if(_editLegHint) _editLegHint.style.display = 'none';
+  if(_editLegLocked) _editLegLocked.style.display = 'none';
+  populateEditLegacyPriceHint(currentAppt && currentAppt.client_id, currentClientName, currentAppt && currentAppt.dbId);
   // Snapshot original date/time so we can detect a change and toggle the reschedule
   // notification panel. Stored on window so saveApptEdit can compare.
   window._editOrigDate = (document.getElementById('edit-date')||{}).value || '';
@@ -4059,6 +4083,19 @@ async function saveApptEdit(mode){
   if(!a||!currentApptKey){console.error('[saveApptEdit] no currentAppt');return;}
   logActivity('appointment_updated','Appt edited: '+((a&&a.n)||'Unknown'),{mode:mode,apptId:a&&a.id});
   console.log('[saveApptEdit] mode='+mode+' recurring='+!!a.recurring+' client='+a.n);
+
+  // If the user clicked "Use this price" on the legacy hint banner, kick off
+  // the property-level lock-in in parallel with the rest of the save. Fire-
+  // and-forget — failure doesn't roll back the edit, just gets logged. This
+  // is the equivalent of saveNewAppt's STEP 2.6 hook for the edit flow.
+  if(_editLegacyPriceLocked && _editLegacyPriceData){
+    persistEditLegacyPriceLockIn().catch(function(err){
+      console.warn('[saveApptEdit] legacy persist error:', err);
+    });
+    // Reset state so the next edit starts clean
+    _editLegacyPriceLocked = false;
+    _editLegacyPriceData = null;
+  }
   var editClient=document.getElementById('edit-client').value||a.n;
   // Service, freq, beds, baths, sqft, condition are property-level — read from current appointment
   var _editSvcEl=document.getElementById('edit-service');
@@ -14231,6 +14268,182 @@ async function persistLegacyPriceLockIn(clientId, propIdx, address){
     }
   } catch(err){
     console.warn('[legacyPrice] persist error:', err);
+  }
+}
+
+/* ── EDIT-SIDE LEGACY PRICE LOCK-IN ─────────────────────────────────────
+   Same flow as the new-appointment side, but for the edit overlay. Use
+   case: user manually created appointments and now wants to lock pricing
+   in via the edit form. Fetches the most recent paid/completed
+   appointment for the client (excluding the one being edited so a recent
+   completed-status appointment that already had this price isn't shown
+   as "use this price" pointing at itself). On click flips the
+   edit-price-override + edit-hours-override and sets a flag. On save
+   (saveApptEdit) the flag triggers persistEditLegacyPriceLockIn, which
+   writes flatRate + durationHours into the selected property.
+
+   Note: edit-side persist uses the EDIT-form property selector
+   (edit-property-select), which is populated by populateEditPropertySelector.
+   If no property selected, falls back to client-level flat_rate. */
+
+var _editLegacyPriceLocked = false;
+var _editLegacyPriceData   = null;
+
+async function populateEditLegacyPriceHint(clientId, clientName, currentApptDbId){
+  var hintBox = document.getElementById('edit-legacy-hint');
+  var lockedBadge = document.getElementById('edit-legacy-locked');
+  if(!hintBox) return;
+  hintBox.style.display = 'none';
+  if(lockedBadge) lockedBadge.style.display = 'none';
+  _editLegacyPriceLocked = false;
+  _editLegacyPriceData = null;
+
+  // Need a real client_id to look up appointment history. If currentAppt
+  // doesn't have one (e.g., legacy in-memory entry never linked), try
+  // resolving by name from clientDB.
+  if((!clientId || clientId.length <= 20) && clientName){
+    var resolved = _findClientByName(clientName);
+    if(resolved && resolved.id && resolved.id.length > 20){
+      clientId = resolved.id;
+    }
+  }
+  if(!clientId || clientId.length <= 20) return;
+
+  try {
+    // Pull the most recent two so we can skip the current appointment if
+    // its dbId matches the most recent (avoid pointing the user at the
+    // appointment they're editing).
+    var res = await db.from('appointments')
+      .select('id, total_price, duration_hours, date, status')
+      .eq('client_id', clientId)
+      .in('status', ['paid', 'completed'])
+      .gt('total_price', 0)
+      .order('date', { ascending: false })
+      .limit(3);
+    if(res.error){ console.warn('[editLegacyPrice] lookup error:', res.error); return; }
+    var rows = (res.data || []).filter(function(r){ return r.id !== currentApptDbId; });
+    if(!rows.length) return;
+    var last = rows[0];
+    var price = parseFloat(last.total_price || 0);
+    var hours = parseFloat(last.duration_hours || 0);
+    if(!price) return;
+
+    _editLegacyPriceData = {
+      totalPrice: price,
+      durationHours: hours || null,
+      sourceApptId: last.id,
+      sourceDate: last.date,
+    };
+
+    var label = document.getElementById('edit-legacy-hint-label');
+    if(label){
+      var hoursStr = hours ? ' \u00B7 ' + hours + ' hr' + (hours === 1 ? '' : 's') : '';
+      label.innerHTML = '<strong>Most recent paid: $' + price.toFixed(2) + hoursStr + '</strong>'
+                     + ' (' + last.date + '). Click to apply this price to the current edit AND save it as the property\u2019s default for future bookings.';
+    }
+    hintBox.style.display = 'block';
+  } catch(err){
+    console.warn('[editLegacyPrice] populate error:', err);
+  }
+}
+
+function applyLegacyPriceToEdit(){
+  if(!_editLegacyPriceData) return;
+  var priceChk = document.getElementById('edit-price-override-chk');
+  var priceVal = document.getElementById('edit-price-override-val');
+  if(priceChk && priceVal){
+    priceChk.checked = true;
+    priceVal.style.display = '';
+    priceVal.value = _editLegacyPriceData.totalPrice.toFixed(2);
+  }
+  if(_editLegacyPriceData.durationHours){
+    var hrsChk = document.getElementById('edit-hours-override-chk');
+    var hrsVal = document.getElementById('edit-hours-override-val');
+    if(hrsChk && hrsVal){
+      hrsChk.checked = true;
+      hrsVal.style.display = '';
+      hrsVal.value = _editLegacyPriceData.durationHours;
+    }
+  }
+  _editLegacyPriceLocked = true;
+  var lockedBadge = document.getElementById('edit-legacy-locked');
+  if(lockedBadge) lockedBadge.style.display = 'inline-block';
+  if(typeof calcEditPrice === 'function') calcEditPrice();
+  if(typeof showToast === 'function') showToast('Legacy price loaded \u2713');
+}
+
+/* Persist legacy price from the edit overlay. Mirrors persistLegacyPriceLockIn
+   but reads from the edit-property-select dropdown and uses currentAppt's
+   address as the fallback for new-property creation. */
+async function persistEditLegacyPriceLockIn(){
+  if(!_editLegacyPriceLocked || !_editLegacyPriceData) return;
+  // Resolve client_id — prefer currentAppt.client_id, fall back to lookup by name
+  var clientId = (currentAppt && currentAppt.client_id) || null;
+  if((!clientId || clientId.length <= 20) && currentClientName){
+    var resolved = _findClientByName(currentClientName);
+    if(resolved && resolved.id && resolved.id.length > 20) clientId = resolved.id;
+  }
+  if(!clientId || clientId.length <= 20) return;
+
+  var price = _editLegacyPriceData.totalPrice;
+  var hours = _editLegacyPriceData.durationHours;
+
+  // Determine target property index. Edit form has its own selector.
+  var propSelEl = document.getElementById('edit-property-select');
+  var propIdx = propSelEl ? parseInt(propSelEl.value, 10) : NaN;
+  var address = (document.getElementById('edit-address') || {}).value || (currentAppt && currentAppt.address) || '';
+
+  try {
+    var client = clientDB[clientId];
+    if(!client){
+      var fetchRes = await db.from('clients').select('id, properties, flat_rate').eq('id', clientId).maybeSingle();
+      if(fetchRes.error || !fetchRes.data){ console.warn('[editLegacyPrice] persist client fetch failed'); return; }
+      client = { properties: fetchRes.data.properties || [] };
+    }
+    var props = Array.isArray(client.properties) ? client.properties.slice() : [];
+
+    if(!isNaN(propIdx) && propIdx >= 0 && props[propIdx]){
+      props[propIdx] = Object.assign({}, props[propIdx], {
+        flatRate: String(price),
+        durationHours: hours ? String(hours) : (props[propIdx].durationHours || ''),
+      });
+    } else if(address){
+      // Try to find an existing property with this address before appending
+      // a duplicate (since the user probably created appointments with the
+      // same address repeatedly).
+      var existingIdx = props.findIndex(function(p){ return p && p.address && p.address.trim().toLowerCase() === address.trim().toLowerCase(); });
+      if(existingIdx >= 0){
+        props[existingIdx] = Object.assign({}, props[existingIdx], {
+          flatRate: String(price),
+          durationHours: hours ? String(hours) : (props[existingIdx].durationHours || ''),
+        });
+      } else {
+        props.push({
+          address: address,
+          beds:  (document.getElementById('edit-beds')||{}).value  || (currentAppt && currentAppt.beds) || '',
+          baths: (document.getElementById('edit-baths')||{}).value || (currentAppt && currentAppt.baths) || '',
+          sqft:  (document.getElementById('edit-sqft')||{}).value  || (currentAppt && currentAppt.sqft) || '',
+          condition: (document.getElementById('edit-cond')||{}).value || (currentAppt && currentAppt.condition) || '7',
+          flatRate: String(price),
+          durationHours: hours ? String(hours) : '',
+          notes: '',
+        });
+      }
+    }
+
+    if(props.length){
+      var upd = await db.from('clients').update({ properties: props }).eq('id', clientId);
+      if(upd.error){ console.warn('[editLegacyPrice] persist properties error:', upd.error); return; }
+      if(clientDB[clientId]) clientDB[clientId].properties = props;
+      console.log('[editLegacyPrice] saved flatRate=$'+price+' to property for client '+clientId);
+    } else {
+      var upd2 = await db.from('clients').update({ flat_rate: price }).eq('id', clientId);
+      if(upd2.error){ console.warn('[editLegacyPrice] persist client flat_rate error:', upd2.error); return; }
+      if(clientDB[clientId]) clientDB[clientId].flatRate = String(price);
+      console.log('[editLegacyPrice] saved flat_rate=$'+price+' to client '+clientId);
+    }
+  } catch(err){
+    console.warn('[editLegacyPrice] persist error:', err);
   }
 }
 

@@ -1826,6 +1826,7 @@ Mahalo 🌺</textarea>
         <div class="action-grid">
           <button class="action-btn green" id="appt-invoice-btn" onclick="openApptInvoice()">Invoice client</button>
           <button class="action-btn green" id="appt-charge-btn" onclick="openApptCharge()">Charge card on file</button>
+          <button class="action-btn blue full" onclick="openApptDuplicate()">Duplicate to another date</button>
           <button class="action-btn blue" onclick="openMsgFromAppt()">Message client</button>
           <button class="action-btn blue full" onclick="openInviteCleaner()">Invite cleaner</button>
           <button class="action-btn amber full" onclick="showApptEdit()">Edit job</button>
@@ -11092,6 +11093,112 @@ function openApptEditProperty(){
 }
 
 /* APPOINTMENT ACTIONS */
+
+/* ─ Duplicate appointment to another date ─────────────────────────────
+   Opens a small overlay asking for a new date. Defaults to tomorrow
+   (most common case is "do this same job again next week" or the
+   immediate next day). On confirm, copies every field from the active
+   appointment except the date, forces frequency to One-time so we
+   don't accidentally duplicate a recurring series, and writes a fresh
+   row to the appointments table. The original appointment is untouched. */
+function openApptDuplicate(){
+  if(!currentAppt){
+    showToast && showToast('No appointment selected', true);
+    return;
+  }
+  var info = document.getElementById('appt-dup-info');
+  // Show the user what's being duplicated so they can sanity-check
+  // before committing — quote total + cleaner + time are the most
+  // common things they'd want to verify.
+  var totalStr = currentAppt.totalPrice ? '$' + Number(currentAppt.totalPrice).toFixed(2) : '—';
+  info.innerHTML =
+      '<div class="info-row"><span class="info-label">Client</span><span class="info-val">' + (currentAppt.n || '—') + '</span></div>'
+    + '<div class="info-row"><span class="info-label">Time</span><span class="info-val">' + (currentAppt.t || '—') + '</span></div>'
+    + '<div class="info-row"><span class="info-label">Cleaner</span><span class="info-val">' + (currentAppt.cleaner || '—') + '</span></div>'
+    + '<div class="info-row"><span class="info-label">Service</span><span class="info-val">' + (currentAppt.service || 'Regular Cleaning') + '</span></div>'
+    + '<div class="info-row"><span class="info-label">Total</span><span class="info-val">' + totalStr + '</span></div>';
+
+  // Pre-fill the date input with tomorrow (in user's local TZ)
+  var tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  var iso = tomorrow.getFullYear() + '-'
+          + String(tomorrow.getMonth() + 1).padStart(2, '0') + '-'
+          + String(tomorrow.getDate()).padStart(2, '0');
+  document.getElementById('appt-dup-date').value = iso;
+  document.getElementById('appt-dup-success').style.display = 'none';
+  document.getElementById('appt-dup-confirm-btn').disabled = false;
+  document.getElementById('appt-dup-confirm-btn').textContent = 'Duplicate';
+
+  // Hide the parent appt-overlay so this one renders on top cleanly
+  // on mobile (where overlays go full-screen)
+  document.getElementById('appt-dup-overlay').classList.remove('hidden');
+}
+
+async function confirmApptDuplicate(){
+  if(!currentAppt) return;
+  var dateInput = document.getElementById('appt-dup-date');
+  var newDate = dateInput && dateInput.value ? dateInput.value : '';
+  if(!newDate){
+    showToast && showToast('Please pick a date', true);
+    return;
+  }
+  var btn = document.getElementById('appt-dup-confirm-btn');
+  btn.disabled = true;
+  btn.textContent = 'Saving...';
+
+  // Build the same data payload that dbSaveAppointment expects, copying
+  // everything except the date. Force One-time so a recurring source
+  // appointment doesn't blow up into a brand-new recurring series.
+  var payload = {
+    clientName:   currentAppt.n,
+    service:      currentAppt.service || 'Regular Cleaning',
+    freq:         'One-time',
+    date:         newDate,
+    time:         currentAppt.t || '8am',
+    address:      currentAppt.address || null,
+    beds:         currentAppt.beds || null,
+    baths:        currentAppt.baths || null,
+    sqft:         currentAppt.sqft || null,
+    condition:    currentAppt.condition || 7,
+    cleanerName:  currentAppt.cleaner || 'Unassigned',
+    basePrice:    currentAppt.basePrice || 0,
+    tax:          currentAppt.tax || 0,
+    totalPrice:   currentAppt.totalPrice || 0,
+    cleanerPay:   currentAppt.cleanerPay || 0,
+    notes:        currentAppt.notes || null,
+    recurring:    false,
+    duration:     currentAppt.duration || null,
+  };
+
+  try {
+    var res = await dbSaveAppointment(payload);
+    if(res && res.error){
+      console.error('[duplicate] DB error:', res.error);
+      btn.disabled = false;
+      btn.textContent = 'Duplicate';
+      showToast && showToast('Save failed: ' + (res.error.message || 'unknown'), true);
+      return;
+    }
+    // Refresh from DB so the new appointment renders on the calendar
+    if(typeof _refreshAppointmentsFromDB === 'function'){
+      await _refreshAppointmentsFromDB({settleMs: 200});
+    }
+    // Close both overlays so user lands back on the calendar showing
+    // their newly-duplicated appointment
+    closeOverlay('appt-dup-overlay');
+    closeOverlay('appt-overlay');
+    // Format the date nicely for the toast
+    var d = new Date(newDate + 'T12:00:00');
+    var prettyDate = d.toLocaleDateString('en-US', {weekday:'short', month:'short', day:'numeric'});
+    showToast && showToast('Duplicated to ' + prettyDate + ' \u2713');
+  } catch (err) {
+    console.error('[duplicate] exception:', err);
+    btn.disabled = false;
+    btn.textContent = 'Duplicate';
+    showToast && showToast('Save failed: ' + err.message, true);
+  }
+}
+
 function openApptInvoice(){
   if(!currentAppt)return;
   var cd=currentApptData||{};
@@ -14484,6 +14591,28 @@ Your total will update automatically when you select a payment method.</textarea
         <button class="btn" onclick="closeOverlay('appt-charge-overlay')">Cancel</button>
       </div>
       <div class="success-bar" id="appt-charge-success">Payment collected successfully!</div>
+    </div>
+  </div>
+</div>
+
+<!-- DUPLICATE APPOINTMENT OVERLAY ─────────────────────────────────────
+     Click Duplicate on an open appointment → this overlay shows a
+     compact preview of what's being duplicated + a single date picker.
+     On confirm, dbSaveAppointment is called with all the original
+     appt's fields (client, time, cleaner, service, duration, price,
+     notes, etc.) but with the new date and frequency forced to
+     One-time so we don't accidentally clone a recurring series. -->
+<div class="overlay hidden" id="appt-dup-overlay" onclick="closeOverlay('appt-dup-overlay')">
+  <div class="panel" onclick="event.stopPropagation()">
+    <div class="panel-header"><div class="panel-title">Duplicate appointment</div><button class="close-btn" onclick="closeOverlay('appt-dup-overlay')">&#x2715;</button></div>
+    <div class="panel-body">
+      <div class="info-block" id="appt-dup-info" style="margin-bottom:14px;"></div>
+      <div class="form-row"><label>New date</label><input type="date" id="appt-dup-date"></div>
+      <div style="display:flex;gap:8px;margin-top:14px;">
+        <button class="action-btn full" onclick="closeOverlay('appt-dup-overlay')" style="background:#EEF2F4;color:#5B7683;border-color:#CFE3EA;">Cancel</button>
+        <button class="action-btn blue full" id="appt-dup-confirm-btn" onclick="confirmApptDuplicate()">Duplicate</button>
+      </div>
+      <div class="success-bar" id="appt-dup-success" style="margin-top:10px;"></div>
     </div>
   </div>
 </div>

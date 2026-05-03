@@ -3604,7 +3604,7 @@ function renderMonth(){
     // Show all appointments - no limit
     daSorted.forEach(function(a){
       var btn=document.createElement('button');
-      btn.className='appt '+(function(st){if(!st)return 'au';if(st==='cancelled')return 'ax';if(st==='scheduled')return 'aa';if(st==='unassigned')return 'au';if(st==='completed')return 'ac';if(st==='paid')return 'ap';return 'aa';})(a.s);
+      btn.className='appt '+_apptColorClass(a);
       // Paired cleaner badge: '+1' for 2 cleaners, '+2' for 3. Uses cleaner_id_2/3
       // (the FK columns) so we don't show a stale badge if names get out of sync.
       var _pairBadge = '';
@@ -3631,6 +3631,38 @@ var CAL_END_HOUR=23;    // 11pm
 var CAL_PX_HR=60;       // pixels per hour
 var CAL_DURATION=90;    // default appointment duration in minutes
 var CAL_TOTAL_H=(CAL_END_HOUR-CAL_START_HOUR)*CAL_PX_HR; // 19*60=1140px
+// ── APPT COLOR HELPERS ──────────────────────────────────────────────────
+// Single source of truth for "what color does this appointment render?"
+// across month / week / day views. The KEY rule: assignment status is
+// derived from cleaner_id presence, NOT from the status field. Status can
+// drift away from cleaner_id (multiple code paths update one without the
+// other — bulk operations, automation rules, calendar pushes, even direct
+// SQL). cleaner_id is the only reliable indicator of whether someone is
+// actually assigned. Status is reserved for terminal states: paid (green),
+// completed (yellow), cancelled (gray). Everything else falls into the
+// assigned/unassigned binary based on cleaner_id alone.
+//
+// Returns the multi-char class used by month-view (.appt.au, .aa, .ac, etc.)
+function _apptColorClass(a){
+  var st = a && a.s;
+  if(st === 'paid') return 'ap';
+  if(st === 'completed') return 'ac';
+  if(st === 'cancelled') return 'ax';
+  // Active: cleaner_id present (or cleaner name resolved to non-Unassigned)
+  if(a && (a.cleaner_id || (a.cleaner && a.cleaner !== 'Unassigned'))) return 'aa';
+  return 'au';
+}
+// Single-char version used by the week/day colorMap (CAL_COLORS keyed by
+// 'u', 'a', 'c', 'p', 'x'). Same rules as above.
+function _apptColorChar(a){
+  var st = a && a.s;
+  if(st === 'paid') return 'p';
+  if(st === 'completed') return 'c';
+  if(st === 'cancelled') return 'x';
+  if(a && (a.cleaner_id || (a.cleaner && a.cleaner !== 'Unassigned'))) return 'a';
+  return 'u';
+}
+
 var CAL_COLORS={
   u:{bg:'#FDE2E4',text:'#8A2C3A',border:'#F9B8BE'}, /* Unassigned — soft coral */
   a:{bg:'#EAF7FB',text:'#16758F',border:'#79D3E1'}, /* Assigned/Scheduled — brand cyan */
@@ -3731,7 +3763,11 @@ function calLayoutAppts(appts,dateKey,col,compact){
 
     cluster.forEach(function(appt){
       var a=appt.a;
-      var sc=(function(st){if(!st)return 'u';if(st==='cancelled')return 'x';if(st==='scheduled')return 'a';if(st==='unassigned')return 'u';if(st==='completed')return 'c';if(st==='paid')return 'p';return 'a';})(a.s);
+      // Single-letter version for the colorMap lookup. Mirrors _apptColorClass
+      // exactly — derives "assigned" from cleaner_id presence (NOT from status
+      // field), so any drift between cleaner_id and status can never cause an
+      // assigned appt to render red.
+      var sc=_apptColorChar(a);
       var clr=colorMap[sc]||colorMap.u;
       var pct=100/numSlots;
       var leftPct=appt.slot*pct;

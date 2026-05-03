@@ -946,7 +946,7 @@ textarea{font-family:inherit;}
         </div>
         <div class="section-title" style="margin-top:16px">Payroll — <span id="payroll-period-label">—</span></div>
         <div class="tw" style="margin-bottom:16px"><table>
-        <thead><tr><th style="min-width:160px;">Cleaner</th><th style="width:80px;">Island</th><th style="width:70px;">Hours</th><th style="width:90px;">Rate</th><th style="width:90px;">Gross</th><th style="width:140px;">Bonus</th><th style="width:100px;">Total</th><th style="width:90px;">Paid</th><th style="width:85px;">Status</th><th style="width:95px;">Action</th></tr></thead>
+        <thead><tr><th style="min-width:160px;">Cleaner</th><th style="width:80px;">Island</th><th style="width:70px;">Hours</th><th style="width:90px;">Rate</th><th style="width:90px;">Gross</th><th style="width:80px;">Tips</th><th style="width:140px;">Bonus</th><th style="width:100px;">Total</th><th style="width:90px;">Paid</th><th style="width:85px;">Status</th><th style="width:95px;">Action</th></tr></thead>
         <tbody id="payroll-tbody"></tbody></table></div>
         <div id="payroll-appts-detail" style="margin-top:12px"></div>
       </div>
@@ -1851,6 +1851,7 @@ Mahalo 🌺</textarea>
           <div class="info-row" id="ai-cpay-2-row" style="display:none;"><span class="info-label">Paired cleaner pay</span><span class="info-val" id="ai-cpay-2">—</span></div>
           <div class="info-row" id="ai-cleaner-3-row" style="display:none;"><span class="info-label">Third cleaner</span><span class="info-val" id="ai-cleaner-3">—</span></div>
           <div class="info-row" id="ai-cpay-3-row" style="display:none;"><span class="info-label">Third cleaner pay</span><span class="info-val" id="ai-cpay-3">—</span></div>
+          <div class="info-row" id="ai-tip-row"><span class="info-label">Tip</span><span class="info-val" id="ai-tip-val" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end;"><span id="ai-tip">—</span><button type="button" class="btn" id="ai-tip-edit-btn" onclick="editApptTip()" style="font-size:11px;padding:3px 10px;min-height:0;">Add tip</button></span></div>
         </div>
         <div class="panel-section">Pricing</div>
         <div class="info-block">
@@ -2717,7 +2718,8 @@ async function dbLoadCleaners(){
     cleaner_pay:parseFloat(data.cleanerPay)||0,
     notes:data.notes||null,
     recurring:data.recurring||false,
-    duration_hours:parseFloat(data.duration)||null
+    duration_hours:parseFloat(data.duration)||null,
+    tip_amount:Math.max(0,parseFloat(data.tipAmount)||0)
   };
   if(data.seriesId) row.series_id=data.seriesId;
   if(data.seriesIndex!=null) row.series_index=data.seriesIndex;
@@ -2827,7 +2829,8 @@ async function dbUpdateAppointment(dbId,data){
     cleaner_pay:parseFloat(data.cleanerPay)||0,
     cleaner_pay_override:data.cleanerPayOverride!=null?parseFloat(data.cleanerPayOverride):null,
     notes:data.notes||null,
-    duration_hours:parseFloat(data.duration)||null
+    duration_hours:parseFloat(data.duration)||null,
+    tip_amount:Math.max(0,parseFloat(data.tipAmount)||0)
   };
   var res=await db.from('appointments').update(payload).eq('id',dbId).select();
   if(res.error)console.error('[dbUpdateAppointment] error:',res.error);
@@ -2948,6 +2951,7 @@ function _rebuildAppointmentsFromDB(appts){
       duration:a.duration_hours||null,
       seriesId:a.series_id||null,
       seriesIndex:a.series_index!=null?a.series_index:null,
+      tipAmount:a.tip_amount!=null?parseFloat(a.tip_amount):0,
       // Paired cleaners
       cleaner_id_2:a.cleaner_id_2||null, cleaner2:cleaner2Name,
       cleanerPay2:a.cleaner_pay_2!=null?parseFloat(a.cleaner_pay_2):null,
@@ -4003,6 +4007,12 @@ function _openApptInner(a,dateKey){
     if(_ai3Row) _ai3Row.style.display = 'none';
     if(_aiP3Row) _aiP3Row.style.display = 'none';
   }
+  // Tip row — always visible. Empty state shows "Add tip", populated state shows amount + "Edit".
+  var _aiTip = document.getElementById('ai-tip');
+  var _aiTipBtn = document.getElementById('ai-tip-edit-btn');
+  var _tipAmt = parseFloat(a.tipAmount) || 0;
+  if(_aiTip) _aiTip.textContent = _tipAmt > 0 ? fmtPrice(_tipAmt) : '\u2014';
+  if(_aiTipBtn) _aiTipBtn.textContent = _tipAmt > 0 ? 'Edit' : 'Add tip';
   document.getElementById('ai-base').textContent=fmtPrice(a.base||a.basePrice);
   document.getElementById('ai-disc').textContent='$0';
   document.getElementById('ai-tax').textContent=fmtPrice(a.tax);
@@ -7293,7 +7303,7 @@ function setPeriod(btn){
         if(!tbody) return;
         var period = _currentPeriod();
         if(!period){
-          tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:24px">Loading pay periods…</td></tr>';
+          tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;color:var(--text-muted);padding:24px">Loading pay periods…</td></tr>';
           return;
         }
         if(lbl) lbl.textContent = period.label + '  ·  Payday: ' + _fmtShort(period.payday);
@@ -7304,15 +7314,21 @@ function setPeriod(btn){
           if(cname==='Unassigned') return;
           var hrs = parseFloat(a.duration)||0;
           var pay = parseFloat(a.cleanerPay) || (typeof calcCleanerPay==='function' ? calcCleanerPay(hrs, cname, a.service) : hrs * (_rateForName(cname)||0));
-          if(!totals[cname]) totals[cname] = { hrs:0, pay:0, jobs:[] };
+          if(!totals[cname]) totals[cname] = { hrs:0, pay:0, tips:0, jobs:[] };
           totals[cname].hrs += hrs;
           totals[cname].pay += pay;
-          totals[cname].jobs.push({date:a._date, client:a.n, hrs:hrs, pay:pay});
+          // Tip share: split evenly across all assigned cleaners (1, 2, or 3) on this appt.
+          // a.cleaner2 / a.cleaner3 are non-null only when paired columns are set.
+          var tipTotal = parseFloat(a.tipAmount) || 0;
+          var nCleaners = 1 + (a.cleaner2 ? 1 : 0) + (a.cleaner3 ? 1 : 0);
+          var tipShare = nCleaners > 0 ? (tipTotal / nCleaners) : 0;
+          totals[cname].tips += tipShare;
+          totals[cname].jobs.push({date:a._date, client:a.n, hrs:hrs, pay:pay, tip:tipShare});
         });
         var periodRows = _payrollPeriodRows[period.key] || {};
         var rows = Object.entries(totals);
         if(rows.length===0){
-          tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:24px">No hours logged for this pay period.</td></tr>';
+          tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;color:var(--text-muted);padding:24px">No hours logged for this pay period.</td></tr>';
         } else {
           tbody.innerHTML = rows.map(function(e){
             var cname = e[0], t = e[1];
@@ -7332,7 +7348,8 @@ function setPeriod(btn){
             var paidDisplay = paid && row.paid_amount_cents ? ('\$'+(row.paid_amount_cents/100).toFixed(2)) : (paid ? '\$'+t.pay.toFixed(2) : '—');
             var bonusCents = (row && row.bonus_cents) ? +row.bonus_cents : 0;
             var bonusDollars = (bonusCents/100);
-            var totalPay = t.pay + bonusDollars;
+            var tipsDollars = +(t.tips || 0);
+            var totalPay = t.pay + tipsDollars + bonusDollars;
             var bonusCellKey = (row && row.id) ? row.id : ('new:'+cnameSafe);
             var bonusInput = '<div class="bonus-input-wrap">' +
               '<span style="color:var(--text-muted);font-size:12px;">$</span>' +
@@ -7345,6 +7362,7 @@ function setPeriod(btn){
               '<td>'+t.hrs.toFixed(2)+'</td>' +
               '<td>\$'+rate.toFixed(2)+'/hr</td>' +
               '<td>\$'+t.pay.toFixed(2)+'</td>' +
+              '<td>'+(tipsDollars>0?('\$'+tipsDollars.toFixed(2)):'\u2014')+'</td>' +
               '<td>'+bonusInput+'</td>' +
               '<td style="font-weight:600;">\$'+totalPay.toFixed(2)+'</td>' +
               '<td>'+paidDisplay+'</td>' +
@@ -7355,10 +7373,16 @@ function setPeriod(btn){
         }
         var totalGross = rows.reduce(function(a,e){return a+e[1].pay;},0);
         var totalHrs = rows.reduce(function(a,e){return a+e[1].hrs;},0);
+        var totalTips = rows.reduce(function(a,e){return a+(e[1].tips||0);},0);
         var totalBonus = Object.values(periodRows).reduce(function(a,r){return a+((r.bonus_cents||0)/100);},0);
         var totalPaid = Object.values(periodRows).filter(function(r){return r.status==='paid';}).reduce(function(a,r){return a+((r.paid_amount_cents||0)/100);},0);
         var m = document.querySelectorAll('#view-payroll .metric-value');
-        if(m[0]) m[0].textContent = '\$'+(totalGross+totalBonus).toFixed(2) + (totalBonus>0?' (+\$'+totalBonus.toFixed(2)+' bonus)':'');
+        if(m[0]) {
+          var extras = [];
+          if(totalTips>0) extras.push('+\$'+totalTips.toFixed(2)+' tips');
+          if(totalBonus>0) extras.push('+\$'+totalBonus.toFixed(2)+' bonus');
+          m[0].textContent = '\$'+(totalGross+totalTips+totalBonus).toFixed(2) + (extras.length?' ('+extras.join(', ')+')':'');
+        }
         if(m[1]) m[1].textContent = totalHrs.toFixed(1) + ' h';
         if(m[2]) m[2].textContent = '\$'+totalPaid.toFixed(2);
         if(m[3]) m[3].textContent = totalHrs>0 ? ('\$'+(totalGross/totalHrs).toFixed(2)+'/hr') : '—';
@@ -7384,11 +7408,14 @@ function setPeriod(btn){
         if(!det) return;
         if(appts.length===0){ det.innerHTML = '<div style="color:var(--text-muted);padding:8px">No appointments for '+cname+' in this period.</div>'; return; }
         det.innerHTML = '<div class="section-title" style="margin-top:8px">'+cname+' — '+period.label+'</div>' +
-          '<div class="tw"><table><thead><tr><th>Date</th><th>Client</th><th>Hours</th><th>Pay</th></tr></thead><tbody>' +
+          '<div class="tw"><table><thead><tr><th>Date</th><th>Client</th><th>Hours</th><th>Pay</th><th>Tip</th></tr></thead><tbody>' +
           appts.map(function(a){
             var hrs = parseFloat(a.duration)||0;
             var pay = parseFloat(a.cleanerPay) || (typeof calcCleanerPay==='function' ? calcCleanerPay(hrs, cname, a.service) : hrs*_rateForName(cname));
-            return '<tr><td>'+a._date+'</td><td>'+(a.n||'')+'</td><td>'+hrs.toFixed(2)+'</td><td>\$'+pay.toFixed(2)+'</td></tr>';
+            var tipTotal = parseFloat(a.tipAmount) || 0;
+            var nCleaners = 1 + (a.cleaner2 ? 1 : 0) + (a.cleaner3 ? 1 : 0);
+            var tipShare = nCleaners > 0 ? (tipTotal / nCleaners) : 0;
+            return '<tr><td>'+a._date+'</td><td>'+(a.n||'')+'</td><td>'+hrs.toFixed(2)+'</td><td>\$'+pay.toFixed(2)+'</td><td>'+(tipShare>0?('\$'+tipShare.toFixed(2)):'\u2014')+'</td></tr>';
           }).join('') +
           '</tbody></table></div>';
       }
@@ -7517,16 +7544,21 @@ function setPeriod(btn){
           var cname = a.cleaner||'Unassigned'; if(cname==='Unassigned') return;
           var hrs = parseFloat(a.duration)||0;
           var pay = parseFloat(a.cleanerPay) || (typeof calcCleanerPay==='function'?calcCleanerPay(hrs,cname,a.service):hrs*_rateForName(cname));
-          if(!totals[cname]) totals[cname] = { hrs:0, pay:0 };
+          if(!totals[cname]) totals[cname] = { hrs:0, pay:0, tips:0 };
           totals[cname].hrs += hrs; totals[cname].pay += pay;
+          var tipTotal = parseFloat(a.tipAmount) || 0;
+          var nCleaners = 1 + (a.cleaner2 ? 1 : 0) + (a.cleaner3 ? 1 : 0);
+          totals[cname].tips += nCleaners > 0 ? (tipTotal / nCleaners) : 0;
         });
-        var lines = ['Cleaner,Island,Hours,Rate,Gross,Period,Payday'];
+        var lines = ['Cleaner,Island,Hours,Rate,Gross,Tips,Total,Period,Payday'];
         Object.entries(totals).forEach(function(e){
           var cname = e[0], t=e[1];
           var c = _findCleanerByName(cname);
           var island = c ? (c.islands||c.island||'') : '';
           var rate = _rateForName(cname)||0;
-          lines.push([JSON.stringify(cname), JSON.stringify(island), t.hrs.toFixed(2), rate.toFixed(2), t.pay.toFixed(2), JSON.stringify(period.label), _fmtISODate(period.payday)].join(','));
+          var tipAmt = +(t.tips||0);
+          var totalAmt = t.pay + tipAmt;
+          lines.push([JSON.stringify(cname), JSON.stringify(island), t.hrs.toFixed(2), rate.toFixed(2), t.pay.toFixed(2), tipAmt.toFixed(2), totalAmt.toFixed(2), JSON.stringify(period.label), _fmtISODate(period.payday)].join(','));
         });
         var blob = new Blob([lines.join('\n')], {type:'text/csv'});
         var url = URL.createObjectURL(blob);
@@ -11795,6 +11827,53 @@ async function confirmApptAssign(){
   closeOverlay('appt-overlay');
   if(typeof showToast === 'function') showToast(cleanerName + ' assigned \u2713');
   if(typeof logActivity === 'function') logActivity('appointment_assigned', cleanerName + ' assigned to ' + (currentAppt.n||'appt'), {apptId: currentAppt.dbId, cleanerId: cleanerId});
+}
+
+// ── Tip entry on appointment overlay (phase 1 of tipping feature, 2026-05-03) ──
+// Admin enters a tip amount (cash, Venmo, or pre-loaded from a future Stripe flow).
+// Tip is stored as a single value on the appointment; payroll splits it evenly
+// across assigned cleaners (1/2/3) at aggregation time. Uses native prompt() to
+// keep the surface small and mobile-friendly.
+async function editApptTip(){
+  if(!currentAppt){ if(typeof showToast === 'function') showToast('No appointment selected', true); return; }
+  var current = parseFloat(currentAppt.tipAmount) || 0;
+  var raw = window.prompt('Tip amount (USD). Enter 0 or leave blank to clear.', current > 0 ? current.toFixed(2) : '');
+  if(raw === null) return; // user cancelled
+  raw = String(raw).trim().replace(/^\$/, '');
+  var amt = raw === '' ? 0 : parseFloat(raw);
+  if(!isFinite(amt) || amt < 0){
+    if(typeof showToast === 'function') showToast('Enter a non-negative number.', true);
+    return;
+  }
+  amt = Math.round(amt * 100) / 100; // round to cents
+  try {
+    var res = await db.from('appointments').update({ tip_amount: amt }).eq('id', currentAppt.dbId);
+    if(res.error){
+      console.error('[editApptTip] DB error:', res.error);
+      if(typeof showToast === 'function') showToast('Tip save failed: '+(res.error.message||'database error'), true);
+      return;
+    }
+  } catch(err){
+    console.error('[editApptTip] error:', err);
+    if(typeof showToast === 'function') showToast('Tip save failed: '+(err.message||'error'), true);
+    return;
+  }
+  // In-memory update
+  currentAppt.tipAmount = amt;
+  // Mirror into apptData so payroll/render paths see the new value without a full DB refresh
+  if(currentApptKey && apptData[currentApptKey]){
+    var idx = apptData[currentApptKey].findIndex(function(x){ return x.dbId === currentAppt.dbId; });
+    if(idx >= 0) apptData[currentApptKey][idx].tipAmount = amt;
+  }
+  // Re-render the tip row inline
+  var _aiTip = document.getElementById('ai-tip');
+  var _aiTipBtn = document.getElementById('ai-tip-edit-btn');
+  if(_aiTip) _aiTip.textContent = amt > 0 ? (typeof fmtPrice === 'function' ? fmtPrice(amt) : ('\$' + amt.toFixed(2))) : '\u2014';
+  if(_aiTipBtn) _aiTipBtn.textContent = amt > 0 ? 'Edit' : 'Add tip';
+  // Refresh payroll totals if the payroll view is open
+  if(typeof renderPayroll === 'function'){ try { renderPayroll(); } catch(e){} }
+  if(typeof showToast === 'function') showToast(amt > 0 ? ('Tip saved: \$' + amt.toFixed(2)) : 'Tip cleared');
+  if(typeof logActivity === 'function') logActivity('appointment_tip_updated', 'Tip set to \$'+amt.toFixed(2)+' for '+(currentAppt.n||'appt'), {apptId: currentAppt.dbId, amount: amt});
 }
 
 function openApptDuplicate(){

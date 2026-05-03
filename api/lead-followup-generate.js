@@ -85,6 +85,13 @@ export default async function handler(req, res) {
       ? Math.floor((Date.now() - new Date(lead.quote_sent_at).getTime()) / (1000 * 60 * 60 * 24))
       : null;
     const hasReplied = !!lead.last_responded_at;
+    // Do we have ANY evidence in our records that a quote/estimate was sent?
+    // The AI should NOT claim 'the estimate I sent' without evidence — happens
+    // a lot for sheet-imported leads where the quote was given verbally over
+    // the phone with no SMS trail. The AI may still find a price in the SMS
+    // history (also visible in the prompt below), in which case it's free to
+    // reference it. This flag only controls the structured CONTEXT signal.
+    const hasStructuredQuote = !!(lead.quote_total || lead.quote_sent_at);
 
     const channelInstructions = [];
     if (wantSms) {
@@ -114,9 +121,11 @@ export default async function handler(req, res) {
 
     const stageContext = (() => {
       if (stage === 'New inquiry') return 'They submitted a lead form but have not received a quote yet. Acknowledge their inquiry and confirm you got their request. Aim is to get them to engage so you can follow up with a quote.';
-      if (stage === 'Quoted' && !hasReplied && daysSinceQuote && daysSinceQuote >= 1) return `They got a quote ${daysSinceQuote} days ago and have not responded. Friendly nudge to see if they have questions or want to book.`;
-      if (stage === 'Quoted' && hasReplied) return 'They got a quote and replied at some point. Look at the conversation history for what they actually said and respond to it. Don\'t pretend you haven\'t talked.';
-      if (stage === 'Follow-up') return `Cold lead — got a quote but went silent. Light, no-pressure check-in. Don\'t guilt them. The aim is to leave the door open without being pushy.`;
+      if (stage === 'Quoted' && hasStructuredQuote && !hasReplied && daysSinceQuote && daysSinceQuote >= 1) return `They got a quote ${daysSinceQuote} days ago and have not responded. Friendly nudge to see if they have questions or want to book.`;
+      if (stage === 'Quoted' && hasStructuredQuote && hasReplied) return 'They got a quote and replied at some point. Look at the conversation history for what they actually said and respond to it. Don\'t pretend you haven\'t talked.';
+      if (stage === 'Quoted' && !hasStructuredQuote) return 'Marked Quoted in the system but I do NOT have a record of an actual estimate being sent — quote may have been verbal/by phone, or just imported from a spreadsheet. DO NOT claim to have sent an estimate or reference a specific quote. Look at the conversation history for any actual prices mentioned. Otherwise be open-ended: "wanted to make sure you had everything you need to decide", "let me know if any questions came up", "happy to walk through pricing again whenever". Aim is to re-engage without making up history.';
+      if (stage === 'Follow-up' && hasStructuredQuote) return 'Cold lead — got a quote but went silent. Light, no-pressure check-in. Don\'t guilt them. The aim is to leave the door open without being pushy.';
+      if (stage === 'Follow-up' && !hasStructuredQuote) return 'Cold lead, but I do NOT have a record of a structured estimate being sent. May have been a phone-only conversation. DO NOT claim to have sent an estimate. Open-ended re-engagement only: "wanted to circle back about your cleaning needs", "let me know if there\'s anything I can help you sort out". Reference details from the SMS/call history if any exist; otherwise keep it short and general.';
       if (stage === 'Closed lost') return 'This was marked lost — try to re-engage gently. Maybe they had a reason that\'s no longer true.';
       return 'Generic follow-up. Be friendly and specific.';
     })();
@@ -139,7 +148,9 @@ export default async function handler(req, res) {
       `- Stage: ${stage}`,
       `- Service interested in: ${service}`,
       lead.address ? `- Address: ${lead.address}` : '',
-      quote ? `- Quote sent: ${quote}` : '',
+      hasStructuredQuote
+        ? `- Quote on record: ${quote || 'yes (amount not stored)'}`
+        : '- Quote on record: NO — there is no structured record of an estimate being sent. If you reference an estimate, it MUST come from a price actually visible in the SMS/call history below — never invent one or claim one was sent.',
       daysSinceQuote != null ? `- Days since quote: ${daysSinceQuote}` : '',
       hasReplied ? `- They have replied at some point (see conversation)` : '- They have NOT replied since the quote was sent',
       lead.notes ? `- Notes: ${lead.notes}` : '',
@@ -156,8 +167,9 @@ export default async function handler(req, res) {
       '- BANNED PHRASES (these are CRM-speak, not how locals talk): "just checking in", "checking in on", "following up on that", "wanted to follow up", "wanted to reach out", "circling back", "touching base", "I hope this finds you well", "I hope this email finds you well", "per our last conversation".',
       '- BANNED OPENERS: "Hey", "Hi", "Hello", "Dear", "Hi there". Always open with "Aloha [firstName],".',
       '- Do NOT make up details that aren\'t in the data above. If you don\'t have a specific hook, keep it short and warm — better a 2-sentence message that feels real than a 5-sentence message stuffed with invented context.',
-      '- PRICES: it is GOOD to reference a price when one is available. Look in two places: (1) the structured CONTEXT block at the top, and (2) the SMS conversation history (Dane often quotes via SMS). If you find a price in either, reference it naturally — e.g. "the $385 we talked about" or "the $179 estimate". Never invent a price that does not appear anywhere in the data — if no price is mentioned in CONTEXT or the conversation history, skip it entirely and say something like "the estimate I sent" or "your quote" instead.',
-      '- Do NOT mention "the quote" or "your quote" robotically. If you reference price, do it like a person would: "the $179 we talked about" or "the move-out estimate".',
+      '- ESTIMATES & PRICES — CRITICAL: Only reference an estimate or quote if there is direct evidence one was sent. Two valid sources: (1) "Quote on record: $X" in CONTEXT above, OR (2) a clear dollar amount in the SMS/call history. If neither exists, you have NO evidence an estimate was sent. In that case do NOT use phrases like "the estimate I sent", "your quote", "checking in on the estimate", "the price I gave you", "the quote we discussed in [month]". The lead may have only had a phone or in-person conversation, OR they may be a sheet-imported lead with no actual estimate ever sent. Use open-ended phrasing instead: "your inquiry", "your interest", "your move-out cleaning needs", "wanted to make sure you had everything to decide", "happy to walk through pricing whenever".',
+      '- When you DO have evidence of a price: reference it naturally — "the $385 we talked about" or "the move-out estimate" — never robotically as "your quote" or "the quote".',
+      '- NEVER invent a price. Never make up a dollar amount.',
       '- DATES — CRITICAL: Today\'s date is at the top of this prompt. NEVER suggest, confirm, or invite the lead to book on a date that has already passed. If the SMS history contains a proposed date (e.g. "Are you available May 5th?") and that date is in the past, treat it as expired — DO NOT reference that specific date as bookable. You can say "the date we discussed didn\'t work out" or "wanted to try and reschedule" or just leave dates out entirely. Future dates and open-ended phrasing ("whenever works for you", "this week", "anytime soon") are fine.',
       '- Do NOT invent any specific date the lead never proposed. "Are you free Tuesday?" is invented if Tuesday wasn\'t mentioned in the conversation history.',
       '',
@@ -167,6 +179,7 @@ export default async function handler(req, res) {
       '  ✓ Would it feel natural coming from a small business owner who knows the islands?',
       '  ✓ If you stripped the lead\'s name out, would it still feel like ME wrote it (vs. any cleaning company)?',
       '  ✓ If the message references any specific date, is that date today or in the future (NEVER in the past)?',
+      '  ✓ If the message references "the estimate I sent" or "your quote" or any specific dollar amount — is that supported by the CONTEXT block or the SMS history? If not, REWRITE without that claim.',
       '',
       history && history.trim() ? '\n=== CONVERSATION HISTORY (most recent first) ===\n' + history + '\n=== END HISTORY ===\n' : '',
       'OUTPUT FORMAT (STRICT):',

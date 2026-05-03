@@ -15,9 +15,16 @@
 <!-- iOS standalone-mode meta tags (iOS Safari ignores some manifest fields) -->
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<!--
+  status-bar-style: 'default' = white bg + dark text, sits ABOVE content
+  (not 'black-translucent' which would push content under the status bar
+  and hide the menu button under the iPhone notch/island).
+-->
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="HNC CRM">
-<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<!-- Apple touch icon — multiple sizes + precomposed fallback for older iOS -->
+<link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png">
+<link rel="apple-touch-icon-precomposed" sizes="180x180" href="/icons/apple-touch-icon.png">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 /* ===== HNC Design Tokens — brand palette (3BB8E3 / 59C7E2 / 79D3E1 / A5E6E9 / F2E19B) ===== */
@@ -46,6 +53,18 @@
 }
 *{box-sizing:border-box;margin:0;padding:0;}
 body{font-family:'Inter','SF Pro Text',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg-wash);color:var(--text);font-size:13.5px;letter-spacing:-.005em;-webkit-font-smoothing:antialiased;}
+
+/* iOS PWA safe-area handling — when running as installed app on iPhone, the
+ * topbar must clear the status bar / Dynamic Island. The standalone media
+ * query targets only installed PWAs so the regular browser experience is
+ * unaffected. env(safe-area-inset-*) was set up via viewport-fit=cover. */
+@media all and (display-mode: standalone) {
+  body { padding-top: env(safe-area-inset-top); padding-left: env(safe-area-inset-left); padding-right: env(safe-area-inset-right); padding-bottom: env(safe-area-inset-bottom); }
+}
+@supports (-webkit-touch-callout: none) {
+  /* Older iOS Safari fallback */
+  body.standalone-ios { padding-top: env(safe-area-inset-top); }
+}
 .crm{display:flex;height:100vh;overflow:hidden;}
 .sidebar{width:220px;background:var(--panel-glass);backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;overflow-y:auto;}
 .sidebar-logo{padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;}

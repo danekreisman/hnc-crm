@@ -5,9 +5,19 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Hawaii Natural Clean — CRM</title>
 <link rel="icon" href="/hnc-logo.png">
+
+<!-- PWA: makes the CRM installable as an app on iOS / Android / desktop ─── -->
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#3BB8E3">
+<!-- iOS standalone-mode meta tags (iOS Safari ignores some manifest fields) -->
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="HNC CRM">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 /* ===== HNC Design Tokens — brand palette (3BB8E3 / 59C7E2 / 79D3E1 / A5E6E9 / F2E19B) ===== */
@@ -6981,6 +6991,103 @@ renderCal();
 loadAllData();
 // Restore last view from session (so browser refresh keeps user where they were)
 try{var _sv=sessionStorage.getItem('hnc_currentView'); if(_sv && _sv!=='calendar'){var _navItem=Array.from(document.querySelectorAll('.nav-item')).find(function(n){return (n.textContent||'').trim().toLowerCase().indexOf(_sv)>=0;}); sv(_sv, _navItem||null); if(_sv==='payments' && typeof renderPaymentsSection==='function'){setTimeout(renderPaymentsSection, 200);}}}catch(e){console.warn('restore view',e);}
+
+/* ============================================================
+   PWA bootstrap — service worker registration + install hint
+   ------------------------------------------------------------
+   Phase 1: registers /service-worker.js so the CRM is treated as
+   a PWA (enables "Add to Home Screen", standalone display, and
+   later push notifications). Also shows a one-time install banner
+   on iOS/Android to guide the user through adding to home screen,
+   since iOS doesn't show a native install prompt.
+   ============================================================ */
+(function pwaBootstrap(){
+  if (!('serviceWorker' in navigator)) return;
+  // Register on window load so initial render isn't slowed by it
+  window.addEventListener('load', function(){
+    navigator.serviceWorker.register('/service-worker.js').then(function(reg){
+      console.log('[PWA] service worker registered, scope:', reg.scope);
+    }).catch(function(err){
+      console.warn('[PWA] SW registration failed:', err && err.message);
+    });
+  });
+
+  // Listen for messages from SW (e.g., navigate after notification click)
+  navigator.serviceWorker.addEventListener('message', function(ev){
+    if (ev.data && ev.data.type === 'navigate' && ev.data.url) {
+      try { window.location.href = ev.data.url; } catch(e){}
+    }
+  });
+
+  /* ─ Install hint banner ─────────────────────────────────────
+     Detect: are we already running as an installed PWA? If so, no
+     hint. If not, and we're on mobile, show a small dismissible
+     bottom-of-screen banner with platform-specific instructions.
+     localStorage flag suppresses re-prompting after dismissal. */
+  function isStandalone() {
+    return (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches)
+        || window.navigator.standalone === true;  // iOS-specific
+  }
+
+  function isMobile() {
+    return /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+  }
+
+  function isIos() {
+    return /iPhone|iPad|iPod/i.test(navigator.userAgent);
+  }
+
+  // Capture native beforeinstallprompt for Android/desktop Chrome
+  var deferredPrompt = null;
+  window.addEventListener('beforeinstallprompt', function(e){
+    e.preventDefault();
+    deferredPrompt = e;
+    // Don't auto-show — only prompt if user opens the install banner
+  });
+
+  function showInstallBanner(){
+    if (isStandalone()) return;
+    try {
+      if (localStorage.getItem('hnc_install_banner_dismissed') === '1') return;
+    } catch(e){}
+    if (!isMobile()) return; // desktop install is via browser menu, no banner needed
+
+    var existing = document.getElementById('hnc-install-banner');
+    if (existing) return;
+
+    var iosCopy = 'Tap the <strong>Share</strong> button below, then <strong>Add to Home Screen</strong>. The app then opens like any native app — full screen, fast, no browser bar.';
+    var androidCopy = 'Tap the menu (\u22EE) in the top-right, then <strong>Install app</strong> or <strong>Add to home screen</strong>. The app then opens like any native app.';
+
+    var banner = document.createElement('div');
+    banner.id = 'hnc-install-banner';
+    banner.style.cssText = 'position:fixed;left:12px;right:12px;bottom:12px;z-index:99998;background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:14px 16px;box-shadow:0 8px 32px rgba(0,0,0,.18);font-family:Inter,system-ui,sans-serif;';
+    banner.innerHTML =
+      '<div style="display:flex;gap:12px;align-items:flex-start;">'
+      + '<img src="/icons/icon-192.png" alt="HNC" style="width:38px;height:38px;border-radius:8px;flex-shrink:0;">'
+      + '<div style="flex:1;min-width:0;">'
+        + '<div style="font-size:14px;font-weight:600;color:#1e293b;margin-bottom:2px;">Install HNC CRM</div>'
+        + '<div style="font-size:12px;color:#475569;line-height:1.5;">' + (isIos() ? iosCopy : androidCopy) + '</div>'
+      + '</div>'
+      + '<button aria-label="Dismiss" id="hnc-install-banner-x" style="background:none;border:none;font-size:22px;color:#94a3b8;cursor:pointer;line-height:1;padding:0 4px;flex-shrink:0;">&times;</button>'
+      + '</div>';
+    document.body.appendChild(banner);
+    document.getElementById('hnc-install-banner-x').addEventListener('click', function(){
+      banner.remove();
+      try { localStorage.setItem('hnc_install_banner_dismissed', '1'); } catch(e){}
+    });
+  }
+
+  // Defer the banner so it doesn't compete with login or initial render
+  setTimeout(showInstallBanner, 2500);
+
+  // Expose a helper users can call from the console / a settings menu to
+  // re-trigger the prompt after dismissal (e.g., "Show install instructions
+  // again"). We'll wire this to a settings UI in Phase 3.
+  window.hncShowInstallHint = function(){
+    try { localStorage.removeItem('hnc_install_banner_dismissed'); } catch(e){}
+    showInstallBanner();
+  };
+})();
 </script>
 
 <!-- NEW LEAD OVERLAY -->

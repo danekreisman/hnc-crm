@@ -4471,7 +4471,7 @@ async function saveApptEdit(mode){
             if(_dupe){ _skipped++; return; }
             var _newAppt = {
               n: editClient,
-              s: 'unassigned',
+              s: (cleanerVal && cleanerVal !== 'Unassigned') ? 'assigned' : 'unassigned',
               t: newTimeStr,
               cleaner: cleanerVal,
               recurring: true,
@@ -4491,11 +4491,17 @@ async function saveApptEdit(mode){
             _inserted++;
             try{
               if(typeof dbSaveAppointment==='function'){
+                // BUG FIX 2026-05-03: previously passed `cleaner: cleanerVal`,
+                // but dbSaveAppointment reads `data.cleanerName` for the
+                // cleaner_id lookup. Mismatch → cleaner_id NULL on every
+                // generated row → status 'unassigned' → red on calendar.
+                // Also dropped the hardcoded status:'unassigned' so
+                // dbSaveAppointment can derive 'assigned' when cleaner is set.
                 dbSaveAppointment({
                   clientName: editClient, service: svcText, freq: freq,
                   date: _oKey, time: newTimeStr, address: editAddr,
                   beds: editBeds, baths: editBaths, sqft: editSqft, condition: editCond,
-                  cleaner: cleanerVal, status: 'unassigned',
+                  cleanerName: cleanerVal,
                   basePrice: editBase, tax: editTax, totalPrice: editTotal,
                   cleanerPay: editCleanerPay, cleanerPayOverride: editCleanerPayOverride,
                   duration: editDuration, notes: editNotes,

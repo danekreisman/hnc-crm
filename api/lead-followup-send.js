@@ -158,6 +158,46 @@ export default async function handler(req, res) {
       }
     }
 
+    // ── Write comms log rows ─────────────────────────────────────────────
+    // One row per channel actually sent (or failed). Surfaces on the lead
+    // profile's Comms log panel via /api/lead-comms-log.
+    const logRows = [];
+    if (wantSms) {
+      logRows.push({
+        lead_id: leadId,
+        channel: 'sms',
+        kind: 'ai_followup',
+        content: String(sms || '').slice(0, 1000),
+        status: smsSent ? 'sent' : 'failed',
+        error_message: smsSent ? null : (errors.find(e => e.includes('SMS')) || 'unknown SMS error'),
+        source_label: 'AI follow-up',
+      });
+    }
+    if (wantEmail) {
+      logRows.push({
+        lead_id: leadId,
+        channel: 'email',
+        kind: 'ai_followup',
+        content: String(email.body || '').slice(0, 1000),
+        subject: String(email.subject || '').slice(0, 200),
+        status: emailSent ? 'sent' : 'failed',
+        error_message: emailSent ? null : (errors.find(e => e.includes('Email')) || 'unknown email error'),
+        source_label: 'AI follow-up',
+      });
+    }
+    if (logRows.length > 0) {
+      try {
+        const insRes = await db.from('lead_comms_log').insert(logRows);
+        if (insRes.error) {
+          // Most likely cause: migration hasn't been run yet. Don't fail the
+          // request — just log so we know to apply the migration.
+          console.warn('[lead-followup-send] comms log insert failed (run migration?):', insRes.error.message);
+        }
+      } catch (logErr) {
+        console.warn('[lead-followup-send] comms log insert threw:', logErr.message);
+      }
+    }
+
     // ── Update lead row ──────────────────────────────────────────────────
     if (smsSent || emailSent) {
       const channelLabel = [smsSent ? 'SMS' : null, emailSent ? 'Email' : null].filter(Boolean).join(' + ');

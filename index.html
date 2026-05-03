@@ -2005,6 +2005,17 @@ Mahalo 🌺</textarea>
           <button class="action-btn red" onclick="deleteRecord('lead')">Delete lead</button>
         </div>
         <div class="success-bar" id="lead-action-success" style="margin-top:10px;"></div>
+
+        <!-- Comms log panel: per-lead timeline of every outbound message
+             (AI follow-ups, automation runs, future manual sends). Lazy-loaded
+             on profile open via /api/lead-comms-log. -->
+        <div style="margin-top:18px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+            <div class="panel-section" style="margin:0;border:none;padding:0;">Comms log</div>
+            <button onclick="loadLeadCommsLog(true)" style="background:none;border:1px solid var(--border);border-radius:8px;padding:4px 10px;font-size:11px;color:var(--text-muted);cursor:pointer;">Refresh</button>
+          </div>
+          <div id="lead-comms-log-body" style="font-size:12px;color:var(--text-muted);padding:8px 0;">Loading…</div>
+        </div>
       </div>
       <div id="lead-edit" style="display:none;">
         <div class="panel-section">Edit lead</div>
@@ -4828,6 +4839,7 @@ function openLead(id){
   openOverlay('lead-overlay');
   setTimeout(loadLeadSummary, 400);
   setTimeout(loadSuggestedQuote, 400);
+  setTimeout(loadLeadCommsLog, 500);
 }
 
 function showLeadEdit(){
@@ -12666,6 +12678,96 @@ function generateClientSummary(){
 }
 
 /* === LEAD SUMMARY ======================================================== */
+/* ──────────────────────────────────────────────────────────────────────
+   Comms log panel — fetches the timeline for the currently-open lead and
+   renders chronologically. Sources combined server-side: lead_comms_log
+   (AI follow-ups + future automation/manual sends) and lead_automation_runs
+   (which rule fired). See /api/lead-comms-log.
+   ────────────────────────────────────────────────────────────────────── */
+async function loadLeadCommsLog(force){
+  if(!currentLeadId) return;
+  var bodyEl = document.getElementById('lead-comms-log-body');
+  if(!bodyEl) return;
+  // Avoid double-loading on the same profile open unless forced
+  if(!force && bodyEl.dataset.loadedFor === currentLeadId) return;
+  bodyEl.dataset.loadedFor = currentLeadId;
+  bodyEl.innerHTML = '<div style="color:var(--text-muted);">Loading\u2026</div>';
+
+  try {
+    var sess = await db.auth.getSession();
+    var tok = sess.data.session ? sess.data.session.access_token : '';
+    var resp = await fetch('/api/lead-comms-log?leadId=' + encodeURIComponent(currentLeadId), {
+      headers: { 'Authorization': 'Bearer ' + tok },
+    });
+    var data = await resp.json();
+    if(!data.success){
+      bodyEl.innerHTML = '<div style="color:#c53030;">Could not load: ' + (data.error || 'unknown error') + '</div>';
+      return;
+    }
+    _renderLeadCommsLog(data.timeline || []);
+  } catch (e) {
+    bodyEl.innerHTML = '<div style="color:#c53030;">Failed to load: ' + e.message + '</div>';
+  }
+}
+
+function _renderLeadCommsLog(timeline){
+  var bodyEl = document.getElementById('lead-comms-log-body');
+  if(!bodyEl) return;
+  if(!timeline.length){
+    bodyEl.innerHTML = '<div style="color:var(--text-muted);font-style:italic;padding:6px 0;">No comms sent yet. AI follow-ups and automation runs will show here.</div>';
+    return;
+  }
+  // Helpers
+  function escape(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  function fmtTime(iso){
+    if(!iso) return '';
+    try {
+      var d = new Date(iso);
+      return d.toLocaleString('en-US', {timeZone: 'Pacific/Honolulu', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit'});
+    } catch(_){ return iso; }
+  }
+  function iconFor(item){
+    if(item.kind === 'ai_followup') return '\u2728'; // sparkles
+    if(item.category === 'automation' || item.kind === 'automation_run') return '\u23F0'; // alarm clock
+    if(item.kind === 'auto_quote') return '\uD83D\uDCAC'; // speech balloon
+    if(item.kind === 'owner_alert') return '\uD83D\uDD14'; // bell
+    return '\u2709'; // envelope fallback
+  }
+  function colorFor(item){
+    if(item.status === 'failed') return '#c53030';
+    if(item.kind === 'ai_followup') return '#553c9a'; // purple
+    if(item.category === 'automation') return '#b7791f'; // amber
+    return 'var(--text)';
+  }
+
+  var html = '<div style="display:flex;flex-direction:column;gap:8px;">';
+  for(var i=0; i<timeline.length; i++){
+    var t = timeline[i];
+    var icon = iconFor(t);
+    var color = colorFor(t);
+    var channelBadge = t.channel ? '<span style="background:#f0f0f0;color:#555;padding:1px 6px;border-radius:4px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;">' + escape(t.channel) + '</span>' : '';
+    var statusBadge = '';
+    if(t.status === 'failed') statusBadge = '<span style="background:#fee;color:#c53030;padding:1px 6px;border-radius:4px;font-size:10px;font-weight:600;margin-left:6px;">FAILED</span>';
+    var preview = '';
+    if(t.subject) preview += '<div style="font-weight:600;color:var(--text);font-size:12px;margin-top:2px;">'+escape(t.subject)+'</div>';
+    if(t.content_preview) preview += '<div style="color:var(--text-muted);font-size:12px;margin-top:2px;line-height:1.4;white-space:pre-wrap;">'+escape(t.content_preview)+'</div>';
+    if(t.error_message && t.status === 'failed') preview += '<div style="color:#c53030;font-size:11px;margin-top:2px;">Error: '+escape(t.error_message)+'</div>';
+
+    html += '<div style="border-left:3px solid '+color+';padding:6px 10px;background:var(--bg-soft);border-radius:0 6px 6px 0;">'
+      + '<div style="display:flex;align-items:center;gap:6px;">'
+      +   '<span style="font-size:13px;">'+icon+'</span>'
+      +   '<span style="font-weight:600;color:'+color+';font-size:12px;">'+escape(t.source_label || t.kind)+'</span>'
+      +   channelBadge
+      +   statusBadge
+      +   '<span style="margin-left:auto;color:var(--text-muted);font-size:11px;">'+escape(fmtTime(t.timestamp))+'</span>'
+      + '</div>'
+      + preview
+      + '</div>';
+  }
+  html += '</div>';
+  bodyEl.innerHTML = html;
+}
+
 async function loadLeadSummary(){
   var d = currentLeadId ? leadDB[currentLeadId] : null;
   if (!d) return;
@@ -15397,6 +15499,9 @@ async function lfSend(){
       + (data.errors && data.errors.length ? '<br><br><span style="font-size:12px;color:#c53030;">Partial errors: '+data.errors.join('; ')+'</span>' : '');
     _lfShowStep('result');
     if(typeof logActivity==='function') logActivity('lead_followup_sent', 'AI follow-up sent: '+parts.join(' + '), {leadId: currentLeadId, channels: parts});
+    // Force-refresh the comms log on the lead profile so the just-sent
+    // entry appears without the user having to close/reopen.
+    if(typeof loadLeadCommsLog === 'function') loadLeadCommsLog(true);
   } catch (err){
     document.getElementById('lf-result-icon').textContent = '\u26A0\uFE0F';
     document.getElementById('lf-result-msg').textContent = 'Send failed: ' + err.message;

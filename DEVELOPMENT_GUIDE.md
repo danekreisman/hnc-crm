@@ -1073,8 +1073,45 @@ GROUP BY 1 ORDER BY 2 DESC;
 
 ---
 
-*Last updated: May 3, 2026 — Tipping feature phase 2 shipped (commit fcda836): client-driven Stripe Checkout flow with HMAC token auth, three-layer security (kill switch + Dane-only test mode + token verify), webhook handler updates tip_amount on payment, audit trail in error_logs. Required env vars: TIP_TOKEN_SECRET, ALLOW_STRIPE_CHARGES, optionally TIP_TEST_MODE/TIP_TEST_EMAIL/BASE_URL. Stripe Dashboard must be subscribed to checkout.session.completed. Currently in test mode — only dane.kreisman@gmail.com can complete a tip charge until TIP_TEST_MODE=false.*
+## 2026-05-03 Session — Tipping feature, phase 3 (commit 75e45d4)
 
-*Phase 1 (commit 481799a, same day): tip_amount column on appointments + manual entry on appt overlay + automatic payroll integration (Tips column between Gross and Bonus, even-split across paired cleaners). Migration must be run in Supabase.*
+### What shipped
+
+A "Tip (optional)" input field on both the booking form and the edit form. Customer arranged a tip in advance? Admin types the amount in. Total updates live, tip flows into payroll automatically (phase 1 already wired this), and the appointment's `tip_amount` column carries the value.
+
+This is the third path into `tip_amount`, complementing phase 1 (manual entry on appt overlay via `editApptTip`) and phase 2 (client-driven Stripe Checkout). All three converge on the same column; phase 1's payroll aggregator picks them all up.
+
+### What changed
+
+| Area | Detail |
+|---|---|
+| HTML | New `#na-tip` and `#edit-tip` number inputs, between cleaner-pay-override and hours-override on each form. |
+| `_applyNaTipToDisplay()` / `_applyEditTipToDisplay()` | Two helpers that run AFTER `calcPrice` / `calcEditPrice` finish their render. They read the tip field, parse the just-rendered `#price-val`, add the tip, write back, and append `+ tip $X.XX` to the breakdown. Called from each exit point so the property-flat / client-flat / standard / override branches all behave identically without duplicating tip math. |
+| `saveNewAppt` | One-time: passes `tipAmount: apptTip` through `dbSaveAppointment`. Recurring: writes `tip_amount` on the FIRST occurrence only (`sidx===0` in the batchRows builder); subsequent occurrences default to 0 because tips are per-job, not per-series. `apptObj` also carries `tipAmount` for immediate in-memory consistency before the DB round-trip lands. |
+| `saveApptEdit` | Reads `editTip` once at the top. Single mode: passes `tipAmount: editTip` to `dbUpdateAppointment` + mirrors `a.tipAmount = editTip` on success. All mode: separate `db.from('appointments').update({tip_amount: editTip}).eq('id', a.dbId)` after the bulk write — same pattern as the per-instance `status` update. Tip change never propagates to the series. |
+| `_openApptInner` | Pre-fills `#edit-tip` from `a.tipAmount`, blank when 0. |
+| `resetNewApptForm` | Clears `#na-tip`. |
+
+### Critical patterns reinforced
+
+1. **Tips are per-instance even in series-bulk edits.** The all-mode bulk update path explicitly excludes `tip_amount` from `sbBasePayload` and instead does a per-row write on `a.dbId`. Same pattern as `status`. Don't add `tip_amount` to `sbBulkPayload` — tipping the entire series in one click is almost never what the user means.
+
+2. **First-occurrence-only for new recurring bookings.** `tip_amount: sidx===0 ? apptTip : 0` in the batchRows builder is intentional. If a customer says "add a $20 tip" while booking a weekly recurring series, that tip is for the next clean, not every clean for the next year.
+
+3. **calcPrice has 3 render paths (property flat, client flat, standard) — the tip helper runs in all 3.** Adding new branches to calcPrice in the future means calling `_applyNaTipToDisplay()` before each early return. Same for calcEditPrice (currently single-path but if branches get added, the helper must run at every exit).
+
+### What's NOT yet wired
+
+**Stripe invoice line item.** When you send an invoice for an appointment that has a tip recorded, the invoice currently doesn't include the tip — you'd be charging the customer for the cleaning only. The next commit (separate scope) will add a tip line item to the bulk-invoice path's `lineItems` builder so invoices charge `service + tip` and show the tip as its own line. Until then, if you record a tip via the booking/edit form AND want to invoice for it, manually add a tip line item to the invoice yourself, OR use the phase-2 Stripe Checkout flow as a separate charge.
+
+The booking-form tip is fully operational for the cash/Venmo/external-payment scenarios — the customer hands you cash, you record the amount, payroll picks it up. The Stripe-side integration is only needed for "I want this tip charged to their card alongside the cleaning."
+
+---
+
+*Last updated: May 3, 2026 — Tipping phase 3 shipped (commit 75e45d4): "Tip (optional)" field on booking + edit forms with live total math + payroll auto-flow. Three input paths into tip_amount now exist (overlay manual, Stripe Checkout, booking/edit form), all converging on the phase-1 payroll aggregator. Stripe invoice tip line-item integration deferred to next commit. Earlier session notes preserved below.*
+
+*Phase 2 (commit fcda836): client-driven Stripe Checkout flow with HMAC token auth, three-layer security (kill switch + Dane-only test mode + token verify), webhook handler updates tip_amount on payment, audit trail in error_logs.*
+
+*Phase 1 (commit 481799a): tip_amount column on appointments + manual entry on appt overlay + automatic payroll integration (Tips column between Gross and Bonus, even-split across paired cleaners). Migration must be run in Supabase.*
 
 *Previous: May 2, 2026 — Two long sessions, ~30 commits. Major: AI follow-up button shipped (manual lead nurture, generates personalized SMS/email per lead, two-step preview-before-send), then evolved across the day with brand voice tuning (Aloha opener, "— Dane from Hawaii Natural Clean" sign-off, banned-phrase list, brand voice paragraph). Bulk multi-select on pipeline added so 46+ leads can be handled in minutes via parallel generate + preview gallery + send. Per-lead Comms log panel with full DB-backed timeline (lead_comms_log table). Per-lead `do_not_contact` toggle (cron-only, doesn't gate manual sends). All 5 user-defined automations disabled — system is in fully manual mode for lead outreach. 64 leads bulk-imported from March/April spreadsheet. AI prompt tuned through 6 iterations to fix: CRM-bot tone (Aloha rewrite), missing prices (SMS history detection + server-side regex scan), JSON-with-postamble parser failure (brace-depth tracker), past dates (today-date injection + ban), fabricated estimates (hasStructuredQuote evidence flag), creepy street addresses (city-only extraction). Backend bugs fixed: VERCEL_URL → BASE_URL routing (Vercel deployment-protection HTML response), Supabase silent UPDATE failures (.update doesn't throw, must check res.error), temporal dead zone in derived flag ordering. Scheduling: day-of-week shift for recurring series (Bobby Nikkhoo Friday→Thursday), duplicate-delete bug (Susanna DeSantos), halt-series cross-contamination, Google Places stuck dropdown. UX wins: parallelized startup (4 DB fetches simultaneous, pipeline renders 1-2s sooner), calendar defaults to current month + Today button, new-appt form starts blank, task undo + reopen + daily 8am Hawaii deadline SMS digest, SMS counter wording clarified. Lead form launch checklist documented at top of Pending. **Patterns codified**: Supabase ops must check `res.error`; never use VERCEL_URL for inter-function calls; use brace-depth parser for LLM JSON; destructive ops on appointments end with `_refreshAppointmentsFromDB` for DB-source-of-truth.*

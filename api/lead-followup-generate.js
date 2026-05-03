@@ -89,12 +89,26 @@ export default async function handler(req, res) {
     const channelInstructions = [];
     if (wantSms) {
       channelInstructions.push(
-        'For SMS: 1-2 short sentences max. Personal tone, like texting a friend. Sign off with "— Dane @ HNC". Do NOT use formal email phrases like "I hope this finds you well." No emojis except maybe 🌺 at the end if it fits naturally.'
+        [
+          'For SMS:',
+          '- OPEN with "Aloha [firstName]," — this is the brand voice, not optional. Never "Hey", "Hi", "Hello".',
+          '- 1-3 short sentences. Sound like a local Hawaii business owner texting a neighbor, not a sales CRM.',
+          '- Sign off "— Dane, Hawaii Natural Clean" or "— Dane 🌺" (pick whichever fits the message length).',
+          '- A 🌺 somewhere is welcome but not required. Do NOT stuff multiple emojis.',
+          '- Tone reference (do NOT copy literally — match the warmth, not the words):',
+          '   "Aloha Sharon! Hope your move is going smooth. Whenever you\'re ready to lock in that move-out clean, just shoot me a text. — Dane 🌺"',
+        ].join('\n')
       );
     }
     if (wantEmail) {
       channelInstructions.push(
-        'For email: warmer and slightly longer (3-5 sentences). Subject line under 50 chars, specific to them — not generic like "Following up". Body opens with a personal hook from their notes/conversation if relevant, then the ask, then a sign-off "— Dane, Hawaii Natural Clean". Skip "Dear" / "Sincerely" — keep it human.'
+        [
+          'For email:',
+          '- OPEN with "Aloha [firstName]," — never "Dear", never "Hi there", never "Hope this email finds you well".',
+          '- 3-5 short paragraphs. Warmer and slightly more thorough than SMS, but still feels like the owner personally wrote it — NOT marketing copy.',
+          '- Subject line: short, specific to them. Avoid generic "Following up" / "Checking in" / "Just touching base".',
+          '- Sign off with two lines: "— Dane" then "Hawaii Natural Clean".',
+        ].join('\n')
       );
     }
 
@@ -126,11 +140,20 @@ export default async function handler(req, res) {
       ...channelInstructions,
       '',
       'GENERAL RULES:',
+      '- BRAND VOICE: Hawaii Natural Clean is a small, locally-owned cleaning business on Oahu and Maui. Owner Dane writes these personally. Voice is warm, neighborly, a little island-flavored — never corporate, never pushy. The reader should feel like a real person remembered them, not a CRM.',
       `- Address them as "${firstName}", not their full name.`,
       '- Be specific. If their notes or conversation history mention something concrete (a date, a property type, a question they asked), reference it.',
-      '- Do NOT start with "I hope this email/text finds you well" or any other generic opener.',
-      '- Do NOT make up details that aren\'t in the data above. If you don\'t have a specific hook, keep it short and direct.',
+      '- BANNED PHRASES (these are CRM-speak, not how locals talk): "just checking in", "checking in on", "following up on that", "wanted to follow up", "wanted to reach out", "circling back", "touching base", "I hope this finds you well", "I hope this email finds you well", "per our last conversation".',
+      '- BANNED OPENERS: "Hey", "Hi", "Hello", "Dear", "Hi there". Always open with "Aloha [firstName],".',
+      '- Do NOT make up details that aren\'t in the data above. If you don\'t have a specific hook, keep it short and warm — better a 2-sentence message that feels real than a 5-sentence message stuffed with invented context.',
       '- Do NOT include a price unless one is provided in CONTEXT — never invent numbers.',
+      '- Do NOT mention "the quote" or "your quote" robotically. If you reference price, do it like a person would: "the $179 we talked about" or "the move-out estimate".',
+      '',
+      'CHECKLIST before you write the message:',
+      '  ✓ Does it open with "Aloha"?',
+      '  ✓ Does it AVOID every banned phrase?',
+      '  ✓ Would it feel natural coming from a small business owner who knows the islands?',
+      '  ✓ If you stripped the lead\'s name out, would it still feel like ME wrote it (vs. any cleaning company)?',
       '',
       history && history.trim() ? '\n=== CONVERSATION HISTORY (most recent first) ===\n' + history + '\n=== END HISTORY ===\n' : '',
       'OUTPUT FORMAT:',

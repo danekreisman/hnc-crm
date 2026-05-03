@@ -15454,7 +15454,14 @@ function _lfUpdateSmsCounter(){
   if(!ta || !ctr) return;
   var len = ta.value.length;
   var seg = len <= 160 ? 1 : Math.ceil(len / 153);
-  ctr.textContent = len + ' chars \u00b7 ' + seg + ' SMS segment' + (seg>1?'s':'');
+  // Recipient always sees ONE continuous message regardless of segment count.
+  // Segments are just OpenPhone billing units — each segment ≈ 153 chars when
+  // a message is split. Wording avoids implying multiple texts are sent.
+  if(seg === 1){
+    ctr.textContent = len + ' / 160 chars \u00b7 1 text';
+  } else {
+    ctr.textContent = len + ' chars \u00b7 1 text (sent in ' + seg + ' segments — recipient sees as one message)';
+  }
 }
 document.addEventListener('input', function(e){
   if(e.target && e.target.id === 'lf-sms-body') _lfUpdateSmsCounter();

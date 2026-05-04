@@ -68,6 +68,43 @@ export default async function handler(req, res) {
   const phone     = d.phone.replace(/\D/g, '');
   const e164      = phone.startsWith('+') ? phone : '+1' + phone;
 
+  // ── 2.4. In-app notification + push for new lead (phase 3 of notif system) ──
+  // Fires for every new lead regardless of automation toggles. The owner
+  // email/SMS below are gated by automations because they're outbound traffic
+  // that costs money. In-app + push are free and the owner always wants to
+  // know about a new lead.
+  // Best-effort — failures are logged but don't block the lead capture flow.
+  (async () => {
+    try {
+      await fetch(`${process.env.SUPABASE_URL}/rest/v1/notifications`, {
+        method: 'POST',
+        headers: {
+          apikey: process.env.SUPABASE_SERVICE_ROLE_KEY,
+          Authorization: 'Bearer ' + process.env.SUPABASE_SERVICE_ROLE_KEY,
+          'Content-Type': 'application/json',
+          Prefer: 'return=minimal'
+        },
+        body: JSON.stringify({
+          event_type: 'lead_inquiry',
+          title: 'New lead: ' + d.name.trim(),
+          body: (d.serviceType || 'Cleaning inquiry') + (d.sqft ? ' \u00b7 ' + d.sqft + ' sqft' : '') + (d.island ? ' \u00b7 ' + d.island : ''),
+          url: '/?lead=' + leadId,
+          metadata: { leadId, name: d.name, phone: d.phone, service: d.serviceType, source: d.referralSource }
+        })
+      });
+    } catch (e) { console.warn('[lead-capture] in-app notify failed:', e && e.message); }
+    try {
+      const { sendPushToAllSubscribed } = await import('./utils/send-push.js');
+      await sendPushToAllSubscribed({
+        title: 'New lead: ' + d.name.trim(),
+        body: (d.serviceType || 'Cleaning inquiry') + (d.island ? ' \u00b7 ' + d.island : ''),
+        url: '/?lead=' + leadId,
+        tag: 'lead-' + leadId,
+        urgency: 'high'
+      });
+    } catch (e) { console.warn('[lead-capture] push notify failed:', e && e.message); }
+  })();
+
   // ── 2.5. Owner notification + OpenPhone contact creation (fire-and-forget) ─
   // We don't await these — if either fails, the lead is still saved and the
   // quote flow still runs. Errors are logged for inspection.

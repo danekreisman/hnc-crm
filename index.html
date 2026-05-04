@@ -7002,6 +7002,17 @@ async function saveNewAppt(){
       if(!batchRes.error&&batchRes.data&&batchRes.data[0]){
         apptObj.dbId=batchRes.data[0].id;
         console.log('[saveNewAppt] Supabase batch saved '+batchRows.length+' rows, first dbId='+apptObj.dbId);
+        // Single summary notification for the whole series — much better UX
+        // than 26 separate "booking_created" pings for a 6-month weekly series.
+        if(typeof _fireNotification === 'function'){
+          _fireNotification({
+            event_type: 'booking_created',
+            title: 'New recurring series: ' + name,
+            body: batchRows.length + ' ' + (freq||'recurring') + ' appointments \u00b7 starts ' + dateVal + ' \u00b7 ' + (cleanerName || 'unassigned'),
+            url: '#calendar',
+            metadata: { seriesId: apptSeriesId, count: batchRows.length, frequency: freq, clientName: name, firstDate: dateVal }
+          });
+        }
       } else if(batchRes.error){
         console.error('[saveNewAppt] Supabase batch error:', batchRes.error);
         showToast('⚠️ Appointments could not be saved: '+(batchRes.error.message||'database error')+'. Check Supabase RLS settings.', 'error');

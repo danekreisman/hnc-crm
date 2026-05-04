@@ -18679,15 +18679,91 @@ async function markAllNotifRead() {
   } catch (err) { console.warn('[notif] mark all failed:', err); }
 }
 
+// Realtime subscriptions (2026-05-03). Replaces 30s polling for snappier UX.
+// One subscription per table. Each push from Supabase triggers a targeted
+// re-fetch of the relevant in-memory state. Polling is kept as a fallback
+// (60s interval, was 30s) — if the websocket drops or Realtime is somehow
+// disabled on a table, polling keeps things eventually-consistent.
+var _hncRealtimeChannels = []; // { channel, name } so we can clean up on signout
+
+function _hncSubscribeRealtime(tableName, onChange) {
+  try {
+    var ch = db.channel('hnc-rt-' + tableName)
+      .on('postgres_changes', { event: '*', schema: 'public', table: tableName }, function(payload){
+        // payload has eventType ('INSERT'|'UPDATE'|'DELETE'), new, old
+        try { onChange(payload); } catch(err){ console.warn('[realtime] '+tableName+' handler error:', err); }
+      })
+      .subscribe(function(status){
+        if (status === 'SUBSCRIBED') console.log('[realtime] '+tableName+' subscribed');
+        else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          console.warn('[realtime] '+tableName+' status:', status, '— polling fallback continues');
+        }
+      });
+    _hncRealtimeChannels.push({ channel: ch, name: tableName });
+  } catch (err) {
+    console.warn('[realtime] subscribe failed for '+tableName+':', err);
+  }
+}
+
+function _hncTeardownRealtime() {
+  _hncRealtimeChannels.forEach(function(entry){
+    try { db.removeChannel(entry.channel); } catch(_) {}
+  });
+  _hncRealtimeChannels = [];
+}
+
 function startNotifPolling() {
   _notifSetupAudioUnlock();
   loadNotifications();
+  // Realtime subscription on notifications. Push-based: any insert from the
+  // server (Stripe webhook) or another client (booking_created from a different
+  // tab) triggers an immediate refresh + sound.
+  _hncSubscribeRealtime('notifications', function(payload){
+    if (payload.eventType === 'INSERT') {
+      // New notification arrived — refresh feed + bell + play sound
+      loadNotifications();
+    } else if (payload.eventType === 'UPDATE' || payload.eventType === 'DELETE') {
+      // Read state changed elsewhere, or row removed — silent refresh
+      loadNotifications();
+    }
+  });
+  // Realtime subscription on appointments. Any insert/update/delete from
+  // any client triggers _refreshAppointmentsFromDB so the calendar stays
+  // in sync across devices in real time. settleMs:0 because the change
+  // already committed before we got the push.
+  _hncSubscribeRealtime('appointments', function(payload){
+    if (typeof _refreshAppointmentsFromDB === 'function') {
+      _refreshAppointmentsFromDB({ settleMs: 0 });
+    }
+  });
+  // Realtime on app_users so deactivating a user evicts them within seconds.
+  // We listen for UPDATE on the current user's row — if active flips to false,
+  // we sign them out immediately.
+  _hncSubscribeRealtime('app_users', function(payload){
+    if (payload.eventType !== 'UPDATE' && payload.eventType !== 'DELETE') return;
+    db.auth.getSession().then(function(sess){
+      if (!sess.data.session) return;
+      var myEmail = (sess.data.session.user.email || '').toLowerCase();
+      var rowEmail = ((payload.new && payload.new.email) || (payload.old && payload.old.email) || '').toLowerCase();
+      if (rowEmail !== myEmail) return;
+      // It's me. If I was deactivated or deleted, sign me out.
+      if (payload.eventType === 'DELETE' || (payload.new && payload.new.active === false)) {
+        // Don't kick hardcoded admins — belt-and-suspenders for self-recovery
+        if (ADMIN_EMAILS.map(function(e){return e.toLowerCase();}).includes(myEmail)) return;
+        if (typeof showToast === 'function') showToast('Your access was revoked. Signing out…', true);
+        setTimeout(function(){ _denyAccess(myEmail, 'Access was revoked while you were signed in.'); }, 1200);
+      }
+    });
+  });
+  // Polling fallback (60s, was 30s). If realtime is disabled or the websocket
+  // drops, this keeps things eventually-consistent. Most users won't hit it.
   if (_notifPollHandle) clearInterval(_notifPollHandle);
-  _notifPollHandle = setInterval(loadNotifications, 30000);
+  _notifPollHandle = setInterval(loadNotifications, 60000);
 }
 
 function stopNotifPolling() {
   if (_notifPollHandle) { clearInterval(_notifPollHandle); _notifPollHandle = null; }
+  _hncTeardownRealtime();
 }
 
 // Insert a notification row. Used for client-side fired events (booking_created

@@ -18687,9 +18687,10 @@ function stopNotifPolling() {
 // Server-side events (invoice_paid via Stripe webhook) insert directly from
 // the webhook handler — they don't need this helper.
 //
-// Best-effort. We don't surface failures to the user because the parent
-// operation (creating the booking, etc.) succeeded — failing to *notify* about
-// it isn't worth a scary toast. We log to console for diagnostics.
+// Phase 2 (2026-05-03): also fans out a push notification via /api/send-push
+// so the alert reaches subscribed devices even when the CRM tab is closed.
+// Both calls are best-effort — the parent operation (creating the booking,
+// etc.) succeeded, failing to *notify* about it isn't worth a scary toast.
 async function _fireNotification(payload) {
   try {
     var row = {
@@ -18706,6 +18707,29 @@ async function _fireNotification(payload) {
     setTimeout(loadNotifications, 200);
   } catch (err) {
     console.warn('[notif] dispatch error:', err);
+  }
+
+  // Phase 2: push fan-out. Separate try/catch so a push failure doesn't
+  // mask the in-app notification's success.
+  try {
+    var sess = await db.auth.getSession();
+    var tok = sess.data.session ? sess.data.session.access_token : null;
+    if (!tok) return; // no session, can't authenticate the push call
+    fetch('/api/send-push', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + tok },
+      body: JSON.stringify({
+        title: payload.title,
+        body: payload.body || '',
+        url: payload.url || '/',
+        tag: payload.event_type + (payload.metadata && payload.metadata.apptId ? ('-' + payload.metadata.apptId) : ''),
+        urgency: payload.urgency || 'normal'
+      })
+    }).then(function(r){
+      if (!r.ok) console.warn('[notif] push fan-out non-OK:', r.status);
+    }).catch(function(e){ console.warn('[notif] push fan-out failed:', e && e.message); });
+  } catch (err) {
+    console.warn('[notif] push fan-out error:', err);
   }
 }
 

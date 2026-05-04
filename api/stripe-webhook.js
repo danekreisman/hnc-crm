@@ -4,6 +4,7 @@
  */
 
 import { isWebhookProcessed, recordWebhook } from './utils/webhook-idempotency.js';
+import { sendPushToAllSubscribed } from './utils/send-push.js';
 import Stripe from 'stripe';
 
 async function logActivity(action, description, metadata={}) {
@@ -137,6 +138,16 @@ export default async function handler(req, res) {
               metadata: { chargeId: data.id, invoiceId: data.invoice, amount: amtDollars }
             })
           });
+          // Phase 2 (push, 2026-05-03): fan out to every subscribed device so
+          // the alert reaches Dane's phone home screen even when CRM is closed.
+          // Best-effort. Errors logged but don't block the webhook response.
+          sendPushToAllSubscribed({
+            title: 'Invoice paid: $' + amtDollars.toFixed(2),
+            body: 'Payment received from ' + customerLabel,
+            url: '/#payments',
+            tag: 'invoice-' + data.id,
+            urgency: 'high'
+          }).catch(function(e){ console.warn('[stripe-webhook] invoice_paid push failed:', e && e.message); });
         } catch (notifErr) { console.warn('[stripe-webhook] invoice_paid notify failed:', notifErr && notifErr.message); }
         console.log('[stripe-webhook] Updated invoice status for charge:', data.id);
       }
@@ -293,6 +304,14 @@ export default async function handler(req, res) {
                 metadata: { appointmentId: apptId, amount: tipDollars, cleanerName: cleanerName }
               })
             });
+            // Phase 2 push fan-out (2026-05-03)
+            sendPushToAllSubscribed({
+              title: 'Tip received: $' + tipDollars.toFixed(2),
+              body: clientName + ' tipped ' + cleanerName,
+              url: '/#payroll',
+              tag: 'tip-' + (data.id || apptId),
+              urgency: 'normal'
+            }).catch(function(e){ console.warn('[stripe-webhook] tip_received push failed:', e && e.message); });
           } catch (notifErr) { console.warn('[stripe-webhook] tip_received notify failed:', notifErr && notifErr.message); }
         }
       }

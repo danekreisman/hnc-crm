@@ -5155,17 +5155,25 @@ function deleteAppointment(){
   // Hard-delete from Supabase by ID only. We require a dbId — refusing to
   // fall back to name+date+time because that would happily delete both
   // duplicates of a doppelganger appointment.
+  //
+  // The success toast NOW fires inside the .then() callback, only after the
+  // DB confirms deletion. Previously it fired unconditionally at the end of
+  // this function, which lied to the user when the DB delete actually failed
+  // (silent failures looked like success). 2026-05-03.
   if(dbId){
     try { if(typeof window.hncSyncGcal === 'function') window.hncSyncGcal(dbId, 'delete'); } catch(e){ console.warn('[deleteAppointment] gcal sync failed', e); }
     db.from('appointments').delete().eq('id', dbId).then(function(res){
       if(res.error){
         console.error('[deleteAppointment] Supabase delete error:', res.error);
-        if(typeof showToast==='function') showToast('Delete failed: ' + res.error.message, true);
+        if(typeof showToast==='function') showToast('Delete failed: ' + (res.error.message || 'database error'), true);
         // Pull from DB to undo the optimistic in-memory removal
         if(typeof _refreshAppointmentsFromDB==='function') _refreshAppointmentsFromDB({settleMs: 0});
         return;
       }
       console.log('[deleteAppointment] Supabase deleted dbId '+dbId);
+      // Success toast fires HERE, after DB confirmed
+      if(typeof showToast==='function') showToast('Appointment deleted');
+      logActivity('appointment_deleted','Appt deleted: '+(clientName||'Unknown'),'appointment',dbId||'',{date:currentApptKey,dbId:dbId||null});
       // Re-sync from DB so any drift between in-memory and DB self-corrects.
       // Cheaper than chasing every edge case in the optimistic filter logic.
       if(typeof _refreshAppointmentsFromDB==='function') _refreshAppointmentsFromDB({settleMs: 200});
@@ -5173,14 +5181,14 @@ function deleteAppointment(){
   } else {
     // No dbId: optimistic-only row that never persisted. Nothing to delete in DB.
     console.log('[deleteAppointment] no dbId — in-memory only removal for '+clientName);
+    if(typeof showToast==='function') showToast('Appointment deleted');
+    logActivity('appointment_deleted','Appt deleted: '+(clientName||'Unknown'),'appointment','',{date:currentApptKey,dbId:null});
   }
 
   var bar = document.getElementById('appt-action-success');
   if(bar){ bar.textContent=''; }
   renderCal();
   closeOverlay('appt-overlay');
-  logActivity('appointment_deleted','Appt deleted: '+(clientName||'Unknown'),'appointment',dbId||'',{date:currentApptKey,dbId:dbId||null});
-  showToast('Appointment deleted');
 }
 
 function deleteEntireSeries(){

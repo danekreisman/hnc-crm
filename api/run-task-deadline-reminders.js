@@ -126,6 +126,40 @@ export default async function handler(req, res) {
       pushResult = { sent: 0, removed: 0, errors: [pushErr.message] };
     }
 
+    // In-app bell notification (phase 3b of notification system, 2026-05-03).
+    // Mirrors the push payload so the bell history matches what hit your
+    // phone home screen. Best-effort — failures don't break SMS or push.
+    try {
+      const totalCount = overdue.length + dueToday.length;
+      const titleParts = [];
+      if (overdue.length) titleParts.push(`${overdue.length} overdue`);
+      if (dueToday.length) titleParts.push(`${dueToday.length} due today`);
+      const inAppTitle = totalCount === 1
+        ? '1 task needs your attention'
+        : `${titleParts.join(' \u00B7 ')} \u2014 ${totalCount} tasks`;
+      const bodyTasks = [...overdue, ...dueToday].slice(0, 3);
+      const inAppBody = bodyTasks.map(t => t.title || 'Untitled').join(', ') +
+        (totalCount > 3 ? `, +${totalCount - 3} more` : '');
+      await fetch(`${SUPABASE_URL}/rest/v1/notifications`, {
+        method: 'POST',
+        headers: {
+          apikey: SUPABASE_KEY,
+          Authorization: 'Bearer ' + SUPABASE_KEY,
+          'Content-Type': 'application/json',
+          Prefer: 'return=minimal'
+        },
+        body: JSON.stringify({
+          event_type: 'task_overdue',
+          title: inAppTitle,
+          body: inAppBody,
+          url: '#tasks',
+          metadata: { overdueCount: overdue.length, dueTodayCount: dueToday.length, totalCount }
+        })
+      });
+    } catch (notifErr) {
+      console.warn('[run-task-deadline-reminders] in-app notify failed:', notifErr.message);
+    }
+
     return res.status(200).json({
       success: true,
       sent: 1,

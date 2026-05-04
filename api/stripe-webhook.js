@@ -148,6 +148,30 @@ export default async function handler(req, res) {
             tag: 'invoice-' + data.id,
             urgency: 'high'
           }).catch(function(e){ console.warn('[stripe-webhook] invoice_paid push failed:', e && e.message); });
+
+          // Phase 3b SMS layer (2026-05-03): for high-value invoices, ALSO
+          // send an SMS to the owner's business line. Threshold is configurable
+          // via env var SMS_INVOICE_THRESHOLD (default $500). Below threshold,
+          // push + in-app are sufficient — SMS adds noise. Above threshold,
+          // owner wants the redundancy across all channels.
+          // Best-effort. SMS failure does not block webhook response.
+          var smsThreshold = parseFloat(process.env.SMS_INVOICE_THRESHOLD || '500');
+          if (amtDollars >= smsThreshold) {
+            var ownerPhone = process.env.OWNER_PHONE || '+18084685356';
+            var smsBody = 'HNC: Invoice paid $' + amtDollars.toFixed(2) + ' from ' + customerLabel + '. View: hnc-crm.vercel.app/#payments';
+            // Use VERCEL_URL only as last resort — see prior session note about
+            // VERCEL_URL returning the deployment-protection wrapper. BASE_URL
+            // is the safer default for inter-function calls.
+            var smsBase = process.env.BASE_URL || 'https://book.hawaiinaturalclean.com';
+            fetch(smsBase + '/api/send-sms', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ to: ownerPhone, message: smsBody })
+            }).then(function(r){
+              if (!r.ok) console.warn('[stripe-webhook] high-value SMS non-OK:', r.status);
+              else console.log('[stripe-webhook] high-value SMS sent ($' + amtDollars.toFixed(2) + ')');
+            }).catch(function(e){ console.warn('[stripe-webhook] high-value SMS failed:', e && e.message); });
+          }
         } catch (notifErr) { console.warn('[stripe-webhook] invoice_paid notify failed:', notifErr && notifErr.message); }
         console.log('[stripe-webhook] Updated invoice status for charge:', data.id);
       }

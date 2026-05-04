@@ -5116,6 +5116,10 @@ async function cancelAllRecurring(){
     console.error('[cancelAllRecurring] Supabase ERROR:', dbRes.error);
   } else {
     console.log('[cancelAllRecurring] SUCCESS — series cancelled in Supabase');
+    // Belt-and-suspenders broadcast — bulk UPDATE has the same WAL emission
+    // reliability concerns as bulk DELETE. Ping every other connected device
+    // to re-sync so phones/other tabs catch the cancel even if WAL events drop.
+    if(typeof _hncBroadcastResync === 'function') _hncBroadcastResync('series_cancelled');
   }
 
   var bar=document.getElementById('appt-action-success');
@@ -5279,6 +5283,11 @@ function deleteEntireSeries(){
       return;
     }
     console.log('[deleteEntireSeries] SUCCESS — '+futureDbIds.length+' future rows deleted from Supabase');
+    // Belt-and-suspenders: ping every other connected device to re-sync.
+    // postgres_changes DELETE events on bulk deletes are unreliable without
+    // REPLICA IDENTITY FULL on the table, so this broadcast guarantees
+    // other devices catch the change even if WAL events drop.
+    if(typeof _hncBroadcastResync === 'function') _hncBroadcastResync('series_deleted');
     // Re-sync in-memory state from DB. Our in-memory filter could over-match
     // (same name+time across multiple series) — DB is source of truth.
     _refreshAppointmentsFromDB({settleMs: 200});
@@ -18821,6 +18830,52 @@ function _hncTeardownRealtime() {
     try { db.removeChannel(entry.channel); } catch(_) {}
   });
   _hncRealtimeChannels = [];
+  if (_hncBroadcastChannel) {
+    try { db.removeChannel(_hncBroadcastChannel); } catch(_) {}
+    _hncBroadcastChannel = null;
+  }
+}
+
+// Broadcast channel — explicit "something changed, please re-sync" pings
+// across devices. Belt-and-suspenders alongside postgres_changes. Postgres
+// realtime DELETE events require REPLICA IDENTITY FULL on the table, and
+// even then bulk deletes can sometimes drop emissions. The broadcast
+// channel doesn't depend on the WAL — sender → server → all subscribers,
+// no DB involvement — so it's a reliable backup for the cases
+// postgres_changes misses.
+var _hncBroadcastChannel = null;
+
+function _hncSetupBroadcast() {
+  if (_hncBroadcastChannel) return;
+  try {
+    _hncBroadcastChannel = db.channel('hnc-sync-bus')
+      .on('broadcast', { event: 'resync' }, function(msg){
+        var reason = (msg && msg.payload && msg.payload.reason) || 'broadcast';
+        console.log('[realtime] broadcast resync received:', reason);
+        _hncFullSyncFromRealtime('broadcast: ' + reason);
+      })
+      .subscribe();
+  } catch (err) {
+    console.warn('[realtime] broadcast setup failed:', err);
+  }
+}
+
+// Call this after any bulk mutation (multi-row delete, batch update) to
+// proactively tell every other connected device to re-sync. The mutating
+// device doesn't need to wait — its postgres_changes handler will fire
+// too if events emit normally; this just ensures other devices get the
+// ping even if events drop.
+function _hncBroadcastResync(reason) {
+  if (!_hncBroadcastChannel) return;
+  try {
+    _hncBroadcastChannel.send({
+      type: 'broadcast',
+      event: 'resync',
+      payload: { reason: reason || 'change', at: Date.now() }
+    });
+  } catch (err) {
+    console.warn('[realtime] broadcast send failed:', err);
+  }
 }
 
 // Wrapper that reloads clients + cleaners THEN appointments. Used by the
@@ -18882,6 +18937,10 @@ async function _hncFullSyncFromRealtime(reason) {
 function startNotifPolling() {
   _notifSetupAudioUnlock();
   loadNotifications();
+  // Broadcast channel — explicit cross-device "please re-sync" pings,
+  // independent of the WAL. Used as a fallback when postgres_changes events
+  // drop (e.g. bulk deletes without REPLICA IDENTITY FULL).
+  _hncSetupBroadcast();
   // Realtime subscription on notifications. Push-based: any insert from the
   // server (Stripe webhook) or another client (booking_created from a different
   // tab) triggers an immediate refresh + sound.

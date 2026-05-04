@@ -453,7 +453,7 @@ textarea{font-family:inherit;}
 /* === HNC AUTH === */
 #hnc-login-overlay{position:fixed;inset:0;background:#fff;z-index:9999;display:flex;align-items:center;justify-content:center;}
 .hnc-va-user #nav-reports-section,.hnc-va-user #nav-reporting{display:none!important;}
-.hnc-va-user .admin-only-tip{display:none!important;}
+.hnc-va-user .admin-only-tip,.hnc-va-user .admin-only{display:none!important;}
 /* === END HNC AUTH === */
 </style>
 </head>
@@ -1386,6 +1386,7 @@ textarea{font-family:inherit;}
           <button class="stab" onclick="switchSettingsTab('policies',this)">📋 Client Policies</button>
           <button class="stab" onclick="switchSettingsTab('operations',this)">⚙️ Operations</button>
           <button class="stab" onclick="switchSettingsTab('data',this)">📥 Data</button>
+          <button class="stab admin-only" onclick="switchSettingsTab('users',this)">👥 Users</button>
           <button class="stab" onclick="switchSettingsTab('danger',this)" style="color:#b91c1c;">🔴 Danger Zone</button>
         </div>
 
@@ -1570,6 +1571,49 @@ Mahalo 🌺</textarea>
               <div style="font-size:13px;color:var(--text-muted);margin-bottom:8px;">Previous imports</div>
               <div id="import-batches-list" style="font-size:13px;"></div>
               <button class="btn" onclick="loadImportBatches()" style="margin-top:8px;font-size:12px;">Refresh list</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── Users (admin-only allowlist) ────────────────────────────── -->
+        <div id="stab-users" class="stab-panel admin-only" style="display:none;">
+          <div class="settings-card">
+            <div class="settings-card-title">User access</div>
+            <div class="settings-card-desc">People who can sign in to this CRM. Anyone signing in with an email not on this list (and not on the hardcoded admin fallback) is rejected at the auth layer.</div>
+
+            <div style="margin:18px 0 22px;padding:12px 14px;background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px;font-size:12px;color:#075985;">
+              <strong>Lockout protection:</strong> Two emails are hardcoded as admins in the app — they always work, even if you delete their rows here. Currently: <code>dane.kreisman@gmail.com</code>, <code>dane@hawaiinaturalclean.net</code>.
+            </div>
+
+            <div style="margin:0 0 22px;">
+              <h3 style="font-size:14px;margin:0 0 8px;font-weight:600;">Invite a user</h3>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-start;">
+                <input type="email" id="user-invite-email" placeholder="email@example.com" style="flex:1;min-width:220px;">
+                <select id="user-invite-role" style="width:130px;">
+                  <option value="va">VA</option>
+                  <option value="admin">Admin</option>
+                </select>
+                <button class="btn btn-primary" style="font-size:12px;" onclick="inviteAppUser()">Invite</button>
+              </div>
+              <div id="user-invite-msg" style="font-size:12px;margin-top:6px;color:var(--text-muted);min-height:16px;"></div>
+              <div style="font-size:11px;margin-top:6px;color:var(--text-muted);">After you invite someone, share <code>book.hawaiinaturalclean.com</code> with them. They sign in with the same email you added here using Google or magic link.</div>
+            </div>
+
+            <div class="tw">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Email</th>
+                    <th style="width:110px;">Role</th>
+                    <th style="width:80px;">Status</th>
+                    <th style="width:130px;">Invited</th>
+                    <th style="width:160px;">Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="users-tbody">
+                  <tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:18px;">Loading\u2026</td></tr>
+                </tbody>
+              </table>
             </div>
           </div>
         </div>
@@ -13473,6 +13517,145 @@ function switchSettingsTab(tab, btn) {
   if (tab === 'communication') initTemplateEditor();
   // Init payroll when switching to operations
   if (tab === 'operations') initPayrollSettingsUI();
+  // Load app_users allowlist when switching to users tab (admin-only feature)
+  if (tab === 'users') loadAppUsers();
+}
+
+// ── User access allowlist (app_users table, 2026-05-03) ──────────────────
+// Admin-only UI to manage who can sign in to the CRM. The auth gate in
+// _authorizeOrReject queries this table on every login. ADMIN_EMAILS in the
+// JS module above are hardcoded fallbacks that always work — they appear
+// in this UI as "Protected" rows that can't be deactivated or deleted.
+
+async function loadAppUsers() {
+  const tbody = document.getElementById('users-tbody');
+  if (!tbody) return;
+  tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:18px;">Loading\u2026</td></tr>';
+  try {
+    const { data, error } = await db.from('app_users').select('*').order('invited_at', { ascending: false });
+    if (error) {
+      tbody.innerHTML = '<tr><td colspan="5" style="color:#c53030;padding:14px;">Error loading users: ' + (error.message || 'unknown') + '</td></tr>';
+      return;
+    }
+    if (!data || data.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:18px;">No users yet.</td></tr>';
+      return;
+    }
+    const adminLower = ADMIN_EMAILS.map(e => e.toLowerCase());
+    const sess = await db.auth.getSession();
+    const myEmail = ((sess.data.session && sess.data.session.user.email) || '').toLowerCase();
+
+    tbody.innerHTML = data.map(u => {
+      const emailLower = (u.email || '').toLowerCase();
+      const isHardcoded = adminLower.includes(emailLower);
+      const isMe = emailLower === myEmail;
+      // Hardcoded admins or the currently-signed-in user can't deactivate/
+      // delete themselves — prevents accidental lockout.
+      const protectedRow = isHardcoded || isMe;
+      const date = u.invited_at ? new Date(u.invited_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '\u2014';
+      const status = u.active
+        ? '<span style="color:#059669;font-weight:600;">Active</span>'
+        : '<span style="color:#9ca3af;">Inactive</span>';
+      const roleSelect = '<select onchange="changeAppUserRole(\'' + u.id + '\', this.value)"' +
+        (protectedRow ? ' disabled title="Protected"' : '') +
+        ' style="font-size:12px;padding:3px 6px;">' +
+        '<option value="va"' + (u.role === 'va' ? ' selected' : '') + '>VA</option>' +
+        '<option value="admin"' + (u.role === 'admin' ? ' selected' : '') + '>Admin</option>' +
+        '</select>';
+
+      let actions;
+      if (protectedRow) {
+        actions = '<span style="font-size:11px;color:var(--text-muted);">' + (isHardcoded ? 'Hardcoded' : 'You') + '</span>';
+      } else if (u.active) {
+        actions = '<button class="btn" style="font-size:11px;padding:3px 9px;" onclick="setAppUserActive(\'' + u.id + '\', false)">Deactivate</button>' +
+                  ' <button class="btn" style="font-size:11px;padding:3px 9px;color:#c53030;" onclick="deleteAppUser(\'' + u.id + '\', \'' + (u.email || '').replace(/'/g, '\\\'') + '\')">Delete</button>';
+      } else {
+        actions = '<button class="btn" style="font-size:11px;padding:3px 9px;" onclick="setAppUserActive(\'' + u.id + '\', true)">Reactivate</button>' +
+                  ' <button class="btn" style="font-size:11px;padding:3px 9px;color:#c53030;" onclick="deleteAppUser(\'' + u.id + '\', \'' + (u.email || '').replace(/'/g, '\\\'') + '\')">Delete</button>';
+      }
+
+      return '<tr><td style="font-family:monospace;font-size:13px;">' + u.email + '</td>' +
+             '<td>' + roleSelect + '</td>' +
+             '<td>' + status + '</td>' +
+             '<td style="font-size:11px;color:var(--text-muted);">' + date + '</td>' +
+             '<td>' + actions + '</td></tr>';
+    }).join('');
+  } catch (err) {
+    tbody.innerHTML = '<tr><td colspan="5" style="color:#c53030;padding:14px;">Error: ' + (err.message || err) + '</td></tr>';
+  }
+}
+
+async function inviteAppUser() {
+  const emailEl = document.getElementById('user-invite-email');
+  const roleEl = document.getElementById('user-invite-role');
+  const msgEl = document.getElementById('user-invite-msg');
+  if (!emailEl || !roleEl || !msgEl) return;
+  const email = (emailEl.value || '').trim().toLowerCase();
+  const role = roleEl.value;
+  if (!email || !email.includes('@') || !email.includes('.')) {
+    msgEl.textContent = 'Enter a valid email.';
+    msgEl.style.color = '#c53030';
+    return;
+  }
+  if (!['admin','va'].includes(role)) {
+    msgEl.textContent = 'Pick a role.';
+    msgEl.style.color = '#c53030';
+    return;
+  }
+  msgEl.textContent = 'Inviting\u2026';
+  msgEl.style.color = 'var(--text-muted)';
+
+  const sess = await db.auth.getSession();
+  const invitedBy = (sess.data.session && sess.data.session.user.email) || 'unknown';
+
+  const { error } = await db.from('app_users').insert([{ email, role, active: true, invited_by: invitedBy }]);
+  if (error) {
+    if (error.code === '23505' || /duplicate|unique/i.test(error.message || '')) {
+      msgEl.textContent = email + ' is already on the list.';
+    } else {
+      msgEl.textContent = 'Error: ' + (error.message || 'database error');
+    }
+    msgEl.style.color = '#c53030';
+    return;
+  }
+  emailEl.value = '';
+  msgEl.textContent = 'Invited ' + email + ' as ' + role + '. They can now sign in at book.hawaiinaturalclean.com.';
+  msgEl.style.color = '#059669';
+  await loadAppUsers();
+  if (typeof logActivity === 'function') logActivity('user_invited', 'Invited ' + email + ' as ' + role, { email, role });
+}
+
+async function setAppUserActive(id, active) {
+  const { error } = await db.from('app_users').update({ active }).eq('id', id);
+  if (error) {
+    if (typeof showToast === 'function') showToast('Error: ' + (error.message || 'database error'), true);
+    return;
+  }
+  if (typeof showToast === 'function') showToast(active ? 'User reactivated' : 'User deactivated');
+  await loadAppUsers();
+}
+
+async function changeAppUserRole(id, role) {
+  if (!['admin','va'].includes(role)) return;
+  const { error } = await db.from('app_users').update({ role }).eq('id', id);
+  if (error) {
+    if (typeof showToast === 'function') showToast('Error: ' + (error.message || 'database error'), true);
+    await loadAppUsers(); // resync UI back to actual DB state
+    return;
+  }
+  if (typeof showToast === 'function') showToast('Role updated to ' + role);
+}
+
+async function deleteAppUser(id, email) {
+  if (!confirm('Remove ' + email + ' from the access list? They will lose access immediately.')) return;
+  const { error } = await db.from('app_users').delete().eq('id', id);
+  if (error) {
+    if (typeof showToast === 'function') showToast('Error: ' + (error.message || 'database error'), true);
+    return;
+  }
+  if (typeof showToast === 'function') showToast(email + ' removed from access list');
+  await loadAppUsers();
+  if (typeof logActivity === 'function') logActivity('user_removed', 'Removed ' + email + ' from access list', { email });
 }
 
 // ─── Policy editor ────────────────────────────────────────────────────────────
@@ -18090,15 +18273,105 @@ async function clientNotifEnabled(dbClient, clientId, key) {
 
 // === HNC AUTH ===
 const ADMIN_EMAILS = ['dane.kreisman@gmail.com', 'dane@hawaiinaturalclean.net'];
+
 async function initAuth() {
   const { data: { session } } = await db.auth.getSession();
-  if (session) { applyUserRole(session.user.email); document.getElementById('hnc-login-overlay').style.display = 'none'; setTimeout(hncMaybePromptForPush, 4000); }
-  else { _setUserFooter(null); document.getElementById('hnc-login-overlay').style.display = 'flex'; }
-  db.auth.onAuthStateChange((event, session) => {
-    if (session) { applyUserRole(session.user.email); document.getElementById('hnc-login-overlay').style.display = 'none'; if (window.location.hash.includes('access_token')) window.history.replaceState({}, document.title, window.location.pathname); setTimeout(hncMaybePromptForPush, 4000); }
+  if (session) {
+    await _authorizeOrReject(session);
+  } else {
+    _setUserFooter(null);
+    document.getElementById('hnc-login-overlay').style.display = 'flex';
+  }
+  db.auth.onAuthStateChange(async (event, session) => {
+    if (session) {
+      await _authorizeOrReject(session);
+    }
   });
 }
-function applyUserRole(email) { if (!ADMIN_EMAILS.map(e=>e.toLowerCase()).includes(email.toLowerCase())) document.body.classList.add('hnc-va-user'); _setUserFooter(email); }
+
+// Authorize the signed-in user against ADMIN_EMAILS (hardcoded fallback) and
+// the app_users table (database allowlist). On reject, sign the user out and
+// surface a clear message in the login overlay. ADMIN_EMAILS always wins so
+// Dane can never be locked out by a bad DB write or RLS misconfiguration.
+async function _authorizeOrReject(session) {
+  const email = ((session.user && session.user.email) || '').toLowerCase();
+  if (!email) { await _denyAccess('', 'No email on the signed-in account.'); return; }
+
+  // Hardcoded fallback admins — always authorized, even if app_users is broken
+  if (ADMIN_EMAILS.map(e => e.toLowerCase()).includes(email)) {
+    _grantAccess(email, 'admin');
+    return;
+  }
+
+  // Database allowlist
+  try {
+    const { data, error } = await db.from('app_users')
+      .select('email,role,active')
+      .eq('email', email)
+      .maybeSingle();
+    if (error) {
+      console.error('[authorize] DB error:', error);
+      await _denyAccess(email, 'Authorization check failed. Try again or contact dane@hawaiinaturalclean.net.');
+      return;
+    }
+    if (!data) {
+      await _denyAccess(email, 'Not on the access list.');
+      return;
+    }
+    if (!data.active) {
+      await _denyAccess(email, 'This account has been deactivated.');
+      return;
+    }
+    _grantAccess(email, data.role || 'va');
+  } catch (err) {
+    console.error('[authorize] error:', err);
+    await _denyAccess(email, 'Authorization check failed. Try again or contact dane@hawaiinaturalclean.net.');
+  }
+}
+
+function _grantAccess(email, role) {
+  applyUserRole(email, role);
+  const overlay = document.getElementById('hnc-login-overlay');
+  if (overlay) overlay.style.display = 'none';
+  if (window.location.hash.includes('access_token')) {
+    window.history.replaceState({}, document.title, window.location.pathname);
+  }
+  setTimeout(hncMaybePromptForPush, 4000);
+}
+
+async function _denyAccess(email, reasonMsg) {
+  console.warn('[authorize] DENY:', email || '(no email)', reasonMsg);
+  try { await db.auth.signOut(); } catch (_) {}
+  try { Object.keys(localStorage).filter(k => k.startsWith('sb-')).forEach(k => localStorage.removeItem(k)); } catch (_) {}
+  const overlay = document.getElementById('hnc-login-overlay');
+  if (overlay) overlay.style.display = 'flex';
+  const msgEl = document.getElementById('hnc-login-msg');
+  if (msgEl) {
+    msgEl.innerHTML = '<strong style="color:#c53030;">Access not granted</strong><br>' +
+      '<span style="font-size:.85rem;display:inline-block;margin-top:4px;">' +
+      (email ? ('Signed in as <code>' + email + '</code>. ') : '') +
+      reasonMsg + '<br>Contact <a href="mailto:dane@hawaiinaturalclean.net">dane@hawaiinaturalclean.net</a> to request access.</span>';
+  }
+  // Re-enable login buttons in case they were left disabled by the in-progress flow
+  const gBtn = document.getElementById('hnc-login-google');
+  if (gBtn) { gBtn.disabled = false; gBtn.style.opacity = '1'; }
+  const mBtn = document.getElementById('hnc-login-btn');
+  if (mBtn) { mBtn.disabled = false; mBtn.textContent = 'Send Magic Link'; }
+}
+
+function applyUserRole(email, role) {
+  // role is 'admin' or 'va' (from app_users table). Hardcoded ADMIN_EMAILS
+  // are always treated as admin even if the DB says otherwise.
+  const isHardcodedAdmin = ADMIN_EMAILS.map(e => e.toLowerCase()).includes((email || '').toLowerCase());
+  const isAdmin = isHardcodedAdmin || role === 'admin';
+  if (isAdmin) {
+    document.body.classList.remove('hnc-va-user');
+  } else {
+    document.body.classList.add('hnc-va-user');
+  }
+  _setUserFooter(email);
+}
+
 function _setUserFooter(email){
   var f=document.getElementById('hnc-user-footer'), e=document.getElementById('hnc-user-email');
   if(!f||!e)return;

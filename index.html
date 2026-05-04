@@ -497,6 +497,24 @@ textarea{font-family:inherit;}
           <div id="search-results" style="display:none;position:absolute;top:36px;right:0;background:#fff;border:1px solid var(--border-strong);border-radius:10px;box-shadow:0 4px 16px rgba(0,0,0,.1);width:300px;max-height:320px;overflow-y:auto;z-index:999;"></div>
         </div>
         <button class="btn" id="sec-btn" onclick="handleSecBtn()">Today</button>
+        <div id="notif-bell-wrap" style="position:relative;">
+          <button id="notif-bell" onclick="toggleNotifPanel()" title="Notifications" style="background:#fff;border:1px solid var(--border-strong);border-radius:8px;padding:6px 9px;cursor:pointer;display:flex;align-items:center;color:var(--text);font-family:inherit;position:relative;" aria-label="Notifications">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 6a5 5 0 0110 0v3l1.5 2.5h-13L3 9V6z" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M6.5 13a1.5 1.5 0 003 0" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+            <span id="notif-badge" style="display:none;position:absolute;top:-4px;right:-4px;background:#dc2626;color:#fff;font-size:10px;font-weight:700;min-width:16px;height:16px;border-radius:8px;padding:0 4px;display:none;align-items:center;justify-content:center;line-height:1;">0</span>
+          </button>
+          <div id="notif-panel" style="display:none;position:absolute;top:38px;right:0;background:#fff;border:1px solid var(--border-strong);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.12);width:340px;max-height:440px;overflow:hidden;z-index:999;display:none;flex-direction:column;">
+            <div style="padding:10px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;">
+              <div style="font-size:13px;font-weight:600;">Notifications</div>
+              <button class="btn" style="font-size:11px;padding:3px 9px;" onclick="markAllNotifRead()">Mark all read</button>
+            </div>
+            <div id="notif-list" style="overflow-y:auto;flex:1;min-height:60px;max-height:380px;">
+              <div style="padding:24px;text-align:center;color:var(--text-muted);font-size:13px;">Loading…</div>
+            </div>
+            <div style="padding:8px 14px;border-top:1px solid var(--border);font-size:11px;color:var(--text-muted);text-align:center;">
+              <a href="javascript:void(0)" onclick="sv('settings'); switchSettingsTab('communication', document.querySelector('.stab[onclick*=communication]'));" style="color:var(--brand-500);text-decoration:none;">Notification settings</a>
+            </div>
+          </div>
+        </div>
         <button class="btn btn-primary" id="top-cta" onclick="handleTopCta()">+ New appointment</button>
       </div>
     </div>
@@ -1423,6 +1441,27 @@ textarea{font-family:inherit;}
 
         <!-- ── Communication ──────────────────────────────────────────── -->
         <div id="stab-communication" class="stab-panel" style="display:none;">
+
+          <!-- Notification settings (phase 1, 2026-05-03) -->
+          <div class="settings-card" style="margin-bottom:14px;">
+            <div class="settings-card-title">Notifications</div>
+            <div class="settings-card-desc">In-app alerts when something important happens (invoice paid, tip received, new booking). Settings are saved per device.</div>
+            <div style="margin-top:14px;display:flex;flex-direction:column;gap:14px;">
+              <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-weight:normal;">
+                <input type="checkbox" id="notif-sound-toggle" onchange="saveNotifPrefs()">
+                <span style="font-size:14px;">Play sound when new notifications arrive</span>
+              </label>
+              <div id="notif-volume-row" style="display:flex;align-items:center;gap:10px;">
+                <label style="font-size:13px;color:var(--text-muted);min-width:60px;">Volume</label>
+                <input type="range" id="notif-volume-slider" min="0" max="1" step="0.05" oninput="saveNotifPrefs()" style="flex:1;max-width:240px;">
+                <span id="notif-volume-pct" style="font-size:12px;color:var(--text-muted);min-width:36px;text-align:right;">40%</span>
+                <button class="btn" style="font-size:12px;padding:5px 12px;" onclick="testNotificationSound()">Test sound</button>
+              </div>
+              <div style="font-size:11px;color:var(--text-muted);background:#f7f9f9;border-radius:6px;padding:8px 10px;">
+                <strong>Coming soon:</strong> push notifications to your phone home screen (so you get alerts even when the CRM tab is closed), and SMS dispatch for the most critical events.
+              </div>
+            </div>
+          </div>
 
           <!-- Email templates -->
           <div class="settings-card" style="margin-bottom:14px;">
@@ -6891,6 +6930,17 @@ async function saveNewAppt(){
       if(!sbRes.error&&sbRes.data&&sbRes.data[0]){
         apptObj.dbId=sbRes.data[0].id;
         console.log('[saveNewAppt] Supabase one-time saved, dbId='+apptObj.dbId);
+        // Fire notification (phase 1, 2026-05-03). Broadcast to all admins.
+        // Best-effort — if this insert fails, the booking still succeeded.
+        if(typeof _fireNotification === 'function'){
+          _fireNotification({
+            event_type: 'booking_created',
+            title: 'New booking: ' + name,
+            body: naServiceText + ' on ' + dateVal + ' at ' + timeStr + ' — ' + (cleanerName || 'unassigned'),
+            url: '#calendar',
+            metadata: { apptId: apptObj.dbId, clientName: name, date: dateVal, total: total }
+          });
+        }
       } else if(sbRes.error){
         console.error('[saveNewAppt] Supabase one-time error:', sbRes.error);
         // Roll back in-memory so UI doesn't show an appointment that didn't save
@@ -13514,7 +13564,7 @@ function switchSettingsTab(tab, btn) {
   // Load policies when switching to that tab
   if (tab === 'policies') loadPolicies();
   // Init template editor when switching to communication
-  if (tab === 'communication') initTemplateEditor();
+  if (tab === 'communication') { initTemplateEditor(); initNotifPrefs(); }
   // Init payroll when switching to operations
   if (tab === 'operations') initPayrollSettingsUI();
   // Load app_users allowlist when switching to users tab (admin-only feature)
@@ -18337,10 +18387,13 @@ function _grantAccess(email, role) {
     window.history.replaceState({}, document.title, window.location.pathname);
   }
   setTimeout(hncMaybePromptForPush, 4000);
+  // Begin notification polling now that the user is authorized
+  if (typeof startNotifPolling === 'function') startNotifPolling();
 }
 
 async function _denyAccess(email, reasonMsg) {
   console.warn('[authorize] DENY:', email || '(no email)', reasonMsg);
+  if (typeof stopNotifPolling === 'function') stopNotifPolling();
   try { await db.auth.signOut(); } catch (_) {}
   try { Object.keys(localStorage).filter(k => k.startsWith('sb-')).forEach(k => localStorage.removeItem(k)); } catch (_) {}
   const overlay = document.getElementById('hnc-login-overlay');
@@ -18377,6 +18430,311 @@ function _setUserFooter(email){
   if(!f||!e)return;
   if(email){ e.textContent=email; e.title=email; f.style.display='flex'; }
   else { e.textContent=''; e.title=''; f.style.display='none'; }
+}
+
+// ── Notifications system (phase 1, 2026-05-03) ──────────────────────────
+// In-app feed only. Polls the notifications table every 30s while the CRM is
+// open. Plays a Web Audio chime when new notifications arrive (after the user
+// has interacted with the page — browser autoplay policy). Settings are kept
+// in localStorage per device: hnc.notif.sound (true/false), hnc.notif.volume (0-1).
+//
+// Phase 2 will add PWA push (using the existing service worker's Phase 2 hook)
+// so notifications fire even when the CRM tab is closed, and SMS dispatch via
+// OpenPhone for the most critical events.
+
+var _notifLastSeenId = null;        // ID of the newest notification we've shown — for sound trigger
+var _notifPollHandle = null;        // setInterval handle so we can stop polling on sign-out
+var _notifAudioCtx = null;          // lazily created on first user interaction
+var _notifUnlocked = false;         // browser audio autoplay unlock flag
+
+function _notifSoundEnabled() {
+  var v = localStorage.getItem('hnc.notif.sound');
+  return v === null ? true : (v === 'true');
+}
+function _notifVolume() {
+  var v = parseFloat(localStorage.getItem('hnc.notif.volume'));
+  return (isFinite(v) && v >= 0 && v <= 1) ? v : 0.4;
+}
+
+// Unlock the audio context on first user interaction. Browsers block
+// AudioContext.start() until the user has interacted with the page —
+// listening to common interaction events does the unlock once and we
+// can play sounds freely after that.
+function _notifSetupAudioUnlock() {
+  if (_notifUnlocked) return;
+  var unlock = function() {
+    try {
+      if (!_notifAudioCtx) _notifAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      if (_notifAudioCtx.state === 'suspended') _notifAudioCtx.resume();
+      _notifUnlocked = true;
+    } catch (_) {}
+    document.removeEventListener('click', unlock);
+    document.removeEventListener('keydown', unlock);
+  };
+  document.addEventListener('click', unlock, { once: true });
+  document.addEventListener('keydown', unlock, { once: true });
+}
+
+// Two-note chime via Web Audio. No external sound files — purely synthesized.
+// Tries to be pleasant (perfect fifth A5 → E6, short envelope).
+function playNotificationSound() {
+  if (!_notifSoundEnabled() || !_notifUnlocked || !_notifAudioCtx) return;
+  try {
+    var ctx = _notifAudioCtx;
+    var vol = _notifVolume();
+    var now = ctx.currentTime;
+    function tone(freq, startOffset, dur) {
+      var o = ctx.createOscillator();
+      var g = ctx.createGain();
+      o.type = 'sine';
+      o.frequency.value = freq;
+      o.connect(g); g.connect(ctx.destination);
+      // Short attack + exponential decay = bell-like ping
+      g.gain.setValueAtTime(0, now + startOffset);
+      g.gain.linearRampToValueAtTime(vol, now + startOffset + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.0001, now + startOffset + dur);
+      o.start(now + startOffset);
+      o.stop(now + startOffset + dur + 0.05);
+    }
+    tone(880, 0, 0.18);    // A5
+    tone(1318.5, 0.09, 0.22); // E6
+  } catch (e) { console.warn('[notif] sound failed:', e); }
+}
+
+// Test sound — used by the Settings panel "Test sound" button.
+function testNotificationSound() {
+  // Force-unlock if user hasn't interacted yet (this click counts)
+  if (!_notifUnlocked) {
+    try { _notifAudioCtx = new (window.AudioContext || window.webkitAudioContext)(); _notifUnlocked = true; } catch(_) {}
+  }
+  if (!_notifSoundEnabled()) {
+    if (typeof showToast === 'function') showToast('Sound is muted in settings. Toggle it on to hear the chime.');
+    return;
+  }
+  playNotificationSound();
+}
+
+async function loadNotifications(opts) {
+  opts = opts || {};
+  try {
+    var sess = await db.auth.getSession();
+    if (!sess.data.session) return;
+    var myEmail = (sess.data.session.user.email || '').toLowerCase();
+    // Pull recent 30. Server-side filter on (target_email = me OR target_email IS NULL).
+    var { data, error } = await db.from('notifications')
+      .select('*')
+      .or('target_email.is.null,target_email.eq.' + myEmail)
+      .order('created_at', { ascending: false })
+      .limit(30);
+    if (error) { console.warn('[notif] load failed:', error); return; }
+    data = data || [];
+
+    // Sound trigger: if we have a previous "last seen" id and the newest row
+    // doesn't match, something new arrived. Don't fire on first load.
+    if (data.length > 0) {
+      var newestId = data[0].id;
+      if (_notifLastSeenId !== null && newestId !== _notifLastSeenId) {
+        // Find any items newer than _notifLastSeenId that are unread
+        var hasNewUnread = data.some(function(n) { return n.id !== _notifLastSeenId && !n.read_at; });
+        // Stop scanning once we hit our previous newest — anything after is old
+        if (hasNewUnread) playNotificationSound();
+      }
+      _notifLastSeenId = newestId;
+    } else if (_notifLastSeenId === null) {
+      _notifLastSeenId = '';  // mark as initialized so future loads can detect new
+    }
+
+    renderNotifList(data);
+    renderNotifBadge(data);
+  } catch (err) {
+    console.warn('[notif] load error:', err);
+  }
+}
+
+function renderNotifBadge(items) {
+  var badge = document.getElementById('notif-badge');
+  if (!badge) return;
+  var unread = (items || []).filter(function(n) { return !n.read_at; }).length;
+  if (unread > 0) {
+    badge.textContent = unread > 99 ? '99+' : String(unread);
+    badge.style.display = 'flex';
+  } else {
+    badge.style.display = 'none';
+  }
+}
+
+function renderNotifList(items) {
+  var list = document.getElementById('notif-list');
+  if (!list) return;
+  if (!items || items.length === 0) {
+    list.innerHTML = '<div style="padding:32px 24px;text-align:center;color:var(--text-muted);font-size:13px;">No notifications yet.<br><span style="font-size:11px;">You\'ll see invoice payments, tips, and bookings here.</span></div>';
+    return;
+  }
+  list.innerHTML = items.map(function(n) {
+    var when = _notifTimeAgo(n.created_at);
+    var unreadBg = n.read_at ? '' : 'background:#f0f9ff;';
+    var dot = n.read_at ? '' : '<span style="display:inline-block;width:8px;height:8px;background:var(--brand-500);border-radius:50%;margin-right:6px;flex-shrink:0;"></span>';
+    var icon = _notifIcon(n.event_type);
+    var bodyHtml = n.body ? '<div style="font-size:12px;color:var(--text-muted);margin-top:2px;">' + _escapeHtml(n.body) + '</div>' : '';
+    var clickAttr = n.url
+      ? 'onclick="handleNotifClick(\'' + n.id + '\', \'' + (n.url || '').replace(/\'/g, "\\'") + '\')"'
+      : 'onclick="handleNotifClick(\'' + n.id + '\', null)"';
+    return '<div class="notif-item" ' + clickAttr +
+      ' style="padding:10px 14px;border-bottom:1px solid var(--border);cursor:pointer;display:flex;align-items:flex-start;gap:8px;' + unreadBg + '" onmouseover="this.style.background=\'#f7f9f9\'" onmouseout="this.style.background=\'' + (n.read_at ? 'transparent' : '#f0f9ff') + '\'">' +
+      dot +
+      '<div style="font-size:18px;flex-shrink:0;line-height:1;margin-top:1px;">' + icon + '</div>' +
+      '<div style="flex:1;min-width:0;">' +
+        '<div style="font-size:13px;font-weight:600;color:var(--text);">' + _escapeHtml(n.title) + '</div>' +
+        bodyHtml +
+        '<div style="font-size:11px;color:var(--text-muted);margin-top:3px;">' + when + '</div>' +
+      '</div>' +
+      '</div>';
+  }).join('');
+}
+
+function _notifIcon(type) {
+  switch (type) {
+    case 'invoice_paid': return '💰';
+    case 'tip_received': return '💵';
+    case 'tip_paid':     return '💵';
+    case 'booking_created': return '📅';
+    case 'lead_inquiry': return '📥';
+    case 'task_overdue': return '⏰';
+    default: return '🔔';
+  }
+}
+
+function _notifTimeAgo(ts) {
+  if (!ts) return '';
+  var d = new Date(ts);
+  var diff = (Date.now() - d.getTime()) / 1000;
+  if (diff < 60) return 'just now';
+  if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
+  if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
+  if (diff < 604800) return Math.floor(diff / 86400) + 'd ago';
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+function _escapeHtml(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, function(c) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+  });
+}
+
+function toggleNotifPanel() {
+  var p = document.getElementById('notif-panel');
+  if (!p) return;
+  if (p.style.display === 'flex') {
+    p.style.display = 'none';
+  } else {
+    p.style.display = 'flex';
+    loadNotifications();  // refresh on open
+  }
+}
+
+// Outside-click closes the panel
+document.addEventListener('click', function(e) {
+  var wrap = document.getElementById('notif-bell-wrap');
+  var panel = document.getElementById('notif-panel');
+  if (!wrap || !panel) return;
+  if (panel.style.display === 'flex' && !wrap.contains(e.target)) {
+    panel.style.display = 'none';
+  }
+});
+
+async function handleNotifClick(id, url) {
+  // Mark read
+  try { await db.from('notifications').update({ read_at: new Date().toISOString() }).eq('id', id); } catch(_) {}
+  // Navigate if url provided
+  if (url && url !== 'null' && url.length > 0) {
+    if (url.startsWith('/') || url.startsWith('#')) {
+      window.location.hash = url.replace(/^\//, '#');
+    } else {
+      window.location.href = url;
+    }
+  }
+  document.getElementById('notif-panel').style.display = 'none';
+  await loadNotifications();
+}
+
+async function markAllNotifRead() {
+  try {
+    var sess = await db.auth.getSession();
+    if (!sess.data.session) return;
+    var myEmail = (sess.data.session.user.email || '').toLowerCase();
+    // Mark unread items targeted at me OR broadcast as read
+    await db.from('notifications')
+      .update({ read_at: new Date().toISOString() })
+      .is('read_at', null)
+      .or('target_email.is.null,target_email.eq.' + myEmail);
+    await loadNotifications();
+  } catch (err) { console.warn('[notif] mark all failed:', err); }
+}
+
+function startNotifPolling() {
+  _notifSetupAudioUnlock();
+  loadNotifications();
+  if (_notifPollHandle) clearInterval(_notifPollHandle);
+  _notifPollHandle = setInterval(loadNotifications, 30000);
+}
+
+function stopNotifPolling() {
+  if (_notifPollHandle) { clearInterval(_notifPollHandle); _notifPollHandle = null; }
+}
+
+// Insert a notification row. Used for client-side fired events (booking_created
+// happens entirely on the client because saveNewAppt runs in the browser).
+// Server-side events (invoice_paid via Stripe webhook) insert directly from
+// the webhook handler — they don't need this helper.
+//
+// Best-effort. We don't surface failures to the user because the parent
+// operation (creating the booking, etc.) succeeded — failing to *notify* about
+// it isn't worth a scary toast. We log to console for diagnostics.
+async function _fireNotification(payload) {
+  try {
+    var row = {
+      event_type: payload.event_type,
+      title: payload.title,
+      body: payload.body || null,
+      url: payload.url || null,
+      metadata: payload.metadata || {},
+      target_email: payload.target_email || null  // null = broadcast to all admins
+    };
+    var { error } = await db.from('notifications').insert([row]);
+    if (error) console.warn('[notif] dispatch failed:', error.message);
+    // Fast refresh so the bell updates immediately for the firing user
+    setTimeout(loadNotifications, 200);
+  } catch (err) {
+    console.warn('[notif] dispatch error:', err);
+  }
+}
+
+// Settings UI handlers — read/write localStorage prefs and sync the form
+function initNotifPrefs() {
+  var soundEl = document.getElementById('notif-sound-toggle');
+  var volEl = document.getElementById('notif-volume-slider');
+  var pctEl = document.getElementById('notif-volume-pct');
+  var rowEl = document.getElementById('notif-volume-row');
+  if (!soundEl || !volEl || !pctEl) return;
+  var on = _notifSoundEnabled();
+  var vol = _notifVolume();
+  soundEl.checked = on;
+  volEl.value = String(vol);
+  pctEl.textContent = Math.round(vol * 100) + '%';
+  if (rowEl) rowEl.style.opacity = on ? '1' : '0.5';
+}
+
+function saveNotifPrefs() {
+  var soundEl = document.getElementById('notif-sound-toggle');
+  var volEl = document.getElementById('notif-volume-slider');
+  var pctEl = document.getElementById('notif-volume-pct');
+  var rowEl = document.getElementById('notif-volume-row');
+  if (!soundEl || !volEl) return;
+  localStorage.setItem('hnc.notif.sound', soundEl.checked ? 'true' : 'false');
+  var v = parseFloat(volEl.value);
+  if (isFinite(v)) localStorage.setItem('hnc.notif.volume', String(v));
+  if (pctEl) pctEl.textContent = Math.round((isFinite(v) ? v : 0.4) * 100) + '%';
+  if (rowEl) rowEl.style.opacity = soundEl.checked ? '1' : '0.5';
 }
 async function hncSignOut(){
   try { await db.auth.signOut(); } catch(err){ console.warn('signOut error:',err); }

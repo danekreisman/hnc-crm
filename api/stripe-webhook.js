@@ -115,6 +115,29 @@ export default async function handler(req, res) {
           paid_at: new Date(data.created * 1000).toISOString()
         }, 'stripe_invoice_id');
         await logActivity('invoice_paid','Invoice paid via Stripe',{chargeId:data.id,invoiceId:data.invoice,amount:data.amount?(data.amount/100).toFixed(2):null});
+        // In-app notification (phase 1 of notification system, 2026-05-03).
+        // Broadcast to all admins (target_email null). Best-effort — failure
+        // here doesn't roll back the payment processing.
+        try {
+          var amtDollars = data.amount ? (data.amount/100) : 0;
+          var customerLabel = (data.billing_details && data.billing_details.name) || (data.metadata && data.metadata.client_name) || 'a client';
+          await fetch(`${SUPABASE_URL}/rest/v1/notifications`, {
+            method: 'POST',
+            headers: {
+              apikey: process.env.SUPABASE_SERVICE_ROLE_KEY,
+              Authorization: 'Bearer ' + process.env.SUPABASE_SERVICE_ROLE_KEY,
+              'Content-Type': 'application/json',
+              Prefer: 'return=minimal'
+            },
+            body: JSON.stringify({
+              event_type: 'invoice_paid',
+              title: 'Invoice paid: $' + amtDollars.toFixed(2),
+              body: 'Payment received from ' + customerLabel,
+              url: '#payments',
+              metadata: { chargeId: data.id, invoiceId: data.invoice, amount: amtDollars }
+            })
+          });
+        } catch (notifErr) { console.warn('[stripe-webhook] invoice_paid notify failed:', notifErr && notifErr.message); }
         console.log('[stripe-webhook] Updated invoice status for charge:', data.id);
       }
     }
@@ -248,6 +271,29 @@ export default async function handler(req, res) {
           await logActivity('tip_paid', 'Tip received: $' + tipDollars + ' for ' + apptId, {
             appointmentId: apptId, amount: tipDollars, sessionId: data.id, paymentIntentId: piId
           });
+
+          // In-app notification (phase 1 of notification system). Tip went to
+          // a specific cleaner — admins want to know about it. Best-effort.
+          try {
+            var clientName = md.client_name || 'a client';
+            var cleanerName = md.cleaner_name || 'cleaner';
+            await fetch(`${SUPABASE_URL}/rest/v1/notifications`, {
+              method: 'POST',
+              headers: {
+                apikey: process.env.SUPABASE_SERVICE_ROLE_KEY,
+                Authorization: 'Bearer ' + process.env.SUPABASE_SERVICE_ROLE_KEY,
+                'Content-Type': 'application/json',
+                Prefer: 'return=minimal'
+              },
+              body: JSON.stringify({
+                event_type: 'tip_received',
+                title: 'Tip received: $' + tipDollars.toFixed(2),
+                body: clientName + ' tipped ' + cleanerName,
+                url: '#payroll',
+                metadata: { appointmentId: apptId, amount: tipDollars, cleanerName: cleanerName }
+              })
+            });
+          } catch (notifErr) { console.warn('[stripe-webhook] tip_received notify failed:', notifErr && notifErr.message); }
         }
       }
     }

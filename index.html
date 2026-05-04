@@ -98,6 +98,12 @@ body{font-family:'Inter','SF Pro Text',-apple-system,BlinkMacSystemFont,'Segoe U
 .nav-item.active .nav-icon{opacity:1;}
 .main{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0;}
 .topbar{padding:12px 22px;background:var(--panel-glass);backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;position:sticky;top:0;z-index:100;}
+/* Notification panel: desktop anchors to the bell (top-right), mobile becomes
+   a viewport-fixed sheet that can't be clipped off either edge. */
+.hnc-notif-panel{position:absolute;top:38px;right:0;width:340px;max-height:440px;flex-direction:column;}
+@media (max-width:600px){
+  .hnc-notif-panel{position:fixed;top:60px;left:8px;right:8px;width:auto;max-height:calc(100vh - 80px);max-width:none;}
+}
 .topbar h1{font-size:15px;font-weight:650;color:var(--text);letter-spacing:-.01em;}
 .topbar-actions{display:flex;gap:8px;}
 .btn{font-size:12.5px;padding:7px 13px;border-radius:10px;border:1px solid var(--border-strong);background:var(--panel);color:var(--text);cursor:pointer;font-family:inherit;box-shadow:var(--shadow-sm);transition:transform .08s ease,box-shadow .2s ease,background .15s ease,border-color .15s ease;}
@@ -502,7 +508,7 @@ textarea{font-family:inherit;}
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 6a5 5 0 0110 0v3l1.5 2.5h-13L3 9V6z" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M6.5 13a1.5 1.5 0 003 0" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
             <span id="notif-badge" style="display:none;position:absolute;top:-4px;right:-4px;background:#dc2626;color:#fff;font-size:10px;font-weight:700;min-width:16px;height:16px;border-radius:8px;padding:0 4px;display:none;align-items:center;justify-content:center;line-height:1;">0</span>
           </button>
-          <div id="notif-panel" style="display:none;position:absolute;top:38px;right:0;background:#fff;border:1px solid var(--border-strong);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.12);width:340px;max-width:calc(100vw - 24px);max-height:440px;overflow:hidden;z-index:999;display:none;flex-direction:column;">
+          <div id="notif-panel" class="hnc-notif-panel" style="display:none;flex-direction:column;background:#fff;border:1px solid var(--border-strong);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.12);overflow:hidden;z-index:999;">
             <div style="padding:10px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;">
               <div style="font-size:13px;font-weight:600;">Notifications</div>
               <button class="btn" style="font-size:11px;padding:3px 9px;" onclick="markAllNotifRead()">Mark all read</button>

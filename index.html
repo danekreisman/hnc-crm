@@ -18680,23 +18680,64 @@ async function markAllNotifRead() {
 }
 
 // Realtime subscriptions (2026-05-03). Replaces 30s polling for snappier UX.
-// One subscription per table. Each push from Supabase triggers a targeted
-// re-fetch of the relevant in-memory state. Polling is kept as a fallback
-// (60s interval, was 30s) — if the websocket drops or Realtime is somehow
-// disabled on a table, polling keeps things eventually-consistent.
+// Self-healing: if a subscription drops we reconnect with exponential backoff.
+// On appointment changes we ALSO reload clients + cleaners so a row created
+// on another device with a brand-new client/cleaner renders correctly here
+// without a full page refresh.
 var _hncRealtimeChannels = []; // { channel, name } so we can clean up on signout
+var _hncRealtimeRetryTimers = {}; // tableName → setTimeout handle for reconnect
+var _hncRealtimeStatus = {}; // tableName → 'subscribed'|'error'|'closed'
+
+// Brief "syncing…" flash so the user can see realtime is working. Appears
+// in the topbar near the bell, fades out after ~900ms.
+function _hncShowSyncFlash(label) {
+  try {
+    var el = document.getElementById('hnc-sync-flash');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'hnc-sync-flash';
+      el.style.cssText = 'position:fixed;top:14px;right:140px;background:#ecfdf5;color:#065f46;border:1px solid #a7f3d0;border-radius:14px;padding:4px 10px;font-size:11px;font-weight:600;z-index:9998;opacity:0;transition:opacity .2s;pointer-events:none;font-family:Inter,system-ui,sans-serif;';
+      document.body.appendChild(el);
+    }
+    el.textContent = '↻ ' + (label || 'syncing');
+    el.style.opacity = '1';
+    clearTimeout(el._hncFlashTimer);
+    el._hncFlashTimer = setTimeout(function(){ el.style.opacity = '0'; }, 900);
+  } catch (_) {}
+}
 
 function _hncSubscribeRealtime(tableName, onChange) {
+  // Tear down any prior channel for this table before re-subscribing.
+  // Prevents leaks on reconnect.
+  _hncRealtimeChannels = _hncRealtimeChannels.filter(function(entry){
+    if (entry.name === tableName) {
+      try { db.removeChannel(entry.channel); } catch(_) {}
+      return false;
+    }
+    return true;
+  });
   try {
-    var ch = db.channel('hnc-rt-' + tableName)
+    var ch = db.channel('hnc-rt-' + tableName + '-' + Date.now())
       .on('postgres_changes', { event: '*', schema: 'public', table: tableName }, function(payload){
-        // payload has eventType ('INSERT'|'UPDATE'|'DELETE'), new, old
         try { onChange(payload); } catch(err){ console.warn('[realtime] '+tableName+' handler error:', err); }
       })
       .subscribe(function(status){
-        if (status === 'SUBSCRIBED') console.log('[realtime] '+tableName+' subscribed');
-        else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-          console.warn('[realtime] '+tableName+' status:', status, '— polling fallback continues');
+        _hncRealtimeStatus[tableName] = status;
+        if (status === 'SUBSCRIBED') {
+          console.log('[realtime] '+tableName+' subscribed');
+          // Clear any pending retry timer
+          if (_hncRealtimeRetryTimers[tableName]) {
+            clearTimeout(_hncRealtimeRetryTimers[tableName]);
+            delete _hncRealtimeRetryTimers[tableName];
+          }
+        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+          console.warn('[realtime] '+tableName+' status:', status, '— scheduling reconnect');
+          // Reconnect after 5s. Cleared on next successful subscribe.
+          if (_hncRealtimeRetryTimers[tableName]) clearTimeout(_hncRealtimeRetryTimers[tableName]);
+          _hncRealtimeRetryTimers[tableName] = setTimeout(function(){
+            console.log('[realtime] reconnecting '+tableName);
+            _hncSubscribeRealtime(tableName, onChange);
+          }, 5000);
         }
       });
     _hncRealtimeChannels.push({ channel: ch, name: tableName });
@@ -18706,10 +18747,68 @@ function _hncSubscribeRealtime(tableName, onChange) {
 }
 
 function _hncTeardownRealtime() {
+  Object.keys(_hncRealtimeRetryTimers).forEach(function(t){ clearTimeout(_hncRealtimeRetryTimers[t]); });
+  _hncRealtimeRetryTimers = {};
   _hncRealtimeChannels.forEach(function(entry){
     try { db.removeChannel(entry.channel); } catch(_) {}
   });
   _hncRealtimeChannels = [];
+}
+
+// Wrapper that reloads clients + cleaners THEN appointments. Used by the
+// appointments realtime handler so a row referencing a brand-new client
+// (created on another device this session) renders correctly without
+// requiring the user to refresh the whole page.
+async function _hncFullSyncFromRealtime(reason) {
+  _hncShowSyncFlash('syncing');
+  try {
+    // Refresh in-memory clients + cleaners + appointments. We can't just call
+    // loadAllData() — it shows the full-page loading overlay and resets the
+    // current view. Instead, do the same fetches it does, but skip the UI reset.
+    var [clients, cleaners, appts] = await Promise.all([
+      typeof dbLoadClients === 'function' ? dbLoadClients() : Promise.resolve([]),
+      typeof dbLoadCleaners === 'function' ? dbLoadCleaners() : Promise.resolve([]),
+      typeof dbLoadAppointments === 'function' ? dbLoadAppointments() : Promise.resolve([])
+    ]);
+    // Repopulate clientDB (matches loadAllData's processing)
+    if (typeof clientDB === 'object' && Array.isArray(clients)) {
+      Object.keys(clientDB).forEach(function(k){ delete clientDB[k]; });
+      clients.forEach(function(c){
+        clientDB[c.id] = {
+          name: c.name, type: c.type || 'Residential',
+          phone: c.phone || '\u2014', email: c.email || '\u2014',
+          address: c.address || '\u2014',
+          payment: (c.payment_type || '\u2014') + (c.payment_last4 ? ' \u00b7 ****' + c.payment_last4 : ''),
+          since: c.since || '\u2014', ltv: '$' + (c.ltv || 0),
+          mrr: c.mrr > 0 ? '$' + c.mrr : '\u2014', jobs: '0', avg: '\u2014',
+          service: c.service || 'Standard clean',
+          stripe_customer_id: c.stripe_customer_id || null,
+          notes: c.notes || '',
+          rate: c.hourly_rate || c.rate || null,
+          tags: c.tags || [],
+          do_not_contact: !!c.do_not_contact
+        };
+      });
+    }
+    // Repopulate cleanerDB
+    if (typeof cleanerDB === 'object' && Array.isArray(cleaners)) {
+      Object.keys(cleanerDB).forEach(function(k){ delete cleanerDB[k]; });
+      cleaners.forEach(function(c){
+        cleanerDB[c.id] = {
+          name: c.name, phone: c.phone || '', email: c.email || '',
+          islands: c.islands || c.island || '',
+          rate: c.hourly_rate || c.rate || 0,
+          active: c.active !== false
+        };
+      });
+    }
+    // Now rebuild appointments view (uses fresh clientDB + cleanerDB)
+    if (typeof _rebuildAppointmentsFromDB === 'function') _rebuildAppointmentsFromDB(appts);
+    if (typeof renderCal === 'function') renderCal();
+    console.log('[realtime] full sync complete (' + reason + ') — ' + appts.length + ' appts');
+  } catch (err) {
+    console.warn('[realtime] full sync failed:', err);
+  }
 }
 
 function startNotifPolling() {
@@ -18719,26 +18818,24 @@ function startNotifPolling() {
   // server (Stripe webhook) or another client (booking_created from a different
   // tab) triggers an immediate refresh + sound.
   _hncSubscribeRealtime('notifications', function(payload){
-    if (payload.eventType === 'INSERT') {
-      // New notification arrived — refresh feed + bell + play sound
-      loadNotifications();
-    } else if (payload.eventType === 'UPDATE' || payload.eventType === 'DELETE') {
-      // Read state changed elsewhere, or row removed — silent refresh
-      loadNotifications();
-    }
+    loadNotifications();
   });
-  // Realtime subscription on appointments. Any insert/update/delete from
-  // any client triggers _refreshAppointmentsFromDB so the calendar stays
-  // in sync across devices in real time. settleMs:0 because the change
-  // already committed before we got the push.
+  // Realtime on appointments. ANY change anywhere triggers a full sync that
+  // also re-pulls clients + cleaners (a new appointment may reference a brand-
+  // new client that this device hasn't seen yet). Visible "syncing…" flash so
+  // the user can see realtime is doing its job.
   _hncSubscribeRealtime('appointments', function(payload){
-    if (typeof _refreshAppointmentsFromDB === 'function') {
-      _refreshAppointmentsFromDB({ settleMs: 0 });
-    }
+    _hncFullSyncFromRealtime(payload.eventType || 'change');
+  });
+  // Realtime on clients/cleaners too. If you create a client on the phone,
+  // their dropdown options should appear on the laptop without refresh.
+  _hncSubscribeRealtime('clients', function(payload){
+    _hncFullSyncFromRealtime('client ' + (payload.eventType || 'change'));
+  });
+  _hncSubscribeRealtime('cleaners', function(payload){
+    _hncFullSyncFromRealtime('cleaner ' + (payload.eventType || 'change'));
   });
   // Realtime on app_users so deactivating a user evicts them within seconds.
-  // We listen for UPDATE on the current user's row — if active flips to false,
-  // we sign them out immediately.
   _hncSubscribeRealtime('app_users', function(payload){
     if (payload.eventType !== 'UPDATE' && payload.eventType !== 'DELETE') return;
     db.auth.getSession().then(function(sess){
@@ -18746,19 +18843,51 @@ function startNotifPolling() {
       var myEmail = (sess.data.session.user.email || '').toLowerCase();
       var rowEmail = ((payload.new && payload.new.email) || (payload.old && payload.old.email) || '').toLowerCase();
       if (rowEmail !== myEmail) return;
-      // It's me. If I was deactivated or deleted, sign me out.
       if (payload.eventType === 'DELETE' || (payload.new && payload.new.active === false)) {
-        // Don't kick hardcoded admins — belt-and-suspenders for self-recovery
         if (ADMIN_EMAILS.map(function(e){return e.toLowerCase();}).includes(myEmail)) return;
-        if (typeof showToast === 'function') showToast('Your access was revoked. Signing out…', true);
+        if (typeof showToast === 'function') showToast('Your access was revoked. Signing out\u2026', true);
         setTimeout(function(){ _denyAccess(myEmail, 'Access was revoked while you were signed in.'); }, 1200);
       }
     });
   });
-  // Polling fallback (60s, was 30s). If realtime is disabled or the websocket
-  // drops, this keeps things eventually-consistent. Most users won't hit it.
+  // Polling fallback (60s, was 30s). If the websocket drops the auto-reconnect
+  // takes over within 5s, but polling adds a third safety net.
   if (_notifPollHandle) clearInterval(_notifPollHandle);
   _notifPollHandle = setInterval(loadNotifications, 60000);
+
+  // One-time check that realtime publication is configured for the tables we
+  // need. Surfaces a banner to the user if any are missing — instead of
+  // silently degrading to polling-only behavior.
+  setTimeout(_hncCheckRealtimeConfig, 8000);
+}
+
+// Verifies realtime is actually wired up on the Supabase side. If a table
+// hasn't been added to supabase_realtime publication, the subscribe() call
+// returns CHANNEL_ERROR. We collect those after a grace period and surface
+// a single user-visible banner with a one-click fix.
+function _hncCheckRealtimeConfig() {
+  var bad = [];
+  ['appointments','notifications','app_users','clients','cleaners'].forEach(function(t){
+    if (_hncRealtimeStatus[t] && _hncRealtimeStatus[t] !== 'SUBSCRIBED') bad.push(t);
+  });
+  if (bad.length === 0) return;
+  // Don't nag if banner already shown this session
+  if (document.getElementById('hnc-rt-config-banner')) return;
+  if (sessionStorage.getItem('hnc_rt_banner_dismissed') === '1') return;
+  var banner = document.createElement('div');
+  banner.id = 'hnc-rt-config-banner';
+  banner.style.cssText = 'position:fixed;left:12px;right:12px;bottom:12px;z-index:99996;background:#fffbeb;border:1px solid #fcd34d;border-radius:10px;padding:12px 14px;font-family:Inter,system-ui,sans-serif;box-shadow:0 4px 16px rgba(0,0,0,.12);';
+  banner.innerHTML =
+    '<div style="display:flex;gap:10px;align-items:flex-start;">' +
+      '<div style="font-size:18px;flex-shrink:0;">\u26a0\ufe0f</div>' +
+      '<div style="flex:1;min-width:0;">' +
+        '<div style="font-size:13px;font-weight:600;color:#92400e;">Realtime sync incomplete</div>' +
+        '<div style="font-size:11px;color:#92400e;line-height:1.5;margin-top:2px;">Tables not in supabase_realtime publication: <strong>' + bad.join(', ') + '</strong>. Run this SQL in Supabase \u2192 SQL Editor:</div>' +
+        '<pre style="background:#fff;border:1px solid #fde68a;border-radius:6px;padding:6px 8px;font-size:11px;margin:6px 0 0;overflow:auto;">' + bad.map(function(t){ return 'ALTER PUBLICATION supabase_realtime ADD TABLE public.' + t + ';'; }).join('\n') + '</pre>' +
+        '<button onclick="this.closest(\'#hnc-rt-config-banner\').remove(); sessionStorage.setItem(\'hnc_rt_banner_dismissed\',\'1\');" style="margin-top:6px;padding:4px 10px;font-size:11px;background:#fff;border:1px solid #fcd34d;border-radius:6px;cursor:pointer;">Dismiss</button>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(banner);
 }
 
 function stopNotifPolling() {

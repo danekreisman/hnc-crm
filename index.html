@@ -10961,7 +10961,7 @@ async function renderPaymentsSection(){ checkStripeConnectivity();
     if (typeof db === 'undefined' || !db || !db.from) return;
     // Pull completed-but-not-invoiced appointments
     var apptsRes = await db.from('appointments')
-      .select('id, client_name, client_id, service, date, time, duration_hours, base_price, tax, total_price, status, invoice_sent')
+      .select('id, client_name, client_id, service, date, time, duration_hours, base_price, tax, total_price, tip_amount, status, invoice_sent')
       .eq('status', 'completed')
       .order('date', {ascending: false});
     var appts = (apptsRes.data || []).filter(function(a){ return !a.invoice_sent; });
@@ -10998,9 +10998,13 @@ async function renderPaymentsSection(){ checkStripeConnectivity();
           }
         }
         var key = cid || ('name:' + (a.client_name || ''));
-        if (!groups[key]) { groups[key] = { cid: cid, name: a.client_name || '', rec: rec, appts: [], total: 0 }; groupOrder.push(key); }
+        if (!groups[key]) { groups[key] = { cid: cid, name: a.client_name || '', rec: rec, appts: [], total: 0, tipTotal: 0 }; groupOrder.push(key); }
         groups[key].appts.push(a);
-        groups[key].total += parseFloat(a.total_price || 0) || 0;
+        // Group total now includes tip — invoice will charge service + tax + tip.
+        // Tip kept separate so we can render it as its own line item below.
+        var _apptTip = parseFloat(a.tip_amount || 0) || 0;
+        groups[key].total += (parseFloat(a.total_price || 0) || 0) + _apptTip;
+        groups[key].tipTotal += _apptTip;
       });
       groupOrder.forEach(function(key){
         var g = groups[key];
@@ -11014,6 +11018,7 @@ async function renderPaymentsSection(){ checkStripeConnectivity();
         hr.setAttribute('data-client-id', g.cid || '');
         hr.setAttribute('data-client-name', g.name);
         hr.setAttribute('data-amount', g.total.toFixed(2));
+        hr.setAttribute('data-tip', g.tipTotal.toFixed(2));
         if (!multi) hr.setAttribute('data-appt-id', g.appts[0].id);
         hr.style.cssText = 'background:var(--bg-soft);';
         var caret = multi ? '<span class="caret" style="display:inline-block;width:14px;color:var(--text-muted);cursor:pointer;transition:transform .15s;">▶</span>' : '<span style="display:inline-block;width:14px;"></span>';
@@ -11046,7 +11051,8 @@ async function renderPaymentsSection(){ checkStripeConnectivity();
             sr.setAttribute('data-appt-id', a.id);
             sr.setAttribute('data-client-id', g.cid || '');
             sr.setAttribute('data-client-name', g.name);
-            sr.setAttribute('data-amount', a.total_price || 0);
+            sr.setAttribute('data-amount', (parseFloat(a.total_price || 0) + parseFloat(a.tip_amount || 0)).toFixed(2));
+            sr.setAttribute('data-tip', (parseFloat(a.tip_amount || 0) || 0).toFixed(2));
             sr.style.cssText = 'display:none;background:#fff;';
             var amtStr = '$' + parseFloat(a.total_price || 0).toFixed(2);
             var subActions = '';
@@ -11189,10 +11195,27 @@ async function createBulkInvoiceFromPending(){
     var tds = tr.querySelectorAll('td');
     var service = tds[2] ? tds[2].textContent : 'Cleaning';
     var date = tds[3] ? tds[3].textContent : '';
-    var amt = parseFloat(tr.getAttribute('data-amount')) || 0;
+    var totalWithTip = parseFloat(tr.getAttribute('data-amount')) || 0;
+    var tipForRow = parseFloat(tr.getAttribute('data-tip') || '0') || 0;
+    // Service amount = total minus tip. We invoice the service as one line and
+    // the tip as a separate line so the customer sees they tipped (matches
+    // restaurant/Uber convention) rather than a single inflated number.
+    var serviceAmount = Math.max(0, totalWithTip - tipForRow);
     var apptId = tr.getAttribute('data-appt-id') || '';
-    return { description: service + ' — ' + date, amount: amt, apptId: apptId };
+    return { description: service + ' \u2014 ' + date, amount: serviceAmount, apptId: apptId, tip: tipForRow };
   });
+  // Append tip line items for any rows with a tip > 0. Kept as separate rows
+  // (not folded into one summary tip) because each tip is tied to a specific
+  // appointment in the payroll/audit trail.
+  var tipLines = lineItems
+    .filter(function(li){ return (li.tip || 0) > 0; })
+    .map(function(li){
+      return { description: 'Tip \u2014 ' + (li.description.split(' \u2014 ')[1] || 'cleaning service'), amount: li.tip };
+    });
+  // Strip the .tip helper before sending so the API only sees real line items
+  lineItems = lineItems.map(function(li){ return { description: li.description, amount: li.amount, apptId: li.apptId }; });
+  // Concatenate: cleaning lines first, tip lines last (matches receipt convention)
+  lineItems = lineItems.concat(tipLines);
   // Look up client email from clientDB - try by id, then by name as fallback
   var clientEmail = null;
   var clientRec = null;
@@ -11326,12 +11349,21 @@ async function chargePendingAppointments(clientId, clientName, apptIds){
     showPaymentToast('No Stripe customer / saved card found for ' + clientName + '. Send an invoice instead.', null, 'error');
     return;
   }
-  var apptRows = await db.from('appointments').select('id,total_price,base_price,tax,service').in('id', apptIds);
+  var apptRows = await db.from('appointments').select('id,total_price,base_price,tax,tip_amount,service').in('id', apptIds);
   if (apptRows.error) { showPaymentToast('Error loading appointments: ' + apptRows.error.message, null, 'error'); return; }
   var totalAmt = 0;
-  (apptRows.data || []).forEach(function(a){ totalAmt += parseFloat(a.total_price || 0) || 0; });
+  var tipTotal = 0;
+  (apptRows.data || []).forEach(function(a){
+    totalAmt += parseFloat(a.total_price || 0) || 0;
+    tipTotal += parseFloat(a.tip_amount || 0) || 0;
+  });
+  // Charge the full amount including tip. Card-on-file path doesn't have a
+  // hosted invoice page so the customer never sees an itemized breakdown
+  // anyway — but the tip still needs to be collected so the cleaner gets it
+  // on payroll.
+  totalAmt += tipTotal;
   if (totalAmt <= 0) { showPaymentToast('Total amount is $0 — nothing to charge.', null, 'error'); return; }
-  showPaymentToast('Charging ' + clientName + ' $' + totalAmt.toFixed(2) + ' via saved card…', null, null);
+  showPaymentToast('Charging ' + clientName + ' $' + totalAmt.toFixed(2) + (tipTotal > 0 ? ' (incl $' + tipTotal.toFixed(2) + ' tip)' : '') + ' via saved card\u2026', null, null);
   try {
     var resp = await fetch('/api/stripe-invoice', {
       method: 'POST',
@@ -11356,7 +11388,7 @@ async function chargePendingAppointments(clientId, clientName, apptIds){
       client_name: clientName,
       client_id: clientId || null,
       service: (apptRows.data && apptRows.data[0] && apptRows.data[0].service) || 'Cleaning',
-      amount: totalAmt,
+      amount: totalAmt - tipTotal,
       tax: 0,
       total: totalAmt,
       payment_method: 'card',
@@ -11364,7 +11396,7 @@ async function chargePendingAppointments(clientId, clientName, apptIds){
       status: 'paid',
       stripe_payment_intent_id: data.paymentIntentId || null,
       appointment_id: apptIds[0] || null,
-      notes: 'Charged via saved card. Appts: ' + apptIds.join(', ')
+      notes: 'Charged via saved card. Appts: ' + apptIds.join(', ') + (tipTotal > 0 ? '. Tip: $' + tipTotal.toFixed(2) : '')
     });
     showPaymentToast('Charged $' + totalAmt.toFixed(2) + ' from ' + clientName + '!', null, 'success');
     if (typeof loadAllData === 'function') await loadAllData();
@@ -11416,13 +11448,15 @@ async function invoicePendingAppointments(clientId, clientName, apptIds){
     showPaymentToast('Client "' + clientName + '" has no email on file. Add one first.', null, 'error');
     return;
   }
-  var apptRows = await db.from('appointments').select('id,total_price,base_price,tax,service,date').in('id', apptIds);
+  var apptRows = await db.from('appointments').select('id,total_price,base_price,tax,tip_amount,service,date').in('id', apptIds);
   if (apptRows.error) { showPaymentToast('Error: ' + apptRows.error.message, null, 'error'); return; }
   var lineItems = [];
+  var tipLineItems = [];
   var subtotal = 0, totalTax = 0;
   (apptRows.data || []).forEach(function(a){
     var base = parseFloat(a.base_price || 0) || 0;
     var tax = parseFloat(a.tax || 0) || 0;
+    var tip = parseFloat(a.tip_amount || 0) || 0;
     if (!base && !tax) {
       var total = parseFloat(a.total_price || 0) || 0;
       base = +(total / 1.04712).toFixed(2);
@@ -11431,14 +11465,27 @@ async function invoicePendingAppointments(clientId, clientName, apptIds){
     subtotal += base;
     totalTax += tax;
     lineItems.push({
-      description: (a.service || 'Cleaning') + ' — ' + (a.date || ''),
+      description: (a.service || 'Cleaning') + ' \u2014 ' + (a.date || ''),
       amount: base,
       apptId: a.id
     });
+    // Tips render as a separate line item (matches restaurant convention).
+    // Tip is per-appointment; if multiple appointments are bundled with tips,
+    // each shows up as its own row on the invoice.
+    if (tip > 0) {
+      tipLineItems.push({
+        description: 'Tip \u2014 ' + (a.date || 'cleaning service'),
+        amount: +tip.toFixed(2),
+        apptId: a.id
+      });
+    }
   });
   if (totalTax > 0) {
     lineItems.push({ description: 'Hawaii GET tax (4.712%)', amount: +totalTax.toFixed(2), apptId: null });
   }
+  // Tip lines go LAST (after tax) so the invoice reads: services, tax, tip.
+  var tipSubtotal = 0;
+  tipLineItems.forEach(function(t){ tipSubtotal += t.amount; lineItems.push(t); });
   showPaymentToast('Sending invoice for ' + apptIds.length + ' job(s) to ' + clientName + '…', null, null);
   try {
     var resp = await fetch('/api/stripe-invoice', {
@@ -11448,11 +11495,11 @@ async function invoicePendingAppointments(clientId, clientName, apptIds){
         action: 'send_invoice',
         customerName: clientName,
         customerEmail: clientEmail,
-        amount: (subtotal + totalTax).toFixed(2),
+        amount: (subtotal + totalTax + tipSubtotal).toFixed(2),
         service: 'Cleaning service',
         terms: 'NET30',
         lineItems: lineItems,
-        notes: 'Invoice for ' + apptIds.length + ' completed job(s).'
+        notes: 'Invoice for ' + apptIds.length + ' completed job(s).' + (tipSubtotal > 0 ? ' Includes $' + tipSubtotal.toFixed(2) + ' tip.' : '')
       })
     });
     var data = await resp.json();
@@ -11469,15 +11516,15 @@ async function invoicePendingAppointments(clientId, clientName, apptIds){
       service: 'Cleaning',
       amount: subtotal,
       tax: totalTax,
-      total: subtotal + totalTax,
+      total: subtotal + totalTax + tipSubtotal,
       payment_method: 'invoice',
       payment_terms: 'NET30',
       status: 'unpaid',
       stripe_invoice_id: data.invoiceId || null,
       appointment_id: apptIds[0] || null,
-      notes: 'Bulk invoice for ' + apptIds.length + ' jobs. Appts: ' + apptIds.join(', ')
+      notes: 'Bulk invoice for ' + apptIds.length + ' jobs. Appts: ' + apptIds.join(', ') + (tipSubtotal > 0 ? '. Tip: $' + tipSubtotal.toFixed(2) : '')
     });
-    showPaymentToast('Invoice sent for $' + (subtotal + totalTax).toFixed(2) + ' to ' + clientName + '!', null, 'success');
+    showPaymentToast('Invoice sent for $' + (subtotal + totalTax + tipSubtotal).toFixed(2) + ' to ' + clientName + '!', null, 'success');
     if (typeof loadAllData === 'function') await loadAllData();
     else if (typeof renderPaymentsSection === 'function') renderPaymentsSection();
   } catch (err) {

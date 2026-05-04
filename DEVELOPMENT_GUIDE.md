@@ -1108,7 +1108,9 @@ The booking-form tip is fully operational for the cash/Venmo/external-payment sc
 
 ---
 
-*Last updated: May 3, 2026 — Tipping phase 3 shipped (commit 75e45d4): "Tip (optional)" field on booking + edit forms with live total math + payroll auto-flow. Three input paths into tip_amount now exist (overlay manual, Stripe Checkout, booking/edit form), all converging on the phase-1 payroll aggregator. Stripe invoice tip line-item integration deferred to next commit. Earlier session notes preserved below.*
+*Last updated: May 3, 2026 — Icons swapped (commit 5512e5a): cropped the 3-leaf plant from the top of hnc-logo.png and rebuilt the full 11-file icon set (favicon-16/32, apple-touch-icon, icon-192/256/384/512, maskable-192/512, plus 2 root-level apple-touch). Old icons were the full logo with text crammed into small squares — became unreadable at favicon size. Filenames preserved so HTML/manifest references unchanged. **To revert: `git revert 5512e5a && git push origin main`** — old icons return verbatim from the previous tree. Browser favicon caches are aggressive — hard refresh or browser restart may be needed to see changes in an existing tab.*
+
+*Tipping phase 3 (commit 75e45d4): "Tip (optional)" field on booking + edit forms with live total math + payroll auto-flow. Three input paths into tip_amount now exist (overlay manual, Stripe Checkout, booking/edit form), all converging on the phase-1 payroll aggregator. Stripe invoice tip line-item integration deferred to next commit. Earlier session notes preserved below.*
 
 *Phase 2 (commit fcda836): client-driven Stripe Checkout flow with HMAC token auth, three-layer security (kill switch + Dane-only test mode + token verify), webhook handler updates tip_amount on payment, audit trail in error_logs.*
 

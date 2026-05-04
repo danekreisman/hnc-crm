@@ -1108,12 +1108,179 @@ The booking-form tip is fully operational for the cash/Venmo/external-payment sc
 
 ---
 
-*Last updated: May 3, 2026 — Icons swapped (commit 5512e5a): cropped the 3-leaf plant from the top of hnc-logo.png and rebuilt the full 11-file icon set (favicon-16/32, apple-touch-icon, icon-192/256/384/512, maskable-192/512, plus 2 root-level apple-touch). Old icons were the full logo with text crammed into small squares — became unreadable at favicon size. Filenames preserved so HTML/manifest references unchanged. **To revert: `git revert 5512e5a && git push origin main`** — old icons return verbatim from the previous tree. Browser favicon caches are aggressive — hard refresh or browser restart may be needed to see changes in an existing tab.*
+## 2026-05-03 — Big day. Twelve commits across tipping, allowlist, notifications, realtime, push, OAuth, and icons.
 
-*Tipping phase 3 (commit 75e45d4): "Tip (optional)" field on booking + edit forms with live total math + payroll auto-flow. Three input paths into tip_amount now exist (overlay manual, Stripe Checkout, booking/edit form), all converging on the phase-1 payroll aggregator. Stripe invoice tip line-item integration deferred to next commit. Earlier session notes preserved below.*
+This session ran across multiple chats over the course of one day. Recapping by feature area rather than chronologically because the commits interleaved as priorities shifted.
 
-*Phase 2 (commit fcda836): client-driven Stripe Checkout flow with HMAC token auth, three-layer security (kill switch + Dane-only test mode + token verify), webhook handler updates tip_amount on payment, audit trail in error_logs.*
+### Tipping feature — fully shipped end-to-end (4 phases)
 
-*Phase 1 (commit 481799a): tip_amount column on appointments + manual entry on appt overlay + automatic payroll integration (Tips column between Gross and Bonus, even-split across paired cleaners). Migration must be run in Supabase.*
+| Phase | Commit | What it does |
+|---|---|---|
+| 1 | `481799a` | `tip_amount` column on appointments + manual entry on appt overlay + payroll integration (Tips column between Gross and Bonus, even-split across paired cleaners) |
+| 2 | `fcda836` | Client-driven Stripe Checkout flow at `/tip.html`. HMAC token auth via `api/utils/tip-token.js`. Three-layer security: ALLOW_STRIPE_CHARGES kill switch + TIP_TEST_MODE Dane-only gate + token verification. Webhook handler updates `tip_amount` on `checkout.session.completed`. Audit trail in `error_logs` with `source='stripe-tip-success'`. |
+| 3 | `75e45d4` | "Tip (optional)" field on booking + edit forms. Live total math via `_applyNaTipToDisplay` / `_applyEditTipToDisplay` helpers that run after each `calcPrice` / `calcEditPrice` exit. Tip per-instance even in series-bulk edits. |
+| 4 | `752c2eb` | Tip line items on Stripe invoices and card-on-file charges. Bulk invoice + per-row "Send invoice" + "Charge card" all plumb tip through. Invoice line order: services → tax → tip (matches restaurant convention). Custom-invoice form left manual on purpose. |
+
+**Three input paths into `tip_amount` now exist:** overlay manual, Stripe Checkout (client-driven), booking/edit form. All converge on the phase-1 payroll aggregator. Stripe webhook adds a fourth (cumulative addition when client tips multiple times).
+
+**Required env vars in Vercel:** `TIP_TOKEN_SECRET` (set), `ALLOW_STRIPE_CHARGES=true` (set), `TIP_TEST_MODE` (defaults 'on' = Dane only), `TIP_TEST_EMAIL` (defaults to `dane.kreisman@gmail.com`).
+
+**Stripe Dashboard:** webhook subscribed to `checkout.session.completed` (in addition to existing charge.* and invoice.* events).
+
+**Tipping NOT YET TESTED with a real $1 charge as of session end** — Dane to do this.
+
+### User access allowlist (commit `163806d`)
+
+Now that OAuth is published, anyone with a Google account could complete the sign-in flow. This adds a strict allowlist gate.
+
+- New `app_users` table: `email`, `role` ('admin'|'va'), `active`, `invited_by`, `invited_at`. Case-insensitive unique index on `lower(email)`. Seeded with the two hardcoded admin emails.
+- Auth gate `_authorizeOrReject` runs after every successful Supabase auth (both `initAuth` and `onAuthStateChange`). Flow: hardcoded ADMIN_EMAILS check → query app_users → reject if not found OR `active=false`. Hardcoded admins ALWAYS authorize even if their DB row says otherwise (lockout protection).
+- `applyUserRole(email, role)` now takes role from the DB. Hardcoded admins still get admin regardless.
+- New Settings tab "👥 Users" (admin-only via `.admin-only` CSS). Invite form, role select per row, deactivate/reactivate, delete. Hardcoded admins show "Hardcoded" badge with no actions. Currently signed-in user shows "You" — can't deactivate self.
+- Realtime subscription on `app_users` evicts deactivated users within ~2s without requiring re-login (see Realtime section below).
+
+**RLS NOT enabled on `app_users` for v1.** Anyone with a valid Supabase session can SELECT (needed for the auth check). Settings UI is admin-gated by CSS only — a VA could in theory bypass via direct API call. Acceptable v1 risk, RLS policies are a v2 task.
+
+### Notifications system — 3 phases
+
+**Phase 1 (commit `43b620a`):** in-app bell + sound + 3 events.
+
+- `notifications` table: `event_type`, `title`, `body`, `url`, `metadata`, `target_email` (null = broadcast), `read_at`. Two indexes: `created_at DESC` + partial unread.
+- Bell icon in topbar between Today and "+ New appointment". Red unread badge with 99+ overflow. Dropdown panel (340px, max-height 440px, max-width `calc(100vw - 24px)` for mobile). Outside-click dismisses. Mark-all-read button. Click navigates to URL + marks read.
+- Settings → Communication → Notifications card: sound toggle, volume slider, Test sound button. Prefs in localStorage per device (`hnc.notif.sound`, `hnc.notif.volume`, default 0.4).
+- Sound: Web Audio synthesized two-note chime (A5 → E6, ~250ms). No external files. AudioContext unlock on first click/keydown after `_grantAccess`.
+- Initial implementation polled every 30s; replaced by Supabase Realtime in the same day's commit (see Realtime).
+- Events wired: `invoice_paid`, `tip_received`, `booking_created` (one-time only).
+
+**Phase 2 (commit `ae55e85`):** PWA push fan-out wired to existing scaffolding.
+
+Discovered the entire push infrastructure was already built but unwired: `api/utils/send-push.js` (`sendPushToAllSubscribed` + `sendPushToUsers`), `api/register-push-subscription.js`, `api/vapid-public-key.js`, service-worker push + notificationclick handlers (with a sub-200ms postMessage trick to focus existing tabs vs cold-bootstrap), and the `hncMaybePromptForPush` soft-prompt UI. Web-push npm package already in package.json. **What was missing was just the wiring.**
+
+- New `api/send-push.js` — thin authed endpoint for client to call. requireAuth (any signed-in user). Title/body/url length-clamped.
+- `_fireNotification` in index.html now also POSTs to `/api/send-push` after the DB insert. Two separate try/catch so push failure doesn't mask in-app success. Tag composed from `event_type + apptId` for OS-level dedupe.
+- `api/stripe-webhook.js` imports `sendPushToAllSubscribed` and calls it after both invoice_paid and tip_received in-app inserts.
+
+VAPID keys (`VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`) already configured in Vercel from when the scaffolding was first laid down. Confirmed with Dane.
+
+**Phase 3a (commit `9289152`):** lead_inquiry + recurring series summary.
+
+- `api/lead-capture.js` fires `lead_inquiry` notification after every new lead (regardless of automation toggles — owner email/SMS gates remain because those cost money, in-app + push are free). Uses dynamic import of `send-push.js` so cold start cost is zero unless triggered.
+- Recurring batch path in `saveNewAppt` fires ONE summary notification ("New recurring series: Jane Doe — 26 weekly appointments starts 2026-05-10") instead of 26 separate `booking_created` pings. event_type stays `booking_created` so icon is calendar emoji.
+
+`booking_cancelled_by_client` deferred — there's no client-portal self-service cancellation feature in the codebase yet. Admin-side cancel is already realtime-synced across devices via the appointments subscription, so it's covered without a separate notification.
+
+**Phase 3b (commit `3e9a4fe`):** task_overdue in-app + SMS layer.
+
+- The existing `api/run-task-deadline-reminders.js` cron at 18:00 UTC (8am Hawaii) already SMS'd the owner phone + push-fanned-out. Was missing the bell entry. Now also inserts an in-app notification mirroring the push payload.
+- SMS layer for high-value invoices: when `data.amount/100 >= SMS_INVOICE_THRESHOLD` (default $500, env-configurable), the Stripe webhook also dispatches an SMS to `OWNER_PHONE` alongside the existing push + in-app. Below threshold, push + in-app are sufficient — adding SMS for every $50 cleaning would be noise.
+- Uses `BASE_URL` not `VERCEL_URL` for inter-function calls (per the prior session note about VERCEL_URL returning Vercel deployment-protection HTML).
+
+**Recurring notification reliability fix (commit `d52ac47`):** Dane reported recurring booking saved but no notification fired on either device. Root cause: the success path was gated on `batchRes.data && batchRes.data[0]`. Some Supabase configs return `data: null` even on successful insert (Prefer: return=minimal headers, RLS variations). Inverted the guard: any non-error response is treated as success, `apptObj.dbId` set only if `data` is populated, but notification fires either way. Also made `_fireNotification` surface DB errors via toast (60s throttled) instead of console-only — silent failures had been the problem.
+
+### Realtime sync — commit 1 + commit 2 (both shipped same day)
+
+**Commit 1 (`6716452`):** initial Supabase Realtime subscriptions on appointments + notifications + app_users. Replaced 30s polling with WAL-driven push. Required `ALTER PUBLICATION supabase_realtime ADD TABLE` on each table — Dane ran this via SQL editor.
+
+**Commit 2 (`9b4ac59`):** five improvements over commit 1.
+
+1. Wider sync on appointment changes — `_hncFullSyncFromRealtime` reloads clients + cleaners + appointments together. Without this, an appointment referencing a brand-new client/cleaner the device hasn't seen would render as "Unknown" or be filtered.
+2. Self-healing reconnect — 5s retry on CHANNEL_ERROR / TIMED_OUT / CLOSED. Auto-recovers from transient drops.
+3. Realtime extended to clients + cleaners (in addition to the original 3). Five tables total.
+4. Visible `↻ syncing` flash in top-right for ~900ms when realtime fires. Confirms it's working without DevTools.
+5. Self-diagnosing config check at 8s after subscribe — if any tables aren't in `supabase_realtime` publication, surfaces a yellow banner with the exact SQL to fix it. No more silent degradation.
+
+**Bulk delete sync fix (commit `c92c35f`):** Dane reported bulk series delete on browser didn't sync to phone. Root cause: postgres_changes DELETE events require `REPLICA IDENTITY FULL` on the table. Without it, bulk deletes via `.eq()` can drop WAL emissions. Fix in two layers:
+
+- LAYER 1: `ALTER TABLE ... REPLICA IDENTITY FULL` on the 5 synced tables. Dane ran this in Supabase SQL editor.
+- LAYER 2: Broadcast channel (`hnc-sync-bus`) — independent of WAL. Sender → server → all subscribers, no DB involvement. `_hncBroadcastResync(reason)` called from success branches of `deleteEntireSeries` (bulk DELETE) and `cancelAllRecurring` (bulk UPDATE). Other devices listen and call `_hncFullSyncFromRealtime` just like for postgres_changes. Belt-and-suspenders: works even if REPLICA IDENTITY ever gets reverted.
+
+**Pattern codified:** any future bulk mutation should call `_hncBroadcastResync(reason)` in its success branch. Search `index.html` for existing callers as the template.
+
+### Other shipped today
+
+**Delete toast truthfulness (commit `b202229`):** the green "Appointment deleted" toast was firing unconditionally before the async DB delete resolved — when DB failed (RLS, FK), user saw green first, then a faint red error easy to miss. Now the success toast and `logActivity` fire INSIDE the `.then()` callback, only after DB confirms. Same anti-pattern as the Supabase silent UPDATE failures already documented. **Codified:** any optimistic-then-fire-and-forget pattern must wait for DB callback before firing success UI.
+
+**Topbar sticky + notif panel viewport-aware (commit `e421f62`):** topbar was only sticky on mobile (per the @media block), scrolled off on desktop. Lifted `position:sticky;top:0;z-index:100` out so it applies on both. Notif panel got `max-width:calc(100vw - 24px)` so it shrinks to fit narrow viewports instead of clipping off the left edge.
+
+**OAuth Consent Screen verification:**
+- Privacy + Terms pages added (`privacy.html`, `terms.html`) — tailored to HNC's actual stack (Supabase, Stripe, OpenPhone, Resend, Anthropic, Google, Vercel) rather than generic boilerplate. Hawaii GET tax mentioned. 24-hour cancellation policy with 50% same-day fee. Independent contractor disclosure for cleaners. Hawaii governing law / Honolulu venue.
+- Login screen footer added with Privacy/Terms links so Google's verification crawler sees them on the home page (commit `93997a4`).
+- Originally tried hosting at `hnc-crm.vercel.app/privacy.html` — Google rejected because vercel.app isn't a "valid domain". Switched URLs to `book.hawaiinaturalclean.com/privacy.html` (subdomain of Dane's verified domain). Same Vercel deployment, accepted by Google.
+- OAuth published. Only requests email/profile/openid scopes (non-sensitive) so verification was instant — no review process needed.
+
+**Icon swap (commits `5512e5a`, `4ce686d`, `132259a`, `570d884`):** the original 11-file icon set was the full Hawaii Natural Clean logo (with text) downsampled into 16-512 squares. At 32px the text became unreadable. New icons crop just the 3-leaf plant from the top of `hnc-logo.png`. Margin iterated 14% → 22% → 30% based on Dane's feedback (kept growing because at small sizes the leaves felt cramped against the canvas edge). Cache-bust query param bumped to `?v=4` so browsers re-fetch. Phone/PWA icons stayed at 14% margin (absolute pixel margin at 192/512 is generous even with small percentage). To revert: `git revert 5512e5a` brings old icons back from the previous tree. Browser favicon caches are aggressive — hard refresh or new tab needed.
+
+### Migrations run in Supabase today
+
+All idempotent. Order doesn't matter.
+
+```sql
+-- Tipping foundation
+ALTER TABLE public.appointments ADD COLUMN IF NOT EXISTS tip_amount numeric NOT NULL DEFAULT 0;
+-- (plus CHECK constraint via DO block, see migrations/2026-05-03-add-tip-amount.sql)
+
+-- Paired cleaners (was already in repo as a migration but not run in production)
+ALTER TABLE appointments
+  ADD COLUMN IF NOT EXISTS cleaner_id_2 UUID REFERENCES cleaners(id),
+  ADD COLUMN IF NOT EXISTS cleaner_pay_2 NUMERIC(10,2),
+  ADD COLUMN IF NOT EXISTS cleaner_id_3 UUID REFERENCES cleaners(id),
+  ADD COLUMN IF NOT EXISTS cleaner_pay_3 NUMERIC(10,2);
+-- (plus indexes + check constraint)
+
+-- Allowlist
+CREATE TABLE IF NOT EXISTS public.app_users (...);
+-- (plus role check, unique lower(email) index, seed data)
+
+-- Notifications
+CREATE TABLE IF NOT EXISTS public.notifications (...);
+-- (plus created_idx, partial unread idx)
+
+-- Push subscriptions
+CREATE TABLE IF NOT EXISTS public.user_push_subscriptions (...);
+
+-- Realtime publication
+ALTER PUBLICATION supabase_realtime ADD TABLE public.appointments;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.notifications;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.app_users;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.clients;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.cleaners;
+
+-- Replica identity (required for reliable DELETE events)
+ALTER TABLE public.appointments REPLICA IDENTITY FULL;
+ALTER TABLE public.notifications REPLICA IDENTITY FULL;
+ALTER TABLE public.app_users REPLICA IDENTITY FULL;
+ALTER TABLE public.clients REPLICA IDENTITY FULL;
+ALTER TABLE public.cleaners REPLICA IDENTITY FULL;
+```
+
+### Patterns codified today
+
+1. **New columns on appointments need updates in three places:** `dbSaveAppointment` row builder, `dbUpdateAppointment` payload builder, and the in-memory mapping in the appointments-load loop. Missing any one silently drops the field at one layer.
+
+2. **Optimistic UI + async DB write must not fire success toast until DB callback resolves.** The `deleteAppointment` lying-toast bug was this pattern. Same lesson as the silent UPDATE failures from earlier sessions.
+
+3. **Bulk DB mutations need the broadcast channel, not just postgres_changes.** Bulk deletes/updates can drop WAL emissions even with REPLICA IDENTITY FULL. Call `_hncBroadcastResync(reason)` in success branches of any new bulk operation.
+
+4. **Don't gate success branches on `batchRes.data[0]`.** Some Supabase configs return `data: null` on successful insert. Treat any non-error response as success; conditionally read `data[0]` only where needed.
+
+5. **Tips are per-instance even in series-bulk edits.** All-mode bulk update path explicitly excludes `tip_amount` from `sbBasePayload` and does a per-row write. Same pattern as `status`. Tipping the entire series in one click is almost never what the user means.
+
+6. **Realtime tables need both publication membership AND `REPLICA IDENTITY FULL`.** Just adding to publication isn't enough for reliable DELETE events.
+
+7. **Push infrastructure can be silently shipped but unwired.** Today's session discovered `send-push.js`, register endpoint, vapid endpoint, service worker handlers all built and ready, just no callers. Future scaffolding-then-wiring patterns may exist elsewhere — search before assuming a feature is unbuilt.
+
+### Open items
+
+- **Tipping not yet tested with real $1 charge.** Dane's TIP_TEST_MODE='on' so only `dane.kreisman@gmail.com` can complete a tip. Test plan: open own appointment → "Send link" → paste in incognito → enter $1 → pay → verify $1 appears on appt + payroll + bell.
+- **Auto-SMS tip link on job completion** — when admin marks a job completed, system auto-texts the client a tip link. Square/Uber-style. Slots into existing automation framework via `run-job-completions` cron pattern. Probably 30–45 min.
+- **Same-day nearby booking chatbot** — books adjacent clients to optimize cleaner routes. From "on the horizon."
+- **Lead re-engagement automation** — already exists per Dane (this guide previously listed it as TODO; correcting that here).
+- **v1 Reports dashboard** — already exists per Dane (same correction).
+- **Phase 5+ realtime polish** — extend to leads, tasks, payments, invoices tables for full cross-device sync. Currently 5 tables: appointments + notifications + app_users + clients + cleaners.
+- **booking_cancelled_by_client notification** — needs a client-portal self-service cancellation feature first; doesn't exist yet.
+
+---
+
+*Last updated: May 3, 2026 — Twelve commits across tipping (4 phases shipped), allowlist, notifications (3 phases), realtime (2 commits + bulk-delete fix), PWA push wiring, OAuth published with privacy/terms pages, icon set replaced with cropped plant. Migrations all run in production. Tipping not yet tested with real $1 charge — only open immediate task.*
 
 *Previous: May 2, 2026 — Two long sessions, ~30 commits. Major: AI follow-up button shipped (manual lead nurture, generates personalized SMS/email per lead, two-step preview-before-send), then evolved across the day with brand voice tuning (Aloha opener, "— Dane from Hawaii Natural Clean" sign-off, banned-phrase list, brand voice paragraph). Bulk multi-select on pipeline added so 46+ leads can be handled in minutes via parallel generate + preview gallery + send. Per-lead Comms log panel with full DB-backed timeline (lead_comms_log table). Per-lead `do_not_contact` toggle (cron-only, doesn't gate manual sends). All 5 user-defined automations disabled — system is in fully manual mode for lead outreach. 64 leads bulk-imported from March/April spreadsheet. AI prompt tuned through 6 iterations to fix: CRM-bot tone (Aloha rewrite), missing prices (SMS history detection + server-side regex scan), JSON-with-postamble parser failure (brace-depth tracker), past dates (today-date injection + ban), fabricated estimates (hasStructuredQuote evidence flag), creepy street addresses (city-only extraction). Backend bugs fixed: VERCEL_URL → BASE_URL routing (Vercel deployment-protection HTML response), Supabase silent UPDATE failures (.update doesn't throw, must check res.error), temporal dead zone in derived flag ordering. Scheduling: day-of-week shift for recurring series (Bobby Nikkhoo Friday→Thursday), duplicate-delete bug (Susanna DeSantos), halt-series cross-contamination, Google Places stuck dropdown. UX wins: parallelized startup (4 DB fetches simultaneous, pipeline renders 1-2s sooner), calendar defaults to current month + Today button, new-appt form starts blank, task undo + reopen + daily 8am Hawaii deadline SMS digest, SMS counter wording clarified. Lead form launch checklist documented at top of Pending. **Patterns codified**: Supabase ops must check `res.error`; never use VERCEL_URL for inter-function calls; use brace-depth parser for LLM JSON; destructive ops on appointments end with `_refreshAppointmentsFromDB` for DB-source-of-truth.*

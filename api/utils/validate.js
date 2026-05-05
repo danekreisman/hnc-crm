@@ -114,6 +114,21 @@ export const SCHEMAS = {
     company: { required: false, rules: [is.maxLength(300)],              message: 'Company must be under 300 chars' },
   },
 
+  acceptCallLead: {
+    taskId:  { required: true,  rules: [is.uuid],                        message: 'taskId must be a valid UUID' },
+    name:    { required: true,  rules: [is.nonEmpty, is.maxLength(200)], message: 'Name is required (max 200 chars)' },
+    phone:   { required: true,  rules: [is.phone, is.maxLength(20)],     message: 'A valid phone number is required (10+ digits)' },
+    email:   { required: false, rules: [is.email,    is.maxLength(200)], message: 'Email must be valid if provided' },
+    address: { required: false, rules: [is.maxLength(300)],              message: 'Address must be under 300 chars' },
+    service: { required: false, rules: [is.maxLength(100)],              message: 'Service must be under 100 chars' },
+    sqft:    { required: false, rules: [is.maxLength(20)],               message: 'Sqft must be under 20 chars' },
+    beds:    { required: false, rules: [is.maxLength(20)],               message: 'Beds must be under 20 chars' },
+    baths:   { required: false, rules: [is.maxLength(20)],               message: 'Baths must be under 20 chars' },
+    condition: { required: false, rules: [is.maxLength(20)],             message: 'Condition must be under 20 chars' },
+    frequency: { required: false, rules: [is.maxLength(50)],             message: 'Frequency must be under 50 chars' },
+    notes:   { required: false, rules: [is.maxLength(2000)],             message: 'Notes must be under 2000 chars' },
+  },
+
   aiSummary: {
     prompt: { required: false, rules: [is.nonEmpty, is.maxLength(8000)], message: 'Prompt must be a non-empty string (max 8000 chars)' },
     leadId: { required: false, rules: [is.uuid], message: 'leadId must be a valid UUID' },

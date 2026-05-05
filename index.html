@@ -8322,6 +8322,74 @@ window.hncDisableNotifications = async function() {
   </div>
 </div>
 
+<!-- CALL LEAD REVIEW OVERLAY (review_call_lead task → edit + create flow) -->
+<div class="overlay hidden" id="call-lead-review-overlay" onclick="closeOverlay('call-lead-review-overlay')">
+  <div class="panel panel-wide" onclick="event.stopPropagation()">
+    <div class="panel-header">
+      <div class="panel-title">Review call lead</div>
+      <button class="close-btn" onclick="closeOverlay('call-lead-review-overlay')">&#x2715;</button>
+    </div>
+    <div class="panel-body">
+      <div id="clr-ai-context" style="background:#f5f0ff;border:1px solid #e9d8fd;border-radius:10px;padding:10px 12px;margin-bottom:14px;font-size:12px;color:#44337a;line-height:1.6;"></div>
+      <div class="panel-section">Lead info</div>
+      <div class="form-row"><label>Name</label><input type="text" id="clr-name" placeholder="Caller's name"></div>
+      <div class="form-two">
+        <div class="form-row"><label>Phone</label><input type="tel" id="clr-phone" placeholder="(808) 555-0000"></div>
+        <div class="form-row"><label>Email (optional)</label><input type="email" id="clr-email" placeholder=""></div>
+      </div>
+      <div class="form-row"><label>Address</label><input type="text" id="clr-address" placeholder="Property address"></div>
+      <div class="panel-section">Service</div>
+      <div class="form-two">
+        <div class="form-row"><label>Service type</label>
+          <select id="clr-service">
+            <option value="">Unknown</option>
+            <option value="Regular Cleaning">Regular Cleaning</option>
+            <option value="Deep Cleaning">Deep Cleaning</option>
+            <option value="Move-out Cleaning">Move-out Cleaning</option>
+            <option value="Move-in Cleaning">Move-in Cleaning</option>
+            <option value="Vacation Rental Cleaning">Vacation Rental Cleaning</option>
+            <option value="Commercial Cleaning">Commercial Cleaning</option>
+            <option value="Janitorial Cleaning">Janitorial Cleaning</option>
+          </select>
+        </div>
+        <div class="form-row"><label>Frequency</label>
+          <select id="clr-frequency">
+            <option value="">Unknown</option>
+            <option value="One-time">One-time</option>
+            <option value="Weekly">Weekly</option>
+            <option value="Biweekly">Biweekly</option>
+            <option value="Monthly">Monthly</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-three">
+        <div class="form-row"><label>Bedrooms</label><input type="text" id="clr-beds" placeholder="e.g. 3"></div>
+        <div class="form-row"><label>Bathrooms</label><input type="text" id="clr-baths" placeholder="e.g. 2"></div>
+        <div class="form-row"><label>Sq ft</label><input type="text" id="clr-sqft" placeholder="e.g. 1,800"></div>
+      </div>
+      <div class="form-row">
+        <label>Condition</label>
+        <select id="clr-condition">
+          <option value="">Unknown</option>
+          <option value="Pristine">Pristine</option>
+          <option value="Decent">Decent</option>
+          <option value="Moderately dirty">Moderately dirty</option>
+          <option value="Very dirty">Very dirty</option>
+          <option value="Extreme">Extreme</option>
+        </select>
+      </div>
+      <div class="form-row"><label>Notes</label><textarea id="clr-notes" style="min-height:70px;" placeholder="Anything else from the call..."></textarea></div>
+      <input type="hidden" id="clr-task-id">
+      <div class="save-bar">
+        <button class="btn btn-primary" id="clr-create-btn" onclick="confirmCallLeadAccept()">Create lead</button>
+        <button class="btn" onclick="closeOverlay('call-lead-review-overlay')">Cancel</button>
+      </div>
+      <div class="success-bar" id="clr-success">Lead created &#x2713;</div>
+      <div id="clr-error" style="display:none;background:#fee2e2;border:1px solid #fca5a5;border-radius:8px;padding:9px 12px;color:#b91c1c;font-size:12px;margin-top:10px;"></div>
+    </div>
+  </div>
+</div>
+
 <!-- NEW CLEANER OVERLAY -->
 <div class="overlay hidden" id="new-cleaner-overlay" onclick="closeOverlay('new-cleaner-overlay')">
   <div class="panel" onclick="event.stopPropagation()">
@@ -17532,8 +17600,8 @@ function renderTasks() {
 function renderTaskCard(t, done) {
   var today = new Date().toISOString().split('T')[0];
   var isOverdue = !done && t.due_date && t.due_date < today;
-  var typeLabel = {invoice:'Invoice',call_lead:'Call lead',call_client:'Call client',project:'Project',other:'Task',review_lead_response:'Lead reply'}[t.type] || 'Task';
-  var typeColor = {invoice:'#3b82f6',call_lead:'#f59e0b',call_client:'#8b5cf6',project:'#10b981',other:'#6b7280',review_lead_response:'#dc2626'}[t.type] || '#6b7280';
+  var typeLabel = {invoice:'Invoice',call_lead:'Call lead',call_client:'Call client',project:'Project',other:'Task',review_lead_response:'Lead reply',review_call_lead:'New call lead'}[t.type] || 'Task';
+  var typeColor = {invoice:'#3b82f6',call_lead:'#f59e0b',call_client:'#8b5cf6',project:'#10b981',other:'#6b7280',review_lead_response:'#dc2626',review_call_lead:'#7c3aed'}[t.type] || '#6b7280';
   var priorityDot = {high:'\uD83D\uDD34',medium:'\uD83D\uDFE1',low:'\uD83D\uDFE2'}[t.priority] || '';
   var relName = (t.leads && t.leads.name) || (t.clients && t.clients.name) || '';
   var dueStr = t.due_date ? new Date(t.due_date + 'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'}) : '';
@@ -17562,6 +17630,16 @@ function renderTaskCard(t, done) {
     reviewActions = '<div style="display:flex;gap:8px;margin-top:10px;">'
       + '<button data-task-id="' + t.id + '" data-lead-id="' + t.related_lead_id + '" onclick="reviewTaskMarkLost(this.dataset.taskId, this.dataset.leadId)" style="flex:1;padding:7px 12px;background:#dc2626;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;">Mark as lost</button>'
       + '<button data-task-id="' + t.id + '" onclick="reviewTaskNotLost(this.dataset.taskId)" style="flex:1;padding:7px 12px;background:#fff;color:var(--text);border:1.5px solid var(--border);border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;">Not lost</button>'
+      + '</div>';
+  }
+
+  // For review_call_lead tasks: "Review and create" opens an edit sheet
+  // with the AI-extracted draft pre-filled. "Not a lead" silently dismisses.
+  // Only on open tasks; the edit sheet does the lead-creation work.
+  if (!done && t.type === 'review_call_lead' && t.extracted_data) {
+    reviewActions = '<div style="display:flex;gap:8px;margin-top:10px;">'
+      + '<button data-task-id="' + t.id + '" onclick="openCallLeadReview(this.dataset.taskId)" style="flex:1;padding:7px 12px;background:#7c3aed;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;">Review &amp; create</button>'
+      + '<button data-task-id="' + t.id + '" onclick="dismissCallLead(this.dataset.taskId)" style="flex:1;padding:7px 12px;background:#fff;color:var(--text);border:1.5px solid var(--border);border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;">Not a lead</button>'
       + '</div>';
   }
 
@@ -17622,6 +17700,154 @@ async function reviewTaskMarkLost(taskId, leadId) {
 async function reviewTaskNotLost(taskId) {
   // No DB lead update needed — just close the task. The lead stays in
   // whatever stage it was already in (Quoted, Follow-up, etc).
+  await completeTaskById(taskId);
+}
+
+/* ──────────────────────────────────────────────────────────────────────
+   review_call_lead task actions. Inbound calls from unknown numbers get
+   classified by AI in the OpenPhone webhook; if it looks like a real lead
+   inquiry, the webhook drops a `review_call_lead` task with an extracted
+   draft in `extracted_data`. Dane reviews + edits the draft and one-taps
+   "Create lead" → /api/accept-call-lead creates the lead row, registers
+   the OpenPhone contact, and completes the task.
+   ────────────────────────────────────────────────────────────────────── */
+
+function openCallLeadReview(taskId) {
+  var task = (_tasks && _tasks.open || []).find(function(t){ return t.id === taskId; });
+  if (!task) { showToast('Task not found', true); return; }
+  var x = task.extracted_data || {};
+
+  document.getElementById('clr-task-id').value = task.id;
+  document.getElementById('clr-name').value      = x.name || '';
+  document.getElementById('clr-phone').value     = x.phone || '';
+  document.getElementById('clr-email').value     = '';
+  document.getElementById('clr-address').value   = x.address || '';
+  document.getElementById('clr-service').value   = x.service || '';
+  document.getElementById('clr-frequency').value = x.frequency || '';
+  document.getElementById('clr-beds').value      = x.beds || '';
+  document.getElementById('clr-baths').value     = x.baths || '';
+  document.getElementById('clr-sqft').value      = x.sqft || '';
+  document.getElementById('clr-condition').value = x.condition || '';
+  document.getElementById('clr-notes').value     = x.notes || '';
+
+  // Show the AI's read at the top so Dane has context for the edits.
+  var ctxParts = [];
+  if (x.ai_confidence) ctxParts.push('<strong>AI confidence:</strong> ' + esc(x.ai_confidence));
+  if (x.ai_reasoning) ctxParts.push('<strong>AI read:</strong> ' + esc(x.ai_reasoning));
+  if (task.description) ctxParts.push('<strong>Source:</strong><br>' + esc(task.description).replace(/\n/g, '<br>'));
+  document.getElementById('clr-ai-context').innerHTML = ctxParts.length ? ctxParts.join('<br>') : 'AI-extracted draft below — edit anything that looks wrong before creating.';
+
+  // Reset state
+  var errEl = document.getElementById('clr-error'); if (errEl) errEl.style.display = 'none';
+  var sucEl = document.getElementById('clr-success'); if (sucEl) sucEl.classList.remove('show');
+  var btn = document.getElementById('clr-create-btn'); if (btn) { btn.disabled = false; btn.textContent = 'Create lead'; }
+
+  openOverlay('call-lead-review-overlay');
+}
+
+async function confirmCallLeadAccept() {
+  var btn = document.getElementById('clr-create-btn');
+  var errEl = document.getElementById('clr-error');
+  var sucEl = document.getElementById('clr-success');
+  if (errEl) errEl.style.display = 'none';
+
+  var taskId = document.getElementById('clr-task-id').value;
+  var name   = (document.getElementById('clr-name').value || '').trim();
+  var phone  = (document.getElementById('clr-phone').value || '').trim();
+  var email  = (document.getElementById('clr-email').value || '').trim();
+
+  if (!name) {
+    if (errEl) { errEl.textContent = 'Name is required.'; errEl.style.display = 'block'; }
+    return;
+  }
+  if (!phone || phone.replace(/\D/g, '').length < 10) {
+    if (errEl) { errEl.textContent = 'Phone must be at least 10 digits.'; errEl.style.display = 'block'; }
+    return;
+  }
+
+  var payload = {
+    taskId: taskId,
+    name: name,
+    phone: phone,
+    email: email || undefined,
+    address:   document.getElementById('clr-address').value.trim() || undefined,
+    service:   document.getElementById('clr-service').value || undefined,
+    frequency: document.getElementById('clr-frequency').value || undefined,
+    beds:      document.getElementById('clr-beds').value.trim() || undefined,
+    baths:     document.getElementById('clr-baths').value.trim() || undefined,
+    sqft:      document.getElementById('clr-sqft').value.trim() || undefined,
+    condition: document.getElementById('clr-condition').value || undefined,
+    notes:     document.getElementById('clr-notes').value.trim() || undefined,
+  };
+
+  if (btn) { btn.disabled = true; btn.textContent = 'Creating…'; }
+  try {
+    var sess = await db.auth.getSession();
+    var tok = sess.data.session ? sess.data.session.access_token : '';
+    var resp = await fetch('/api/accept-call-lead', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + tok },
+      body: JSON.stringify(payload),
+    });
+    var data = await resp.json();
+    if (!resp.ok || !data.success) {
+      throw new Error(data.error || ('HTTP ' + resp.status));
+    }
+
+    // Success — refresh leads + tasks so the new lead appears in the
+    // pipeline and the task moves to Done. Then close the modal.
+    if (sucEl) sucEl.classList.add('show');
+    try {
+      var freshLeads = await dbLoadLeads();
+      if (Array.isArray(freshLeads) && typeof leadDB === 'object') {
+        // Surgical: just add the new row to leadDB so the pipeline picks it up.
+        var newRow = freshLeads.find(function(l){ return l.id === data.leadId; });
+        if (newRow) {
+          leadDB[newRow.id] = {
+            name: newRow.name, contact: newRow.contact_name || newRow.name,
+            phone: newRow.phone || '\u2014', email: newRow.email || '\u2014',
+            address: newRow.address || '\u2014', value: newRow.estimated_value || 'TBD',
+            service: newRow.service || '\u2014', sqft: newRow.sqft || '\u2014',
+            source: newRow.source || '\u2014',
+            date: new Date(newRow.created_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}),
+            stage: newRow.stage || 'New inquiry',
+            action: newRow.next_action || 'Follow up',
+            assigned: newRow.assigned_to || 'Dane',
+            notes: newRow.notes || '\u2014',
+            beds: newRow.beds || null, baths: newRow.baths || null,
+            frequency: newRow.frequency || null, condition: newRow.condition || null,
+            doNotContact: !!newRow.do_not_contact,
+          };
+          if (typeof renderLeadsPipeline === 'function') { try { renderLeadsPipeline(); } catch(_){} }
+        }
+      }
+    } catch (refreshErr) {
+      console.warn('[confirmCallLeadAccept] lead refresh failed:', refreshErr.message);
+    }
+
+    // Move the task to done in-memory + close modal. Skip the toast/undo —
+    // the success bar in the modal is the confirmation here.
+    if (taskId) {
+      var task = _tasks.open.find(function(t){ return t.id === taskId; });
+      if (task) {
+        _tasks.open = _tasks.open.filter(function(t){ return t.id !== taskId; });
+        task.status = 'completed';
+        task.completed_at = new Date().toISOString();
+        _tasks.done.unshift(task);
+        renderTasks();
+      }
+    }
+    setTimeout(function(){ closeOverlay('call-lead-review-overlay'); }, 700);
+  } catch (err) {
+    console.error('[confirmCallLeadAccept] error:', err);
+    if (errEl) { errEl.textContent = 'Could not create lead: ' + err.message; errEl.style.display = 'block'; }
+    if (btn) { btn.disabled = false; btn.textContent = 'Create lead'; }
+  }
+}
+
+async function dismissCallLead(taskId) {
+  // Caller wasn't a real lead. Just complete the task. We don't prompt —
+  // the action is reversible (undo via the toast on completeTaskById).
   await completeTaskById(taskId);
 }
 

@@ -1,4 +1,6 @@
 import { isWebhookProcessed, recordWebhook } from './utils/webhook-idempotency.js';
+import { fetchWithTimeout, TIMEOUTS } from './utils/with-timeout.js';
+import { logError } from './utils/error-logger.js';
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -134,6 +136,115 @@ export default async function handler(req, res) {
 
     // Brace-tracking JSON extractor — same pattern used in lead-followup-generate.
     // Avoids indexOf/lastIndexOf brittleness when the model adds preamble or postamble.
+    const start = text.indexOf('{');
+    if (start === -1) throw new Error('No JSON in AI response');
+    let depth = 0, inString = false, escape = false, jsonStr = null;
+    for (let i = start; i < text.length; i++) {
+      const ch = text[i];
+      if (escape) { escape = false; continue; }
+      if (inString) { if (ch === '\\') { escape = true; continue; } if (ch === '"') inString = false; continue; }
+      if (ch === '"') { inString = true; continue; }
+      if (ch === '{') depth++;
+      else if (ch === '}') { depth--; if (depth === 0) { jsonStr = text.slice(start, i + 1); break; } }
+    }
+    if (!jsonStr) throw new Error('Unbalanced JSON in AI response');
+    return JSON.parse(jsonStr);
+  }
+
+  /**
+   * Classify an inbound call's transcript: is this a real lead inquiry, and
+   * if so, what fields can we pre-fill on the lead form?
+   *
+   * Used by `call.transcript.completed` to auto-create a `review_call_lead`
+   * task. False positives waste Dane's time clicking "Not a lead"; false
+   * negatives leak revenue. We err toward conservative (only flag clear
+   * lead signals) — Dane can always log a missed lead manually.
+   *
+   * Returns {
+   *   is_lead: boolean,
+   *   confidence: 'high'|'medium'|'low',
+   *   extracted: { name, service, address, beds, baths, sqft, condition, frequency, notes },
+   *   reasoning: string
+   * }
+   *
+   * Extracted fields use null when uncertain — never hallucinate addresses
+   * or property details. The notes field captures anything the caller said
+   * that doesn't fit a structured field but matters (timeline, special
+   * requests, who they are, etc).
+   */
+  async function classifyAndExtractCallLead({ transcript, summary, callerPhone, durationSeconds }) {
+    const callContext = [
+      callerPhone ? `Caller phone: ${callerPhone}` : '',
+      durationSeconds ? `Duration: ${durationSeconds}s` : '',
+      summary ? `OpenPhone-generated summary: ${summary}` : '',
+    ].filter(Boolean).join('\n');
+
+    const transcriptBlock = transcript ? `\n=== CALL TRANSCRIPT ===\n${transcript}\n=== END TRANSCRIPT ===` : '';
+
+    const prompt = [
+      'You are classifying an inbound phone call to Hawaii Natural Clean (a residential and commercial cleaning business in Hawaii). Your job is two-fold:',
+      '  (1) Decide if this caller is a real lead — someone inquiring about cleaning services for themselves or their property.',
+      '  (2) If they are, extract the lead fields you can confidently parse from what was actually said.',
+      '',
+      'NOT a lead (is_lead = false):',
+      '  - Other cleaners or service providers pitching us',
+      '  - Sales/marketing/advertising calls',
+      '  - Wrong number, accidental dial, hangup',
+      '  - Existing customer calling about an existing booking (those should be handled separately)',
+      '  - Vendor calls (suppliers, accountants, etc)',
+      '  - Robocalls / spam',
+      '',
+      'IS a lead (is_lead = true):',
+      '  - Caller asks about cleaning service, pricing, availability, or scheduling',
+      '  - Caller describes a property they want cleaned (home, rental, office, etc)',
+      '  - Caller is referred by someone and wants a quote',
+      '  - Caller is asking for general info but clearly looking to hire',
+      '',
+      'Confidence:',
+      '  - "high": unambiguous lead inquiry, clear service ask',
+      '  - "medium": probably a lead but some ambiguity',
+      '  - "low": coin flip — leaning lead but could be junk. We will NOT auto-create a task at low confidence; default to is_lead=false instead unless you are at least medium-confident.',
+      '',
+      'EXTRACTION RULES (only apply if is_lead=true):',
+      '  - name: caller\'s name if stated. Null if not mentioned. Do NOT guess from caller ID.',
+      '  - service: one of "Regular Cleaning", "Deep Cleaning", "Move-out Cleaning", "Move-in Cleaning", "Commercial Cleaning", "Janitorial Cleaning", "Vacation Rental Cleaning". Null if unclear.',
+      '  - address: full address if stated. Null if only neighborhood/island given (put that in notes instead). NEVER hallucinate — leave null if uncertain.',
+      '  - beds: number of bedrooms if stated (e.g. "3"). Null otherwise.',
+      '  - baths: number of bathrooms if stated. Null otherwise.',
+      '  - sqft: square footage if stated. Null otherwise.',
+      '  - condition: one of "Pristine", "Decent", "Moderately dirty", "Very dirty", "Extreme" if the caller described the property\'s condition. Null otherwise.',
+      '  - frequency: one of "One-time", "Weekly", "Biweekly", "Monthly" if stated. Null otherwise.',
+      '  - notes: a short 1-3 sentence summary of who they are, what they need, timeline, and any special requests or context not captured above. Empty string if nothing extra.',
+      '',
+      'Return ONLY a JSON object — first character must be { and last must be }. No preamble, no postamble, no markdown.',
+      'Format:',
+      '{"is_lead": <bool>, "confidence": "high"|"medium"|"low", "reasoning": "<one short sentence>", "extracted": {"name": <string|null>, "service": <string|null>, "address": <string|null>, "beds": <string|null>, "baths": <string|null>, "sqft": <string|null>, "condition": <string|null>, "frequency": <string|null>, "notes": <string>}}',
+      '',
+      '=== CALL CONTEXT ===',
+      callContext || '(no metadata available)',
+      transcriptBlock,
+    ].join('\n');
+
+    const aiResp = await fetchWithTimeout('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': process.env.ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 800,
+        messages: [{ role: 'user', content: prompt }],
+      }),
+    }, TIMEOUTS.ANTHROPIC);
+    if (!aiResp.ok) throw new Error('Anthropic API HTTP ' + aiResp.status);
+    const data = await aiResp.json();
+    const text = data?.content?.[0]?.text || '';
+    if (!text) throw new Error('AI returned empty response');
+
+    // Same brace-tracking JSON extractor as classifyLeadResponse — robust to
+    // pre/postamble even when the prompt explicitly forbids it.
     const start = text.indexOf('{');
     if (start === -1) throw new Error('No JSON in AI response');
     let depth = 0, inString = false, escape = false, jsonStr = null;
@@ -304,6 +415,119 @@ export default async function handler(req, res) {
         transcript: transcript,
         status: 'transcript_ready'
       }, 'call_id');
+
+      // ── Auto-log inbound call leads ─────────────────────────────────────
+      // Read back the call_transcripts row (call.completed should have written
+      // direction/duration/phone earlier). If this is an inbound call from an
+      // unknown number with a transcript, classify it and — if it looks like
+      // a real lead — create a `review_call_lead` task with an AI-extracted
+      // draft so Dane can one-tap accept.
+      try {
+        const callRowResp = await fetch(
+          `${SUPABASE_URL}/rest/v1/call_transcripts?call_id=eq.${encodeURIComponent(data.callId)}&select=phone,direction,duration_seconds,summary,client_id&limit=1`,
+          { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }
+        );
+        const callRows = await callRowResp.json();
+        const callRow = Array.isArray(callRows) && callRows[0];
+
+        if (!callRow) {
+          console.log('[openphone-webhook] call.transcript.completed: no call_transcripts row yet for', data.callId, '— skipping lead-classify');
+        } else if (callRow.direction !== 'inbound') {
+          console.log('[openphone-webhook] call', data.callId, 'is', callRow.direction, '— skipping lead-classify');
+        } else if ((callRow.duration_seconds || 0) < 30) {
+          console.log('[openphone-webhook] call', data.callId, 'too short (' + callRow.duration_seconds + 's) — skipping lead-classify');
+        } else if (!transcript || transcript.length < 40) {
+          console.log('[openphone-webhook] call', data.callId, 'transcript too short — skipping lead-classify');
+        } else if (callRow.client_id) {
+          console.log('[openphone-webhook] call', data.callId, 'is from existing client — skipping lead-classify');
+        } else {
+          // Final unknown-number check (clients table may have changed since
+          // call.completed wrote client_id; also catches existing leads).
+          const callerPhone = callRow.phone;
+          const existingClient = await findClientByPhone(callerPhone);
+          const existingLead = await findLeadByPhone(callerPhone);
+          if (existingClient || existingLead) {
+            console.log('[openphone-webhook] call', data.callId, 'is from existing', existingClient ? 'client' : 'lead', '— skipping lead-classify');
+          } else if (!process.env.ANTHROPIC_API_KEY) {
+            console.warn('[openphone-webhook] ANTHROPIC_API_KEY not set — skipping lead-classify');
+          } else {
+            const verdict = await classifyAndExtractCallLead({
+              transcript,
+              summary: callRow.summary || '',
+              callerPhone,
+              durationSeconds: callRow.duration_seconds,
+            });
+            console.log('[openphone-webhook] call-lead verdict for', data.callId, ':', JSON.stringify(verdict).slice(0, 400));
+
+            // Only act on is_lead=true with non-low confidence. Low confidence
+            // = coin flip; we prefer to silently miss those rather than spam
+            // Dane with junk-call review tasks.
+            if (verdict && verdict.is_lead === true && verdict.confidence !== 'low') {
+              const extracted = verdict.extracted || {};
+              const callerName = extracted.name || ('Caller ' + (callerPhone || 'unknown'));
+              const today = new Date().toISOString().split('T')[0];
+              const summaryExcerpt = (callRow.summary || transcript || '').slice(0, 300);
+
+              const taskInsertRes = await supabaseInsert('tasks', {
+                title: 'New call lead — ' + callerName,
+                type: 'review_call_lead',
+                priority: verdict.confidence === 'high' ? 'high' : 'medium',
+                due_date: today,
+                description:
+                  'Inbound call from ' + (callerPhone || 'unknown') + '\n\n' +
+                  'AI read: ' + (verdict.reasoning || 'looks like a lead inquiry') + ' (confidence: ' + verdict.confidence + ')\n\n' +
+                  'Excerpt: ' + summaryExcerpt,
+                status: 'open',
+                extracted_data: {
+                  name: extracted.name || null,
+                  phone: callerPhone || null,
+                  service: extracted.service || null,
+                  address: extracted.address || null,
+                  beds: extracted.beds || null,
+                  baths: extracted.baths || null,
+                  sqft: extracted.sqft || null,
+                  condition: extracted.condition || null,
+                  frequency: extracted.frequency || null,
+                  notes: extracted.notes || '',
+                  call_id: data.callId,
+                  ai_confidence: verdict.confidence,
+                  ai_reasoning: verdict.reasoning || null,
+                  source: 'Phone call',
+                },
+              });
+              if (!taskInsertRes.ok) {
+                const errBody = await taskInsertRes.text().catch(() => '<unreadable>');
+                console.error('[openphone-webhook] review_call_lead insert FAILED status=' + taskInsertRes.status + ' body=' + errBody.slice(0, 500));
+                await logError('openphone-webhook:review_call_lead', new Error('Task insert ' + taskInsertRes.status), {
+                  call_id: data.callId, body: errBody.slice(0, 500)
+                });
+              } else {
+                console.log('[openphone-webhook] Created review_call_lead task for call', data.callId);
+                // Push fan-out — same pattern as the SMS lost-intent flow.
+                try {
+                  const { sendPushToAllSubscribed } = await import('./utils/send-push.js');
+                  const pushRes = await sendPushToAllSubscribed({
+                    title: 'New call lead — ' + callerName,
+                    body: 'AI read: ' + (verdict.reasoning || 'looks like a lead').slice(0, 100),
+                    url: '/#tasks',
+                    tag: 'call-lead-' + data.callId,
+                    requireInteraction: verdict.confidence === 'high',
+                  });
+                  console.log('[openphone-webhook] call-lead push fanout:', JSON.stringify(pushRes));
+                } catch (pushErr) {
+                  console.warn('[openphone-webhook] call-lead push failed:', pushErr.message);
+                }
+              }
+            }
+          }
+        }
+      } catch (classifyErr) {
+        // Never fail the webhook on classification errors — best-effort feature
+        console.warn('[openphone-webhook] call-lead classify failed:', classifyErr.message);
+        try {
+          await logError('openphone-webhook:classify-call-lead', classifyErr, { call_id: data.callId });
+        } catch (_) { /* logging failure must not break the webhook */ }
+      }
     }
 
     // Record the webhook as processed

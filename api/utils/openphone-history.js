@@ -102,12 +102,15 @@ async function fetchCallSummaries(apiKey, phoneNumberId, participantPhone, maxCa
   const withSummaries = await Promise.all(calls.map(async (call) => {
     let summary = null;
     try {
-      const sResp = await fetch(`${OPENPHONE_BASE}/calls/${call.id}/summary`, {
+      const sResp = await fetch(`${OPENPHONE_BASE}/call-summaries/${call.id}`, {
         headers: { 'Authorization': apiKey },
       });
       if (sResp.ok) {
         const sData = await sResp.json();
-        summary = sData.data?.summary || null;
+        // OpenPhone returns `summary` as an array of bullet strings (matches
+        // the shape webhook handler already expects in openphone-webhook.js).
+        const raw = sData.data?.summary;
+        summary = Array.isArray(raw) ? raw.join(' ') : (raw || null);
       }
     } catch (_) {}
     return {

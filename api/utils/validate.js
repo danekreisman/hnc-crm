@@ -106,6 +106,14 @@ export const SCHEMAS = {
     message: { required: true,  rules: [is.nonEmpty, is.maxLength(1600)], message: 'Message is required (max 1600 chars — SMS limit)' },
   },
 
+  openphoneContact: {
+    name:    { required: true,  rules: [is.nonEmpty, is.maxLength(200)], message: 'Name is required (max 200 chars)' },
+    phone:   { required: true,  rules: [is.phone, is.maxLength(20)],     message: 'A valid phone number is required (10+ digits)' },
+    email:   { required: false, rules: [is.email,    is.maxLength(200)], message: 'Email must be valid if provided' },
+    leadId:  { required: false, rules: [is.maxLength(100)],              message: 'leadId must be a string under 100 chars' },
+    company: { required: false, rules: [is.maxLength(300)],              message: 'Company must be under 300 chars' },
+  },
+
   aiSummary: {
     prompt: { required: false, rules: [is.nonEmpty, is.maxLength(8000)], message: 'Prompt must be a non-empty string (max 8000 chars)' },
     leadId: { required: false, rules: [is.uuid], message: 'leadId must be a valid UUID' },

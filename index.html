@@ -8424,6 +8424,32 @@ function saveNewLead(){
     quote_total: _nlQ ? _nlQ.total : null,
     quote_data: _nlQ ? _nlQ.data : null
   });
+  // Mirror the web-form path: register the lead's phone as an OpenPhone
+  // contact so their name appears in OpenPhone and the AI summary panel can
+  // pull their call/SMS history. Fire-and-forget — UI shouldn't block on it.
+  (function(){
+    var nlPhone = document.getElementById('nl-phone').value;
+    if(!nlPhone || !nlPhone.replace(/\D/g,'')) return;
+    var nlEmail = document.getElementById('nl-email').value;
+    var svcVal = (document.getElementById('nl-service')||{}).value || '';
+    var addrVal = document.getElementById('nl-address').value || '';
+    var isCommercial = /commercial|janitorial|government/i.test(svcVal);
+    fetch('/api/openphone-create-contact', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        name: name,
+        phone: nlPhone,
+        email: nlEmail || undefined,
+        leadId: id,
+        company: isCommercial && addrVal ? addrVal : undefined
+      })
+    }).then(function(r){return r.json();}).then(function(d){
+      console.log('[saveNewLead] openphone contact:', d);
+    }).catch(function(err){
+      console.warn('[saveNewLead] openphone contact failed:', err && err.message);
+    });
+  })();
   var s=document.getElementById('nl-success');s.textContent='Lead "'+name+'" added to pipeline!';s.classList.add('show');
   setTimeout(function(){s.classList.remove('show');closeOverlay('new-lead-overlay');
     ['nl-name','nl-contact','nl-phone','nl-email','nl-address','nl-value','nl-sqft','nl-action','nl-notes'].forEach(function(id){var el=document.getElementById(id);if(el)el.value='';});

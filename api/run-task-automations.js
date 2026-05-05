@@ -37,7 +37,7 @@ import { buildSummaryPrompt } from './utils/summary-prompt.js';
 const ANTHROPIC_API = 'https://api.anthropic.com/v1/messages';
 
 // ── TEST MODE: limit task creation to Dane only during rollout ─────────────
-const TASK_AUTOMATIONS_TEST_MODE = true;
+const TASK_AUTOMATIONS_TEST_MODE = false;
 const DANE_PHONE_DIGITS = '8082697636';
 const DANE_EMAIL = 'dane.kreisman@gmail.com';
 

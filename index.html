@@ -19763,11 +19763,21 @@ async function executeBulkMove(targetStage){
       }
     });
 
-    /* Activity log — one line per move so audit trail captures them all */
+    /* Activity log — one line per move so audit trail captures them all.
+       logActivity signature: (action, description, entityType, entityId, metadata) */
     if(typeof logActivity === 'function'){
       succeeded.forEach(function(r){
         var lead = (typeof leadDB !== 'undefined') ? leadDB[r.id] : null;
-        try { logActivity('lead_stage_change', { leadId: r.id, leadName: lead ? lead.name : '(unknown)', newStage: targetStage, viaBulk: true }); } catch(_e){}
+        var leadName = lead ? lead.name : '(unknown)';
+        try {
+          logActivity(
+            'lead_stage_change',
+            'Bulk moved ' + leadName + ' to "' + targetStage + '"',
+            'lead',
+            r.id,
+            { newStage: targetStage, viaBulk: true }
+          );
+        } catch(_e){}
       });
     }
 
@@ -19778,12 +19788,18 @@ async function executeBulkMove(targetStage){
     if(failed.length === 0){
       if(typeof showToast === 'function') showToast('\u2713 Moved ' + succeeded.length + ' lead' + (succeeded.length>1?'s':'') + ' to "' + targetStage + '"');
     } else {
-      if(typeof showToast === 'function') showToast('Moved ' + succeeded.length + ' / ' + ids.length + ' \u2014 ' + failed.length + ' failed', true);
+      /* Surface the actual error from the first failure so Dane can see what
+         happened, not just a generic "X failed" message. */
+      var firstErr = failed[0].error;
+      var errMsg = (firstErr && (firstErr.message || firstErr.code || JSON.stringify(firstErr))) || 'unknown';
+      var toastMsg = 'Moved ' + succeeded.length + ' / ' + ids.length + '. Error: ' + errMsg;
+      if(typeof showToast === 'function') showToast(toastMsg, true);
       console.error('[bulk-move] failures:', failed);
     }
   } catch(err){
     console.error('[bulk-move] error:', err);
-    if(typeof showToast === 'function') showToast('Bulk move failed: ' + (err.message || err), true);
+    var msg = err && (err.message || err.toString()) || 'unknown error';
+    if(typeof showToast === 'function') showToast('Bulk move failed: ' + msg, true);
     if(btn){ btn.disabled = false; btn.innerHTML = '&#x21AA; Move to\u2026'; }
   }
 }

@@ -17600,8 +17600,8 @@ function renderTasks() {
 function renderTaskCard(t, done) {
   var today = new Date().toISOString().split('T')[0];
   var isOverdue = !done && t.due_date && t.due_date < today;
-  var typeLabel = {invoice:'Invoice',call_lead:'Call lead',call_client:'Call client',project:'Project',other:'Task',review_lead_response:'Lead reply',review_call_lead:'New call lead'}[t.type] || 'Task';
-  var typeColor = {invoice:'#3b82f6',call_lead:'#f59e0b',call_client:'#8b5cf6',project:'#10b981',other:'#6b7280',review_lead_response:'#dc2626',review_call_lead:'#7c3aed'}[t.type] || '#6b7280';
+  var typeLabel = {invoice:'Invoice',call_lead:'Call lead',call_client:'Call client',project:'Project',other:'Task',review_lead_response:'Lead reply',review_call_lead:'New call lead',review_quote_sent:'Confirm quote'}[t.type] || 'Task';
+  var typeColor = {invoice:'#3b82f6',call_lead:'#f59e0b',call_client:'#8b5cf6',project:'#10b981',other:'#6b7280',review_lead_response:'#dc2626',review_call_lead:'#7c3aed',review_quote_sent:'#059669'}[t.type] || '#6b7280';
   var priorityDot = {high:'\uD83D\uDD34',medium:'\uD83D\uDFE1',low:'\uD83D\uDFE2'}[t.priority] || '';
   var relName = (t.leads && t.leads.name) || (t.clients && t.clients.name) || '';
   var dueStr = t.due_date ? new Date(t.due_date + 'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'}) : '';
@@ -17640,6 +17640,19 @@ function renderTaskCard(t, done) {
     reviewActions = '<div style="display:flex;gap:8px;margin-top:10px;">'
       + '<button data-task-id="' + t.id + '" onclick="openCallLeadReview(this.dataset.taskId)" style="flex:1;padding:7px 12px;background:#7c3aed;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;">Review &amp; create</button>'
       + '<button data-task-id="' + t.id + '" onclick="dismissCallLead(this.dataset.taskId)" style="flex:1;padding:7px 12px;background:#fff;color:var(--text);border:1.5px solid var(--border);border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;">Not a lead</button>'
+      + '</div>';
+  }
+
+  // For review_quote_sent tasks: "Confirm $X" stamps the lead's quote_sent_at
+  // and quote_total. "Edit" lets Dane override the AI's amount before
+  // confirming. "Not a quote" silently dismisses. Only on open tasks where
+  // we have both an extracted amount and a related lead to act on.
+  if (!done && t.type === 'review_quote_sent' && t.extracted_data && typeof t.extracted_data.amount === 'number' && t.related_lead_id) {
+    var qAmt = Number(t.extracted_data.amount).toFixed(2);
+    reviewActions = '<div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap;">'
+      + '<button data-task-id="' + t.id + '" data-lead-id="' + t.related_lead_id + '" data-amount="' + qAmt + '" onclick="confirmQuoteSent(this.dataset.taskId, this.dataset.leadId, this.dataset.amount)" style="flex:1;min-width:120px;padding:7px 12px;background:#059669;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;">Confirm $' + qAmt + '</button>'
+      + '<button data-task-id="' + t.id + '" data-lead-id="' + t.related_lead_id + '" data-amount="' + qAmt + '" onclick="editAndConfirmQuoteSent(this.dataset.taskId, this.dataset.leadId, this.dataset.amount)" style="padding:7px 12px;background:#fff;color:var(--text);border:1.5px solid var(--border);border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;">Edit</button>'
+      + '<button data-task-id="' + t.id + '" onclick="dismissQuoteSent(this.dataset.taskId)" style="padding:7px 12px;background:#fff;color:var(--text-muted);border:1.5px solid var(--border);border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;">Not a quote</button>'
       + '</div>';
   }
 
@@ -17718,6 +17731,12 @@ function openCallLeadReview(taskId) {
   var x = task.extracted_data || {};
 
   document.getElementById('clr-task-id').value = task.id;
+  // Stash AI-detected quote amount on the same element so confirmCallLeadAccept
+  // can pass it through to /api/accept-call-lead, which will chain a
+  // review_quote_sent task if it's set. Empty string means "no quote
+  // detected at usable confidence" — the chain is skipped.
+  document.getElementById('clr-task-id').dataset.quoteAmount =
+    (typeof x.quote_amount === 'number' && x.quote_amount > 0) ? String(x.quote_amount) : '';
   document.getElementById('clr-name').value      = x.name || '';
   document.getElementById('clr-phone').value     = x.phone || '';
   document.getElementById('clr-email').value     = '';
@@ -17765,6 +17784,9 @@ async function confirmCallLeadAccept() {
     return;
   }
 
+  var stashedQuote = document.getElementById('clr-task-id').dataset.quoteAmount || '';
+  var quoteNum = stashedQuote ? Number(stashedQuote) : null;
+
   var payload = {
     taskId: taskId,
     name: name,
@@ -17778,6 +17800,7 @@ async function confirmCallLeadAccept() {
     sqft:      document.getElementById('clr-sqft').value.trim() || undefined,
     condition: document.getElementById('clr-condition').value || undefined,
     notes:     document.getElementById('clr-notes').value.trim() || undefined,
+    quote_amount: (typeof quoteNum === 'number' && isFinite(quoteNum) && quoteNum > 0) ? quoteNum : undefined,
   };
 
   if (btn) { btn.disabled = true; btn.textContent = 'Creating…'; }
@@ -17848,6 +17871,71 @@ async function confirmCallLeadAccept() {
 async function dismissCallLead(taskId) {
   // Caller wasn't a real lead. Just complete the task. We don't prompt —
   // the action is reversible (undo via the toast on completeTaskById).
+  await completeTaskById(taskId);
+}
+
+/* ──────────────────────────────────────────────────────────────────────
+   review_quote_sent task actions — "Confirm / Edit / Not a quote" buttons
+   on tasks created when AI detects a verbal quote on a call transcript.
+   Confirm stamps quote_sent_at + quote_total + stage='Quoted' on the lead,
+   which is what makes the Day-1 followup task fire the next morning.
+   ────────────────────────────────────────────────────────────────────── */
+
+async function confirmQuoteSent(taskId, leadId, amount) {
+  if (!taskId || !leadId) return;
+  var amt = Number(amount);
+  if (!isFinite(amt) || amt <= 0) {
+    showToast('Invalid amount', true);
+    return;
+  }
+  try {
+    var sess = (await db.auth.getSession()).data.session;
+    if (!sess) { showToast('Sign in required', true); return; }
+    var r = await fetch('/api/confirm-quote-sent', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + sess.access_token },
+      body: JSON.stringify({ taskId: taskId, leadId: leadId, amount: amt }),
+    });
+    var j = await r.json().catch(function(){ return {}; });
+    if (!r.ok || !j.success) {
+      showToast('Could not confirm quote: ' + (j.error || ('HTTP ' + r.status)), true);
+      return;
+    }
+    // Mirror the stamp into in-memory leadDB so the lead profile reflects
+    // it without a refresh. This matches the optimistic-update pattern
+    // used by reviewTaskMarkLost.
+    if (leadDB[leadId]) {
+      leadDB[leadId].quote_sent_at = j.leadRow && j.leadRow.quote_sent_at;
+      leadDB[leadId].quote_total = amt;
+      leadDB[leadId].stage = (j.leadRow && j.leadRow.stage) || leadDB[leadId].stage;
+    }
+    try { renderLeadsPipeline(); } catch (_) { /* best-effort */ }
+    await completeTaskById(taskId);
+    showToast('Quote of $' + amt.toFixed(2) + ' confirmed — Day-1 followup will fire tomorrow', false);
+  } catch (e) {
+    showToast('Network error: ' + e.message, true);
+  }
+}
+
+function editAndConfirmQuoteSent(taskId, leadId, currentAmount) {
+  // Tiny prompt-based override. We considered an inline editable input but
+  // the task card already crowds with three buttons + AI brief — a prompt
+  // keeps the card stable and works fine on mobile. Default value is the
+  // AI's extracted amount so a confirm-as-is is one Enter press.
+  var input = window.prompt('Confirm or correct the quote amount (USD):', String(currentAmount));
+  if (input == null) return; // user cancelled
+  var trimmed = String(input).trim().replace(/^\$/, '').replace(/,/g, '');
+  var n = Number(trimmed);
+  if (!isFinite(n) || n <= 0) {
+    showToast('Invalid amount — must be a positive number', true);
+    return;
+  }
+  confirmQuoteSent(taskId, leadId, n);
+}
+
+async function dismissQuoteSent(taskId) {
+  // AI false positive (no real quote was given) — just close the task.
+  // Reversible via the completeTaskById undo toast.
   await completeTaskById(taskId);
 }
 

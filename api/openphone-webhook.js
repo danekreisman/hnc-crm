@@ -215,10 +215,12 @@ export default async function handler(req, res) {
       '  - condition: one of "Pristine", "Decent", "Moderately dirty", "Very dirty", "Extreme" if the caller described the property\'s condition. Null otherwise.',
       '  - frequency: one of "One-time", "Weekly", "Biweekly", "Monthly" if stated. Null otherwise.',
       '  - notes: a short 1-3 sentence summary of who they are, what they need, timeline, and any special requests or context not captured above. Empty string if nothing extra.',
+      '  - quote_amount: if the rep verbally quoted a SPECIFIC dollar figure during the call (e.g. "I can do that for $245", "the total comes out to four hundred fifty"), extract the number as a JSON number (no $ sign, no commas). Null if no specific price was given. Soft estimates ("ballpark", "starting around", "somewhere between") should be null — only extract committed prices.',
+      '  - quote_confidence: "high" | "medium" | "low" | "none" — how confident you are that a SPECIFIC quote was given. "none" if quote_amount is null. We treat low as null on the consumer side.',
       '',
       'Return ONLY a JSON object — first character must be { and last must be }. No preamble, no postamble, no markdown.',
       'Format:',
-      '{"is_lead": <bool>, "confidence": "high"|"medium"|"low", "reasoning": "<one short sentence>", "extracted": {"name": <string|null>, "service": <string|null>, "address": <string|null>, "beds": <string|null>, "baths": <string|null>, "sqft": <string|null>, "condition": <string|null>, "frequency": <string|null>, "notes": <string>}}',
+      '{"is_lead": <bool>, "confidence": "high"|"medium"|"low", "reasoning": "<one short sentence>", "extracted": {"name": <string|null>, "service": <string|null>, "address": <string|null>, "beds": <string|null>, "baths": <string|null>, "sqft": <string|null>, "condition": <string|null>, "frequency": <string|null>, "notes": <string>, "quote_amount": <number|null>, "quote_confidence": "high"|"medium"|"low"|"none"}}',
       '',
       '=== CALL CONTEXT ===',
       callContext || '(no metadata available)',
@@ -245,6 +247,88 @@ export default async function handler(req, res) {
 
     // Same brace-tracking JSON extractor as classifyLeadResponse — robust to
     // pre/postamble even when the prompt explicitly forbids it.
+    const start = text.indexOf('{');
+    if (start === -1) throw new Error('No JSON in AI response');
+    let depth = 0, inString = false, escape = false, jsonStr = null;
+    for (let i = start; i < text.length; i++) {
+      const ch = text[i];
+      if (escape) { escape = false; continue; }
+      if (inString) { if (ch === '\\') { escape = true; continue; } if (ch === '"') inString = false; continue; }
+      if (ch === '"') { inString = true; continue; }
+      if (ch === '{') depth++;
+      else if (ch === '}') { depth--; if (depth === 0) { jsonStr = text.slice(start, i + 1); break; } }
+    }
+    if (!jsonStr) throw new Error('Unbalanced JSON in AI response');
+    return JSON.parse(jsonStr);
+  }
+
+  /**
+   * Quote-only extractor for transcripts where the caller is already a known
+   * lead (so the call-lead classifier doesn't run). Returns a small JSON
+   * with whether a specific dollar quote was given and the amount.
+   *
+   *   { quote_discussed: bool, amount: number|null,
+   *     confidence: 'high'|'medium'|'low', reasoning: string }
+   *
+   * Conservative by design — false positives spam Dane with confirm-quote
+   * tasks that don't represent real quotes. We only act on medium+.
+   */
+  async function extractQuoteFromTranscript({ transcript, summary, leadName, durationSeconds }) {
+    const ctx = [
+      leadName ? `Existing lead on the call: ${leadName}` : '',
+      durationSeconds ? `Call duration: ${durationSeconds}s` : '',
+      summary ? `OpenPhone-generated summary: ${summary}` : '',
+    ].filter(Boolean).join('\n');
+
+    const transcriptBlock = transcript
+      ? `\n=== CALL TRANSCRIPT ===\n${transcript}\n=== END TRANSCRIPT ===`
+      : '';
+
+    const prompt = [
+      'You are reviewing a call transcript between Hawaii Natural Clean (a residential and commercial cleaning business) and an existing lead. Your only job is to detect whether the rep gave the lead a SPECIFIC dollar quote during the call.',
+      '',
+      'Return quote_discussed=true ONLY if the rep stated a specific committed price the lead can act on, e.g. "I can do that for $245", "the total comes out to four hundred fifty", "$60 per hour for an estimated 4 hours so $240".',
+      '',
+      'Return quote_discussed=false if:',
+      '  - No price was discussed at all',
+      '  - Only a soft estimate ("ballpark", "starting around", "somewhere between $200 and $300", "I\'d need to see it first")',
+      '  - The lead asked about price but the rep deflected ("we\'ll need to do a walkthrough", "send me your address")',
+      '  - The rep quoted a price but immediately retracted or revised it without committing',
+      '',
+      'Confidence:',
+      '  - "high": rep clearly stated a single dollar figure as THE price',
+      '  - "medium": price was given but with some hedging — still actionable',
+      '  - "low": ambiguous, probably worth a manual review',
+      '',
+      'Amount: extract as a JSON number (no $ sign, no commas). If a range was given AND committed (rare — usually unrealistic), use the lower bound. Null if quote_discussed=false.',
+      '',
+      'Return ONLY a JSON object — first character must be { and last must be }. No preamble, no markdown.',
+      'Format: {"quote_discussed": <bool>, "amount": <number|null>, "confidence": "high"|"medium"|"low", "reasoning": "<one short sentence>"}',
+      '',
+      '=== CALL CONTEXT ===',
+      ctx || '(no metadata available)',
+      transcriptBlock,
+    ].join('\n');
+
+    const aiResp = await fetchWithTimeout('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': process.env.ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 400,
+        messages: [{ role: 'user', content: prompt }],
+      }),
+    }, TIMEOUTS.ANTHROPIC);
+    if (!aiResp.ok) throw new Error('Anthropic API HTTP ' + aiResp.status);
+    const data = await aiResp.json();
+    const text = data?.content?.[0]?.text || '';
+    if (!text) throw new Error('AI returned empty response');
+
+    // Same brace-tracking JSON extractor as the other classifiers.
     const start = text.indexOf('{');
     if (start === -1) throw new Error('No JSON in AI response');
     let depth = 0, inString = false, escape = false, jsonStr = null;
@@ -447,7 +531,87 @@ export default async function handler(req, res) {
           const existingClient = await findClientByPhone(callerPhone);
           const existingLead = await findLeadByPhone(callerPhone);
           if (existingClient || existingLead) {
-            console.log('[openphone-webhook] call', data.callId, 'is from existing', existingClient ? 'client' : 'lead', '— skipping lead-classify');
+            // Existing-client calls are skipped entirely (clients aren't quoted —
+            // they're already paying customers). Existing-lead calls run quote
+            // detection: if the rep verbally quoted a price, drop a
+            // review_quote_sent task so Dane can confirm and stamp the lead.
+            if (existingClient) {
+              console.log('[openphone-webhook] call', data.callId, 'is from existing client — skipping lead-classify and quote-detect');
+            } else if (!process.env.ANTHROPIC_API_KEY) {
+              console.warn('[openphone-webhook] ANTHROPIC_API_KEY not set — skipping quote-detect');
+            } else {
+              try {
+                const qVerdict = await extractQuoteFromTranscript({
+                  transcript,
+                  summary: callRow.summary || '',
+                  leadName: existingLead.name || '',
+                  durationSeconds: callRow.duration_seconds,
+                });
+                console.log('[openphone-webhook] quote-detect verdict for', data.callId, ':', JSON.stringify(qVerdict).slice(0, 300));
+
+                if (qVerdict && qVerdict.quote_discussed === true && qVerdict.confidence !== 'low' && typeof qVerdict.amount === 'number' && qVerdict.amount > 0) {
+                  // Idempotency: skip if an open review_quote_sent task already
+                  // exists for this lead (e.g. duplicate webhook delivery, or
+                  // the lead just had a separate call earlier today). The
+                  // confirm endpoint will close the existing one.
+                  const existingTaskResp = await fetch(
+                    `${SUPABASE_URL}/rest/v1/tasks?related_lead_id=eq.${existingLead.id}&type=eq.review_quote_sent&status=eq.open&select=id&limit=1`,
+                    { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }
+                  );
+                  const existingTaskRows = await existingTaskResp.json().catch(() => []);
+                  if (Array.isArray(existingTaskRows) && existingTaskRows.length > 0) {
+                    console.log('[openphone-webhook] open review_quote_sent task already exists for lead', existingLead.id, '— skipping');
+                  } else {
+                    const today = new Date().toISOString().split('T')[0];
+                    const amount = Number(qVerdict.amount);
+                    const taskRes = await supabaseInsert('tasks', {
+                      title: `Confirm $${amount.toFixed(2)} quote for ${existingLead.name || 'lead'}`,
+                      type: 'review_quote_sent',
+                      priority: qVerdict.confidence === 'high' ? 'high' : 'medium',
+                      due_date: today,
+                      description:
+                        `Detected on call ${data.callId} (${callRow.duration_seconds || '?'}s).\n\n` +
+                        `AI read: ${qVerdict.reasoning || 'price was quoted on the call'} (confidence: ${qVerdict.confidence})\n\n` +
+                        `Confirm the amount to stamp quote_sent_at on this lead — that's what kicks off the Day-1 followup task.`,
+                      status: 'open',
+                      related_lead_id: existingLead.id,
+                      extracted_data: {
+                        amount: amount,
+                        confidence: qVerdict.confidence,
+                        reasoning: qVerdict.reasoning || null,
+                        call_id: data.callId,
+                      },
+                    });
+                    if (!taskRes.ok) {
+                      const errBody = await taskRes.text().catch(() => '<unreadable>');
+                      console.error('[openphone-webhook] review_quote_sent insert FAILED status=' + taskRes.status + ' body=' + errBody.slice(0, 500));
+                      await logError('openphone-webhook:review_quote_sent', new Error('Task insert ' + taskRes.status), {
+                        call_id: data.callId, lead_id: existingLead.id, body: errBody.slice(0, 500),
+                      });
+                    } else {
+                      console.log('[openphone-webhook] Created review_quote_sent task for lead', existingLead.id, 'amount=$' + amount.toFixed(2));
+                      // Push fan-out — same pattern as review_call_lead.
+                      try {
+                        const { sendPushToAllSubscribed } = await import('./utils/send-push.js');
+                        const pushRes = await sendPushToAllSubscribed({
+                          title: `Confirm $${amount.toFixed(2)} quote — ${existingLead.name || 'lead'}`,
+                          body: `AI read: ${(qVerdict.reasoning || 'price was quoted').slice(0, 100)}`,
+                          url: '/#tasks',
+                          tag: 'quote-' + data.callId,
+                          requireInteraction: qVerdict.confidence === 'high',
+                        });
+                        console.log('[openphone-webhook] quote-confirm push fanout:', JSON.stringify(pushRes));
+                      } catch (pushErr) {
+                        console.warn('[openphone-webhook] quote-confirm push failed:', pushErr.message);
+                      }
+                    }
+                  }
+                }
+              } catch (qErr) {
+                console.error('[openphone-webhook] quote-detect failed for', data.callId, ':', qErr.message);
+                await logError('openphone-webhook:quote-detect', qErr, { call_id: data.callId, lead_id: existingLead.id });
+              }
+            }
           } else if (!process.env.ANTHROPIC_API_KEY) {
             console.warn('[openphone-webhook] ANTHROPIC_API_KEY not set — skipping lead-classify');
           } else {
@@ -489,6 +653,12 @@ export default async function handler(req, res) {
                   condition: extracted.condition || null,
                   frequency: extracted.frequency || null,
                   notes: extracted.notes || '',
+                  // Quote info captured in the same AI pass — accept-call-lead.js
+                  // chains a review_quote_sent task using these fields after the
+                  // lead is created. Treat 'low' / 'none' confidence as null so
+                  // we never spam Dane with iffy auto-quote tasks.
+                  quote_amount: (typeof extracted.quote_amount === 'number' && extracted.quote_amount > 0 && (extracted.quote_confidence === 'high' || extracted.quote_confidence === 'medium')) ? extracted.quote_amount : null,
+                  quote_confidence: extracted.quote_confidence || 'none',
                   call_id: data.callId,
                   ai_confidence: verdict.confidence,
                   ai_reasoning: verdict.reasoning || null,

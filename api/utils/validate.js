@@ -127,7 +127,13 @@ export const SCHEMAS = {
     condition: { required: false, rules: [is.maxLength(20)],             message: 'Condition must be under 20 chars' },
     frequency: { required: false, rules: [is.maxLength(50)],             message: 'Frequency must be under 50 chars' },
     notes:   { required: false, rules: [is.maxLength(2000)],             message: 'Notes must be under 2000 chars' },
+    quote_amount: { required: false, rules: [(v) => v == null || (is.positiveNumber(Number(v)) && Number(v) < 100000)], message: 'Quote amount must be a positive number under 100000' },
   },
+
+  confirmQuoteSent: {
+    taskId: { required: true, rules: [is.uuid], message: 'taskId must be a valid UUID' },
+    leadId: { required: true, rules: [is.uuid], message: 'leadId must be a valid UUID' },
+    amount: { required: true, rules: [(v) => is.positiveNumber(Number(v)) && Number(v) < 100000], message: 'Amount must be a positive number under 100000' },
 
   aiSummary: {
     prompt: { required: false, rules: [is.nonEmpty, is.maxLength(8000)], message: 'Prompt must be a non-empty string (max 8000 chars)' },

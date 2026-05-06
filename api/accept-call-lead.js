@@ -45,7 +45,7 @@ export default async function handler(req, res) {
 
   const {
     taskId, name, phone, email, address, service, sqft, beds, baths,
-    condition, frequency, notes,
+    condition, frequency, notes, quote_amount,
   } = req.body;
 
   const db = createClient(
@@ -111,6 +111,37 @@ export default async function handler(req, res) {
       .then(r => r.text())
       .then(t => console.log('[accept-call-lead] openphone contact:', String(t).slice(0, 200)))
       .catch(err => console.warn('[accept-call-lead] openphone contact failed:', err.message));
+
+    // 4. If the AI extracted a verbal quote during the call (and Dane didn't
+    //    clear it in the modal), drop a review_quote_sent task referencing
+    //    the just-created lead. Confirming it stamps quote_sent_at and kicks
+    //    off the Day-1 followup automation. Best-effort — failure to create
+    //    this chained task should not roll back the lead.
+    if (typeof quote_amount === 'number' && quote_amount > 0) {
+      try {
+        const today = new Date().toISOString().split('T')[0];
+        const { error: qTaskErr } = await db.from('tasks').insert([{
+          title: `Confirm $${quote_amount.toFixed(2)} quote for ${leadInsert.name}`,
+          type: 'review_quote_sent',
+          priority: 'medium',
+          due_date: today,
+          description:
+            `Quote auto-detected on the inbound call when this lead was logged.\n\n` +
+            `Confirm the amount to stamp quote_sent_at on the lead — that's what kicks off the Day-1 followup task.`,
+          status: 'open',
+          related_lead_id: lead.id,
+          extracted_data: {
+            amount: quote_amount,
+            confidence: 'medium',
+            reasoning: 'Extracted from call transcript at lead-accept time',
+            source_task_id: taskId || null,
+          },
+        }]);
+        if (qTaskErr) console.warn('[accept-call-lead] chained quote task failed:', qTaskErr.message);
+      } catch (qChainErr) {
+        console.warn('[accept-call-lead] chained quote task threw:', qChainErr.message);
+      }
+    }
 
     return res.status(200).json({ success: true, leadId: lead.id, leadRow: lead });
   } catch (err) {

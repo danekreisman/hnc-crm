@@ -9352,6 +9352,8 @@ function renderAutoList(){
         + '<div data-auto-section="cleaners">' + cancelCleanerSmsCard + rescheduleCleanerSmsCard + '</div>' +
       _autoSectionHdr('Admin (VA tasks)')
         + '<div data-auto-section="admin">' + vaQuoteDay1Card + vaDay5Card + vaPostFirstCleanCard + newLeadOwnerEmailCard + newLeadOwnerSmsCard + autoBookAdminSmsCard + taskCreatedEmailCard + taskCreatedSmsCard + '</div>' +
+      _autoSectionHdr('Audit')
+        + '<div data-auto-section="audit"><div id="auto-audit-host"><div style="padding:24px;text-align:center;color:var(--text-muted);font-size:13px;">Loading audit…</div></div></div>' +
       '<div class="empty-state" style="padding:28px;text-align:center;color:var(--muted);background:var(--panel);border:1px dashed var(--border);border-radius:var(--radius);margin-top:18px;">No custom automations yet. Click <b>+ New automation</b> to build your first rule.</div>';
     _ensureAutomationToggleListener();
     _ensureAutomationTabListener();
@@ -9373,6 +9375,8 @@ function renderAutoList(){
       + '<div data-auto-section="cleaners">' + cancelCleanerSmsCard + rescheduleCleanerSmsCard + '</div>' +
     _autoSectionHdr('Admin (VA tasks)')
       + '<div data-auto-section="admin">' + vaQuoteDay1Card + vaDay5Card + vaPostFirstCleanCard + newLeadOwnerEmailCard + newLeadOwnerSmsCard + autoBookAdminSmsCard + taskCreatedEmailCard + taskCreatedSmsCard + '</div>' +
+    _autoSectionHdr('Audit')
+      + '<div data-auto-section="audit"><div id="auto-audit-host"><div style="padding:24px;text-align:center;color:var(--text-muted);font-size:13px;">Loading audit…</div></div></div>' +
     _autoSectionHdr('Custom rules');
   for(var i=0;i<automations.length;i++){
     var a = automations[i];
@@ -9464,24 +9468,25 @@ function _syncAutomationStatusUI(){
 function _buildAutomationTabs(){
   var nav = document.getElementById('auto-tabs');
   if(!nav) return;
-  var sections = ['leads','clients','cleaners','admin'];
-  var labels = {leads:'Leads', clients:'Clients', cleaners:'Cleaners', admin:'Admin'};
+  var sections = ['leads','clients','cleaners','admin','audit'];
+  var labels = {leads:'Leads', clients:'Clients', cleaners:'Cleaners', admin:'Admin', audit:'Audit'};
   var saved = localStorage.getItem('hnc_auto_tab') || 'leads';
   if(sections.indexOf(saved) < 0) saved = 'leads';
   nav.innerHTML = sections.map(function(s){
     var wrap = document.querySelector('#auto-list [data-auto-section="'+s+'"]');
-    var count = wrap ? wrap.children.length : 0;
+    /* Audit tab is a single dynamic table — count is meaningless, suppress it. */
+    var count = (s === 'audit') ? null : (wrap ? wrap.children.length : 0);
     var active = (s === saved);
     return '<button type="button" data-auto-tab="'+s+'" class="auto-tab'+(active?' active':'')+'">'
       + '<span>'+labels[s]+'</span>'
-      + '<span class="auto-tab-count">'+count+'</span>'
+      + (count !== null ? '<span class="auto-tab-count">'+count+'</span>' : '')
       + '</button>';
   }).join('');
   _applyAutomationTab(saved);
 }
 
 function _applyAutomationTab(name){
-  var sections = ['leads','clients','cleaners','admin'];
+  var sections = ['leads','clients','cleaners','admin','audit'];
   if(sections.indexOf(name) < 0) name = 'leads';
   localStorage.setItem('hnc_auto_tab', name);
   /* Toggle which section is visible. Section headers (the helpers now return
@@ -9497,9 +9502,207 @@ function _applyAutomationTab(name){
     if(btn.getAttribute('data-auto-tab') === name) btn.classList.add('active');
     else btn.classList.remove('active');
   });
+  /* Audit tab: load fresh data on every selection (light query, ~5 reads). */
+  if(name === 'audit' && typeof renderAutomationsAudit === 'function'){
+    try { renderAutomationsAudit(); } catch(e){ console.warn('[audit] render failed:', e); }
+  }
 }
 
-/* Delegated click handler for tabs. Wired once. */
+/* ─── AUTOMATIONS AUDIT ────────────────────────────────────────────────────
+   Single-pane inventory of every automation across both systems:
+     • Custom stage_entered / segment_entered etc. rows from `lead_automations`
+     • Legacy boolean toggles in `ai_booking_settings` (lead-capture, daily VA
+       crons, appointment crons, broadcasts)
+   Shows: name, system, trigger, status, last fire, source. Honest about
+   what's running and what's not. Read-only by design — toggling lives on
+   the per-feature card in the other tabs, where the labels are richer.
+   ───────────────────────────────────────────────────────────────────────── */
+
+/* Static catalog of legacy toggles. Hand-curated — there are ~15 and they
+   change rarely. New legacy toggle? Add a row here. */
+var _AUDIT_LEGACY_CATALOG = [
+  // Inbound (lead form submission)
+  {key:'auto_quote_enabled',              label:'Auto-quote → email + SMS to lead',         category:'Inbound',   trigger:'Lead form submitted',                          file:'api/lead-capture.js'},
+  {key:'janitorial_enabled',              label:'Janitorial walkthrough request',           category:'Inbound',   trigger:'Janitorial lead form submitted',                file:'api/lead-capture.js'},
+  {key:'new_lead_owner_email_enabled',    label:'New-lead notification → owner email',      category:'Inbound',   trigger:'Lead form submitted',                          file:'api/lead-capture.js'},
+  {key:'new_lead_owner_sms_enabled',      label:'New-lead notification → owner SMS',        category:'Inbound',   trigger:'Lead form submitted',                          file:'api/lead-capture.js'},
+  {key:'auto_book_admin_sms_enabled',     label:'Auto-book → admin SMS',                    category:'Inbound',   trigger:'Lead self-books an appointment',                file:'api/lead-book.js'},
+  // Daily VA-task crons
+  {key:'va_task_quote_day1_enabled',      label:'Day-1 quote follow-up VA task',            category:'Cron · daily',  trigger:'Quote sent ~24h ago',                       file:'api/run-task-automations.js'},
+  {key:'va_task_quote_day5_enabled',      label:'Day-5 re-engagement VA task',              category:'Cron · daily',  trigger:'Quote sent ~5d ago, no booking',            file:'api/run-task-automations.js'},
+  {key:'va_task_post_first_clean_enabled',label:'Post-first-clean call VA task',            category:'Cron · hourly', trigger:'First completed appointment',                file:'api/run-job-completions.js'},
+  {key:'task_created_email_enabled',      label:'Task created → email assignee',            category:'Internal',  trigger:'New VA task created',                           file:'api/tasks.js'},
+  {key:'task_created_sms_enabled',        label:'Task created → SMS assignee',              category:'Internal',  trigger:'New VA task created',                           file:'api/tasks.js'},
+  // Customer-facing crons
+  {key:'booking_confirm_enabled',         label:'Booking confirmation email/SMS',           category:'Client',    trigger:'New appointment booked',                        file:'api/lead-book.js'},
+  {key:'review_sms_enabled',              label:'Post-clean review request SMS',            category:'Cron · daily',  trigger:'Appointment completed ~24h ago',            file:'api/run-review-requests.js'},
+  {key:'post_clean_thankyou_enabled',     label:'Post-clean thank-you email',               category:'Client',    trigger:'Appointment marked completed',                  file:'api/run-job-completions.js'},
+  {key:'invoice_reminder_enabled',        label:'Unpaid invoice reminder SMS',              category:'Cron · daily',  trigger:'Invoice still unpaid 24h+ after sending',   file:'api/run-invoice-reminders.js'},
+  {key:'policy_reminder_enabled',         label:'Policy agreement reminder',                category:'Cron · daily',  trigger:'New client without policy on file',         file:'api/run-policy-reminders.js'},
+  {key:'policy_first_booking_sms_enabled',label:'First-booking policy SMS',                 category:'Client',    trigger:'New client books their first appointment',      file:'api/lead-book.js'},
+];
+
+function _auditFmtTimeAgo(iso){
+  if(!iso) return '<span style="color:var(--text-muted);">never</span>';
+  try {
+    var diff = Date.now() - new Date(iso).getTime();
+    if(diff < 0) return new Date(iso).toLocaleString();
+    var m = Math.floor(diff/60000);
+    if(m < 1) return 'just now';
+    if(m < 60) return m+'m ago';
+    var h = Math.floor(m/60);
+    if(h < 24) return h+'h ago';
+    var d = Math.floor(h/24);
+    if(d < 30) return d+'d ago';
+    return new Date(iso).toLocaleDateString();
+  } catch(_e){ return iso; }
+}
+
+function _auditEsc(s){
+  return String(s == null ? '' : s).replace(/[&<>"]/g, function(c){
+    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];
+  });
+}
+
+function _auditPill(state){
+  var styles = {
+    on:    'background:#dcfce7;color:#166534;border:1px solid #bbf7d0;',
+    off:   'background:#f3f4f6;color:#6b7280;border:1px solid #e5e7eb;',
+    custom:'background:#dbeafe;color:#1e40af;border:1px solid #bfdbfe;'
+  };
+  var labels = {on:'On', off:'Off', custom:'Custom'};
+  return '<span style="font-size:11px;padding:2px 8px;border-radius:999px;font-weight:600;'+(styles[state]||styles.off)+'">'+labels[state]+'</span>';
+}
+
+async function renderAutomationsAudit(){
+  var host = document.getElementById('auto-audit-host');
+  if(!host) return;
+  if(typeof db === 'undefined' || !db){
+    host.innerHTML = '<div style="padding:24px;text-align:center;color:var(--text-muted);">Database not connected.</div>';
+    return;
+  }
+
+  /* Fetch legacy toggle row + custom automations + recent run log in parallel. */
+  var legacyKeys = _AUDIT_LEGACY_CATALOG.map(function(r){ return r.key; });
+  var selectCols = 'id,'+legacyKeys.join(',');
+
+  var legacyP = db.from('ai_booking_settings').select(selectCols).eq('id',1).maybeSingle();
+  var customP = db.from('lead_automations').select('id,name,trigger_type,trigger_config,actions,is_enabled,last_run_at,total_runs,total_succeeded,total_failed,created_at').order('created_at',{ascending:true});
+  var runsP   = db.from('lead_automation_runs').select('automation_id,status,completed_at').order('completed_at',{ascending:false}).limit(200);
+
+  var legacyRow, customRows, recentRuns;
+  try {
+    var results = await Promise.all([legacyP, customP, runsP]);
+    legacyRow  = (results[0] && results[0].data) || {};
+    customRows = (results[1] && results[1].data) || [];
+    recentRuns = (results[2] && results[2].data) || [];
+  } catch(e){
+    host.innerHTML = '<div style="padding:24px;text-align:center;color:var(--danger);">Audit load failed: '+_auditEsc(e.message||e)+'</div>';
+    return;
+  }
+
+  /* Build a per-automation last-run-success-or-fail map from recent runs. */
+  var lastRunByAuto = {};
+  recentRuns.forEach(function(r){
+    if(!r || !r.automation_id || !r.completed_at) return;
+    if(!lastRunByAuto[r.automation_id] || r.completed_at > lastRunByAuto[r.automation_id].completed_at){
+      lastRunByAuto[r.automation_id] = r;
+    }
+  });
+
+  /* Compose unified row list. */
+  var rows = [];
+
+  // Custom automations (lead_automations table)
+  customRows.forEach(function(a){
+    var cfg = a.trigger_config || {};
+    var triggerLabel = a.trigger_type || 'unknown';
+    if(a.trigger_type === 'stage_entered' && cfg.stage){
+      var d = cfg.delay_minutes || 0;
+      triggerLabel = 'Stage → '+cfg.stage + (d ? ' · +'+(d>=1440 ? Math.round(d/1440)+'d' : Math.round(d/60)+'h') : ' (immediate)');
+    } else if(a.trigger_type === 'segment_entered' && cfg.segment){
+      triggerLabel = 'Segment → '+cfg.segment;
+    } else if(a.trigger_type === 'days_in_segment' && cfg.segment){
+      triggerLabel = cfg.days+'d in '+cfg.segment;
+    }
+    var lastRun = lastRunByAuto[a.id];
+    rows.push({
+      name: a.name || 'Untitled custom automation',
+      category: 'Custom · stage event',
+      trigger: triggerLabel,
+      state: a.is_enabled ? 'on' : 'off',
+      lastFire: a.last_run_at || (lastRun && lastRun.completed_at) || null,
+      lastStatus: lastRun ? lastRun.status : null,
+      stats: (a.total_runs ? (a.total_runs+' runs · '+(a.total_succeeded||0)+' ok · '+(a.total_failed||0)+' err') : 'no runs yet'),
+      source: 'lead_automations',
+      isCustom: true,
+    });
+  });
+
+  // Legacy boolean toggles (ai_booking_settings)
+  _AUDIT_LEGACY_CATALOG.forEach(function(meta){
+    var enabled = legacyRow && legacyRow[meta.key] === true;
+    rows.push({
+      name: meta.label,
+      category: meta.category,
+      trigger: meta.trigger,
+      state: enabled ? 'on' : 'off',
+      lastFire: null, // legacy crons don't write per-key timestamps
+      lastStatus: null,
+      stats: meta.file,
+      source: 'ai_booking_settings.'+meta.key,
+      isCustom: false,
+    });
+  });
+
+  /* Aggregate counts for the summary header. */
+  var totals = {all:rows.length, on:0, off:0};
+  rows.forEach(function(r){ if(r.state==='on') totals.on++; else totals.off++; });
+
+  /* Render. Table is the right primitive here — sortable mental model,
+     dense, and it's read-only so no need for cards-with-toggles bloat. */
+  var html = '';
+  html += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;">';
+  html += '<div style="background:var(--bg-soft);border:1px solid var(--border);border-radius:10px;padding:10px 14px;font-size:12px;"><b style="font-size:16px;">'+totals.all+'</b><div style="color:var(--text-muted);margin-top:2px;">total automations</div></div>';
+  html += '<div style="background:#dcfce7;border:1px solid #bbf7d0;border-radius:10px;padding:10px 14px;font-size:12px;color:#166534;"><b style="font-size:16px;">'+totals.on+'</b><div style="margin-top:2px;">enabled</div></div>';
+  html += '<div style="background:#f3f4f6;border:1px solid #e5e7eb;border-radius:10px;padding:10px 14px;font-size:12px;color:#6b7280;"><b style="font-size:16px;">'+totals.off+'</b><div style="margin-top:2px;">disabled</div></div>';
+  html += '<div style="margin-left:auto;align-self:center;font-size:11px;color:var(--text-muted);">Toggles live on the Leads / Clients / Cleaners / Admin tabs. This is a read-only inventory.</div>';
+  html += '</div>';
+
+  html += '<div style="overflow-x:auto;border:1px solid var(--border);border-radius:10px;">';
+  html += '<table style="width:100%;border-collapse:collapse;font-size:13px;">';
+  html += '<thead style="background:var(--bg-soft);"><tr>'
+       +    '<th style="text-align:left;padding:10px 14px;font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--text-muted);">Automation</th>'
+       +    '<th style="text-align:left;padding:10px 14px;font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--text-muted);">Category</th>'
+       +    '<th style="text-align:left;padding:10px 14px;font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--text-muted);">Trigger</th>'
+       +    '<th style="text-align:left;padding:10px 14px;font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--text-muted);">Status</th>'
+       +    '<th style="text-align:left;padding:10px 14px;font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--text-muted);">Last fire</th>'
+       +    '<th style="text-align:left;padding:10px 14px;font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--text-muted);">Source</th>'
+       +  '</tr></thead><tbody>';
+
+  rows.forEach(function(r, i){
+    var border = (i < rows.length - 1) ? 'border-bottom:1px solid var(--border);' : '';
+    html += '<tr style="'+border+'">'
+         +    '<td style="padding:12px 14px;"><div style="font-weight:500;color:var(--text);">'+_auditEsc(r.name)+'</div>'
+         +      (r.isCustom ? '<div style="font-size:11px;color:var(--text-muted);margin-top:2px;">'+_auditEsc(r.stats)+'</div>' : '')
+         +    '</td>'
+         +    '<td style="padding:12px 14px;color:var(--text-muted);font-size:12px;white-space:nowrap;">'+_auditEsc(r.category)+'</td>'
+         +    '<td style="padding:12px 14px;font-size:12px;color:var(--text);">'+_auditEsc(r.trigger)+'</td>'
+         +    '<td style="padding:12px 14px;">'+_auditPill(r.state)+'</td>'
+         +    '<td style="padding:12px 14px;font-size:12px;color:var(--text-muted);">'+_auditFmtTimeAgo(r.lastFire)+'</td>'
+         +    '<td style="padding:12px 14px;font-size:11px;font-family:ui-monospace,monospace;color:var(--text-muted);">'+_auditEsc(r.source)+'</td>'
+         +  '</tr>';
+  });
+
+  html += '</tbody></table></div>';
+  html += '<div style="margin-top:12px;font-size:11px;color:var(--text-muted);line-height:1.5;">'
+       +    '<b>Note:</b> "Last fire" is only tracked for custom automations (lead_automations table). Legacy toggles run via Vercel cron schedules and don\'t write per-key timestamps — see the cron schedule in <code>vercel.json</code> if you need to verify a specific job\'s timing.'
+       +  '</div>';
+
+  host.innerHTML = html;
+}
+
+
 function _ensureAutomationTabListener(){
   if(window._autoTabListenerWired) return;
   window._autoTabListenerWired = true;

@@ -146,16 +146,17 @@ button:not(.btn):not(.btn-primary):not(.template-tab):not(.stab):not(.chat-tab):
    inline by the JS handler (we don't override it for buttons that already
    have positioning). */
 @keyframes hnc-ripple {
-  0%   { transform: scale(0); opacity: .55; }
-  100% { transform: scale(2.6); opacity: 0; }
+  0%   { transform: scale(0); opacity: .9; }
+  100% { transform: scale(3.5); opacity: 0; }
 }
 .hnc-ripple-ink {
   position: absolute;
   border-radius: 50%;
   pointer-events: none;
-  background: radial-gradient(circle, rgba(59,184,227,.45) 0%, rgba(59,184,227,.25) 45%, rgba(59,184,227,0) 75%);
+  background: radial-gradient(circle, rgba(59,184,227,.85) 0%, rgba(59,184,227,.55) 40%, rgba(59,184,227,.15) 70%, rgba(59,184,227,0) 100%);
   transform: scale(0);
-  animation: hnc-ripple .55s cubic-bezier(.4, 0, .2, 1) forwards;
+  animation: hnc-ripple .85s cubic-bezier(.4, 0, .2, 1) forwards;
+  z-index: 1;
 }
 @media (prefers-reduced-motion: reduce){
   .hnc-ripple-ink { display: none; }
@@ -20946,10 +20947,14 @@ function _hncAlohaFlower(){
 }
 
 /* ────────────────────────────────────────────────────────────────────────
-   WAVE-SPLASH RIPPLE — single global click listener, event delegation
-   means we add zero per-button JS overhead. On click of any button
-   (with the same opt-outs as the hover glow), we inject a <span> at
-   the click point that animates outward via CSS, then auto-removes.
+   WAVE-SPLASH RIPPLE — single global mousedown listener, event delegation
+   means we add zero per-button JS overhead. On press of any button (with
+   the same opt-outs as the hover glow), we inject a <span> at the press
+   point that animates outward via CSS, then auto-removes.
+
+   We use mousedown (not click) so the ripple appears the instant the
+   button is pressed — before any onclick handler has a chance to
+   re-render the page and wipe the ripple span out of existence.
    ──────────────────────────────────────────────────────────────────────── */
 (function(){
   /* These selectors match buttons that should NOT ripple (they have their
@@ -20963,34 +20968,46 @@ function _hncAlohaFlower(){
     return false;
   }
 
-  document.addEventListener('click', function(ev){
-    /* Find the closest <button> ancestor — handles clicks on inner spans/icons. */
-    var btn = ev.target && ev.target.closest && ev.target.closest('button');
-    if(!btn || shouldSkip(btn)) return;
+  function spawnRipple(ev){
+    try {
+      /* Find the closest <button> ancestor — handles clicks on inner spans/icons. */
+      var btn = ev.target && ev.target.closest && ev.target.closest('button');
+      if(!btn || shouldSkip(btn)) return;
 
-    /* Compute click point relative to the button's bounding box. */
-    var rect = btn.getBoundingClientRect();
-    var size = Math.max(rect.width, rect.height);
-    var x = (ev.clientX || (rect.left + rect.width/2)) - rect.left;
-    var y = (ev.clientY || (rect.top + rect.height/2)) - rect.top;
+      /* Compute press point relative to the button's bounding box. */
+      var rect = btn.getBoundingClientRect();
+      if(rect.width < 4 || rect.height < 4) return; // skip degenerate buttons
+      var size = Math.max(rect.width, rect.height);
+      var x = (ev.clientX || (rect.left + rect.width/2)) - rect.left;
+      var y = (ev.clientY || (rect.top + rect.height/2)) - rect.top;
 
-    /* Ensure the button can host an absolutely-positioned child. We only
-       set position:relative if it's currently static — never overwrite an
-       explicit positioning. Same for overflow. */
-    var computed = window.getComputedStyle(btn);
-    if(computed.position === 'static') btn.style.position = 'relative';
-    if(computed.overflow === 'visible') btn.style.overflow = 'hidden';
+      /* Ensure the button can host an absolutely-positioned child. */
+      var computed = window.getComputedStyle(btn);
+      if(computed.position === 'static') btn.style.position = 'relative';
+      if(computed.overflow === 'visible') btn.style.overflow = 'hidden';
 
-    var ink = document.createElement('span');
-    ink.className = 'hnc-ripple-ink';
-    ink.style.width = size + 'px';
-    ink.style.height = size + 'px';
-    ink.style.left = (x - size/2) + 'px';
-    ink.style.top = (y - size/2) + 'px';
-    btn.appendChild(ink);
+      var ink = document.createElement('span');
+      ink.className = 'hnc-ripple-ink';
+      ink.style.width = size + 'px';
+      ink.style.height = size + 'px';
+      ink.style.left = (x - size/2) + 'px';
+      ink.style.top = (y - size/2) + 'px';
+      btn.appendChild(ink);
 
-    /* Auto-cleanup after the animation completes (.55s + buffer). */
-    setTimeout(function(){ if(ink.parentNode) ink.remove(); }, 700);
+      /* Auto-cleanup after the animation completes. */
+      setTimeout(function(){ if(ink.parentNode) ink.remove(); }, 1000);
+    } catch(e) {
+      /* Never let a ripple bug break the actual click handler. */
+      console.warn('[ripple]', e);
+    }
+  }
+
+  /* Capture-phase mousedown so we run BEFORE any onclick rerenders the page. */
+  document.addEventListener('mousedown', spawnRipple, true);
+  /* Also handle touch/pen for mobile support. */
+  document.addEventListener('pointerdown', function(ev){
+    if(ev.pointerType === 'mouse') return; // already handled by mousedown
+    spawnRipple(ev);
   }, true);
 })();
 // === END HNC AUTH ===

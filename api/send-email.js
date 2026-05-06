@@ -350,13 +350,23 @@ export default async function handler(req, res) {
         ? `https://hnc-crm.vercel.app/book.html?bt=${bookingToken}`
         : (bookingUrl || 'https://hnc-crm.vercel.app/book.html');
 
+      // Photo encouragement card — placed AFTER the price breakdown so the
+      // primary visual flow stays "see price → click Book Now". This is a
+      // soft offer, not a gate. Wording explicitly says "totally optional"
+      // and "your current quote is ready to book as-is" so the lead doesn't
+      // infer that photos are required. Framed as "better assessment" not
+      // "price guarantee" — we keep our right to adjust on arrival regardless.
+      const photoCardHtml = `<p style="margin:0 0 8px;color:${BRAND.text};font-size:15px;line-height:1.6;">Reply to this email with a few photos of the space and we'll fine-tune your quote based on what we see.</p>
+        <p style="margin:0;color:${BRAND.muted || '#64748b'};font-size:13px;line-height:1.6;">Totally optional — your current quote is ready to book as-is.</p>`;
+
       html = renderBrandedEmail({
         preheader: `Your quote from ${BUSINESS} — ready to book`,
         heading: `Your quote is ready 🌺`,
         intro: customIntro || `Aloha ${firstName} — mahalo for reaching out. Here's your personalized quote.`,
         bodyHtml:
           card('Service summary', summaryTable) +
-          card('Price breakdown', priceTable),
+          card('Price breakdown', priceTable) +
+          card('Want a more accurate quote?', photoCardHtml),
         ctaText: 'Book now',
         ctaUrl:  finalBookUrl,
         footnote: `Questions or want to adjust? Call or text <a href="tel:${PHONE.replace(/\D/g,'')}" style="color:${BRAND.primary};text-decoration:none;">${PHONE}</a> or reply to this email. We'll make it right.`,

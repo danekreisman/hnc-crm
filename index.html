@@ -9577,130 +9577,373 @@ function _auditPill(state){
 async function renderAutomationsAudit(){
   var host = document.getElementById('auto-audit-host');
   if(!host) return;
-  if(typeof db === 'undefined' || !db){
-    host.innerHTML = '<div style="padding:24px;text-align:center;color:var(--text-muted);">Database not connected.</div>';
-    return;
+
+  /* Lazy-load d3 + d3-sankey on first open. ~70KB combined, only paid when
+     someone actually clicks the Audit tab. Subsequent opens reuse. */
+  if(!window._d3SankeyLoading && (typeof d3 === 'undefined' || !d3.sankey)){
+    window._d3SankeyLoading = true;
+    host.innerHTML = '<div style="padding:48px;text-align:center;color:var(--text-muted);font-size:13px;">Loading visualization…</div>';
+    try {
+      await _loadScript('https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js');
+      await _loadScript('https://cdn.jsdelivr.net/npm/d3-sankey@0.12/dist/d3-sankey.min.js');
+    } catch(e){
+      host.innerHTML = '<div style="padding:24px;text-align:center;color:var(--danger);">Failed to load visualization library: '+_auditEsc(e.message||e)+'</div>';
+      window._d3SankeyLoading = false;
+      return;
+    }
+    window._d3SankeyLoading = false;
   }
+  /* If a previous call started loading and is still in flight, bail; the
+     completion callback will re-render. (Edge case — fast tab toggling.) */
+  if(window._d3SankeyLoading) return;
 
-  /* Fetch legacy toggle row + custom automations + recent run log in parallel. */
-  var legacyKeys = _AUDIT_LEGACY_CATALOG.map(function(r){ return r.key; });
-  var selectCols = 'id,'+legacyKeys.join(',');
+  /* Read the current time-range selection (default 90 days). */
+  var days = parseInt(localStorage.getItem('hnc_audit_days') || '90', 10);
+  if(![30,60,90,180].includes(days)) days = 90;
 
-  var legacyP = db.from('ai_booking_settings').select(selectCols).eq('id',1).maybeSingle();
-  var customP = db.from('lead_automations').select('id,name,trigger_type,trigger_config,actions,is_enabled,last_run_at,total_runs,total_succeeded,total_failed,created_at').order('created_at',{ascending:true});
-  var runsP   = db.from('lead_automation_runs').select('automation_id,status,completed_at').order('completed_at',{ascending:false}).limit(200);
+  host.innerHTML =
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px;">'
+    + '<div style="display:flex;gap:6px;background:var(--bg-soft);padding:4px;border-radius:10px;border:1px solid var(--border);">'
+    +   [30,60,90,180].map(function(d){
+          var active = (d === days);
+          return '<button class="audit-range-btn" data-days="'+d+'" style="font-size:12px;padding:6px 12px;border-radius:7px;border:none;cursor:pointer;font-weight:500;background:'+(active?'var(--brand-500)':'transparent')+';color:'+(active?'#fff':'var(--text-muted)')+';">'+d+'d</button>';
+        }).join('')
+    + '</div>'
+    + '<div id="audit-stats" style="display:flex;gap:12px;font-size:12px;color:var(--text-muted);"></div>'
+    + '</div>'
+    + '<div id="audit-sankey-host" style="background:var(--panel,#fff);border:1px solid var(--border);border-radius:12px;padding:20px;min-height:480px;position:relative;overflow:hidden;"></div>'
+    + '<div id="audit-legend" style="display:flex;gap:16px;flex-wrap:wrap;margin-top:12px;font-size:11px;color:var(--text-muted);"></div>'
+    + '<div id="audit-help" style="margin-top:8px;font-size:11px;color:var(--text-muted);line-height:1.5;"></div>';
 
-  var legacyRow, customRows, recentRuns;
+  /* Wire range buttons */
+  host.querySelectorAll('.audit-range-btn').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var d = parseInt(btn.getAttribute('data-days'), 10);
+      localStorage.setItem('hnc_audit_days', String(d));
+      renderAutomationsAudit();
+    });
+  });
+
+  /* Fetch flow data */
+  var data;
   try {
-    var results = await Promise.all([legacyP, customP, runsP]);
-    legacyRow  = (results[0] && results[0].data) || {};
-    customRows = (results[1] && results[1].data) || [];
-    recentRuns = (results[2] && results[2].data) || [];
+    var resp = await fetch('/api/get-automations-flow?days='+days, {headers:{'Cache-Control':'no-cache'}});
+    if(!resp.ok) throw new Error('HTTP '+resp.status);
+    data = await resp.json();
   } catch(e){
-    host.innerHTML = '<div style="padding:24px;text-align:center;color:var(--danger);">Audit load failed: '+_auditEsc(e.message||e)+'</div>';
+    document.getElementById('audit-sankey-host').innerHTML =
+      '<div style="padding:48px;text-align:center;color:var(--danger);">Failed to load flow data: '+_auditEsc(e.message||e)+'</div>';
     return;
   }
 
-  /* Build a per-automation last-run-success-or-fail map from recent runs. */
-  var lastRunByAuto = {};
-  recentRuns.forEach(function(r){
-    if(!r || !r.automation_id || !r.completed_at) return;
-    if(!lastRunByAuto[r.automation_id] || r.completed_at > lastRunByAuto[r.automation_id].completed_at){
-      lastRunByAuto[r.automation_id] = r;
+  /* Stats line */
+  var statsEl = document.getElementById('audit-stats');
+  if(statsEl && data.stats){
+    statsEl.innerHTML =
+        '<span><b style="color:var(--text);">'+data.stats.total_leads+'</b> leads</span>'
+      + '<span><b style="color:var(--text);">'+data.stats.total_transitions+'</b> transitions</span>'
+      + '<span><b style="color:var(--text);">'+data.stats.total_automation_fires+'</b> automation fires</span>';
+  }
+
+  /* Render the Sankey */
+  _renderAuditSankey(data, document.getElementById('audit-sankey-host'));
+
+  /* Legend */
+  var legendEl = document.getElementById('audit-legend');
+  if(legendEl){
+    legendEl.innerHTML =
+        _legendDot('#3b82f6','Lead source')
+      + _legendDot('#10b981','Active stage')
+      + _legendDot('#94a3b8','Closed lost')
+      + _legendDot('#f59e0b','Closed won')
+      + _legendDot('#8b5cf6','Automation')
+      + '<div style="margin-left:auto;display:flex;align-items:center;gap:6px;"><div style="width:24px;height:2px;background:linear-gradient(90deg,#94a3b8,#94a3b8);border-radius:2px;"></div>Lead flow</div>'
+      + '<div style="display:flex;align-items:center;gap:6px;"><div style="width:24px;height:2px;background:linear-gradient(90deg,#8b5cf6,#8b5cf6);border-radius:2px;"></div>Automation fired</div>';
+  }
+
+  /* Help line */
+  var helpEl = document.getElementById('audit-help');
+  if(helpEl){
+    var msg = '';
+    if(!data.stats || !data.stats.has_enough_data){
+      msg = '<b>Building flow data:</b> the visualization gets sharper as more leads move through stages. Stage events have only been recorded since May 5 (when the Phase 1 trigger shipped) — leads that pre-date that show source → current-stage only.';
+    } else {
+      msg = 'Hover any node or link for details. Line thickness is proportional to lead volume. Animated dots represent leads currently flowing through that path.';
     }
-  });
-
-  /* Compose unified row list. */
-  var rows = [];
-
-  // Custom automations (lead_automations table)
-  customRows.forEach(function(a){
-    var cfg = a.trigger_config || {};
-    var triggerLabel = a.trigger_type || 'unknown';
-    if(a.trigger_type === 'stage_entered' && cfg.stage){
-      var d = cfg.delay_minutes || 0;
-      triggerLabel = 'Stage → '+cfg.stage + (d ? ' · +'+(d>=1440 ? Math.round(d/1440)+'d' : Math.round(d/60)+'h') : ' (immediate)');
-    } else if(a.trigger_type === 'segment_entered' && cfg.segment){
-      triggerLabel = 'Segment → '+cfg.segment;
-    } else if(a.trigger_type === 'days_in_segment' && cfg.segment){
-      triggerLabel = cfg.days+'d in '+cfg.segment;
-    }
-    var lastRun = lastRunByAuto[a.id];
-    rows.push({
-      name: a.name || 'Untitled custom automation',
-      category: 'Custom · stage event',
-      trigger: triggerLabel,
-      state: a.is_enabled ? 'on' : 'off',
-      lastFire: a.last_run_at || (lastRun && lastRun.completed_at) || null,
-      lastStatus: lastRun ? lastRun.status : null,
-      stats: (a.total_runs ? (a.total_runs+' runs · '+(a.total_succeeded||0)+' ok · '+(a.total_failed||0)+' err') : 'no runs yet'),
-      source: 'lead_automations',
-      isCustom: true,
-    });
-  });
-
-  // Legacy boolean toggles (ai_booking_settings)
-  _AUDIT_LEGACY_CATALOG.forEach(function(meta){
-    var enabled = legacyRow && legacyRow[meta.key] === true;
-    rows.push({
-      name: meta.label,
-      category: meta.category,
-      trigger: meta.trigger,
-      state: enabled ? 'on' : 'off',
-      lastFire: null, // legacy crons don't write per-key timestamps
-      lastStatus: null,
-      stats: meta.file,
-      source: 'ai_booking_settings.'+meta.key,
-      isCustom: false,
-    });
-  });
-
-  /* Aggregate counts for the summary header. */
-  var totals = {all:rows.length, on:0, off:0};
-  rows.forEach(function(r){ if(r.state==='on') totals.on++; else totals.off++; });
-
-  /* Render. Table is the right primitive here — sortable mental model,
-     dense, and it's read-only so no need for cards-with-toggles bloat. */
-  var html = '';
-  html += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;">';
-  html += '<div style="background:var(--bg-soft);border:1px solid var(--border);border-radius:10px;padding:10px 14px;font-size:12px;"><b style="font-size:16px;">'+totals.all+'</b><div style="color:var(--text-muted);margin-top:2px;">total automations</div></div>';
-  html += '<div style="background:#dcfce7;border:1px solid #bbf7d0;border-radius:10px;padding:10px 14px;font-size:12px;color:#166534;"><b style="font-size:16px;">'+totals.on+'</b><div style="margin-top:2px;">enabled</div></div>';
-  html += '<div style="background:#f3f4f6;border:1px solid #e5e7eb;border-radius:10px;padding:10px 14px;font-size:12px;color:#6b7280;"><b style="font-size:16px;">'+totals.off+'</b><div style="margin-top:2px;">disabled</div></div>';
-  html += '<div style="margin-left:auto;align-self:center;font-size:11px;color:var(--text-muted);">Toggles live on the Leads / Clients / Cleaners / Admin tabs. This is a read-only inventory.</div>';
-  html += '</div>';
-
-  html += '<div style="overflow-x:auto;border:1px solid var(--border);border-radius:10px;">';
-  html += '<table style="width:100%;border-collapse:collapse;font-size:13px;">';
-  html += '<thead style="background:var(--bg-soft);"><tr>'
-       +    '<th style="text-align:left;padding:10px 14px;font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--text-muted);">Automation</th>'
-       +    '<th style="text-align:left;padding:10px 14px;font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--text-muted);">Category</th>'
-       +    '<th style="text-align:left;padding:10px 14px;font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--text-muted);">Trigger</th>'
-       +    '<th style="text-align:left;padding:10px 14px;font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--text-muted);">Status</th>'
-       +    '<th style="text-align:left;padding:10px 14px;font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--text-muted);">Last fire</th>'
-       +    '<th style="text-align:left;padding:10px 14px;font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--text-muted);">Source</th>'
-       +  '</tr></thead><tbody>';
-
-  rows.forEach(function(r, i){
-    var border = (i < rows.length - 1) ? 'border-bottom:1px solid var(--border);' : '';
-    html += '<tr style="'+border+'">'
-         +    '<td style="padding:12px 14px;"><div style="font-weight:500;color:var(--text);">'+_auditEsc(r.name)+'</div>'
-         +      (r.isCustom ? '<div style="font-size:11px;color:var(--text-muted);margin-top:2px;">'+_auditEsc(r.stats)+'</div>' : '')
-         +    '</td>'
-         +    '<td style="padding:12px 14px;color:var(--text-muted);font-size:12px;white-space:nowrap;">'+_auditEsc(r.category)+'</td>'
-         +    '<td style="padding:12px 14px;font-size:12px;color:var(--text);">'+_auditEsc(r.trigger)+'</td>'
-         +    '<td style="padding:12px 14px;">'+_auditPill(r.state)+'</td>'
-         +    '<td style="padding:12px 14px;font-size:12px;color:var(--text-muted);">'+_auditFmtTimeAgo(r.lastFire)+'</td>'
-         +    '<td style="padding:12px 14px;font-size:11px;font-family:ui-monospace,monospace;color:var(--text-muted);">'+_auditEsc(r.source)+'</td>'
-         +  '</tr>';
-  });
-
-  html += '</tbody></table></div>';
-  html += '<div style="margin-top:12px;font-size:11px;color:var(--text-muted);line-height:1.5;">'
-       +    '<b>Note:</b> "Last fire" is only tracked for custom automations (lead_automations table). Legacy toggles run via Vercel cron schedules and don\'t write per-key timestamps — see the cron schedule in <code>vercel.json</code> if you need to verify a specific job\'s timing.'
-       +  '</div>';
-
-  host.innerHTML = html;
+    helpEl.innerHTML = msg;
+  }
 }
+
+function _legendDot(color, label){
+  return '<div style="display:flex;align-items:center;gap:6px;"><div style="width:10px;height:10px;background:'+color+';border-radius:2px;"></div>'+label+'</div>';
+}
+
+function _loadScript(src){
+  return new Promise(function(resolve, reject){
+    /* Skip if already loaded */
+    if(document.querySelector('script[src="'+src+'"]')){ resolve(); return; }
+    var s = document.createElement('script');
+    s.src = src;
+    s.onload = function(){ resolve(); };
+    s.onerror = function(){ reject(new Error('Failed to load '+src)); };
+    document.head.appendChild(s);
+  });
+}
+
+function _auditNodeColor(node){
+  if(node.type === 'source') return '#3b82f6';
+  if(node.type === 'automation') return '#8b5cf6';
+  if(node.type === 'always') return '#a855f7';
+  if(node.type === 'stage'){
+    if(node.stage === 'Closed won') return '#f59e0b';
+    if(node.stage === 'Closed lost') return '#94a3b8';
+    if(node.stage === 'Follow-up') return '#06b6d4';
+    return '#10b981';
+  }
+  return '#64748b';
+}
+
+function _renderAuditSankey(data, container){
+  if(!data || !data.nodes || data.nodes.length === 0){
+    container.innerHTML = '<div style="padding:48px;text-align:center;color:var(--text-muted);">No flow data in this range yet. Try a wider window or check back after a few leads have moved through stages.</div>';
+    return;
+  }
+  if(!data.links || data.links.length === 0){
+    container.innerHTML = '<div style="padding:48px;text-align:center;color:var(--text-muted);">No stage transitions recorded in this range. The DB trigger writes events on stage changes — once leads start moving, this will populate.</div>';
+    return;
+  }
+
+  /* Clean any prior SVG/canvas */
+  container.innerHTML = '';
+
+  /* Inner positioning shell so SVG and canvas share the same origin. The
+     outer container has padding:20px which would cause the canvas (positioned
+     absolute) to drift relative to SVG content. Inner div has no padding. */
+  var inner = document.createElement('div');
+  inner.style.position = 'relative';
+  inner.style.width = '100%';
+  container.appendChild(inner);
+
+  var width = inner.clientWidth || 800;
+  var height = Math.max(480, Math.min(720, data.nodes.length * 28));
+
+  /* SVG for nodes + static links + labels */
+  var svg = d3.select(inner).append('svg')
+    .attr('width', width)
+    .attr('height', height)
+    .style('display','block');
+
+  /* Canvas overlay (positioned absolute over the SVG) for animated particles
+     — Canvas is dramatically faster than SVG circles for hundreds of moving
+     dots. Same dimensions and origin as the SVG. */
+  var canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  canvas.style.position = 'absolute';
+  canvas.style.top = '0';
+  canvas.style.left = '0';
+  canvas.style.pointerEvents = 'none';
+  inner.appendChild(canvas);
+  var ctx = canvas.getContext('2d');
+
+  /* Build sankey graph. Note: d3-sankey mutates node/link objects in place,
+     so we deep-clone first. */
+  var graph = {
+    nodes: data.nodes.map(function(n,i){ return Object.assign({index:i}, n); }),
+    links: data.links.map(function(l){ return Object.assign({}, l); }),
+  };
+
+  var sankey = d3.sankey()
+    .nodeWidth(14)
+    .nodePadding(14)
+    .extent([[8, 8], [width - 8, height - 8]])
+    .nodeAlign(d3.sankeyJustify);
+
+  try {
+    sankey(graph);
+  } catch(e){
+    container.innerHTML = '<div style="padding:48px;text-align:center;color:var(--danger);">Sankey layout failed: '+(e.message||e)+'<br><small>Usually means a cycle in the flow data — try a shorter time range.</small></div>';
+    return;
+  }
+
+  /* Tooltip */
+  var tooltip = d3.select(inner).append('div')
+    .style('position','absolute')
+    .style('background','#1f2937')
+    .style('color','#fff')
+    .style('padding','8px 12px')
+    .style('border-radius','8px')
+    .style('font-size','12px')
+    .style('font-weight','500')
+    .style('pointer-events','none')
+    .style('opacity',0)
+    .style('transition','opacity .12s')
+    .style('white-space','nowrap')
+    .style('z-index',100)
+    .style('box-shadow','0 4px 12px rgba(0,0,0,.2)');
+
+  /* Links — gradient-stroked paths. Different stroke for automation-fire vs flow. */
+  var linkGroup = svg.append('g').attr('fill','none');
+  var linkPaths = linkGroup.selectAll('path')
+    .data(graph.links)
+    .enter().append('path')
+      .attr('d', d3.sankeyLinkHorizontal())
+      .attr('stroke', function(d){ return d.kind === 'fired' ? '#8b5cf6' : '#cbd5e1'; })
+      .attr('stroke-opacity', function(d){ return d.kind === 'fired' ? 0.45 : 0.35; })
+      .attr('stroke-width', function(d){ return Math.max(1, d.width); })
+      .style('mix-blend-mode','multiply')
+      .style('cursor','pointer');
+
+  linkPaths
+    .on('mouseover', function(ev, d){
+      d3.select(this).attr('stroke-opacity', 0.7);
+      var fromName = d.source.label || d.source.id;
+      var toName = d.target.label || d.target.id;
+      var label = (d.kind === 'fired'
+        ? '⚙ '+fromName+' fired '+toName+' — <b>'+d.value+'</b> time'+(d.value!==1?'s':'')
+        : fromName+' → '+toName+' — <b>'+d.value+'</b> lead'+(d.value!==1?'s':''));
+      tooltip.html(label).style('opacity',1);
+    })
+    .on('mousemove', function(ev){
+      var rect = inner.getBoundingClientRect();
+      tooltip.style('left',(ev.clientX - rect.left + 12)+'px')
+             .style('top',(ev.clientY - rect.top + 12)+'px');
+    })
+    .on('mouseout', function(ev, d){
+      d3.select(this).attr('stroke-opacity', d.kind === 'fired' ? 0.45 : 0.35);
+      tooltip.style('opacity',0);
+    });
+
+  /* Nodes */
+  var nodeGroup = svg.append('g');
+  var nodes = nodeGroup.selectAll('g')
+    .data(graph.nodes)
+    .enter().append('g')
+      .attr('transform', function(d){ return 'translate('+d.x0+','+d.y0+')'; });
+
+  nodes.append('rect')
+    .attr('height', function(d){ return Math.max(2, d.y1 - d.y0); })
+    .attr('width', function(d){ return d.x1 - d.x0; })
+    .attr('fill', _auditNodeColor)
+    .attr('rx', 3)
+    .style('cursor','pointer')
+    .on('mouseover', function(ev, d){
+      var inFlow = (d.targetLinks||[]).reduce(function(s,l){ return s + (l.kind==='flow'?l.value:0); }, 0);
+      var outFlow = (d.sourceLinks||[]).reduce(function(s,l){ return s + (l.kind==='flow'?l.value:0); }, 0);
+      var fired = (d.sourceLinks||[]).reduce(function(s,l){ return s + (l.kind==='fired'?l.value:0); }, 0);
+      var lines = ['<b>'+(d.label||d.id)+'</b>'];
+      if(d.type === 'source') lines.push((d.count||0)+' leads from this source');
+      else if(d.type === 'automation') lines.push((d.enabled?'✓ Enabled':'✗ Disabled')+' · '+(d.fires||0)+' fires');
+      else if(d.type === 'stage'){
+        lines.push(inFlow+' entered, '+outFlow+' exited');
+        if(fired) lines.push('Triggered '+fired+' automation run'+(fired!==1?'s':''));
+      }
+      tooltip.html(lines.join('<br>')).style('opacity',1);
+    })
+    .on('mousemove', function(ev){
+      var rect = inner.getBoundingClientRect();
+      tooltip.style('left',(ev.clientX - rect.left + 12)+'px')
+             .style('top',(ev.clientY - rect.top + 12)+'px');
+    })
+    .on('mouseout', function(){ tooltip.style('opacity',0); });
+
+  /* Labels — placed left or right of node depending on x position to stay onscreen */
+  nodes.append('text')
+    .attr('x', function(d){ return d.x0 < width / 2 ? (d.x1 - d.x0) + 6 : -6; })
+    .attr('y', function(d){ return (d.y1 - d.y0) / 2; })
+    .attr('dy', '0.35em')
+    .attr('text-anchor', function(d){ return d.x0 < width / 2 ? 'start' : 'end'; })
+    .style('font-size','11px')
+    .style('font-weight','500')
+    .style('fill','var(--text)')
+    .style('pointer-events','none')
+    .text(function(d){
+      var label = d.label || d.id;
+      /* Truncate long automation names to keep layout clean */
+      if(label.length > 32) label = label.slice(0,30) + '…';
+      return label;
+    });
+
+  /* ── Animated particles ────────────────────────────────────────────────
+     Each link gets a count of particles proportional to log(value).
+     Each particle has a random offset along the path's length, and on each
+     frame we sample the path at (offset + speed * t) % length to get x,y.
+     Canvas redraw is one clearRect + N fillCircles per frame — 60fps for
+     hundreds of particles is fine on modern hardware. */
+  var particles = [];
+  graph.links.forEach(function(link){
+    if(!link.value || !linkPaths) return;
+    /* Generate a sample of points along the path to interpolate. d3-sankey
+       links are SVG paths — extract the SVG path string and use a temp
+       SVGPathElement to get total length + point at offset. */
+    var pathStr = d3.sankeyLinkHorizontal()(link);
+    if(!pathStr) return;
+    var tmp = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    tmp.setAttribute('d', pathStr);
+    var totalLength = 0;
+    try { totalLength = tmp.getTotalLength(); } catch(_e){ return; }
+    if(!totalLength || !isFinite(totalLength)) return;
+
+    /* Sample N points along the path. More samples = smoother but more
+       memory. 80 is plenty for typical Sankey curves. */
+    var SAMPLES = 80;
+    var pts = [];
+    for(var s = 0; s <= SAMPLES; s++){
+      var p = tmp.getPointAtLength((s / SAMPLES) * totalLength);
+      pts.push([p.x, p.y]);
+    }
+
+    /* Particle count: scale with link value, capped. */
+    var particleCount = Math.max(1, Math.min(8, Math.ceil(Math.log(link.value + 1) * 1.5)));
+    /* Speed: tune for "lazy river" feel — about 4 seconds end-to-end for
+       a typical link. Faster for thicker links to imply higher throughput. */
+    var speed = 0.0015 + Math.min(0.0025, link.value / 4000);
+    var color = link.kind === 'fired' ? '#8b5cf6' : '#94a3b8';
+    var radius = link.kind === 'fired' ? 2 : 1.6;
+    for(var i = 0; i < particleCount; i++){
+      particles.push({
+        pts: pts,
+        offset: Math.random(),     // 0..1 along path
+        speed: speed,
+        color: color,
+        radius: radius,
+        kind: link.kind,
+      });
+    }
+  });
+
+  /* Animation loop. Use rAF; cancel on tab change to free CPU. */
+  var animationId = null;
+  var startTime = performance.now();
+  /* Account for the SVG → canvas offset. The SVG content area starts
+     at (0,0) inside its <svg>, but the canvas is positioned (20,20)
+     inside container (matching #audit-sankey-host's padding). Sankey
+     coordinates are in SVG space, so canvas needs no offset. */
+  function draw(){
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    var t = (performance.now() - startTime);
+    for(var i = 0; i < particles.length; i++){
+      var p = particles[i];
+      var pos = (p.offset + p.speed * t) % 1;
+      var idx = Math.min(p.pts.length - 1, Math.floor(pos * (p.pts.length - 1)));
+      var pt = p.pts[idx];
+      ctx.beginPath();
+      ctx.arc(pt[0], pt[1], p.radius, 0, Math.PI * 2);
+      ctx.fillStyle = p.color;
+      ctx.globalAlpha = p.kind === 'fired' ? 0.85 : 0.7;
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    animationId = requestAnimationFrame(draw);
+  }
+  draw();
+
+  /* Cancel animation when leaving Audit tab (saves battery on phones). */
+  /* Stash on container so we can cancel before next render. */
+  if(container._auditAnimId) cancelAnimationFrame(container._auditAnimId);
+  container._auditAnimId = animationId;
+}
+
 
 
 function _ensureAutomationTabListener(){

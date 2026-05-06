@@ -139,6 +139,27 @@ button:not(.btn):not(.btn-primary):not(.template-tab):not(.stab):not(.chat-tab):
   .btn-primary:hover, .hnc-glow:hover{animation:none;}
   button:hover { transform:none !important; box-shadow:none !important; }
 }
+/* Wave-splash ripple effect on every button click. JS injects a span at
+   the click coordinates inside the button; CSS animates it expanding +
+   fading. Pointer-events:none so the ripple doesn't swallow subsequent
+   clicks. Buttons that wouldn't have position:relative get one assigned
+   inline by the JS handler (we don't override it for buttons that already
+   have positioning). */
+@keyframes hnc-ripple {
+  0%   { transform: scale(0); opacity: .55; }
+  100% { transform: scale(2.6); opacity: 0; }
+}
+.hnc-ripple-ink {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+  background: radial-gradient(circle, rgba(59,184,227,.45) 0%, rgba(59,184,227,.25) 45%, rgba(59,184,227,0) 75%);
+  transform: scale(0);
+  animation: hnc-ripple .55s cubic-bezier(.4, 0, .2, 1) forwards;
+}
+@media (prefers-reduced-motion: reduce){
+  .hnc-ripple-ink { display: none; }
+}
 /* Hot-lead pulse — applied to attention cards in the highest-urgency tier
    (lead replied recently). A soft red breathe to convey "this is alive".
    Subtle on purpose — no flashing, just a slow fade. */
@@ -20923,6 +20944,55 @@ function _hncAlohaFlower(){
   setTimeout(function(){ flower.style.opacity = '0'; }, 2400);
   setTimeout(function(){ if(flower.parentNode) flower.remove(); }, 3400);
 }
+
+/* ────────────────────────────────────────────────────────────────────────
+   WAVE-SPLASH RIPPLE — single global click listener, event delegation
+   means we add zero per-button JS overhead. On click of any button
+   (with the same opt-outs as the hover glow), we inject a <span> at
+   the click point that animates outward via CSS, then auto-removes.
+   ──────────────────────────────────────────────────────────────────────── */
+(function(){
+  /* These selectors match buttons that should NOT ripple (they have their
+     own active/inactive state styling that would conflict). */
+  var SKIP_CLASSES = ['template-tab','stab','chat-tab','pay-tab','auto-tab','ctab-btn','close-btn'];
+  function shouldSkip(btn){
+    if(btn.disabled) return true;
+    for(var i = 0; i < SKIP_CLASSES.length; i++){
+      if(btn.classList.contains(SKIP_CLASSES[i])) return true;
+    }
+    return false;
+  }
+
+  document.addEventListener('click', function(ev){
+    /* Find the closest <button> ancestor — handles clicks on inner spans/icons. */
+    var btn = ev.target && ev.target.closest && ev.target.closest('button');
+    if(!btn || shouldSkip(btn)) return;
+
+    /* Compute click point relative to the button's bounding box. */
+    var rect = btn.getBoundingClientRect();
+    var size = Math.max(rect.width, rect.height);
+    var x = (ev.clientX || (rect.left + rect.width/2)) - rect.left;
+    var y = (ev.clientY || (rect.top + rect.height/2)) - rect.top;
+
+    /* Ensure the button can host an absolutely-positioned child. We only
+       set position:relative if it's currently static — never overwrite an
+       explicit positioning. Same for overflow. */
+    var computed = window.getComputedStyle(btn);
+    if(computed.position === 'static') btn.style.position = 'relative';
+    if(computed.overflow === 'visible') btn.style.overflow = 'hidden';
+
+    var ink = document.createElement('span');
+    ink.className = 'hnc-ripple-ink';
+    ink.style.width = size + 'px';
+    ink.style.height = size + 'px';
+    ink.style.left = (x - size/2) + 'px';
+    ink.style.top = (y - size/2) + 'px';
+    btn.appendChild(ink);
+
+    /* Auto-cleanup after the animation completes (.55s + buffer). */
+    setTimeout(function(){ if(ink.parentNode) ink.remove(); }, 700);
+  }, true);
+})();
 // === END HNC AUTH ===
 
 // === ACTIVITY LOGGING ===

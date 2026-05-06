@@ -64,6 +64,15 @@ DECLARE
   ];
 BEGIN
   FOREACH t IN ARRAY crm_tables LOOP
+    -- Skip silently if the table doesn't exist (some entries in the array
+    -- were scaffolded in code but the table was never created)
+    IF NOT EXISTS (
+      SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = t
+    ) THEN
+      RAISE NOTICE 'Skipping % (does not exist)', t;
+      CONTINUE;
+    END IF;
+
     -- Enable RLS (idempotent — safe to re-run)
     EXECUTE format('ALTER TABLE public.%I ENABLE ROW LEVEL SECURITY', t);
 
@@ -101,6 +110,12 @@ DECLARE
   ];
 BEGIN
   FOREACH t IN ARRAY server_only_tables LOOP
+    IF NOT EXISTS (
+      SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = t
+    ) THEN
+      RAISE NOTICE 'Skipping % (does not exist)', t;
+      CONTINUE;
+    END IF;
     EXECUTE format('ALTER TABLE public.%I ENABLE ROW LEVEL SECURITY', t);
   END LOOP;
 END $$;

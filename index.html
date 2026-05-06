@@ -3664,37 +3664,6 @@ function quickReactivate(id){
 function renderLeadsPipeline(){
   var leadEntries=Object.entries(leadDB).filter(function(e){return e[0].length>=30;});
   console.log('[renderLeadsPipeline] Rendering '+leadEntries.length+' real leads from Supabase');
-
-  /* TEMP DIAGNOSTIC — remove once flame issue is resolved.
-     Surfaces what leadDB knows about William so we can see whether
-     lastRespondedAt is populated and what _isLeadHot evaluates to. */
-  try {
-    var willEntry = leadEntries.find(function(e){
-      return /william/i.test((e[1] && e[1].name) || '');
-    });
-    var diag = document.getElementById('hnc-flame-diag');
-    if(willEntry){
-      var w = willEntry[1];
-      var hoursAgo = w.lastRespondedAt ? ((Date.now() - new Date(w.lastRespondedAt).getTime()) / 36e5).toFixed(2) : 'null';
-      var hot = (typeof _isLeadHot === 'function') ? _isLeadHot(w) : 'function-missing';
-      var msg = 'WILLIAM: stage=' + w.stage + ' | lastRespondedAt=' + (w.lastRespondedAt || 'null') + ' | hoursAgo=' + hoursAgo + ' | _isLeadHot=' + hot + ' | doNotContact=' + w.doNotContact;
-      if(!diag){
-        diag = document.createElement('div');
-        diag.id = 'hnc-flame-diag';
-        diag.style.cssText = 'position:fixed;top:60px;left:10px;right:10px;background:#7c2d12;color:#fed7aa;padding:10px 14px;border-radius:8px;font-size:11px;font-family:monospace;z-index:99999;box-shadow:0 4px 14px rgba(0,0,0,.35);cursor:pointer;line-height:1.5;';
-        diag.title = 'click to dismiss';
-        diag.onclick = function(){ diag.remove(); };
-        document.body.appendChild(diag);
-      }
-      diag.textContent = msg;
-    } else {
-      if(diag){
-        diag.style.background = '#7c2d12';
-        diag.textContent = 'WILLIAM: not found in leadDB (' + leadEntries.length + ' leads loaded)';
-      }
-    }
-  } catch(_diagErr){ console.warn('[flame-diag]', _diagErr); }
-
   // Clear all deal cards from both pipeline views before re-rendering
   ['view-dashboard','view-pipeline'].forEach(function(viewId){
     var view=document.getElementById(viewId);
@@ -8592,6 +8561,7 @@ function sv(view,el){
   document.getElementById('search-results').style.display='none';
   document.getElementById('sec-btn').textContent=secs[view]||'Filter';
   if(view==='messaging')renderInbox();
+  if(view==='pipeline'){ try { renderLeadsPipeline(); } catch(e){ console.warn('[pipeline] re-render failed:', e); } }
   if(view==='automations')loadLeadAutomations();
   if(view==='daily-list'){ try { loadDailyList(); } catch(e){ console.warn('[daily-list] load failed:', e); } }
   if(view==='broadcasts')loadBroadcasts();

@@ -174,7 +174,7 @@ export const SCHEMAS = {
  */
 export function validateActions(actions) {
   const errors = [];
-  const validTypes = ['sms', 'email', 'segment_move', 'internal_notification'];
+  const validTypes = ['sms', 'email', 'segment_move', 'internal_notification', 'create_va_task'];
 
   if (!Array.isArray(actions)) {
     return ['actions must be an array'];
@@ -197,6 +197,12 @@ export function validateActions(actions) {
     }
     if (action.type === 'segment_move' && !action.new_segment?.trim()) {
       errors.push(`${label} (segment_move): new_segment is required`);
+    }
+    if (action.type === 'create_va_task' && !action.title?.trim()) {
+      errors.push(`${label} (create_va_task): title is required`);
+    }
+    if (action.type === 'create_va_task' && action.title && action.title.length > 200) {
+      errors.push(`${label} (create_va_task): title must be under 200 characters`);
     }
     if (action.delay_minutes !== undefined && (typeof action.delay_minutes !== 'number' || action.delay_minutes < 0)) {
       errors.push(`${label}: delay_minutes must be a non-negative number`);

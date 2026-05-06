@@ -515,6 +515,45 @@ export default async function handler(req, res) {
                   console.log(`[${executionId}] Moved lead to segment: ${action.new_segment}`);
                 }
 
+                if (action.type === 'create_va_task') {
+                  // Create a VA task linked to the lead. Schema mirrors
+                  // run-task-automations.js — same `tasks` table, same fields.
+                  // The {firstName}, {service}, {stage} placeholders in title
+                  // and description are interpolated from the lead.
+                  try {
+                    const firstName = (lead.name || lead.contact_name || 'Lead').split(' ')[0];
+                    const interpolate = (s) => (s || '')
+                      .replaceAll('{firstName}', firstName)
+                      .replaceAll('{name}', lead.name || lead.contact_name || 'Lead')
+                      .replaceAll('{service}', lead.service || 'cleaning')
+                      .replaceAll('{stage}', lead.stage || '');
+                    const todayIso = new Date().toISOString().slice(0, 10);
+                    const { error: taskErr } = await db.from('tasks').insert([{
+                      title: interpolate(action.title) || `Follow up with ${firstName}`,
+                      type: action.task_type || 'call_lead',
+                      priority: action.priority || 'high',
+                      due_date: todayIso,
+                      description: interpolate(action.description) || '',
+                      related_lead_id: lead.id,
+                      status: 'open',
+                    }]);
+                    if (taskErr) throw taskErr;
+                    actionsExecuted.push({
+                      action_index: i,
+                      type: 'create_va_task',
+                      status: 'success',
+                      executed_at: actionStartTime.toISOString()
+                    });
+                  } catch (vaErr) {
+                    actionsExecuted.push({
+                      action_index: i,
+                      type: 'create_va_task',
+                      status: 'failed',
+                      error: vaErr.message,
+                      executed_at: actionStartTime.toISOString()
+                    });
+                  }
+                }
                 if (action.type === 'internal_notification') {
                   // Log for now (could integrate with Slack/email later)
                   console.log(`[${executionId}] Internal notification: ${action.message}`);

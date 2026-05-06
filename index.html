@@ -438,6 +438,35 @@ tr.clickable:hover td{background:var(--brand-50);cursor:pointer;}
 .price-preview-label{font-size:11px;color:#276749;margin-bottom:4px;}
 .price-preview-val{font-size:22px;font-weight:700;color:var(--brand-500);}
 .price-preview-breakdown{font-size:11px;color:var(--text-muted);margin-top:4px;}
+/* PRICING BREAKDOWN — stacked 3-section panel used on lead profile + booking modal.
+   Job spec (gray) → Client pricing (sky blue) → Your margin (green). Same visual
+   language so admins immediately recognize the breakdown wherever it appears. */
+.hnc-pricing-stack{display:flex;flex-direction:column;gap:10px;}
+.hnc-pricing-card{border-radius:10px;padding:12px 14px;border:1px solid;}
+.hnc-pricing-card .hnc-pc-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;opacity:.75;}
+.hnc-pricing-card .hnc-pc-row{display:flex;justify-content:space-between;align-items:baseline;padding:3px 0;font-size:13px;line-height:1.5;}
+.hnc-pricing-card .hnc-pc-row .k{color:var(--text);}
+.hnc-pricing-card .hnc-pc-row .v{font-variant-numeric:tabular-nums;font-weight:600;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;}
+.hnc-pricing-card .hnc-pc-row.hnc-pc-discount .v{color:#059669;}
+.hnc-pricing-card .hnc-pc-divider{height:1px;background:currentColor;opacity:.15;margin:6px 0;}
+.hnc-pricing-card .hnc-pc-divider-bold{opacity:.3;height:1.5px;}
+.hnc-pricing-card .hnc-pc-row.hnc-pc-total{padding-top:4px;}
+.hnc-pricing-card .hnc-pc-row.hnc-pc-total .k{font-weight:700;}
+.hnc-pricing-card .hnc-pc-big{font-size:18px;font-weight:700;}
+.hnc-pricing-card .hnc-pc-row.hnc-pc-tiny{font-size:11px;color:var(--text-muted);padding-top:2px;}
+.hnc-pricing-card .hnc-pc-row.hnc-pc-tiny .v{font-size:11px;font-weight:500;color:var(--text-muted);}
+.hnc-pricing-card .hnc-pc-row.hnc-pc-hours .v{font-size:18px;color:#7c2d12;}
+/* Section-specific tints */
+.hnc-pc-spec{background:#f8fafc;border-color:#e2e8f0;color:#334155;}
+.hnc-pc-spec .hnc-pc-label{color:#64748b;}
+.hnc-pc-client{background:#eff6ff;border-color:#bfdbfe;color:#1e3a8a;}
+.hnc-pc-client .hnc-pc-label{color:#1e40af;}
+.hnc-pc-client .hnc-pc-row.hnc-pc-total .v{color:#1d4ed8;}
+.hnc-pc-margin{background:#f0fdf4;border-color:#bbf7d0;color:#14532d;}
+.hnc-pc-margin .hnc-pc-label{color:#15803d;}
+.hnc-pc-margin .hnc-pc-row.hnc-pc-total .v{color:#15803d;}
+.hnc-pc-margin-empty{background:#fafafa;border-color:#e5e7eb;color:#9ca3af;}
+.hnc-pc-margin-empty .hnc-pc-label{color:#9ca3af;}
 /* MESSAGING INBOX */
 .inbox-layout{display:grid;grid-template-columns:260px 1fr;height:calc(100vh - 120px);background:#fff;border:1px solid var(--border);border-radius:10px;overflow:hidden;}
 .inbox-list{border-right:1px solid var(--border);overflow-y:auto;}
@@ -2026,6 +2055,8 @@ Mahalo 🌺</textarea>
             <div class="price-preview-breakdown" id="price-breakdown">— enter property details —</div>
             <div id="na-pricing-rules-display" style="display:none;background:var(--brand-50);border:1px solid #9ae6b4;border-radius:8px;padding:8px 11px;margin-top:8px;font-size:11px;color:#276749;"></div>
             <div id="na-cleaner-pay-line" style="font-size:11px;color:var(--text-muted);margin-top:2px;display:none;">Cleaner pay: <span id="na-cleaner-pay-val">—</span></div>
+            <!-- Detailed pricing breakdown — Job spec / Client pricing / Your margin -->
+            <div id="na-pricing-breakdown" style="margin-top:12px;"></div>
             <div style="margin-top:10px;display:flex;align-items:center;gap:10px;">
               <label style="font-size:13px;color:var(--text-muted);font-weight:normal;display:flex;align-items:center;gap:6px;cursor:pointer;">
                 <input type="checkbox" id="na-price-override-chk" onchange="calcPrice()"> Override price
@@ -2412,33 +2443,10 @@ Mahalo 🌺</textarea>
         <div class="panel-section">Notes</div>
         <div class="info-block"><div style="font-size:12px;color:var(--text);line-height:1.6;" id="lead-notes">—</div></div>
         <div class="panel-section">Quote</div>
-        <div id="suggested-quote-card" style="background:#f0f9ff;border:1px solid #bfdbfe;border-radius:10px;padding:12px 13px;margin-bottom:10px;display:none;">
-          <div id="suggested-quote-loading" style="text-align:center;color:var(--text-muted);font-size:12px;">⏳ Calculating quote...</div>
+        <div id="suggested-quote-card" style="background:transparent;border:none;border-radius:0;padding:0;margin-bottom:10px;display:none;">
+          <div id="suggested-quote-loading" style="text-align:center;color:var(--text-muted);font-size:12px;padding:14px;">⏳ Calculating quote...</div>
           <div id="suggested-quote-content" style="display:none;">
-            <div style="display:flex;gap:12px;margin-bottom:10px;">
-              <div style="flex:1;">
-                <div style="font-size:11px;color:var(--text-muted);">Service</div>
-                <div style="font-size:13px;font-weight:600;color:var(--text);margin-top:2px;" id="sug-service">—</div>
-              </div>
-              <div style="flex:1;">
-                <div style="font-size:11px;color:var(--text-muted);">Frequency</div>
-                <div style="font-size:13px;font-weight:600;color:var(--text);margin-top:2px;" id="sug-frequency">—</div>
-              </div>
-            </div>
-            <div style="background:#fff;border:1px solid #dbeafe;border-radius:8px;padding:10px 12px;">
-              <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text-muted);padding-bottom:6px;">
-                <span>Subtotal</span><span id="sug-subtotal">—</span>
-              </div>
-              <div id="sug-discount-row" style="display:flex;justify-content:space-between;font-size:12px;color:#059669;padding-bottom:6px;display:none;">
-                <span id="sug-discount-label">Discount</span><span id="sug-discount">—</span>
-              </div>
-              <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text-muted);padding-bottom:8px;border-bottom:1px solid #dbeafe;">
-                <span>Hawaii GET (4.712%)</span><span id="sug-tax">—</span>
-              </div>
-              <div style="display:flex;justify-content:space-between;font-size:15px;font-weight:700;color:#15803d;padding-top:8px;">
-                <span>Total</span><span id="sug-total">—</span>
-              </div>
-            </div>
+            <div id="lead-pricing-breakdown"></div>
             <div id="sug-error" style="background:#fee;border:1px solid #fca;border-radius:6px;padding:8px 10px;margin-top:10px;font-size:11px;color:#c5192d;display:none;"></div>
           </div>
         </div>
@@ -7760,6 +7768,135 @@ function _applyNaTipToDisplay(){
   }
 }
 
+/* ────────────────────────────────────────────────────────────────────────
+   PRICING BREAKDOWN — shared renderer for the lead profile and the
+   booking modal. Takes a normalized data object and writes a stacked
+   3-section panel (Job spec, Client pricing, Your margin) into `target`.
+
+   Usage:
+     renderPricingBreakdown('breakdown-container-id', {
+       service: 'Deep Cleaning',
+       frequency: 'Weekly',
+       beds: 3, baths: 2, sqft: 1450, condition: 7,
+       hours: 4.5,
+       basePrice: 585.00,
+       discountPct: 20,            // 0 if none
+       discountAmount: 117.00,     // 0 if none
+       subtotal: 468.00,           // base - discount
+       tax: 22.05,
+       total: 490.05,
+       hourlyRate: 65,             // client-facing $/hr (base / hours)
+       // Margin section — pass null/undefined to hide:
+       cleanerName: 'Maria K',     // null = no cleaner assigned (margin section grayed)
+       cleanerHours: 4.5,          // total cleaner hours (may differ from estimate)
+       cleanerPay: 76.50,          // total cleaner pay
+       cleanerRate: 17,            // cleaner's hourly rate
+       cleanerPayOverride: null    // override $ amount, null if not overridden
+     });
+
+   Any field can be null/undefined — the renderer hides rows it can't fill.
+   ──────────────────────────────────────────────────────────────────────── */
+function renderPricingBreakdown(targetId, d){
+  var target = typeof targetId === 'string' ? document.getElementById(targetId) : targetId;
+  if(!target) return;
+  d = d || {};
+
+  /* Helpers */
+  var $ = function(n){ return (n == null || isNaN(n)) ? null : Number(n); };
+  var fmt = function(n){
+    var v = $(n);
+    if(v === null) return '—';
+    return '$' + v.toFixed(2);
+  };
+  var hasMargin = d.cleanerName && $(d.cleanerPay) !== null && $(d.cleanerPay) > 0;
+  var marginAmount = hasMargin ? ($(d.subtotal) || 0) - ($(d.cleanerPay) || 0) : null;
+  var marginPerHour = (hasMargin && $(d.hours) > 0) ? marginAmount / $(d.hours) : null;
+  var clientPerHour = ($(d.total) && $(d.hours) > 0) ? $(d.total) / $(d.hours) : null;
+
+  /* Property spec line */
+  var spec = [];
+  if(d.beds  != null && d.beds  !== '') spec.push(d.beds + ' bed');
+  if(d.baths != null && d.baths !== '') spec.push(d.baths + ' bath');
+  if(d.sqft  != null && d.sqft  !== '') spec.push((typeof d.sqft === 'number' ? d.sqft.toLocaleString() : d.sqft) + ' sqft');
+  if(d.condition != null && d.condition !== '') {
+    var c = parseInt(d.condition);
+    var tier = (c <= 4 ? 'Tough' : c <= 6 ? 'Moderate' : 'Standard');
+    spec.push('condition: ' + tier + ' (' + c + '/10)');
+  }
+
+  /* Build HTML — 3 stacked sections */
+  var html = '<div class="hnc-pricing-stack">';
+
+  /* ── Section 1: Job spec ───────────────────────────────────── */
+  html += '<div class="hnc-pricing-card hnc-pc-spec">'
+    + '<div class="hnc-pc-label">Job spec</div>'
+    + '<div class="hnc-pc-row"><span class="k">Service</span><span class="v">' + (d.service || '—') + '</span></div>'
+    + '<div class="hnc-pc-row"><span class="k">Frequency</span><span class="v">' + (d.frequency || 'One-time') + '</span></div>';
+  if(spec.length){
+    html += '<div class="hnc-pc-row"><span class="k">Property</span><span class="v" style="font-size:12px;">' + spec.join(' · ') + '</span></div>';
+  }
+  html += '<div class="hnc-pc-row hnc-pc-hours">'
+    + '<span class="k">Estimated hours</span>'
+    + '<span class="v hnc-pc-big">' + ($(d.hours) !== null ? $(d.hours) + ' hrs' : '—') + '</span>'
+    + '</div>';
+  html += '</div>';
+
+  /* ── Section 2: Client pricing ────────────────────────────── */
+  html += '<div class="hnc-pricing-card hnc-pc-client">'
+    + '<div class="hnc-pc-label">What the client pays</div>';
+  html += '<div class="hnc-pc-row"><span class="k">Base</span><span class="v">' + fmt(d.basePrice) + '</span></div>';
+  if($(d.discountAmount) > 0){
+    html += '<div class="hnc-pc-row hnc-pc-discount">'
+      + '<span class="k">Frequency discount (' + ($(d.discountPct) || 0) + '%)</span>'
+      + '<span class="v">−' + fmt(d.discountAmount) + '</span>'
+      + '</div>';
+  }
+  html += '<div class="hnc-pc-divider"></div>';
+  html += '<div class="hnc-pc-row"><span class="k">Subtotal</span><span class="v">' + fmt(d.subtotal) + '</span></div>';
+  html += '<div class="hnc-pc-row"><span class="k">Hawaii GET (4.712%)</span><span class="v">+' + fmt(d.tax) + '</span></div>';
+  html += '<div class="hnc-pc-divider hnc-pc-divider-bold"></div>';
+  html += '<div class="hnc-pc-row hnc-pc-total">'
+    + '<span class="k">Total</span>'
+    + '<span class="v hnc-pc-big">' + fmt(d.total) + '</span>'
+    + '</div>';
+  if(clientPerHour !== null){
+    html += '<div class="hnc-pc-row hnc-pc-tiny"><span class="k">Effective rate</span><span class="v">$' + clientPerHour.toFixed(2) + '/hr</span></div>';
+  }
+  html += '</div>';
+
+  /* ── Section 3: Your margin ───────────────────────────────── */
+  html += '<div class="hnc-pricing-card hnc-pc-margin' + (hasMargin ? '' : ' hnc-pc-margin-empty') + '">'
+    + '<div class="hnc-pc-label">Your margin</div>';
+  if(!hasMargin){
+    html += '<div class="hnc-pc-row" style="justify-content:center;color:var(--text-muted);font-style:italic;font-size:12px;padding:14px 0;">'
+      + 'Assign a cleaner during booking to see your margin'
+      + '</div>';
+  } else {
+    html += '<div class="hnc-pc-row"><span class="k">Subtotal (revenue)</span><span class="v">' + fmt(d.subtotal) + '</span></div>';
+    var cleanerLabel;
+    if(d.cleanerPayOverride != null){
+      cleanerLabel = 'Cleaner pay (override)';
+    } else {
+      cleanerLabel = 'Cleaner pay (' + ($(d.cleanerHours) || $(d.hours)) + 'h × $' + ($(d.cleanerRate) || 0) + '/hr)';
+    }
+    html += '<div class="hnc-pc-row hnc-pc-discount"><span class="k">' + cleanerLabel + '</span><span class="v">−' + fmt(d.cleanerPay) + '</span></div>';
+    html += '<div class="hnc-pc-divider"></div>';
+    html += '<div class="hnc-pc-row hnc-pc-total">'
+      + '<span class="k">Your gross margin</span>'
+      + '<span class="v hnc-pc-big">' + fmt(marginAmount) + '</span>'
+      + '</div>';
+    if(marginPerHour !== null){
+      html += '<div class="hnc-pc-row hnc-pc-tiny"><span class="k">Your $/hour</span><span class="v">$' + marginPerHour.toFixed(2) + '/hr</span></div>';
+    }
+    html += '<div class="hnc-pc-row hnc-pc-tiny" style="color:var(--text-muted);"><span class="k" style="font-size:10px;">GET tax of ' + fmt(d.tax) + ' is paid through to the state — not part of your margin.</span><span class="v"></span></div>';
+  }
+  html += '</div>';
+
+  html += '</div>'; /* close stack */
+
+  target.innerHTML = html;
+}
+
 function calcPrice(){
   // Check for property/client flat rate overrides first
   var _propSelForFlat=document.getElementById('na-property-select');
@@ -7900,6 +8037,62 @@ function calcPrice(){
   var _cpData=_cpEntry?clientDB[_cpEntry.id]:null;
   showClientPricingRules(_cpData);
   _applyNaTipToDisplay();
+
+  /* Detailed breakdown panel. Reuses the same numbers we just computed
+     to populate the 3-section card stack at the bottom of the booking
+     modal. Wrapped in try/catch so a render bug here can never block
+     the underlying price calc. */
+  try {
+    var _bdEl = document.getElementById('na-pricing-breakdown');
+    if(_bdEl){
+      /* Pull cleaner data again (same source of truth as the cleaner-pay line above) */
+      var _bdCleanerEl = document.getElementById('na-cleaner');
+      var _bdCleanerName = _bdCleanerEl ? _bdCleanerEl.value : '';
+      var _bdCleanerHasReal = _bdCleanerName && _bdCleanerName !== 'unassigned' && _bdCleanerName !== '';
+      var _bdCleanerRate = _bdCleanerHasReal ? getCleanerRate(_bdCleanerName) : null;
+      var _bdCleanerPay = _bdCleanerHasReal ? calcCleanerPay(hrs, _bdCleanerName, svcType) : null;
+      /* Cleaner pay override — mirror the existing cleaner-pay-line logic */
+      var _bdCpOvrChk = document.getElementById('na-cleaner-pay-override-chk');
+      var _bdCpOvrVal = document.getElementById('na-cleaner-pay-override-val');
+      var _bdCpOverride = (_bdCpOvrChk && _bdCpOvrChk.checked && _bdCpOvrVal && _bdCpOvrVal.value)
+        ? parseFloat(_bdCpOvrVal.value) : null;
+      var _bdEffectiveCleanerPay = _bdCpOverride != null ? _bdCpOverride : _bdCleanerPay;
+
+      /* Pull beds/baths/sqft from the booking form so the spec line is accurate */
+      var _bdBedsEl  = document.getElementById('na-beds');
+      var _bdBathsEl = document.getElementById('na-baths');
+      var _bdSqftEl  = document.getElementById('na-sqft');
+      var _bdCondEl  = document.getElementById('na-condition');
+
+      /* Service display name for the user — svcType is internal value like 'deep' */
+      var _bdSvcMap = { regular: 'Regular Cleaning', deep: 'Deep Cleaning', moveout: 'Move-out Cleaning', airbnb: 'Airbnb Turnover', commercial: 'Commercial Cleaning' };
+      var _bdSvcName = _bdSvcMap[svcType] || svcType || 'Cleaning';
+
+      /* Frequency display */
+      var _bdFreqVal = freqVal || (document.getElementById('na-freq') ? document.getElementById('na-freq').selectedOptions[0].text : 'One-time');
+
+      renderPricingBreakdown('na-pricing-breakdown', {
+        service: _bdSvcName,
+        frequency: _bdFreqVal,
+        beds: _bdBedsEl && _bdBedsEl.value ? _bdBedsEl.value : null,
+        baths: _bdBathsEl && _bdBathsEl.value ? _bdBathsEl.value : null,
+        sqft: _bdSqftEl && _bdSqftEl.value ? _bdSqftEl.value : null,
+        condition: _bdCondEl && _bdCondEl.value ? _bdCondEl.value : null,
+        hours: hrs,
+        basePrice: base,
+        discountPct: freqDiscount > 0 ? Math.round(freqDiscount * 1000) / 10 : 0,
+        discountAmount: discountAmt,
+        subtotal: discountedBase,
+        tax: tax,
+        total: total,
+        cleanerName: _bdCleanerHasReal ? _bdCleanerName : null,
+        cleanerHours: hrs,
+        cleanerPay: _bdEffectiveCleanerPay,
+        cleanerRate: _bdCleanerRate,
+        cleanerPayOverride: _bdCpOverride,
+      });
+    }
+  } catch(_bdErr){ console.warn('[pricing-breakdown render]', _bdErr); }
 }
 
 function showClientPricingRules(clientData){
@@ -16271,21 +16464,33 @@ async function loadSuggestedQuote(){
       errorEl.style.display = 'block';
       loading.style.display = 'none';
     } else {
-      document.getElementById('sug-service').textContent = result.service || '—';
-      document.getElementById('sug-frequency').textContent = d.frequency || '—';
-      document.getElementById('sug-subtotal').textContent = '$' + result.subtotal.toFixed(2);
+      /* Normalize the calculate-quote response into the shape the
+         renderer expects, then hand it off. The renderer handles all
+         the visual concerns. */
       var TAX_RATE = 0.04712;
-      var tax = +(result.total * TAX_RATE).toFixed(2);
-      document.getElementById('sug-tax').textContent = '$' + tax.toFixed(2);
-      document.getElementById('sug-total').textContent = '$' + (result.total + tax).toFixed(2);
-      var discRow = document.getElementById('sug-discount-row');
-      if(result.discount_pct > 0){
-        document.getElementById('sug-discount-label').textContent = result.discount_pct + '% frequency discount';
-        document.getElementById('sug-discount').textContent = '−$' + result.discount.toFixed(2);
-        discRow.style.display = 'flex';
-      } else {
-        discRow.style.display = 'none';
-      }
+      var subtotal = Number(result.subtotal) || 0;
+      var tax = Number(result.tax) || +(subtotal * TAX_RATE).toFixed(2);
+      var total = Number(result.total) || +(subtotal + tax).toFixed(2);
+      renderPricingBreakdown('lead-pricing-breakdown', {
+        service:        result.service || d.service || '—',
+        frequency:      d.frequency || result.frequency || 'One-time',
+        beds:           d.beds  != null && d.beds !== '—' ? d.beds  : null,
+        baths:          d.baths != null && d.baths !== '—' ? d.baths : null,
+        sqft:           d.sqft  != null && d.sqft !== '—' ? d.sqft : null,
+        condition:      d.condition || null,
+        hours:          result.hours != null ? result.hours : (result.duration_minutes ? result.duration_minutes/60 : null),
+        basePrice:      Number(result.base_price) || (subtotal + (Number(result.discount) || 0)),
+        discountPct:    Number(result.discount_pct) || 0,
+        discountAmount: Number(result.discount) || 0,
+        subtotal:       subtotal,
+        tax:            tax,
+        total:          total,
+        /* Margin section: lead profile has no cleaner assigned yet, so this is empty */
+        cleanerName:    null,
+        cleanerHours:   null,
+        cleanerPay:     null,
+        cleanerRate:    null,
+      });
       loading.style.display = 'none';
       content.style.display = 'block';
     }

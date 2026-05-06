@@ -616,6 +616,12 @@ body:not(.hnc-assistant-user) .assistant-only{display:none!important;}
 
       <!-- PIPELINE -->
       <div id="view-pipeline" class="vc">
+        <!-- TEMP: test button for animation previews. Remove once Dane has seen each animation. -->
+        <div id="anim-test-bar" style="background:#fef3c7;border:1px solid #fcd34d;border-radius:10px;padding:10px 14px;margin-bottom:14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+          <span style="font-size:12px;color:#78350f;font-weight:600;">🎨 Animation preview:</span>
+          <button onclick="_hncConfetti()" style="background:#fff;border:1px solid #fcd34d;color:#78350f;padding:5px 12px;border-radius:7px;font-size:12px;cursor:pointer;font-weight:600;">🎉 Confetti</button>
+          <span style="font-size:11px;color:#92400e;margin-left:auto;">temporary — will be removed</span>
+        </div>
         <div class="metrics" style="grid-template-columns:repeat(3,minmax(0,1fr));">
           <div class="metric"><div class="metric-label">Total pipeline</div><div class="metric-value" id="pipe-total-val">—</div><div class="metric-sub" id="pipe-total-sub"></div></div>
           <div class="metric"><div class="metric-label">Commercial</div><div class="metric-value" id="pipe-commercial-val">—</div><div class="metric-sub" id="pipe-commercial-sub"></div></div>

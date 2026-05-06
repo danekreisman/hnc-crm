@@ -20974,6 +20974,22 @@ function _hncAlohaFlower(){
       var btn = ev.target && ev.target.closest && ev.target.closest('button');
       if(!btn || shouldSkip(btn)) return;
 
+      /* DIAGNOSTIC: flash a banner top-center so we can see if the handler
+         is even being invoked. Remove this block once ripple is confirmed. */
+      try {
+        var diag = document.getElementById('hnc-ripple-diag');
+        if(!diag){
+          diag = document.createElement('div');
+          diag.id = 'hnc-ripple-diag';
+          diag.style.cssText = 'position:fixed;top:10px;left:50%;transform:translateX(-50%);background:#dc2626;color:#fff;padding:6px 14px;border-radius:8px;font-size:12px;font-weight:700;z-index:999999;pointer-events:none;font-family:system-ui,sans-serif;box-shadow:0 4px 12px rgba(0,0,0,.3);';
+          document.body.appendChild(diag);
+        }
+        diag.textContent = '🌊 ripple fired on <' + (btn.tagName||'?') + '> ' + (btn.className||'(no class)').slice(0,60);
+        diag.style.opacity = '1';
+        clearTimeout(diag._t);
+        diag._t = setTimeout(function(){ diag.style.opacity = '0'; diag.style.transition = 'opacity .3s'; }, 900);
+      } catch(_d){}
+
       /* Compute press point relative to the button's bounding box. */
       var rect = btn.getBoundingClientRect();
       if(rect.width < 4 || rect.height < 4) return; // skip degenerate buttons

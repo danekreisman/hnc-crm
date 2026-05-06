@@ -112,6 +112,44 @@ async function taskExists(db, type, relatedLeadId) {
   return data && data.length > 0;
 }
 
+// Phase 2 coordination layer (2026-05-05). Returns true if there's an
+// ENABLED `stage_entered` automation in lead_automations that covers the
+// given stage + action type with delay_minutes inside [minDelay, maxDelay].
+// The window is intentional: a user-configured Day-1 automation should NOT
+// suppress the legacy Day-5 job (different business intent), and vice versa.
+//
+// Used by the legacy hardcoded jobs below to skip leads that the new
+// framework will handle, preventing duplicate VA tasks. Fail-OPEN: if the
+// query errors, returns false so the legacy job still runs (better to have
+// a duplicate task than a missed one — Dane can dismiss dupes; missed
+// tasks are silent).
+async function isStageEnteredCovered(db, stage, actionType, minDelayMinutes, maxDelayMinutes) {
+  try {
+    const { data, error } = await db
+      .from('lead_automations')
+      .select('id, name, trigger_config, actions')
+      .eq('trigger_type', 'stage_entered')
+      .eq('is_enabled', true);
+    if (error || !data) return false;
+    for (const row of data) {
+      const cfg = row.trigger_config || {};
+      if (cfg.stage !== stage) continue;
+      const delay = typeof cfg.delay_minutes === 'number' ? cfg.delay_minutes : 0;
+      if (delay < minDelayMinutes || delay > maxDelayMinutes) continue;
+      const actions = row.actions || [];
+      const hasActionType = actions.some(a => a && a.type === actionType);
+      if (hasActionType) {
+        console.log(`[run-task-automations] legacy ${stage}/${actionType} (delay window ${minDelayMinutes}-${maxDelayMinutes}m) superseded by automation '${row.name}' (id=${row.id}, delay=${delay}m)`);
+        return true;
+      }
+    }
+    return false;
+  } catch (e) {
+    console.warn('[isStageEnteredCovered] err:', e.message);
+    return false; // fail-open
+  }
+}
+
 async function logActivity(action, description, metadata={}) {
   try {
     await fetch(process.env.SUPABASE_URL+'/rest/v1/activity_logs', {
@@ -161,8 +199,16 @@ export default async function handler(req, res) {
 
     if (day1Err) throw day1Err;
 
+    // Phase 2 coordination: if there's an enabled stage_entered automation
+    // for Quoted with delay 0-3000 min (~0-50h, covering Day-0 and Day-1
+    // intents) that creates a VA task, that automation is the new source of
+    // truth — skip the legacy path entirely for this run. Window is bounded
+    // to avoid suppressing the Day-5 job when only a Day-1 automation exists.
+    const day1SupersededByFramework = await isStageEnteredCovered(db, 'Quoted', 'create_va_task', 0, 3000);
+
     for (const lead of day1Leads || []) {
       try {
+        if (day1SupersededByFramework) { results.skipped_idempotent++; continue; }
         if (!isTestSafeRecord(lead)) { results.skipped_test_mode++; continue; }
         const exists = await taskExists(db, 'call_lead', lead.id);
         if (exists) { results.skipped_idempotent++; continue; }
@@ -207,8 +253,14 @@ export default async function handler(req, res) {
 
     if (day5Err) throw day5Err;
 
+    // Phase 2 coordination: same pattern as Day-1, but window targets
+    // Day-3-to-Day-7 intents (4320-10080 min) so a Day-1 automation does
+    // NOT suppress this Day-5 legacy job.
+    const day5SupersededByFramework = await isStageEnteredCovered(db, 'Quoted', 'create_va_task', 4320, 10080);
+
     for (const lead of day5Leads || []) {
       try {
+        if (day5SupersededByFramework) { results.skipped_idempotent++; continue; }
         if (!isTestSafeRecord(lead)) { results.skipped_test_mode++; continue; }
         const exists = await taskExists(db, 'call_lead_reengagement', lead.id);
         if (exists) { results.skipped_idempotent++; continue; }

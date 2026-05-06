@@ -21502,19 +21502,6 @@ async function loadClientHistory(clientId) {
     if(!btn || btn.disabled) return;
     for(var i=0;i<SKIP.length;i++){ if(btn.classList.contains(SKIP[i])) return; }
 
-    // Diagnostic banner — flashes when handler runs
-    var diag = document.getElementById('hnc-rip-diag');
-    if(!diag){
-      diag = document.createElement('div');
-      diag.id = 'hnc-rip-diag';
-      diag.style.cssText = 'position:fixed;top:12px;left:50%;transform:translateX(-50%);background:#16a34a;color:#fff;padding:8px 16px;border-radius:8px;font-size:13px;font-weight:700;z-index:999999;pointer-events:none;font-family:system-ui,-apple-system,sans-serif;box-shadow:0 4px 14px rgba(0,0,0,.25);transition:opacity .3s;';
-      document.body.appendChild(diag);
-    }
-    diag.textContent = '✅ Ripple fired: <' + btn.tagName + '> ' + (btn.className || '(no class)').slice(0,50);
-    diag.style.opacity = '1';
-    clearTimeout(diag._t);
-    diag._t = setTimeout(function(){ diag.style.opacity = '0'; }, 900);
-
     var rect = btn.getBoundingClientRect();
     if(rect.width < 4) return;
     var size = Math.max(rect.width, rect.height);
@@ -21537,16 +21524,6 @@ async function loadClientHistory(clientId) {
 
   document.addEventListener('mousedown', fire, true);
   document.addEventListener('pointerdown', function(e){ if(e.pointerType !== 'mouse') fire(e); }, true);
-
-  // Boot signal — flash a banner ONCE on load so we know this script ran.
-  // STAYS VISIBLE until clicked, so it can't be missed in a quick refresh.
-  setTimeout(function(){
-    var boot = document.createElement('div');
-    boot.textContent = '🌊 Ripple script loaded — click to dismiss';
-    boot.style.cssText = 'position:fixed;bottom:20px;right:20px;background:#3BB8E3;color:#fff;padding:10px 16px;border-radius:10px;font-size:13px;font-weight:700;z-index:999999;font-family:system-ui,-apple-system,sans-serif;box-shadow:0 6px 20px rgba(0,0,0,.3);cursor:pointer;';
-    boot.onclick = function(){ boot.remove(); };
-    document.body.appendChild(boot);
-  }, 100);
 })();
 </script>
 

@@ -3671,6 +3671,9 @@ function renderLeadsPipeline(){
     view.querySelectorAll('.pipe-col .deal-card').forEach(function(c){c.remove();});
   });
   var stageMap={'New inquiry':0,'Quoted':1,'Walkthrough requested':1,'Follow-up':2};
+  /* Hot-detection counters for visibility — logged at end of render */
+  var _renderHotCount = 0;
+  var _renderHotNames = [];
   leadEntries.forEach(function(entry){
     var id=entry[0];var l=entry[1];
     var colIdx=stageMap[l.stage];
@@ -3682,9 +3685,18 @@ function renderLeadsPipeline(){
       if(!cols[colIdx])return;
       var card=document.createElement('div');
       card.className='deal-card';
-      /* Flame the card if this lead is hot (replied <48h, awaiting response) */
-      var isHot = _isLeadHot(l);
-      if(isHot) card.className += ' deal-card-hot';
+      /* Hot-lead detection inlined here so it can NEVER fail because of
+         function-resolution order or undefined helpers. Same logic as
+         _isLeadHot: replied within 48h, not closed, not DNC. */
+      var isHot = false;
+      if(l.lastRespondedAt && !l.doNotContact && l.stage !== 'Closed won' && l.stage !== 'Closed lost'){
+        var hoursSinceReply = (Date.now() - new Date(l.lastRespondedAt).getTime()) / 36e5;
+        if(hoursSinceReply >= 0 && hoursSinceReply < 48) isHot = true;
+      }
+      if(isHot){
+        card.className += ' deal-card-hot';
+        if(viewId === 'view-pipeline'){ _renderHotCount++; _renderHotNames.push(l.name); }
+      }
       card.dataset.leadId=id;
       var svc=l.service||'Service';
       var badgeCls=svc.toLowerCase().indexOf('commercial')>=0?'bc':'br';
@@ -3733,6 +3745,10 @@ function renderLeadsPipeline(){
   // Refresh the "Needs your attention" panel at the top of the pipeline.
   // Same data source (leadDB), so it reruns whenever the pipeline does.
   try { if (typeof renderNeedsAttention === 'function') renderNeedsAttention(); } catch(e) { console.warn('[needs-attn] render failed:', e); }
+
+  /* Visibility log: how many cards got the flame and who. If this prints
+     the expected hot lead but the visual isn't there, the bug is CSS. */
+  console.log('[renderLeadsPipeline] Hot leads flagged: ' + _renderHotCount + (_renderHotNames.length ? ' — ' + _renderHotNames.join(', ') : ''));
 }
 
 /* ────────────────────────────────────────────────────────────────────────
@@ -8561,7 +8577,28 @@ function sv(view,el){
   document.getElementById('search-results').style.display='none';
   document.getElementById('sec-btn').textContent=secs[view]||'Filter';
   if(view==='messaging')renderInbox();
-  if(view==='pipeline'){ try { renderLeadsPipeline(); } catch(e){ console.warn('[pipeline] re-render failed:', e); } }
+  if(view==='pipeline'){
+    /* Re-fetch leads from Supabase on every Pipeline open so the cards
+       always reflect current DB state — no reliance on stale leadDB
+       (realtime drops, missed UPDATE events, manual SQL backfills, etc.) */
+    (async function(){
+      try {
+        var fresh = await dbLoadLeads();
+        if(Array.isArray(fresh)){
+          /* Wipe out the old leadDB entries so deletions/stage changes propagate */
+          Object.keys(leadDB).forEach(function(k){
+            if(k.length >= 30) delete leadDB[k];
+          });
+          fresh.forEach(function(l){ leadDB[l.id] = _leadRowToDb(l); });
+        }
+        renderLeadsPipeline();
+        if(typeof renderNeedsAttention === 'function'){ try { renderNeedsAttention(); } catch(_e){} }
+      } catch(e){
+        console.warn('[pipeline] re-fetch failed, falling back to stale render:', e);
+        try { renderLeadsPipeline(); } catch(_e2){}
+      }
+    })();
+  }
   if(view==='automations')loadLeadAutomations();
   if(view==='daily-list'){ try { loadDailyList(); } catch(e){ console.warn('[daily-list] load failed:', e); } }
   if(view==='broadcasts')loadBroadcasts();

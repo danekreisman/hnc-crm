@@ -462,8 +462,9 @@ textarea{font-family:inherit;}
 .hnc-va-user .admin-only-tip,.hnc-va-user .admin-only{display:none!important;}
 /* Assistant role — sees only Daily list + Calendar (read-only). Everything
    else in the sidebar is hidden. The .assistant-only nav item is hidden for
-   everyone EXCEPT assistant role. Symmetrical class .non-assistant-only is
-   hidden FOR the assistant. */
+   everyone EXCEPT assistant role. The non-assistant-only class is ONLY active
+   when an assistant is logged in (gated by .hnc-assistant-user on body) so
+   admin/VA users see all their normal nav items. */
 .hnc-assistant-user .non-assistant-only{display:none!important;}
 .hnc-assistant-user .admin-only-tip,.hnc-assistant-user .admin-only{display:none!important;}
 body:not(.hnc-assistant-user) .assistant-only{display:none!important;}
@@ -589,6 +590,7 @@ body:not(.hnc-assistant-user) .assistant-only{display:none!important;}
       </div>
 
       <!-- DASHBOARD -->
+      <div id="view-dashboard" class="vc">
         <div class="metrics">
           <div class="metric"><div class="metric-label">Active clients</div><div class="metric-value" id="dash-active-clients">—</div><div class="metric-sub" id="dash-active-clients-sub"></div></div>
           <div class="metric"><div class="metric-label">Open leads</div><div class="metric-value" id="dash-open-leads">—</div><div class="metric-sub" id="dash-open-leads-sub"></div></div>

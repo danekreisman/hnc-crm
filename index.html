@@ -677,19 +677,6 @@ body:not(.hnc-assistant-user) .assistant-only{display:none!important;}
 
       <!-- PIPELINE -->
       <div id="view-pipeline" class="vc">
-        <!-- TEMP: test button for animation previews. Remove once Dane has seen each animation. -->
-        <div id="anim-test-bar" style="background:#fef3c7;border:1px solid #fcd34d;border-radius:10px;padding:10px 14px;margin-bottom:14px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
-          <span style="font-size:12px;color:#78350f;font-weight:600;">🎨 Preview:</span>
-          <button onclick="_hncConfetti()" class="hnc-glow" style="background:#fff;border:1px solid #fcd34d;color:#78350f;padding:5px 10px;border-radius:7px;font-size:12px;cursor:pointer;font-weight:600;">🎉 Confetti</button>
-          <button onclick="_animPreviewTickers()" class="hnc-glow" style="background:#fff;border:1px solid #fcd34d;color:#78350f;padding:5px 10px;border-radius:7px;font-size:12px;cursor:pointer;font-weight:600;">🔢 Tickers</button>
-          <button onclick="_animPreviewCascade()" class="hnc-glow" style="background:#fff;border:1px solid #fcd34d;color:#78350f;padding:5px 10px;border-radius:7px;font-size:12px;cursor:pointer;font-weight:600;">⬇ Cascade</button>
-          <button onclick="_animPreviewHotPulse()" class="hnc-glow" style="background:#fff;border:1px solid #fcd34d;color:#78350f;padding:5px 10px;border-radius:7px;font-size:12px;cursor:pointer;font-weight:600;">💗 Hot pulse</button>
-          <button onclick="_animPreviewShimmer()" class="hnc-glow" style="background:#fff;border:1px solid #fcd34d;color:#78350f;padding:5px 10px;border-radius:7px;font-size:12px;cursor:pointer;font-weight:600;">✨ AI shimmer</button>
-          <button onclick="_animPreviewRocket(this)" class="hnc-glow" style="background:#fff;border:1px solid #fcd34d;color:#78350f;padding:5px 10px;border-radius:7px;font-size:12px;cursor:pointer;font-weight:600;">🚀 Rocket</button>
-          <button onclick="_hncCoinRain()" class="hnc-glow" style="background:#fff;border:1px solid #fcd34d;color:#78350f;padding:5px 10px;border-radius:7px;font-size:12px;cursor:pointer;font-weight:600;">💰 Coins</button>
-          <button onclick="_hncConfetti({origin:'center',count:180,colors:['#fbbf24','#f59e0b','#22c55e','#10b981','#3BB8E3','#ffffff']})" class="hnc-glow" style="background:#fff;border:1px solid #fcd34d;color:#78350f;padding:5px 10px;border-radius:7px;font-size:12px;cursor:pointer;font-weight:600;">🏆 Won</button>
-          <span style="font-size:11px;color:#92400e;margin-left:auto;">Try typing "aloha" anywhere 🌺</span>
-        </div>
         <div class="metrics" style="grid-template-columns:repeat(3,minmax(0,1fr));">
           <div class="metric"><div class="metric-label">Total pipeline</div><div class="metric-value" id="pipe-total-val">—</div><div class="metric-sub" id="pipe-total-sub"></div></div>
           <div class="metric"><div class="metric-label">Commercial</div><div class="metric-value" id="pipe-commercial-val">—</div><div class="metric-sub" id="pipe-commercial-sub"></div></div>
@@ -4345,121 +4332,7 @@ function _hncCoinRain(opts){
   setTimeout(function(){ if(wrap.parentNode) wrap.remove(); }, durationMs + 500);
 }
 
-/* ────────────────────────────────────────────────────────────────────────
-   ANIMATION PREVIEW HELPERS
-   Wired to buttons in the temporary preview bar. Lets Dane trigger each
-   animation in isolation without waiting for real data. Remove these
-   functions when removing the preview bar.
-   ──────────────────────────────────────────────────────────────────────── */
-function _animPreviewTickers(){
-  /* Pick the visible metric values on Pipeline + Dashboard, reset them,
-     and re-tick to a random target so the animation re-fires. */
-  var ids = ['pipe-total-val','pipe-commercial-val','dash-active-clients','dash-open-leads'];
-  ids.forEach(function(id){
-    var el = document.getElementById(id);
-    if(!el) return;
-    el.textContent = '0';
-    var targetNum = Math.floor(Math.random() * 80) + 20;
-    var suffix = (id === 'pipe-total-val') ? ' open' : '';
-    _hncTicker(el, targetNum, { suffix: suffix, durationMs: 900 });
-  });
-}
 
-function _animPreviewCascade(){
-  /* Drop a row of 6 demo "cards" into the page and cascade them in.
-     Cleans up after 4 seconds. */
-  var existing = document.getElementById('anim-cascade-demo');
-  if(existing) existing.remove();
-  var wrap = document.createElement('div');
-  wrap.id = 'anim-cascade-demo';
-  wrap.style.cssText = 'background:#fff;border:1px solid var(--border);border-radius:12px;padding:14px;margin:14px 0;';
-  wrap.innerHTML = '<div style="font-size:12px;color:var(--text-muted);margin-bottom:10px;font-weight:600;">↓ Cascade demo (auto-clears in 4s)</div>'
-    + Array.from({length:6}).map(function(_,i){
-        return '<div data-cascade-card style="background:#f8fafc;border:1px solid #e2e8f0;border-left:3px solid #8b5cf6;border-radius:8px;padding:10px 14px;margin-bottom:6px;font-size:13px;color:#475569;opacity:0;transform:translateY(12px);transition:opacity .35s ease, transform .35s ease;">Demo card '+(i+1)+'</div>';
-      }).join('');
-  /* Insert just below the test bar */
-  var bar = document.getElementById('anim-test-bar');
-  if(bar && bar.parentNode) bar.parentNode.insertBefore(wrap, bar.nextSibling);
-  /* Cascade in */
-  wrap.querySelectorAll('[data-cascade-card]').forEach(function(card, idx){
-    setTimeout(function(){ card.style.opacity = '1'; card.style.transform = 'translateY(0)'; }, idx * 80);
-  });
-  /* Auto-remove */
-  setTimeout(function(){ wrap.remove(); }, 4000);
-}
-
-function _animPreviewHotPulse(){
-  /* Drop a single demo "hot" card so Dane can see the pulse. Auto-clears. */
-  var existing = document.getElementById('anim-hot-demo');
-  if(existing) existing.remove();
-  var card = document.createElement('div');
-  card.id = 'anim-hot-demo';
-  card.className = 'hnc-hot-card';
-  card.style.cssText = 'background:#fff;border-left:3px solid #dc2626;border-radius:8px;padding:14px 18px;margin:14px 0;font-size:13px;color:#1f2937;';
-  card.innerHTML = '<div style="font-weight:600;margin-bottom:2px;">💗 Hot-lead pulse demo <span style="background:#fee2e2;color:#dc2626;font-size:10px;padding:2px 8px;border-radius:999px;font-weight:700;margin-left:6px;">Replied 2h ago</span></div>'
-    + '<div style="font-size:12px;color:var(--text-muted);">Replied recently — awaiting your response (auto-clears in 6s)</div>';
-  var bar = document.getElementById('anim-test-bar');
-  if(bar && bar.parentNode) bar.parentNode.insertBefore(card, bar.nextSibling);
-  setTimeout(function(){ card.remove(); }, 6000);
-}
-
-function _animPreviewShimmer(){
-  /* Drop a fake AI-drafted message and shimmer it. */
-  var existing = document.getElementById('anim-shimmer-demo');
-  if(existing) existing.remove();
-  var demo = document.createElement('div');
-  demo.id = 'anim-shimmer-demo';
-  demo.style.cssText = 'background:#fafafa;border:1px solid var(--border);border-radius:10px;padding:14px;margin:14px 0;';
-  demo.innerHTML =
-      '<div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;font-weight:600;">Suggested message</div>'
-    + '<div id="anim-shimmer-target" style="white-space:pre-wrap;font-size:13px;color:var(--text);line-height:1.5;">Aloha Marii! Just wanted to circle back about your move-out cleaning quote — happy to answer any questions or get you on the schedule.\n\n— Lia from Hawaii Natural Clean</div>';
-  var bar = document.getElementById('anim-test-bar');
-  if(bar && bar.parentNode) bar.parentNode.insertBefore(demo, bar.nextSibling);
-  setTimeout(function(){
-    var t = document.getElementById('anim-shimmer-target');
-    if(t){
-      t.classList.add('hnc-shimmer');
-      setTimeout(function(){ t.classList.remove('hnc-shimmer'); }, 1500);
-    }
-  }, 50);
-  setTimeout(function(){ demo.remove(); }, 5000);
-}
-
-async function _animPreviewRocket(btnEl){
-  /* Wrap _hncRocketLaunch around a fake send (1s delay, always succeeds) so
-     Dane can see the rocket without actually sending anything. We clone the
-     test button so we don't permanently transform it into a checkmark. */
-  var clone = btnEl.cloneNode(true);
-  clone.id = 'anim-rocket-clone';
-  /* Remove inline onclick so it doesn't re-trigger */
-  clone.removeAttribute('onclick');
-  clone.style.background = '#2563eb';
-  clone.style.color = '#fff';
-  clone.style.border = 'none';
-  clone.textContent = 'Send text →';
-  /* Drop the clone below the test bar so it's clearly a demo */
-  var bar = document.getElementById('anim-test-bar');
-  if(bar && bar.parentNode){
-    var prev = document.getElementById('anim-rocket-demo');
-    if(prev) prev.remove();
-    var demoWrap = document.createElement('div');
-    demoWrap.id = 'anim-rocket-demo';
-    demoWrap.style.cssText = 'background:#fff;border:1px solid var(--border);border-radius:10px;padding:14px;margin:14px 0;display:flex;align-items:center;gap:12px;';
-    var label = document.createElement('span');
-    label.textContent = '🚀 Rocket demo:';
-    label.style.cssText = 'font-size:12px;color:var(--text-muted);font-weight:600;';
-    demoWrap.appendChild(label);
-    demoWrap.appendChild(clone);
-    bar.parentNode.insertBefore(demoWrap, bar.nextSibling);
-    /* Auto-fire */
-    try {
-      await _hncRocketLaunch(clone, function(){
-        return new Promise(function(r){ setTimeout(function(){ r({ ok: true }); }, 1000); });
-      });
-    } catch(_e){}
-    setTimeout(function(){ demoWrap.remove(); }, 4500);
-  }
-}
 
 async function loadDailyList(){
   var listEl = document.getElementById('dl-list');

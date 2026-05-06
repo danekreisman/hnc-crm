@@ -3688,6 +3688,32 @@ function renderLeadsPipeline(){
   /* Hot-detection counters for visibility — logged at end of render */
   var _renderHotCount = 0;
   var _renderHotNames = [];
+
+  /* Sort leads so HOT cards bubble to the top of each pipeline column.
+     Inline hot detection here too (matches the per-card check below) so
+     we can compute it once and reuse for the sort.
+     Tiebreaker: most recent reply first among hot leads; most recently
+     created among non-hot. */
+  function _hotnessFor(l){
+    if(!l) return { hot: false, sortKey: 0 };
+    if(l.lastRespondedAt && !l.doNotContact && l.stage !== 'Closed won' && l.stage !== 'Closed lost'){
+      var hoursSinceReply = (Date.now() - new Date(l.lastRespondedAt).getTime()) / 36e5;
+      if(hoursSinceReply >= 0 && hoursSinceReply < 48){
+        return { hot: true, sortKey: new Date(l.lastRespondedAt).getTime() };
+      }
+    }
+    var createdMs = l.createdAt ? new Date(l.createdAt).getTime() : 0;
+    return { hot: false, sortKey: createdMs };
+  }
+  leadEntries.sort(function(a, b){
+    var ha = _hotnessFor(a[1]);
+    var hb = _hotnessFor(b[1]);
+    /* Hot leads come first */
+    if(ha.hot !== hb.hot) return ha.hot ? -1 : 1;
+    /* Within the same hotness tier, most recent first */
+    return hb.sortKey - ha.sortKey;
+  });
+
   leadEntries.forEach(function(entry){
     var id=entry[0];var l=entry[1];
     var colIdx=stageMap[l.stage];

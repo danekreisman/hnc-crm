@@ -2536,6 +2536,7 @@ Mahalo 🌺</textarea>
     var _origFetch = window.fetch;
     var _inFlight = new Map();
     var _recent = new Map();
+    var _recentWarn = new Map();
     var DUPE_WINDOW_MS = 10000;
 
     function bodyToKey(method, body) {
@@ -2596,13 +2597,37 @@ Mahalo 🌺</textarea>
         var key = bodyToKey(method, body);
         if (!key) return _origFetch.apply(this, arguments);
 
+        // Extract action name from the body for clearer diagnostics. The
+        // hash alone ("POST:4d9da0b1") tells us nothing about WHAT is being
+        // duplicated — knowing it's e.g. "stripe_status_check" or
+        // "find_customer_cards" makes the source instantly obvious.
+        var dupeAction = '';
+        try {
+          var bodyStr = (typeof body === 'string') ? body : (body ? JSON.stringify(body) : '');
+          var m = bodyStr.match(/"action"\s*:\s*"([^"]+)"/);
+          if (m) dupeAction = m[1];
+        } catch (e) {}
+
+        // Per-key log throttle: warn at most once per (key, 10s window) so a
+        // render loop firing 30 identical calls produces ONE console line,
+        // not 30. The dedupe still blocks every duplicate — this only
+        // controls how often we tell the user about it.
+        function maybeWarn(label){
+          var lastWarnedAt = _recentWarn.get(key) || 0;
+          if (Date.now() - lastWarnedAt < DUPE_WINDOW_MS) return;
+          _recentWarn.set(key, Date.now());
+          if (window.console && console.debug) {
+            console.debug('[hnc] /api/stripe-invoice ' + label + (dupeAction ? ' (action: ' + dupeAction + ')' : '') + ' — further dupes silenced for 10s');
+          }
+        }
+
         if (_inFlight.has(key)) {
-          if (window.console && console.warn) console.warn('[hnc] /api/stripe-invoice duplicate coalesced (in-flight)', key);
+          maybeWarn('duplicate coalesced (in-flight)');
           return _inFlight.get(key);
         }
         var ra = _recent.get(key);
         if (ra && (Date.now() - ra) < DUPE_WINDOW_MS) {
-          if (window.console && console.warn) console.warn('[hnc] /api/stripe-invoice duplicate refused (recent <10s)', key);
+          maybeWarn('duplicate refused (recent <10s)');
           return Promise.resolve(new Response(JSON.stringify({
             error: 'duplicate_request_blocked',
             message: 'Please wait a moment before retrying.'

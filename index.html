@@ -19200,18 +19200,103 @@ document.addEventListener('click', function(e) {
 });
 
 async function handleNotifClick(id, url) {
-  // Mark read
+  // Mark read first so the badge updates regardless of what happens next
   try { await db.from('notifications').update({ read_at: new Date().toISOString() }).eq('id', id); } catch(_) {}
-  // Navigate if url provided
-  if (url && url !== 'null' && url.length > 0) {
-    if (url.startsWith('/') || url.startsWith('#')) {
-      window.location.hash = url.replace(/^\//, '#');
-    } else {
-      window.location.href = url;
+
+  // Close the notification panel
+  var panel = document.getElementById('notif-panel');
+  if (panel) panel.style.display = 'none';
+
+  // Fetch the full row so we can deep-link via event_type + metadata.
+  // The list render only passes id + url; metadata stays in the DB.
+  var notif = null;
+  try {
+    var r = await db.from('notifications').select('event_type, metadata, url').eq('id', id).maybeSingle();
+    notif = r && r.data;
+  } catch (e) { console.warn('[notif] fetch on click failed:', e); }
+
+  // Refresh the bell/list now that read_at is set
+  try { await loadNotifications(); } catch(_) {}
+
+  // Helper: switch CRM view by clicking the matching .nav-item (sv() expects
+  // an element so its .active class lights up correctly)
+  function _gotoView(view) {
+    if (typeof sv !== 'function') return false;
+    var item = document.querySelector(".nav-item[onclick*=\"'" + view + "'\"]");
+    if (!item) return false;
+    sv(view, item);
+    return true;
+  }
+
+  // Helper: open an appointment overlay by its Supabase row id. Walks the
+  // in-memory apptData map (which renderCal populates from Supabase on load)
+  // to find the matching (a, dateKey) pair openAppt() needs.
+  function _openApptByDbId(dbId) {
+    if (!dbId || typeof apptData === 'undefined') return false;
+    var keys = Object.keys(apptData);
+    for (var i = 0; i < keys.length; i++) {
+      var k = keys[i];
+      var arr = apptData[k] || [];
+      for (var j = 0; j < arr.length; j++) {
+        if (arr[j].dbId === dbId) {
+          try { openAppt(arr[j], k); } catch(e) { console.warn('[notif] openAppt failed:', e); }
+          return true;
+        }
+      }
+    }
+    if (typeof showToast === 'function') {
+      showToast('Appointment isn\'t loaded yet — try refreshing if it doesn\'t appear.');
+    }
+    return false;
+  }
+
+  // Route by event_type + metadata. Falls through to URL fallback below
+  // if event_type is unknown or metadata is missing.
+  if (notif) {
+    var et = notif.event_type || '';
+    var meta = notif.metadata || {};
+
+    if (et === 'booking_created' && meta.apptId) {
+      _gotoView('calendar');
+      // Brief delay so the calendar view has painted before the overlay opens
+      setTimeout(function(){ _openApptByDbId(meta.apptId); }, 120);
+      return;
+    }
+    if (et === 'lead_inquiry' && meta.leadId) {
+      _gotoView('pipeline');
+      setTimeout(function(){ if (typeof openLead === 'function') openLead(meta.leadId); }, 120);
+      return;
+    }
+    if (et === 'invoice_paid') { _gotoView('payments'); return; }
+    if (et === 'tip_received' || et === 'tip_paid') { _gotoView('payroll'); return; }
+    if (et === 'task_overdue') {
+      _gotoView('tasks');
+      if (typeof loadTasks === 'function') setTimeout(loadTasks, 120);
+      return;
     }
   }
-  document.getElementById('notif-panel').style.display = 'none';
-  await loadNotifications();
+
+  // Fallback: legacy URL handling for notifications created before this
+  // router existed (or future event_types we haven't mapped yet).
+  if (url && url !== 'null' && url.length > 0) {
+    var u = url;
+    // Normalize leading '/' or '/#' so we just have the route name
+    if (u.charAt(0) === '#') u = u.slice(1);
+    else if (u.indexOf('/#') === 0) u = u.slice(2);
+    // /?lead=<id> → pipeline + open lead (legacy lead-capture URL)
+    if (u.charAt(0) === '/' || u.indexOf('?') >= 0) {
+      var qm = u.match(/[?&]lead=([^&]+)/);
+      if (qm && typeof openLead === 'function') {
+        _gotoView('pipeline');
+        setTimeout(function(){ openLead(qm[1]); }, 120);
+        return;
+      }
+    }
+    // Try as a view name (calendar, payments, payroll, etc.)
+    if (u && _gotoView(u)) return;
+    // Last-ditch: hash navigation
+    try { window.location.hash = u; } catch(_) {}
+  }
 }
 
 async function markAllNotifRead() {

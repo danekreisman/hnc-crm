@@ -136,6 +136,27 @@ body{font-family:'Inter','SF Pro Text',-apple-system,BlinkMacSystemFont,'Segoe U
 @media (prefers-reduced-motion: reduce){
   .hnc-hot-card{animation:none;}
 }
+/* Magic-dust shimmer — applied to AI-drafted message previews on first render
+   to signal "this was AI-generated". Plays once for ~1.4s then the element
+   stays static. Implemented as a moving gradient highlight, no library. */
+@keyframes hnc-shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.hnc-shimmer {
+  background-image: linear-gradient(110deg, transparent 35%, rgba(139, 92, 246, 0.15) 50%, transparent 65%);
+  background-size: 200% 100%;
+  background-repeat: no-repeat;
+  animation: hnc-shimmer 1.4s ease-out 1;
+}
+@media (prefers-reduced-motion: reduce){
+  .hnc-shimmer{animation:none;background:none;}
+}
+@keyframes hnc-flash-fade {
+  0%   { opacity: 0; }
+  30%  { opacity: 1; }
+  100% { opacity: 0; }
+}
 .content{flex:1;overflow-y:auto;padding:20px;}
 .vc{display:none;}.vc.active{display:block;}
 .metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:18px;}
@@ -641,13 +662,17 @@ body:not(.hnc-assistant-user) .assistant-only{display:none!important;}
       <!-- PIPELINE -->
       <div id="view-pipeline" class="vc">
         <!-- TEMP: test button for animation previews. Remove once Dane has seen each animation. -->
-        <div id="anim-test-bar" style="background:#fef3c7;border:1px solid #fcd34d;border-radius:10px;padding:10px 14px;margin-bottom:14px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+        <div id="anim-test-bar" style="background:#fef3c7;border:1px solid #fcd34d;border-radius:10px;padding:10px 14px;margin-bottom:14px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
           <span style="font-size:12px;color:#78350f;font-weight:600;">🎨 Preview:</span>
-          <button onclick="_hncConfetti()" class="hnc-glow" style="background:#fff;border:1px solid #fcd34d;color:#78350f;padding:5px 12px;border-radius:7px;font-size:12px;cursor:pointer;font-weight:600;">🎉 Confetti</button>
-          <button onclick="_animPreviewTickers()" class="hnc-glow" style="background:#fff;border:1px solid #fcd34d;color:#78350f;padding:5px 12px;border-radius:7px;font-size:12px;cursor:pointer;font-weight:600;">🔢 Tickers</button>
-          <button onclick="_animPreviewCascade()" class="hnc-glow" style="background:#fff;border:1px solid #fcd34d;color:#78350f;padding:5px 12px;border-radius:7px;font-size:12px;cursor:pointer;font-weight:600;">⬇ Cascade demo</button>
-          <button onclick="_animPreviewHotPulse()" class="hnc-glow" style="background:#fff;border:1px solid #fcd34d;color:#78350f;padding:5px 12px;border-radius:7px;font-size:12px;cursor:pointer;font-weight:600;">💗 Hot pulse</button>
-          <span style="font-size:11px;color:#92400e;margin-left:auto;">Hover any button to see #3 glow</span>
+          <button onclick="_hncConfetti()" class="hnc-glow" style="background:#fff;border:1px solid #fcd34d;color:#78350f;padding:5px 10px;border-radius:7px;font-size:12px;cursor:pointer;font-weight:600;">🎉 Confetti</button>
+          <button onclick="_animPreviewTickers()" class="hnc-glow" style="background:#fff;border:1px solid #fcd34d;color:#78350f;padding:5px 10px;border-radius:7px;font-size:12px;cursor:pointer;font-weight:600;">🔢 Tickers</button>
+          <button onclick="_animPreviewCascade()" class="hnc-glow" style="background:#fff;border:1px solid #fcd34d;color:#78350f;padding:5px 10px;border-radius:7px;font-size:12px;cursor:pointer;font-weight:600;">⬇ Cascade</button>
+          <button onclick="_animPreviewHotPulse()" class="hnc-glow" style="background:#fff;border:1px solid #fcd34d;color:#78350f;padding:5px 10px;border-radius:7px;font-size:12px;cursor:pointer;font-weight:600;">💗 Hot pulse</button>
+          <button onclick="_animPreviewShimmer()" class="hnc-glow" style="background:#fff;border:1px solid #fcd34d;color:#78350f;padding:5px 10px;border-radius:7px;font-size:12px;cursor:pointer;font-weight:600;">✨ AI shimmer</button>
+          <button onclick="_animPreviewRocket(this)" class="hnc-glow" style="background:#fff;border:1px solid #fcd34d;color:#78350f;padding:5px 10px;border-radius:7px;font-size:12px;cursor:pointer;font-weight:600;">🚀 Rocket</button>
+          <button onclick="_hncCoinRain()" class="hnc-glow" style="background:#fff;border:1px solid #fcd34d;color:#78350f;padding:5px 10px;border-radius:7px;font-size:12px;cursor:pointer;font-weight:600;">🪙 Coins</button>
+          <button onclick="_hncConfetti({origin:'center',count:180,colors:['#fbbf24','#f59e0b','#22c55e','#10b981','#3BB8E3','#ffffff']})" class="hnc-glow" style="background:#fff;border:1px solid #fcd34d;color:#78350f;padding:5px 10px;border-radius:7px;font-size:12px;cursor:pointer;font-weight:600;">🏆 Won</button>
+          <span style="font-size:11px;color:#92400e;margin-left:auto;">Try typing "aloha" anywhere 🌺</span>
         </div>
         <div class="metrics" style="grid-template-columns:repeat(3,minmax(0,1fr));">
           <div class="metric"><div class="metric-label">Total pipeline</div><div class="metric-value" id="pipe-total-val">—</div><div class="metric-sub" id="pipe-total-sub"></div></div>
@@ -4140,6 +4165,153 @@ function _hncTicker(el, target, opts){
 }
 
 /* ────────────────────────────────────────────────────────────────────────
+   ROCKET LAUNCH — turn a "Send" button into a brief rocket animation,
+   leaving a green checkmark on success or restoring on failure.
+   Awaits the supplied async sendFn and resolves with its result.
+
+   Usage: await _hncRocketLaunch(btnEl, async () => { ...do the send... });
+   ──────────────────────────────────────────────────────────────────────── */
+async function _hncRocketLaunch(btnEl, sendFn){
+  if(!btnEl) return await sendFn();
+  var prefersReduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /* Snapshot the original state so we can restore on error or after success */
+  var origText = btnEl.textContent;
+  var origHTML = btnEl.innerHTML;
+  var origWidth = btnEl.getBoundingClientRect().width;
+  btnEl.style.minWidth = origWidth + 'px';
+  btnEl.disabled = true;
+
+  if(prefersReduced){
+    btnEl.textContent = 'Sending…';
+    try {
+      var r = await sendFn();
+      btnEl.textContent = '✓ Sent';
+      btnEl.style.background = '#10b981';
+      return r;
+    } catch(e){
+      btnEl.disabled = false;
+      btnEl.textContent = origText;
+      btnEl.style.minWidth = '';
+      throw e;
+    }
+  }
+
+  /* Phase 1: rocket appears, button goes to "launching" state */
+  btnEl.innerHTML = '<span class="hnc-rocket" style="display:inline-block;font-size:16px;">🚀</span>';
+  btnEl.style.position = 'relative';
+  btnEl.style.overflow = 'hidden';
+
+  /* Add a CSS-driven launch animation on the rocket span */
+  var rocket = btnEl.querySelector('.hnc-rocket');
+  if(rocket){
+    rocket.style.transition = 'transform .9s cubic-bezier(.5,-0.2,.7,1.4), opacity .3s ease .6s';
+    /* Force a frame so the transition applies */
+    void rocket.offsetWidth;
+    rocket.style.transform = 'translateX(140px) translateY(-40px) rotate(35deg)';
+    rocket.style.opacity = '0';
+  }
+
+  /* Trail: 5 small puffs that fade. Light blue + brand to match HNC palette. */
+  for(var i = 0; i < 5; i++){
+    (function(idx){
+      setTimeout(function(){
+        var puff = document.createElement('span');
+        puff.style.cssText = 'position:absolute;left:8px;top:50%;width:8px;height:8px;border-radius:50%;background:radial-gradient(circle,#cbd5e1 0%,rgba(203,213,225,0) 70%);transform:translateY(-50%);pointer-events:none;transition:transform .6s ease,opacity .6s ease;opacity:.9;';
+        btnEl.appendChild(puff);
+        void puff.offsetWidth;
+        puff.style.transform = 'translateY(-50%) translateX(-30px) scale(0)';
+        puff.style.opacity = '0';
+        setTimeout(function(){ if(puff.parentNode) puff.remove(); }, 700);
+      }, idx * 80);
+    })(i);
+  }
+
+  /* Wait for the rocket to clear, then await the actual send */
+  await new Promise(function(r){ setTimeout(r, 200); });
+
+  try {
+    var result = await sendFn();
+    /* Phase 2: success — transform into a checkmark with a small bloom */
+    btnEl.innerHTML = '';
+    btnEl.style.background = '#10b981';
+    btnEl.style.transition = 'background .25s ease, transform .25s ease';
+    var check = document.createElement('span');
+    check.textContent = '✓ Sent';
+    check.style.cssText = 'display:inline-flex;align-items:center;gap:6px;color:#fff;font-weight:600;font-size:13px;transform:scale(0);transition:transform .35s cubic-bezier(.34,1.56,.64,1);';
+    btnEl.appendChild(check);
+    void check.offsetWidth;
+    check.style.transform = 'scale(1)';
+    return result;
+  } catch(err){
+    /* Phase 2 alt: failure — restore button so user can retry */
+    btnEl.disabled = false;
+    btnEl.innerHTML = origHTML;
+    btnEl.style.background = '';
+    btnEl.style.minWidth = '';
+    btnEl.style.position = '';
+    btnEl.style.overflow = '';
+    throw err;
+  }
+}
+
+/* ────────────────────────────────────────────────────────────────────────
+   COIN RAIN — gold coins fall down the right edge of the screen.
+   Used when an invoice gets paid or a tip is received. Pavlovian
+   reward training. Auto-respects prefers-reduced-motion (becomes a
+   simple gold flash overlay instead of falling coins).
+
+   Usage: _hncCoinRain() or _hncCoinRain({ count: 18, durationMs: 3500 })
+   ──────────────────────────────────────────────────────────────────────── */
+function _hncCoinRain(opts){
+  opts = opts || {};
+  var count = opts.count || 14;
+  var durationMs = opts.durationMs || 2800;
+  var prefersReduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  if(prefersReduced){
+    /* Reduced-motion fallback: a single gold flash on the page edge */
+    var flash = document.createElement('div');
+    flash.style.cssText = 'position:fixed;top:0;right:0;width:6px;height:100vh;background:linear-gradient(180deg,#fbbf24,#f59e0b);z-index:99998;pointer-events:none;animation:hnc-flash-fade 1s ease-out forwards;';
+    document.body.appendChild(flash);
+    setTimeout(function(){ flash.remove(); }, 1000);
+    return;
+  }
+
+  var wrap = document.createElement('div');
+  wrap.style.cssText = 'position:fixed;top:0;right:0;bottom:0;width:120px;pointer-events:none;z-index:99998;overflow:hidden;';
+  document.body.appendChild(wrap);
+
+  for(var i = 0; i < count; i++){
+    (function(idx){
+      var coin = document.createElement('div');
+      var size = 18 + Math.random() * 10;
+      var leftOffset = Math.random() * 80; // px from right edge
+      var fallDuration = 1400 + Math.random() * 900;
+      var delay = idx * 90;
+      coin.textContent = '🪙';
+      coin.style.cssText =
+        'position:absolute;'
+        + 'right:' + leftOffset + 'px;'
+        + 'top:-40px;'
+        + 'font-size:' + size + 'px;'
+        + 'opacity:0;'
+        + 'transform:rotate(0deg);'
+        + 'transition:transform ' + fallDuration + 'ms cubic-bezier(.45,0,.55,1), top ' + fallDuration + 'ms cubic-bezier(.45,0,.55,1), opacity .3s ease;'
+        + 'will-change:transform,top;';
+      wrap.appendChild(coin);
+      setTimeout(function(){
+        coin.style.opacity = '1';
+        coin.style.top = (window.innerHeight + 40) + 'px';
+        coin.style.transform = 'rotate(' + (Math.random() * 720 - 360) + 'deg)';
+      }, delay + 30);
+      setTimeout(function(){ if(coin.parentNode) coin.remove(); }, delay + fallDuration + 500);
+    })(i);
+  }
+  setTimeout(function(){ if(wrap.parentNode) wrap.remove(); }, durationMs + 500);
+}
+
+/* ────────────────────────────────────────────────────────────────────────
    ANIMATION PREVIEW HELPERS
    Wired to buttons in the temporary preview bar. Lets Dane trigger each
    animation in isolation without waiting for real data. Remove these
@@ -4195,6 +4367,64 @@ function _animPreviewHotPulse(){
   var bar = document.getElementById('anim-test-bar');
   if(bar && bar.parentNode) bar.parentNode.insertBefore(card, bar.nextSibling);
   setTimeout(function(){ card.remove(); }, 6000);
+}
+
+function _animPreviewShimmer(){
+  /* Drop a fake AI-drafted message and shimmer it. */
+  var existing = document.getElementById('anim-shimmer-demo');
+  if(existing) existing.remove();
+  var demo = document.createElement('div');
+  demo.id = 'anim-shimmer-demo';
+  demo.style.cssText = 'background:#fafafa;border:1px solid var(--border);border-radius:10px;padding:14px;margin:14px 0;';
+  demo.innerHTML =
+      '<div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;font-weight:600;">Suggested message</div>'
+    + '<div id="anim-shimmer-target" style="white-space:pre-wrap;font-size:13px;color:var(--text);line-height:1.5;">Aloha Marii! Just wanted to circle back about your move-out cleaning quote — happy to answer any questions or get you on the schedule.\n\n— Lia from Hawaii Natural Clean</div>';
+  var bar = document.getElementById('anim-test-bar');
+  if(bar && bar.parentNode) bar.parentNode.insertBefore(demo, bar.nextSibling);
+  setTimeout(function(){
+    var t = document.getElementById('anim-shimmer-target');
+    if(t){
+      t.classList.add('hnc-shimmer');
+      setTimeout(function(){ t.classList.remove('hnc-shimmer'); }, 1500);
+    }
+  }, 50);
+  setTimeout(function(){ demo.remove(); }, 5000);
+}
+
+async function _animPreviewRocket(btnEl){
+  /* Wrap _hncRocketLaunch around a fake send (1s delay, always succeeds) so
+     Dane can see the rocket without actually sending anything. We clone the
+     test button so we don't permanently transform it into a checkmark. */
+  var clone = btnEl.cloneNode(true);
+  clone.id = 'anim-rocket-clone';
+  /* Remove inline onclick so it doesn't re-trigger */
+  clone.removeAttribute('onclick');
+  clone.style.background = '#2563eb';
+  clone.style.color = '#fff';
+  clone.style.border = 'none';
+  clone.textContent = 'Send text →';
+  /* Drop the clone below the test bar so it's clearly a demo */
+  var bar = document.getElementById('anim-test-bar');
+  if(bar && bar.parentNode){
+    var prev = document.getElementById('anim-rocket-demo');
+    if(prev) prev.remove();
+    var demoWrap = document.createElement('div');
+    demoWrap.id = 'anim-rocket-demo';
+    demoWrap.style.cssText = 'background:#fff;border:1px solid var(--border);border-radius:10px;padding:14px;margin:14px 0;display:flex;align-items:center;gap:12px;';
+    var label = document.createElement('span');
+    label.textContent = '🚀 Rocket demo:';
+    label.style.cssText = 'font-size:12px;color:var(--text-muted);font-weight:600;';
+    demoWrap.appendChild(label);
+    demoWrap.appendChild(clone);
+    bar.parentNode.insertBefore(demoWrap, bar.nextSibling);
+    /* Auto-fire */
+    try {
+      await _hncRocketLaunch(clone, function(){
+        return new Promise(function(r){ setTimeout(function(){ r({ ok: true }); }, 1000); });
+      });
+    } catch(_e){}
+    setTimeout(function(){ demoWrap.remove(); }, 4500);
+  }
 }
 
 async function loadDailyList(){
@@ -4267,6 +4497,20 @@ async function loadDailyList(){
           card.style.transform = 'translateY(0)';
         }, idx * 55);
       });
+      /* Magic-dust shimmer: AI draft previews glow-pulse once after the
+         cascade reveals them. Tells the assistant "this was AI-generated"
+         without a banner or label. ~1.4s shimmer, then stays static. */
+      setTimeout(function(){
+        listEl.querySelectorAll('[id^="dl-draft-"]').forEach(function(el, idx){
+          /* Stagger shimmers so they ripple across cards rather than firing in unison */
+          setTimeout(function(){
+            el.classList.add('hnc-shimmer');
+            /* Strip class after animation completes so it doesn't replay on
+               unrelated reflows. */
+            setTimeout(function(){ el.classList.remove('hnc-shimmer'); }, 1500);
+          }, idx * 80);
+        });
+      }, cards.length * 55 + 100);
     }
     _dlLastLoadedAt = Date.now();
   } catch (e){
@@ -4377,29 +4621,29 @@ async function _dlSendText(recId, btnEl){
   var rec = await _dlLoadRec(recId);
   if(!rec) return;
 
-  if(btnEl){ btnEl.disabled = true; btnEl.textContent = 'Sending…'; }
   try {
-    var sess = await db.auth.getSession();
-    var tok = sess.data.session ? sess.data.session.access_token : '';
-    var resp = await fetch('/api/lead-followup-send', {
-      method:'POST',
-      headers:{'Content-Type':'application/json','Authorization':'Bearer '+tok},
-      body: JSON.stringify({ leadId: rec.lead_id, sms: draft }),
+    await _hncRocketLaunch(btnEl, async function(){
+      var sess = await db.auth.getSession();
+      var tok = sess.data.session ? sess.data.session.access_token : '';
+      var resp = await fetch('/api/lead-followup-send', {
+        method:'POST',
+        headers:{'Content-Type':'application/json','Authorization':'Bearer '+tok},
+        body: JSON.stringify({ leadId: rec.lead_id, sms: draft }),
+      });
+      var data = await resp.json();
+      if(!data.success) throw new Error((data.errors && data.errors.join('; ')) || data.error || 'Send failed');
+      /* Mark rec completed (fire-and-forget — UI feedback is the rocket) */
+      fetch('/api/complete-lead-recommendation', {
+        method:'POST',
+        headers:{'Content-Type':'application/json','Authorization':'Bearer '+tok},
+        body: JSON.stringify({ recId: recId, action: 'sent', payload: { channel: 'sms' } }),
+      }).catch(function(){});
+      return data;
     });
-    var data = await resp.json();
-    if(!data.success) throw new Error((data.errors && data.errors.join('; ')) || data.error || 'Send failed');
-
-    /* Mark rec completed */
-    await fetch('/api/complete-lead-recommendation', {
-      method:'POST',
-      headers:{'Content-Type':'application/json','Authorization':'Bearer '+tok},
-      body: JSON.stringify({ recId: recId, action: 'sent', payload: { channel: 'sms' } }),
-    });
-    /* Slide-out and remove */
-    _dlAnimateOut(card);
+    /* Hold the green ✓ on the button briefly, then slide the card out */
+    setTimeout(function(){ _dlAnimateOut(card); }, 700);
     if(typeof showToast === 'function') showToast('Text sent ✓');
   } catch(e){
-    if(btnEl){ btnEl.disabled = false; btnEl.textContent = 'Send text →'; }
     if(typeof showToast === 'function') showToast('Send failed: ' + (e.message || e), true);
   }
 }
@@ -4415,26 +4659,27 @@ async function _dlSendEmail(recId, btnEl){
   if(!draft){ alert('No email body to send'); return; }
   if(!confirm('Send this email?\n\nSubject: ' + subject + '\n\n' + draft.slice(0, 300) + (draft.length > 300 ? '…' : ''))) return;
 
-  if(btnEl){ btnEl.disabled = true; btnEl.textContent = 'Sending…'; }
   try {
-    var sess = await db.auth.getSession();
-    var tok = sess.data.session ? sess.data.session.access_token : '';
-    var resp = await fetch('/api/lead-followup-send', {
-      method:'POST',
-      headers:{'Content-Type':'application/json','Authorization':'Bearer '+tok},
-      body: JSON.stringify({ leadId: rec.lead_id, email: { subject: subject, body: draft } }),
+    await _hncRocketLaunch(btnEl, async function(){
+      var sess = await db.auth.getSession();
+      var tok = sess.data.session ? sess.data.session.access_token : '';
+      var resp = await fetch('/api/lead-followup-send', {
+        method:'POST',
+        headers:{'Content-Type':'application/json','Authorization':'Bearer '+tok},
+        body: JSON.stringify({ leadId: rec.lead_id, email: { subject: subject, body: draft } }),
+      });
+      var data = await resp.json();
+      if(!data.success) throw new Error((data.errors && data.errors.join('; ')) || data.error || 'Send failed');
+      fetch('/api/complete-lead-recommendation', {
+        method:'POST',
+        headers:{'Content-Type':'application/json','Authorization':'Bearer '+tok},
+        body: JSON.stringify({ recId: recId, action: 'sent', payload: { channel: 'email' } }),
+      }).catch(function(){});
+      return data;
     });
-    var data = await resp.json();
-    if(!data.success) throw new Error((data.errors && data.errors.join('; ')) || data.error || 'Send failed');
-    await fetch('/api/complete-lead-recommendation', {
-      method:'POST',
-      headers:{'Content-Type':'application/json','Authorization':'Bearer '+tok},
-      body: JSON.stringify({ recId: recId, action: 'sent', payload: { channel: 'email' } }),
-    });
-    _dlAnimateOut(card);
+    setTimeout(function(){ _dlAnimateOut(card); }, 700);
     if(typeof showToast === 'function') showToast('Email sent ✓');
   } catch(e){
-    if(btnEl){ btnEl.disabled = false; btnEl.textContent = 'Send email →'; }
     if(typeof showToast === 'function') showToast('Send failed: ' + (e.message || e), true);
   }
 }
@@ -16223,6 +16468,18 @@ function _markLeadWonOnBook(lid, leadObj, clientName){
   try{ if(typeof renderLeadsPipeline === 'function') renderLeadsPipeline(); }catch(e){}
   try{ if(typeof logActivity === 'function') logActivity('lead_won', {leadName: leadObj.name, viaBooking: true, clientName: clientName||leadObj.name}); }catch(e){}
   try{ if(typeof showToast === 'function') showToast('Lead "' + leadObj.name + '" marked as won'); }catch(e){}
+  /* Won celebration: confetti from center + a slightly different palette
+     leaning gold/green (money + go-status colors) to mark the conversion. */
+  try {
+    if(typeof _hncConfetti === 'function'){
+      _hncConfetti({
+        origin: 'center',
+        count: 180,
+        colors: ['#fbbf24','#f59e0b','#22c55e','#10b981','#3BB8E3','#ffffff'],
+        durationMs: 3500,
+      });
+    }
+  } catch(_e){}
 }
 
 /* Map free-text lead.service to booking-form na-service value. */
@@ -20085,6 +20342,20 @@ async function loadNotifications(opts) {
         var hasNewUnread = data.some(function(n) { return n.id !== _notifLastSeenId && !n.read_at; });
         // Stop scanning once we hit our previous newest — anything after is old
         if (hasNewUnread) playNotificationSound();
+        // Money-in coin rain: if any new arrival is invoice_paid or tip_received,
+        // fire the celebratory animation. Pavlovian reward training. Only fires
+        // on truly NEW notifications (after first load), so a page refresh that
+        // surfaces a paid invoice from yesterday does NOT replay the animation.
+        try {
+          var newMoneyEvents = data.filter(function(n){
+            return n.id !== _notifLastSeenId
+                && !n.read_at
+                && (n.event_type === 'invoice_paid' || n.event_type === 'tip_received');
+          });
+          if (newMoneyEvents.length > 0 && typeof _hncCoinRain === 'function') {
+            _hncCoinRain({ count: newMoneyEvents.length === 1 ? 14 : 22 });
+          }
+        } catch (e) { /* never break notif polling on animation error */ }
       }
       _notifLastSeenId = newestId;
     } else if (_notifLastSeenId === null) {
@@ -20689,6 +20960,62 @@ async function hncSignInWithGoogle() {
 }
 document.addEventListener('DOMContentLoaded', initAuth);
 document.addEventListener('DOMContentLoaded', () => setTimeout(loadReminderToggleState, 800));
+
+/* ────────────────────────────────────────────────────────────────────────
+   ALOHA EASTER EGG 🌺
+   Type "aloha" anywhere in the app (outside an input/textarea) and a
+   hibiscus floats up from the bottom of the screen and fades. Pure
+   delight, no purpose. Don't tell anyone, let them find it.
+   ──────────────────────────────────────────────────────────────────────── */
+(function(){
+  var TARGET = 'aloha';
+  var buffer = '';
+  document.addEventListener('keydown', function(e){
+    /* Don't trigger when user is typing in a form field — they have a right
+       to spell aloha in a message without summoning a flower. */
+    var t = e.target;
+    if(t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+    /* Only single printable characters; ignore modifier-keyed shortcuts */
+    if(e.key && e.key.length === 1 && !e.metaKey && !e.ctrlKey && !e.altKey){
+      buffer += e.key.toLowerCase();
+      if(buffer.length > TARGET.length) buffer = buffer.slice(-TARGET.length);
+      if(buffer === TARGET){
+        _hncAlohaFlower();
+        buffer = '';
+      }
+    } else if(e.key === 'Escape' || e.key === 'Enter'){
+      buffer = '';
+    }
+  });
+})();
+
+function _hncAlohaFlower(){
+  var flower = document.createElement('div');
+  flower.textContent = '🌺';
+  /* Random horizontal start so successive triggers don't stack on the same line */
+  var leftPct = 20 + Math.random() * 60;
+  flower.style.cssText =
+    'position:fixed;'
+    + 'left:' + leftPct + 'vw;'
+    + 'bottom:-60px;'
+    + 'font-size:48px;'
+    + 'pointer-events:none;'
+    + 'z-index:99997;'
+    + 'opacity:0;'
+    + 'transform:translateY(0) rotate(0deg);'
+    + 'transition:bottom 3.2s cubic-bezier(.3,.7,.4,1), opacity 3.2s ease, transform 3.2s ease;'
+    + 'will-change:bottom,transform,opacity;'
+    + 'filter:drop-shadow(0 4px 12px rgba(236,72,153,.4));';
+  document.body.appendChild(flower);
+  /* Force a frame so the transition picks up the change */
+  void flower.offsetWidth;
+  flower.style.bottom = (window.innerHeight + 80) + 'px';
+  flower.style.opacity = '1';
+  flower.style.transform = 'translateY(0) rotate(' + (Math.random() * 60 - 30) + 'deg)';
+  /* Fade out near the top */
+  setTimeout(function(){ flower.style.opacity = '0'; }, 2400);
+  setTimeout(function(){ if(flower.parentNode) flower.remove(); }, 3400);
+}
 // === END HNC AUTH ===
 
 // === ACTIVITY LOGGING ===

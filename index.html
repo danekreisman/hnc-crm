@@ -3061,6 +3061,7 @@ function _leadRowToDb(l){
        are the ISO strings for math (days since X, etc.). */
     createdAt: l.created_at || null,
     lastRespondedAt: l.last_responded_at || null,
+    attentionSnoozedUntil: l.attention_snoozed_until || null,
   };
 }
 
@@ -3624,6 +3625,17 @@ function _scoreLeadForAttention(id, l){
   /* Respect the do-not-contact flag */
   if(l.doNotContact) return null;
 
+  /* Respect the per-lead "Handled" snooze, but auto-expire it if the lead
+     has REPLIED since the snooze was set (a reply is a real new event that
+     should override "I already handled it"). The snooze TTL is 7 days. */
+  if(l.attentionSnoozedUntil){
+    var snoozeUntil = new Date(l.attentionSnoozedUntil).getTime();
+    var snoozeStillActive = snoozeUntil > Date.now();
+    var repliedAfterSnooze = l.lastRespondedAt &&
+      new Date(l.lastRespondedAt).getTime() > (snoozeUntil - 7*24*60*60*1000);
+    if(snoozeStillActive && !repliedAfterSnooze) return null;
+  }
+
   var now = Date.now();
   var daysSinceCreated = _daysAgo(l.createdAt);
   var daysSinceQuote   = _daysAgo(l.quoteSentAt);
@@ -3804,7 +3816,10 @@ function renderNeedsAttention(){
       +     '</div>'
       +     '<div style="font-size:12px;color:#6b7280;margin-top:2px;">' + _attnEsc(item.reason) + '</div>'
       +   '</div>'
-      +   _attnButtonHTML(item)
+      +   '<div style="display:flex;gap:6px;align-items:center;">'
+      +     _attnButtonHTML(item)
+      +     '<button onclick="_attnHandled(\'' + item.id + '\', this)" title="Mark as handled — hides for 7 days or until they reply" style="background:transparent;color:#6b7280;border:1px solid #e5e7eb;padding:7px 11px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;">✓ Handled</button>'
+      +   '</div>'
       + '</div>';
   }).join('');
 }
@@ -3834,6 +3849,38 @@ function _attnRunFollowup(leadId){
     if(typeof openLeadFollowupModal === 'function') openLeadFollowupModal();
   }, 220);
 }
+
+/* Action: mark a lead as "handled" — snoozes them from the attention list
+   for 7 days. The snooze auto-expires if the lead replies (handled by the
+   scorer's reply-after-snooze check). Optimistic UI: we hide the row first,
+   then write to Supabase. If the write fails, we restore the row + alert. */
+async function _attnHandled(leadId, btn){
+  var row = btn && btn.closest('[data-attn-lead]');
+  if(!leadId || !row) return;
+  /* Optimistic: dim immediately so the click feels responsive */
+  row.style.transition = 'opacity .2s, transform .2s';
+  row.style.opacity = '0.4';
+  row.style.transform = 'translateX(20px)';
+
+  var until = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+  try {
+    var res = await db.from('leads').update({ attention_snoozed_until: until }).eq('id', leadId);
+    if(res && res.error) throw res.error;
+    /* Update in-memory state so re-render reflects it without a round trip */
+    if(leadDB[leadId]) leadDB[leadId].attentionSnoozedUntil = until;
+    /* Slide-out animation, then re-render the panel */
+    setTimeout(function(){
+      try { renderNeedsAttention(); } catch(_e){}
+    }, 220);
+    if(typeof showToast === 'function') showToast('Marked as handled — hidden for 7 days');
+  } catch(e){
+    console.error('[attn] handled write failed:', e);
+    row.style.opacity = '1';
+    row.style.transform = '';
+    if(typeof showToast === 'function') showToast('Could not save: ' + (e.message || 'unknown error'), true);
+  }
+}
+
 
 function toggleNeedsAttention(){
   var panel = document.getElementById('needs-attention-panel');

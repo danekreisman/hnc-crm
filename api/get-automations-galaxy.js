@@ -239,6 +239,11 @@ export default async function handler(req, res) {
   } catch (err) {
     console.error('[get-automations-galaxy] err:', err);
     try { await logError('get-automations-galaxy', err.message || String(err), {}); } catch (_e) {}
-    return res.status(500).json({ error: 'Failed to load galaxy data', detail: err.message });
+    return res.status(500).json({
+      error: 'Failed to load galaxy data',
+      detail: err.message || String(err),
+      code: err.code,
+      hint: err.hint,
+    });
   }
 }

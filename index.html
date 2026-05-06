@@ -9562,7 +9562,14 @@ async function renderAutomationsAudit(){
   var data;
   try {
     var resp = await fetch('/api/get-automations-galaxy', {headers:{'Cache-Control':'no-cache'}});
-    if(!resp.ok) throw new Error('HTTP '+resp.status);
+    if(!resp.ok){
+      var errBody = null;
+      try { errBody = await resp.json(); } catch(_e){}
+      var msg = 'HTTP '+resp.status;
+      if(errBody && errBody.detail) msg += ' — '+errBody.detail;
+      else if(errBody && errBody.error) msg += ' — '+errBody.error;
+      throw new Error(msg);
+    }
     data = await resp.json();
   } catch(e){
     document.getElementById('galaxy-status').innerHTML = '<span style="color:var(--danger);">Failed to load: '+_auditEsc(e.message||e)+'</span>';

@@ -1544,6 +1544,7 @@ body:not(.hnc-assistant-user) .assistant-only{display:none!important;}
           <button class="stab" onclick="switchSettingsTab('operations',this)">⚙️ Operations</button>
           <button class="stab" onclick="switchSettingsTab('data',this)">📥 Data</button>
           <button class="stab admin-only" onclick="switchSettingsTab('users',this)">👥 Users</button>
+          <button class="stab admin-only" onclick="switchSettingsTab('health',this)">🩺 System Health</button>
           <button class="stab" onclick="switchSettingsTab('danger',this)" style="color:#b91c1c;">🔴 Danger Zone</button>
         </div>
 
@@ -1793,6 +1794,19 @@ Mahalo 🌺</textarea>
                 </tbody>
               </table>
             </div>
+          </div>
+        </div>
+
+        <!-- ── System Health ───────────────────────────────────────────── -->
+        <div id="stab-health" class="stab-panel admin-only" style="display:none;">
+          <div class="settings-card">
+            <div class="settings-card-title">🩺 System Health</div>
+            <div class="settings-card-desc">Quick check on the AI recommendations system. Tells you why the daily list might be empty.</div>
+            <div style="margin-top:14px;display:flex;gap:10px;flex-wrap:wrap;">
+              <button class="btn btn-primary" onclick="runSystemHealthCheck()">Run health check</button>
+              <button class="btn" onclick="triggerRecsCronManually()" title="Manually trigger the recommendation generation that normally runs at 8am + 2pm HST">Trigger recs cron now</button>
+            </div>
+            <div id="health-output" style="margin-top:18px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;line-height:1.55;"></div>
           </div>
         </div>
 
@@ -21173,6 +21187,147 @@ function _hncAlohaFlower(){
 // === END HNC AUTH ===
 
 // === ACTIVITY LOGGING ===
+/* ────────────────────────────────────────────────────────────────────────
+   SYSTEM HEALTH — admin-only diagnostics for the AI recommendations
+   system. These hit existing API endpoints and render the results in
+   plain English so admins can see at a glance what's wrong without
+   reading JSON or opening Supabase.
+   ──────────────────────────────────────────────────────────────────────── */
+async function runSystemHealthCheck(){
+  var out = document.getElementById('health-output');
+  if(!out) return;
+  out.innerHTML = '<div style="color:var(--text-muted);">Running checks…</div>';
+  try {
+    var resp = await fetch('/api/recs-diagnostic');
+    if(!resp.ok){
+      out.innerHTML = '<div style="color:#dc2626;">❌ Diagnostic endpoint returned HTTP ' + resp.status + '</div>';
+      return;
+    }
+    var report = await resp.json();
+    out.innerHTML = _renderHealthReport(report);
+  } catch(e){
+    out.innerHTML = '<div style="color:#dc2626;">❌ ' + (e.message || e) + '</div>';
+  }
+}
+
+function _renderHealthReport(r){
+  var lines = [];
+  var checks = r.checks || {};
+
+  function row(ok, label, detail){
+    var icon = ok === true ? '✅' : (ok === false ? '❌' : '⚠️');
+    var color = ok === true ? '#16a34a' : (ok === false ? '#dc2626' : '#ca8a04');
+    return '<div style="margin-bottom:6px;"><span style="color:' + color + ';font-weight:700;">' + icon + '</span> '
+      + '<strong>' + label + '</strong>'
+      + (detail ? '<div style="margin-left:24px;color:var(--text-muted);font-size:11px;">' + detail + '</div>' : '')
+      + '</div>';
+  }
+
+  // 1. Table existence
+  if(checks.table_exists){
+    if(checks.table_exists.ok){
+      lines.push(row(true, 'lead_recommendations table exists', checks.table_exists.total_rows + ' total rows'));
+    } else {
+      lines.push(row(false, 'lead_recommendations table missing', checks.table_exists.hint || checks.table_exists.error));
+    }
+  }
+
+  // 2. Anthropic key
+  lines.push(row(
+    checks.anthropic_key_set === true,
+    checks.anthropic_key_set ? 'ANTHROPIC_API_KEY env var is set' : 'ANTHROPIC_API_KEY env var NOT SET on Vercel',
+    checks.anthropic_key_set ? '' : 'AI rec generation will fail until you add this in the Vercel dashboard.'
+  ));
+
+  // 3. Assistant user
+  if(checks.assistant_user){
+    if(checks.assistant_user.count > 0){
+      var u = checks.assistant_user.users[0];
+      lines.push(row(true, checks.assistant_user.count + ' assistant user(s) registered', (u.display_name || u.email) + ' — active=' + u.active));
+    } else {
+      lines.push(row('warn', 'No assistant user registered', 'Recs will use a generic name. Invite an assistant in Settings → Users.'));
+    }
+  }
+
+  // 4. Recs counts
+  if(checks.by_status && checks.by_status.ok){
+    var counts = checks.by_status.counts || {};
+    var summary = Object.keys(counts).length === 0
+      ? 'No recs at all'
+      : Object.keys(counts).map(function(k){ return k + ': ' + counts[k]; }).join(' · ');
+    lines.push(row(Object.keys(counts).length > 0, 'Recommendations by status', summary));
+  }
+
+  // 5. Last 24h
+  if(checks.last_24h && checks.last_24h.ok){
+    var last24 = checks.last_24h.count;
+    lines.push(row(
+      last24 > 0,
+      'Recs created in the last 24h: ' + last24,
+      last24 === 0 ? 'Cron may not be running OR all leads are filtered out as not-actionable.' : ''
+    ));
+  }
+
+  // 6. Most recent
+  if(checks.most_recent && checks.most_recent.ok && checks.most_recent.recs && checks.most_recent.recs.length > 0){
+    var newest = checks.most_recent.recs[0];
+    var hours = checks.most_recent.newest_hours_ago;
+    lines.push(row(true, 'Most recent rec', hours + 'h ago · ' + newest.action_type + ' · status=' + newest.status));
+  }
+
+  // 7. Open leads denominator
+  if(checks.open_leads && checks.open_leads.ok){
+    lines.push(row(true, 'Open leads in pipeline', checks.open_leads.count + ' (these are the candidates for rec generation)'));
+  }
+
+  // 8. Verdict
+  if(r.verdict && r.verdict.length){
+    lines.push('<div style="margin-top:14px;padding:12px;background:#fff7ed;border-left:3px solid #f59e0b;border-radius:6px;">');
+    lines.push('<div style="font-weight:700;color:#9a3412;margin-bottom:6px;">Verdict</div>');
+    r.verdict.forEach(function(v){
+      lines.push('<div style="color:#7c2d12;font-size:12px;margin-bottom:3px;">→ ' + v + '</div>');
+    });
+    lines.push('</div>');
+  }
+
+  return lines.join('');
+}
+
+async function triggerRecsCronManually(){
+  var out = document.getElementById('health-output');
+  if(!out) return;
+  if(!confirm('Run the recommendation generator now? This will call Claude Haiku for each open actionable lead — costs ~$0.05-$0.15 depending on lead count.')) return;
+  out.innerHTML = '<div style="color:var(--text-muted);">Triggering recs cron… this can take 30-60 seconds for ~50 leads.</div>';
+  try {
+    var resp = await fetch('/api/run-lead-recommendations', { method: 'GET' });
+    var data = await resp.json();
+    if(!resp.ok){
+      out.innerHTML = '<div style="color:#dc2626;">❌ Cron endpoint returned HTTP ' + resp.status + ': ' + (data.error || 'unknown') + '</div>';
+      return;
+    }
+    var s = data.stats || {};
+    var html = '<div style="padding:12px;background:#f0fdf4;border-left:3px solid #16a34a;border-radius:6px;">';
+    html += '<div style="font-weight:700;color:#15803d;margin-bottom:8px;">✅ Cron ran successfully</div>';
+    html += '<div style="font-size:12px;color:#166534;line-height:1.6;">';
+    html += '• Examined: <strong>' + (s.examined || 0) + '</strong><br>';
+    html += '• Generated: <strong>' + (s.generated || 0) + '</strong><br>';
+    html += '• Skipped (had fresh rec): <strong>' + (s.skipped_fresh_rec || 0) + '</strong><br>';
+    html += '• Skipped (not actionable): <strong>' + (s.skipped_not_actionable || 0) + '</strong><br>';
+    html += '• Failed: <strong>' + (s.failed || 0) + '</strong>';
+    html += '</div></div>';
+    if((s.generated || 0) > 0){
+      html += '<div style="margin-top:10px;color:var(--text-muted);font-size:11px;">Re-run the health check to see the new recs.</div>';
+    } else {
+      html += '<div style="margin-top:10px;padding:10px;background:#fef3c7;border-radius:6px;color:#78350f;font-size:11px;">';
+      html += 'No new recs were generated. Either all your open leads already have fresh recs (skipped_fresh_rec) or none of them passed the actionable filter (skipped_not_actionable). The actionable filter requires: not closed, not DNC, has phone or email, not generated in last 12h.';
+      html += '</div>';
+    }
+    out.innerHTML = html;
+  } catch(e){
+    out.innerHTML = '<div style="color:#dc2626;">❌ ' + (e.message || e) + '</div>';
+  }
+}
+
 async function logActivity(action, description, entityType='', entityId='', metadata={}) {
   try { const { data: { session } } = await db.auth.getSession(); const userEmail = session?.user?.email || 'system'; await db.from('activity_logs').insert({ action, description, user_email: userEmail, entity_type: entityType, entity_id: String(entityId), metadata }); } catch(e) { console.warn('logActivity failed:', e.message); }
 }

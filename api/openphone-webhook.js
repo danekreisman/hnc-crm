@@ -53,32 +53,45 @@ export default async function handler(req, res) {
   async function findClientByPhone(phone) {
     if (!phone) return null;
     const digits = phone.replace(/\D/g, '').slice(-10);
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/clients?select=id,name,phone&limit=100`, {
+    if (digits.length < 10) return null;
+    /* Query Supabase directly using the last-10-digits suffix instead of
+       fetching the first 100 rows and filtering client-side. The old
+       approach silently failed once the table grew beyond the limit —
+       any client outside the first 100 was unmatched. The wildcard
+       prefix `%` lets us match phones stored with country codes,
+       formatting, etc. We sort by id desc just for determinism if
+       multiple rows share the same trailing digits. */
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/clients?select=id,name,phone&phone=ilike.%25${digits}&limit=5`, {
       headers: {
         'apikey': SUPABASE_KEY,
         'Authorization': `Bearer ${SUPABASE_KEY}`
       }
     });
     const clients = await res.json();
-    if (!Array.isArray(clients)) return null;
+    if (!Array.isArray(clients) || clients.length === 0) return null;
+    /* Defensive double-check on last-10-digits in case the ilike matched
+       a longer/shorter number that happened to contain the suffix as a
+       substring (e.g. someone's phone ending in our search digits + extra). */
     return clients.find(c => c.phone && c.phone.replace(/\D/g, '').slice(-10) === digits) || null;
   }
 
   async function findLeadByPhone(phone) {
     if (!phone) return null;
     const digits = phone.replace(/\D/g, '').slice(-10);
-    // Pull name + response_count too — task title needs the name, and the
-    // PATCH that increments response_count needs the current value
-    // (otherwise (undefined || 0) + 1 = 1 every single time, which means
-    // the counter never goes above 1 even after multiple replies).
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/leads?select=id,name,phone,response_count&limit=200`, {
+    if (digits.length < 10) return null;
+    /* Same fix as findClientByPhone — query by phone suffix instead of
+       pulling N rows and filtering. The old `limit=200` meant any lead
+       past the 200th most-recent would never be matched (so any reply
+       from an older lead was silently ignored — which is what was
+       happening to William). */
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/leads?select=id,name,phone,response_count&phone=ilike.%25${digits}&limit=5`, {
       headers: {
         'apikey': SUPABASE_KEY,
         'Authorization': `Bearer ${SUPABASE_KEY}`
       }
     });
     const leads = await res.json();
-    if (!Array.isArray(leads)) return null;
+    if (!Array.isArray(leads) || leads.length === 0) return null;
     return leads.find(l => l.phone && l.phone.replace(/\D/g, '').slice(-10) === digits) || null;
   }
 

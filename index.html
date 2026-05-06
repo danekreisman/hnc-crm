@@ -174,6 +174,41 @@ button:not(.btn):not(.btn-primary):not(.template-tab):not(.stab):not(.chat-tab):
 @media (prefers-reduced-motion: reduce){
   .hnc-hot-card{animation:none;}
 }
+/* Hot pipeline card — orange-tinted, flame badge top-right, gentle pulse.
+   Applied in renderLeadsPipeline when _isLeadHot(lead) returns true.
+   Visible on the actual deal-card on the pipeline board, distinct from
+   the .hnc-hot-card used in the attention panel rows. */
+@keyframes hnc-deal-flame-pulse {
+  0%, 100% { box-shadow: 0 1px 3px rgba(0,0,0,.06), 0 0 0 0 rgba(251, 146, 60, 0); }
+  50%      { box-shadow: 0 1px 3px rgba(0,0,0,.06), 0 0 0 5px rgba(251, 146, 60, .18), 0 4px 14px rgba(251, 146, 60, .25); }
+}
+@keyframes hnc-flame-flicker {
+  0%, 100% { transform: scale(1) rotate(-2deg); filter: drop-shadow(0 0 4px rgba(251, 146, 60, .5)); }
+  50%      { transform: scale(1.08) rotate(3deg); filter: drop-shadow(0 0 8px rgba(251, 146, 60, .8)); }
+}
+.deal-card-hot {
+  background: linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%) !important;
+  border-color: #fb923c !important;
+  border-left: 3px solid #f97316 !important;
+  animation: hnc-deal-flame-pulse 2.2s ease-in-out infinite;
+}
+.deal-card-hot .deal-name {
+  color: #9a3412;
+  font-weight: 700;
+}
+.deal-flame {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  font-size: 16px;
+  pointer-events: none;
+  animation: hnc-flame-flicker 1.4s ease-in-out infinite;
+  z-index: 2;
+}
+@media (prefers-reduced-motion: reduce){
+  .deal-card-hot{animation:none;}
+  .deal-flame{animation:none;}
+}
 /* Magic-dust shimmer — applied to AI-drafted message previews on first render
    to signal "this was AI-generated". Plays once for ~1.4s then the element
    stays static. Implemented as a moving gradient highlight, no library. */
@@ -3175,12 +3210,24 @@ function _subscribeLeadsRealtime(){
             return;
           }
           var prevStage = (leadDB[l.id] && leadDB[l.id].stage) || prev.stage || null;
+          var prevReplyAt = (leadDB[l.id] && leadDB[l.id].lastRespondedAt) || prev.last_responded_at || null;
           leadDB[l.id] = _leadRowToDb(l);
           if(typeof renderLeadsPipeline === 'function') renderLeadsPipeline();
           if(typeof updateDashboardStats === 'function') updateDashboardStats();
           if(prevStage && l.stage && prevStage !== l.stage){
             if(typeof showToast === 'function') showToast((l.name || 'Lead') + ' → ' + l.stage);
             if(typeof playNotificationSound === 'function') playNotificationSound();
+          }
+          /* Reply detection: last_responded_at advanced. Fire toast + sound
+             so Dane (and assistant) actually notice. Only fires when the
+             timestamp ACTUALLY changed — guards against unrelated UPDATEs
+             (notes edits, stage flips that don't touch reply time, etc.)
+             that would otherwise spam the toast. */
+          if(l.last_responded_at && l.last_responded_at !== prevReplyAt){
+            if(typeof showToast === 'function') showToast('🔥 ' + (l.name || 'Lead') + ' just replied');
+            if(typeof playNotificationSound === 'function') playNotificationSound();
+            /* Re-render attention panel so the now-hot lead surfaces immediately */
+            if(typeof renderNeedsAttention === 'function'){ try { renderNeedsAttention(); } catch(_e){} }
           }
         } catch(e){ console.warn('[leads-rt] update handler failed:', e); }
       })
@@ -3635,6 +3682,9 @@ function renderLeadsPipeline(){
       if(!cols[colIdx])return;
       var card=document.createElement('div');
       card.className='deal-card';
+      /* Flame the card if this lead is hot (replied <48h, awaiting response) */
+      var isHot = _isLeadHot(l);
+      if(isHot) card.className += ' deal-card-hot';
       card.dataset.leadId=id;
       var svc=l.service||'Service';
       var badgeCls=svc.toLowerCase().indexOf('commercial')>=0?'bc':'br';
@@ -3642,8 +3692,12 @@ function renderLeadsPipeline(){
       var freqDisplay = l.frequency ? '<div style="font-size:11px;color:var(--text-muted);margin-top:2px;">'+l.frequency+'</div>' : '';
       // Select-mode checkbox indicator (hidden when not in select mode)
       var checkIndicator = '<div class="bulk-check" data-lead-check="'+id+'" style="display:none;position:absolute;top:8px;right:8px;width:20px;height:20px;border-radius:50%;border:2px solid var(--border-strong);background:#fff;align-items:center;justify-content:center;font-size:12px;line-height:1;color:#fff;font-weight:700;"></div>';
+      // Flame badge top-right when card is hot — sits in the same corner as
+      // the bulk-check; bulk-check uses display:none unless in select mode,
+      // so they don't visually collide in normal use.
+      var flameBadge = isHot ? '<div class="deal-flame" title="Replied within 48h \u2014 awaiting your response">\ud83d\udd25</div>' : '';
       card.style.position='relative';
-      card.innerHTML=checkIndicator+'<div class="deal-name">'+l.name+'</div><div class="deal-type"><span class="badge '+badgeCls+'">'+svc+'</span>'+freqDisplay+'</div><div class="deal-val">'+priceDisplay+'</div>';
+      card.innerHTML=checkIndicator+flameBadge+'<div class="deal-name">'+l.name+'</div><div class="deal-type"><span class="badge '+badgeCls+'">'+svc+'</span>'+freqDisplay+'</div><div class="deal-val">'+priceDisplay+'</div>';
       (function(lid){
         card.addEventListener('click',function(e){
           // In select mode, click toggles selection instead of opening profile
@@ -3698,6 +3752,21 @@ function _daysAgo(iso){ return _msAgo(iso) / (24*60*60*1000); }
 /* Returns an object with {score, reason, actionLabel, actionFn} for a lead,
    or null if the lead doesn't need attention today. Higher score = higher
    urgency. Reason is a one-liner shown to the user. */
+
+/* Lightweight "is this lead hot?" check — used by the pipeline card renderer
+   to flame-badge cards. Same definition as Tier 1 in _scoreLeadForAttention:
+   lead replied within the last 48 hours and is awaiting our response.
+   Closed/DNC excluded. Snooze ignored intentionally — pipeline visual stays
+   accurate even if attention panel hid the lead. */
+function _isLeadHot(l){
+  if(!l) return false;
+  if(l.stage === 'Closed won' || l.stage === 'Closed lost') return false;
+  if(l.doNotContact) return false;
+  if(!l.lastRespondedAt) return false;
+  var hoursSinceReply = (Date.now() - new Date(l.lastRespondedAt).getTime()) / 36e5;
+  return hoursSinceReply >= 0 && hoursSinceReply < 48;
+}
+
 function _scoreLeadForAttention(id, l){
   if(!l || !l.stage) return null;
   /* Closed leads never appear */

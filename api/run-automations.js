@@ -237,6 +237,62 @@ export default async function handler(req, res) {
           }
         }
 
+        // --------------------------------------------------------------------
+        // TRIGGER 6: stage_entered (lead entered a specific stage, optional delay)
+        // --------------------------------------------------------------------
+        // Polls lead_stage_events for unprocessed entries matching the
+        // configured stage where the delay window has elapsed. Idempotency
+        // is per-(automation, event) — same lead can re-enter the same stage
+        // and re-trigger because each entry produces a distinct event row.
+        let stageEventMap = null; // event-id by lead-id for stamping the run record below
+        if (trigger_type === 'stage_entered') {
+          const targetStage = trigger_config?.stage;
+          const delayMinutes = Number(trigger_config?.delay_minutes) || 0;
+          if (targetStage) {
+            // Compute the cutoff: only events whose occurred_at + delay <= now
+            // are eligible.
+            const cutoff = new Date(now.getTime() - delayMinutes * 60 * 1000).toISOString();
+
+            // Pull candidate unprocessed events for this stage in the
+            // delay-elapsed window. We scan a 90-day window — anything older
+            // is treated as expired (covers reactivation cadences up to 90
+            // days; longer cadences should be split into multiple automations
+            // OR we extend this window in a future phase).
+            const ninetyDaysAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000).toISOString();
+
+            const { data: events, error: evErr } = await db
+              .from('lead_stage_events')
+              .select('id, lead_id, occurred_at')
+              .eq('to_stage', targetStage)
+              .is('processed_at', null)
+              .gte('occurred_at', ninetyDaysAgo)
+              .lte('occurred_at', cutoff)
+              .order('occurred_at', { ascending: true })
+              .limit(100);
+
+            if (evErr) {
+              console.warn(`[${executionId}] stage_entered query failed:`, evErr.message);
+            } else if (events && events.length) {
+              // Per-(automation, event) idempotency: drop events that already
+              // have a run row for this automation. We do this in one round
+              // trip rather than per-event checks below.
+              const eventIds = events.map(e => e.id);
+              const { data: alreadyRun } = await db
+                .from('lead_automation_runs')
+                .select('stage_event_id')
+                .eq('automation_id', automationId)
+                .in('stage_event_id', eventIds);
+              const alreadyRunSet = new Set((alreadyRun || []).map(r => r.stage_event_id));
+
+              const fresh = events.filter(e => !alreadyRunSet.has(e.id));
+              matchingLeads = fresh.map(e => ({ id: e.lead_id }));
+              // Build a map so the run record below can be stamped with the
+              // event id (enables future audit / debug queries).
+              stageEventMap = new Map(fresh.map(e => [e.lead_id, e.id]));
+            }
+          }
+        }
+
         // Blacklist guard: re-filter matchingLeads to drop any do_not_contact leads
         // (for trigger types that didn't filter upstream)
         if (matchingLeads.length > 0) {
@@ -260,19 +316,26 @@ export default async function handler(req, res) {
           try {
             const leadId = lead.id;
 
-            // Check if automation already ran for this lead today
-            const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-            const { data: existingRun } = await db
-              .from('lead_automation_runs')
-              .select('id')
-              .eq('automation_id', automationId)
-              .eq('lead_id', leadId)
-              .gte('started_at', oneDayAgo.toISOString())
-              .limit(1);
+            // Legacy 24h idempotency check applies to all triggers EXCEPT
+            // stage_entered (which uses per-(automation, stage_event_id)
+            // idempotency upstream — same lead can re-enter the same stage
+            // and re-fire). Skipping the legacy check for stage_entered
+            // also lets multiple stage_entered automations on the same lead
+            // fire in the same cron tick without spurious skips.
+            if (trigger_type !== 'stage_entered') {
+              const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+              const { data: existingRun } = await db
+                .from('lead_automation_runs')
+                .select('id')
+                .eq('automation_id', automationId)
+                .eq('lead_id', leadId)
+                .gte('started_at', oneDayAgo.toISOString())
+                .limit(1);
 
-            if (existingRun && existingRun.length > 0) {
-              console.log(`[${executionId}] Skipping lead ${leadId} - automation already ran today`);
-              continue;
+              if (existingRun && existingRun.length > 0) {
+                console.log(`[${executionId}] Skipping lead ${leadId} - automation already ran today`);
+                continue;
+              }
             }
 
             // Get full lead data
@@ -291,7 +354,9 @@ export default async function handler(req, res) {
 
             console.log(`[${executionId}] Executing ${actions?.length || 0} actions for lead: ${leadData.name}`);
 
-            // Track execution
+            // Track execution. For stage_entered triggers, stamp the source
+            // event id so the upstream idempotency query can see this run.
+            const stageEventIdForRun = stageEventMap ? stageEventMap.get(leadId) : null;
             const { data: runRecord } = await db
               .from('lead_automation_runs')
               .insert([{
@@ -300,6 +365,7 @@ export default async function handler(req, res) {
                 trigger_data: trigger_config,
                 status: 'running',
                 started_at: now.toISOString(),
+                stage_event_id: stageEventIdForRun || null,
               }])
               .select()
               .single();

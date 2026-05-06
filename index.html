@@ -9975,7 +9975,7 @@ function autoDelete(id){
 
 function updateTriggerExtra(){
   var trigger = document.getElementById('auton-trigger').value;
-  var needsValue = ['days_since_response', 'scheduled', 'booking_completed', 'days_in_segment'];
+  var needsValue = ['days_since_response', 'scheduled', 'booking_completed', 'days_in_segment', 'stage_entered'];
   var extraDiv = document.getElementById('auton-trigger-extra');
   var label = document.getElementById('auton-trigger-label');
   var input = document.getElementById('auton-trigger-value');
@@ -9986,6 +9986,7 @@ function updateTriggerExtra(){
     else if(trigger === 'scheduled') { label.textContent = 'Time of day (HH:MM, e.g. 09:00)'; if(input) input.placeholder = '09:00'; }
     else if(trigger === 'booking_completed') { label.textContent = 'Hours after booking completed'; if(input) input.placeholder = 'e.g. 24'; }
     else if(trigger === 'days_in_segment') { label.textContent = 'Segment and days (format: segment:days)'; if(input) input.placeholder = 'nurture:30  or  canceled:60  or  one_time:30'; }
+    else if(trigger === 'stage_entered') { label.textContent = 'Stage and days after entry (format: stage:days)'; if(input) input.placeholder = 'Quoted:1   Closed lost:30   Follow-up:7'; }
   } else {
     extraDiv.style.display = 'none';
   }
@@ -10079,6 +10080,19 @@ async function leadAutoSave(){
     // Format: "nurture:30" or "canceled:60"
     var parts = (triggerValue || '').split(':');
     triggerConfig = { segment: (parts[0] || 'nurture').trim(), days: parseInt(parts[1]) || 30 };
+  }
+  else if(triggerType === 'stage_entered') {
+    // Format: "Quoted:1" → {stage: 'Quoted', delay_minutes: 1440}
+    // Bare "Quoted" with no colon → delay 0 (fires at next cron tick after entry).
+    // We store delay_minutes (canonical unit) so backend math is unit-clean;
+    // UI input is in days for usability since 99% of stage-entered automations
+    // are a number of days.
+    var sParts = (triggerValue || '').split(':');
+    var stageVal = (sParts[0] || '').trim();
+    var daysVal = parseInt(sParts[1]);
+    if (!stageVal) { alert('Stage name is required (format: stage:days, e.g. Quoted:1)'); return; }
+    if (isNaN(daysVal) || daysVal < 0) daysVal = 0;
+    triggerConfig = { stage: stageVal, delay_minutes: daysVal * 24 * 60 };
   }
 
   var actions = [];
@@ -10202,7 +10216,15 @@ function renderLeadAutoList(automationList){
     var actionSummary = (auto.actions || []).map(function(a){ return a.type; }).join(', ') || 'no actions';
     var triggerDetail = '';
     if(auto.trigger_config) {
-      if(auto.trigger_config.days && typeof auto.trigger_config.days === 'number') triggerDetail = ' · ' + auto.trigger_config.days + ' days';
+      if (auto.trigger_type === 'stage_entered' && auto.trigger_config.stage) {
+        var dMin = Number(auto.trigger_config.delay_minutes || 0);
+        var dDays = Math.floor(dMin / (24*60));
+        triggerDetail = ' · ' + auto.trigger_config.stage + (dDays > 0 ? ' + ' + dDays + 'd' : ' (immediate)');
+      }
+      else if (auto.trigger_type === 'days_in_segment' && auto.trigger_config.segment) {
+        triggerDetail = ' · ' + auto.trigger_config.segment + ' (' + (auto.trigger_config.days || 30) + 'd)';
+      }
+      else if(auto.trigger_config.days && typeof auto.trigger_config.days === 'number') triggerDetail = ' · ' + auto.trigger_config.days + ' days';
       else if(auto.trigger_config.hours_after) triggerDetail = ' · ' + auto.trigger_config.hours_after + 'h after';
       else if(auto.trigger_config.time_of_day) triggerDetail = ' · ' + auto.trigger_config.time_of_day;
     }
@@ -10286,6 +10308,13 @@ async function editLeadAuto(id) {
     var cfg = data.trigger_config || {};
     if (data.trigger_type === 'days_in_segment') {
       triggerValue = (cfg.segment || 'nurture') + ':' + (cfg.days || 30);
+    }
+    else if (data.trigger_type === 'stage_entered') {
+      // Convert delay_minutes back to days for display; round (any partial-day
+      // values were entered through some other path — show the floor day value).
+      var dMin = Number(cfg.delay_minutes || 0);
+      var days = Math.floor(dMin / (24 * 60));
+      triggerValue = (cfg.stage || '') + ':' + days;
     }
     else if(typeof cfg.days === 'number') triggerValue = cfg.days;
     else if(cfg.hours_after) triggerValue = cfg.hours_after;
@@ -16043,6 +16072,7 @@ loadSettings();
         <select id="auton-trigger" onchange="updateTriggerExtra()">
           <option value="form_submission">Form submission (new lead from website)</option>
           <option value="lead_created">Any new lead is created</option>
+          <option value="stage_entered">Lead entered a specific stage (Quoted, Closed lost, etc.)</option>
           <option value="days_since_response">Lead hasn't responded for N days</option>
           <option value="scheduled">Scheduled (every day/week at specific time)</option>
           <option value="booking_completed">Booking/appointment completed</option>

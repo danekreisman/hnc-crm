@@ -145,8 +145,8 @@ export const SCHEMAS = {
     name:         { required: true, rules: [is.nonEmpty, is.maxLength(100)],  message: 'Automation name is required (max 100 chars)' },
     trigger_type: {
       required: true,
-      rules: [is.oneOf(['lead_created', 'form_submission', 'scheduled', 'days_since_response', 'booking_completed'])],
-      message: 'trigger_type must be one of: lead_created, form_submission, scheduled, days_since_response, booking_completed'
+      rules: [is.oneOf(['lead_created', 'form_submission', 'scheduled', 'days_since_response', 'booking_completed', 'days_in_segment', 'stage_entered'])],
+      message: 'trigger_type must be one of: lead_created, form_submission, scheduled, days_since_response, booking_completed, days_in_segment, stage_entered'
     },
     actions: { required: true, rules: [is.nonEmptyArray], message: 'At least one action is required' },
   },

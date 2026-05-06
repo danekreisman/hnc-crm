@@ -20947,85 +20947,10 @@ function _hncAlohaFlower(){
 }
 
 /* ────────────────────────────────────────────────────────────────────────
-   WAVE-SPLASH RIPPLE — single global mousedown listener, event delegation
-   means we add zero per-button JS overhead. On press of any button (with
-   the same opt-outs as the hover glow), we inject a <span> at the press
-   point that animates outward via CSS, then auto-removes.
-
-   We use mousedown (not click) so the ripple appears the instant the
-   button is pressed — before any onclick handler has a chance to
-   re-render the page and wipe the ripple span out of existence.
+   WAVE-SPLASH RIPPLE — moved to dedicated <script> tag at end of body
+   for isolation. If there's a JS error elsewhere in this block, the
+   ripple still works. See bottom of index.html.
    ──────────────────────────────────────────────────────────────────────── */
-(function(){
-  /* These selectors match buttons that should NOT ripple (they have their
-     own active/inactive state styling that would conflict). */
-  var SKIP_CLASSES = ['template-tab','stab','chat-tab','pay-tab','auto-tab','ctab-btn','close-btn'];
-  function shouldSkip(btn){
-    if(btn.disabled) return true;
-    for(var i = 0; i < SKIP_CLASSES.length; i++){
-      if(btn.classList.contains(SKIP_CLASSES[i])) return true;
-    }
-    return false;
-  }
-
-  function spawnRipple(ev){
-    try {
-      /* Find the closest <button> ancestor — handles clicks on inner spans/icons. */
-      var btn = ev.target && ev.target.closest && ev.target.closest('button');
-      if(!btn || shouldSkip(btn)) return;
-
-      /* DIAGNOSTIC: flash a banner top-center so we can see if the handler
-         is even being invoked. Remove this block once ripple is confirmed. */
-      try {
-        var diag = document.getElementById('hnc-ripple-diag');
-        if(!diag){
-          diag = document.createElement('div');
-          diag.id = 'hnc-ripple-diag';
-          diag.style.cssText = 'position:fixed;top:10px;left:50%;transform:translateX(-50%);background:#dc2626;color:#fff;padding:6px 14px;border-radius:8px;font-size:12px;font-weight:700;z-index:999999;pointer-events:none;font-family:system-ui,sans-serif;box-shadow:0 4px 12px rgba(0,0,0,.3);';
-          document.body.appendChild(diag);
-        }
-        diag.textContent = '🌊 ripple fired on <' + (btn.tagName||'?') + '> ' + (btn.className||'(no class)').slice(0,60);
-        diag.style.opacity = '1';
-        clearTimeout(diag._t);
-        diag._t = setTimeout(function(){ diag.style.opacity = '0'; diag.style.transition = 'opacity .3s'; }, 900);
-      } catch(_d){}
-
-      /* Compute press point relative to the button's bounding box. */
-      var rect = btn.getBoundingClientRect();
-      if(rect.width < 4 || rect.height < 4) return; // skip degenerate buttons
-      var size = Math.max(rect.width, rect.height);
-      var x = (ev.clientX || (rect.left + rect.width/2)) - rect.left;
-      var y = (ev.clientY || (rect.top + rect.height/2)) - rect.top;
-
-      /* Ensure the button can host an absolutely-positioned child. */
-      var computed = window.getComputedStyle(btn);
-      if(computed.position === 'static') btn.style.position = 'relative';
-      if(computed.overflow === 'visible') btn.style.overflow = 'hidden';
-
-      var ink = document.createElement('span');
-      ink.className = 'hnc-ripple-ink';
-      ink.style.width = size + 'px';
-      ink.style.height = size + 'px';
-      ink.style.left = (x - size/2) + 'px';
-      ink.style.top = (y - size/2) + 'px';
-      btn.appendChild(ink);
-
-      /* Auto-cleanup after the animation completes. */
-      setTimeout(function(){ if(ink.parentNode) ink.remove(); }, 1000);
-    } catch(e) {
-      /* Never let a ripple bug break the actual click handler. */
-      console.warn('[ripple]', e);
-    }
-  }
-
-  /* Capture-phase mousedown so we run BEFORE any onclick rerenders the page. */
-  document.addEventListener('mousedown', spawnRipple, true);
-  /* Also handle touch/pen for mobile support. */
-  document.addEventListener('pointerdown', function(ev){
-    if(ev.pointerType === 'mouse') return; // already handled by mousedown
-    spawnRipple(ev);
-  }, true);
-})();
 // === END HNC AUTH ===
 
 // === ACTIVITY LOGGING ===
@@ -21566,6 +21491,88 @@ async function loadClientHistory(clientId) {
   };
 })();
 
+</script>
+
+<!-- ─────────────────────────────────────────────────────────────────────
+     Isolated ripple-effect script. Loaded at end of body in its own
+     <script> tag so it runs independently of the main app code. If
+     anything else in the page throws, this still works.
+     ─────────────────────────────────────────────────────────────────── -->
+<script>
+(function(){
+  'use strict';
+
+  // Inject CSS directly so we don't depend on the stylesheet being applied
+  var styleEl = document.createElement('style');
+  styleEl.textContent =
+    '@keyframes _hnc_rip_kf {' +
+    '  0%   { transform: scale(0); opacity: .85; }' +
+    '  100% { transform: scale(4); opacity: 0; }' +
+    '}' +
+    '.hnc-rip-ink {' +
+    '  position: absolute;' +
+    '  border-radius: 50%;' +
+    '  pointer-events: none;' +
+    '  background: radial-gradient(circle, rgba(59,184,227,.85) 0%, rgba(59,184,227,.45) 45%, rgba(59,184,227,0) 80%);' +
+    '  transform: scale(0);' +
+    '  animation: _hnc_rip_kf .8s cubic-bezier(.4,0,.2,1) forwards;' +
+    '  z-index: 1;' +
+    '}';
+  document.head.appendChild(styleEl);
+
+  var SKIP = ['template-tab','stab','chat-tab','pay-tab','auto-tab','ctab-btn','close-btn'];
+
+  function fire(ev){
+    var btn = ev.target && ev.target.closest && ev.target.closest('button');
+    if(!btn || btn.disabled) return;
+    for(var i=0;i<SKIP.length;i++){ if(btn.classList.contains(SKIP[i])) return; }
+
+    // Diagnostic banner — flashes when handler runs
+    var diag = document.getElementById('hnc-rip-diag');
+    if(!diag){
+      diag = document.createElement('div');
+      diag.id = 'hnc-rip-diag';
+      diag.style.cssText = 'position:fixed;top:12px;left:50%;transform:translateX(-50%);background:#16a34a;color:#fff;padding:8px 16px;border-radius:8px;font-size:13px;font-weight:700;z-index:999999;pointer-events:none;font-family:system-ui,-apple-system,sans-serif;box-shadow:0 4px 14px rgba(0,0,0,.25);transition:opacity .3s;';
+      document.body.appendChild(diag);
+    }
+    diag.textContent = '✅ Ripple fired: <' + btn.tagName + '> ' + (btn.className || '(no class)').slice(0,50);
+    diag.style.opacity = '1';
+    clearTimeout(diag._t);
+    diag._t = setTimeout(function(){ diag.style.opacity = '0'; }, 900);
+
+    var rect = btn.getBoundingClientRect();
+    if(rect.width < 4) return;
+    var size = Math.max(rect.width, rect.height);
+    var x = (ev.clientX != null ? ev.clientX : rect.left + rect.width/2) - rect.left;
+    var y = (ev.clientY != null ? ev.clientY : rect.top + rect.height/2) - rect.top;
+
+    var cs = window.getComputedStyle(btn);
+    if(cs.position === 'static') btn.style.position = 'relative';
+    if(cs.overflow === 'visible') btn.style.overflow = 'hidden';
+
+    var ink = document.createElement('span');
+    ink.className = 'hnc-rip-ink';
+    ink.style.width = size + 'px';
+    ink.style.height = size + 'px';
+    ink.style.left = (x - size/2) + 'px';
+    ink.style.top = (y - size/2) + 'px';
+    btn.appendChild(ink);
+    setTimeout(function(){ if(ink.parentNode) ink.remove(); }, 1000);
+  }
+
+  document.addEventListener('mousedown', fire, true);
+  document.addEventListener('pointerdown', function(e){ if(e.pointerType !== 'mouse') fire(e); }, true);
+
+  // Boot signal — flash a different banner ONCE on load so we know this script ran at all
+  setTimeout(function(){
+    var boot = document.createElement('div');
+    boot.textContent = '🌊 Ripple script loaded';
+    boot.style.cssText = 'position:fixed;bottom:20px;right:20px;background:#3BB8E3;color:#fff;padding:8px 14px;border-radius:8px;font-size:12px;font-weight:700;z-index:999999;pointer-events:none;font-family:system-ui,-apple-system,sans-serif;box-shadow:0 4px 14px rgba(0,0,0,.25);transition:opacity .5s;';
+    document.body.appendChild(boot);
+    setTimeout(function(){ boot.style.opacity = '0'; }, 3000);
+    setTimeout(function(){ boot.remove(); }, 3700);
+  }, 100);
+})();
 </script>
 
 </body>

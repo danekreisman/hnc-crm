@@ -601,6 +601,24 @@ textarea{font-family:inherit;}
           <div class="metric"><div class="metric-label">Avg close time</div><div class="metric-value">—</div></div>
         </div>
 
+        <!-- NEEDS YOUR ATTENTION TODAY ────────────────────────────────────
+             Prioritized to-do list of leads where action today is most likely
+             to convert. Limited to ~10 cards. Each row has one suggested
+             action with the button right there. Hidden when empty. -->
+        <div id="needs-attention-panel" style="display:none;background:linear-gradient(135deg,#fef3c7 0%,#fde68a 100%);border:1px solid #fcd34d;border-radius:14px;padding:18px 20px;margin-bottom:18px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
+            <div style="display:flex;align-items:center;gap:10px;">
+              <div style="font-size:18px;">⚡</div>
+              <div>
+                <div style="font-weight:700;font-size:15px;color:#78350f;">Needs your attention today</div>
+                <div style="font-size:12px;color:#92400e;margin-top:2px;" id="needs-attention-subtitle">Highest-priority leads first.</div>
+              </div>
+            </div>
+            <button id="needs-attention-collapse" onclick="toggleNeedsAttention()" style="background:rgba(255,255,255,0.6);border:1px solid rgba(146,64,14,0.2);color:#78350f;padding:5px 12px;border-radius:8px;font-size:12px;cursor:pointer;font-weight:600;">Hide</button>
+          </div>
+          <div id="needs-attention-list"></div>
+        </div>
+
         <!-- FILTER TABS -->
         <div style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap;align-items:center;">
           <button class="template-tab active" onclick="filterLeads('pipeline',this)">Pipeline</button>
@@ -3038,6 +3056,11 @@ function _leadRowToDb(l){
     condition: l.condition!=null?l.condition:((l.notes&&/Condition:\s*(\d+)/.exec(l.notes))?/Condition:\s*(\d+)/.exec(l.notes)[1]:null),
     doNotContact: !!l.do_not_contact,
     updatedAt: l.updated_at || null,
+    /* Raw timestamps used by the "Needs attention" prioritizer at the top of
+       the pipeline. Display fields above use formatted date for the UI; these
+       are the ISO strings for math (days since X, etc.). */
+    createdAt: l.created_at || null,
+    lastRespondedAt: l.last_responded_at || null,
   };
 }
 
@@ -3571,6 +3594,268 @@ function renderLeadsPipeline(){
   // only populated by markLeadLost/convertLeadToClient during the active
   // session, so any lead marked closed in a previous session was invisible.
   renderClosedLeadsTables();
+
+  // Refresh the "Needs your attention" panel at the top of the pipeline.
+  // Same data source (leadDB), so it reruns whenever the pipeline does.
+  try { if (typeof renderNeedsAttention === 'function') renderNeedsAttention(); } catch(e) { console.warn('[needs-attn] render failed:', e); }
+}
+
+/* ────────────────────────────────────────────────────────────────────────
+   NEEDS YOUR ATTENTION TODAY
+   Prioritized to-do list of leads where action today is most likely to
+   convert. Pulls from leadDB only — no API calls, no extra DB reads.
+   Each lead gets a numeric priority score; top ~10 render. Each entry
+   has one suggested action with a button right there.
+   ──────────────────────────────────────────────────────────────────────── */
+
+function _msAgo(iso){
+  if(!iso) return Infinity;
+  try { return Date.now() - new Date(iso).getTime(); } catch(_){ return Infinity; }
+}
+function _daysAgo(iso){ return _msAgo(iso) / (24*60*60*1000); }
+
+/* Returns an object with {score, reason, actionLabel, actionFn} for a lead,
+   or null if the lead doesn't need attention today. Higher score = higher
+   urgency. Reason is a one-liner shown to the user. */
+function _scoreLeadForAttention(id, l){
+  if(!l || !l.stage) return null;
+  /* Closed leads never appear */
+  if(l.stage === 'Closed won' || l.stage === 'Closed lost') return null;
+  /* Respect the do-not-contact flag */
+  if(l.doNotContact) return null;
+
+  var now = Date.now();
+  var daysSinceCreated = _daysAgo(l.createdAt);
+  var daysSinceQuote   = _daysAgo(l.quoteSentAt);
+  var daysSinceReply   = _daysAgo(l.lastRespondedAt);
+  var hasReplied = !!l.lastRespondedAt;
+  var hasQuote = !!l.quoteSentAt;
+
+  /* ── Tier 1: lead replied recently and is awaiting your response. */
+  /* This is the highest-value signal — they're engaged, the conversation is hot. */
+  if(hasReplied && daysSinceReply >= 0 && daysSinceReply < 2){
+    return {
+      score: 1000 + (2 - daysSinceReply) * 100,
+      reason: 'Replied ' + _humanAgo(l.lastRespondedAt) + ' — awaiting your response',
+      actionLabel: 'Open conversation',
+      actionType: 'open_lead',
+      tone: 'hot',
+    };
+  }
+
+  /* ── Tier 2: walkthrough requested but not yet confirmed. */
+  /* These leads asked for in-person contact and will go cold fast. */
+  if(l.stage === 'Walkthrough requested'){
+    var d = Math.max(0, daysSinceCreated);
+    return {
+      score: 800 - Math.min(700, d * 50),
+      reason: 'Walkthrough requested ' + _humanAgo(l.updatedAt || l.createdAt) + ' — needs scheduling',
+      actionLabel: 'Send AI follow-up',
+      actionType: 'ai_followup',
+      tone: 'urgent',
+    };
+  }
+
+  /* ── Tier 3: brand-new lead from today, no quote sent yet. */
+  /* If auto-quote is on this resolves itself fast — but if it's off or the
+     lead is janitorial / unusual, this catches those. */
+  if(l.stage === 'New inquiry' && daysSinceCreated < 1){
+    return {
+      score: 700,
+      reason: 'New lead ' + _humanAgo(l.createdAt) + ' — make first contact',
+      actionLabel: 'Open lead',
+      actionType: 'open_lead',
+      tone: 'fresh',
+    };
+  }
+
+  /* ── Tier 4: quoted but no reply, in the sweet spot for follow-up (2–7 days). */
+  /* Day-1 is too soon (they may just be deciding); 8+ days is colder and
+     handled by the Day-5 re-engagement tier below if they're still pipelined. */
+  if(l.stage === 'Quoted' && hasQuote && !hasReplied && daysSinceQuote >= 2 && daysSinceQuote <= 7){
+    return {
+      score: 600 - (daysSinceQuote - 2) * 30,
+      reason: 'Quoted ' + Math.round(daysSinceQuote) + 'd ago, no reply — send follow-up',
+      actionLabel: 'Send AI follow-up',
+      actionType: 'ai_followup',
+      tone: 'medium',
+    };
+  }
+
+  /* ── Tier 5: quoted, no reply, going cold (8–21 days). */
+  if(l.stage === 'Quoted' && hasQuote && !hasReplied && daysSinceQuote > 7 && daysSinceQuote <= 21){
+    return {
+      score: 400 - (daysSinceQuote - 8) * 10,
+      reason: 'Quoted ' + Math.round(daysSinceQuote) + 'd ago, going cold — last-ditch nudge',
+      actionLabel: 'Send AI follow-up',
+      actionType: 'ai_followup',
+      tone: 'cold',
+    };
+  }
+
+  /* ── Tier 6: stuck in Follow-up stage. */
+  if(l.stage === 'Follow-up'){
+    var d2 = _daysAgo(l.updatedAt || l.createdAt);
+    /* Only surface if it's been at least 3 days since something changed —
+       otherwise you'd see the same lead the day after you moved them here. */
+    if(d2 >= 3){
+      return {
+        score: 350 - Math.min(300, (d2 - 3) * 5),
+        reason: 'In Follow-up for ' + Math.round(d2) + 'd — decide: nudge or close out',
+        actionLabel: 'Send AI follow-up',
+        actionType: 'ai_followup',
+        tone: 'cold',
+      };
+    }
+  }
+
+  /* ── Tier 7: new inquiry from yesterday or 2 days ago, never quoted. */
+  /* Catches leads that fell through the cracks of auto-quote (e.g., janitorial
+     where the form skips quoting). */
+  if(l.stage === 'New inquiry' && daysSinceCreated >= 1 && daysSinceCreated <= 7){
+    return {
+      score: 500 - daysSinceCreated * 20,
+      reason: 'New inquiry ' + Math.round(daysSinceCreated) + 'd ago, no quote yet',
+      actionLabel: 'Open lead',
+      actionType: 'open_lead',
+      tone: 'urgent',
+    };
+  }
+
+  return null;
+}
+
+/* Format a human-readable "X ago" — short form for cards. */
+function _humanAgo(iso){
+  if(!iso) return 'a while ago';
+  var ms = _msAgo(iso);
+  if(!isFinite(ms) || ms < 0) return 'just now';
+  var min = Math.floor(ms / 60000);
+  if(min < 1) return 'just now';
+  if(min < 60) return min + 'm ago';
+  var hr = Math.floor(min / 60);
+  if(hr < 24) return hr + 'h ago';
+  var d = Math.floor(hr / 24);
+  if(d < 30) return d + 'd ago';
+  return new Date(iso).toLocaleDateString('en-US', {month:'short', day:'numeric'});
+}
+
+/* Color/style by urgency tone — used for the left accent bar on each card. */
+function _toneColor(tone){
+  switch(tone){
+    case 'hot':     return '#dc2626'; // red — replies need fastest action
+    case 'urgent':  return '#f59e0b'; // amber — walkthroughs / fresh leads
+    case 'fresh':   return '#3b82f6'; // blue — brand-new
+    case 'medium':  return '#8b5cf6'; // violet — standard follow-up window
+    case 'cold':    return '#64748b'; // slate — going cold
+    default:        return '#64748b';
+  }
+}
+
+function renderNeedsAttention(){
+  var panel = document.getElementById('needs-attention-panel');
+  var listEl = document.getElementById('needs-attention-list');
+  var subtitleEl = document.getElementById('needs-attention-subtitle');
+  if(!panel || !listEl) return;
+
+  /* User can collapse it for the session */
+  if(localStorage.getItem('hnc_needs_attn_collapsed') === '1'){
+    panel.style.display = 'none';
+    return;
+  }
+
+  /* Score every lead and keep the top N */
+  var scored = [];
+  Object.keys(leadDB).forEach(function(id){
+    if(id.length < 30) return; // skip non-uuid legacy entries
+    var entry = _scoreLeadForAttention(id, leadDB[id]);
+    if(entry){ entry.id = id; entry.lead = leadDB[id]; scored.push(entry); }
+  });
+  scored.sort(function(a,b){ return b.score - a.score; });
+  var top = scored.slice(0, 10);
+
+  /* Hide the entire panel if nothing needs attention */
+  if(top.length === 0){
+    panel.style.display = 'none';
+    return;
+  }
+  panel.style.display = '';
+
+  /* Subtitle: a quick honest summary */
+  if(subtitleEl){
+    var moreCount = scored.length - top.length;
+    subtitleEl.textContent =
+      top.length + ' lead' + (top.length !== 1 ? 's' : '') + ' need attention'
+      + (moreCount > 0 ? ' (' + moreCount + ' more lower-priority)' : '');
+  }
+
+  /* Render rows */
+  listEl.innerHTML = top.map(function(item){
+    var l = item.lead;
+    var tone = _toneColor(item.tone);
+    var name = l.name || 'Unnamed';
+    var stage = l.stage || '';
+    var phone = (l.phone && l.phone !== '—') ? l.phone : '';
+    return ''
+      + '<div data-attn-lead="' + item.id + '" style="background:#fff;border-left:3px solid ' + tone + ';border-radius:8px;padding:10px 14px;margin-bottom:6px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">'
+      +   '<div style="flex:1;min-width:200px;cursor:pointer;" onclick="openLead(\'' + item.id + '\')">'
+      +     '<div style="font-weight:600;font-size:13px;color:#1f2937;">' + _attnEsc(name)
+      +       '<span style="background:#f3f4f6;color:#6b7280;font-size:10px;padding:2px 7px;border-radius:999px;font-weight:500;margin-left:6px;vertical-align:middle;">' + _attnEsc(stage) + '</span>'
+      +     '</div>'
+      +     '<div style="font-size:12px;color:#6b7280;margin-top:2px;">' + _attnEsc(item.reason) + '</div>'
+      +   '</div>'
+      +   _attnButtonHTML(item)
+      + '</div>';
+  }).join('');
+}
+
+function _attnEsc(s){
+  return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){
+    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+  });
+}
+
+function _attnButtonHTML(item){
+  if(item.actionType === 'ai_followup'){
+    return '<button onclick="_attnRunFollowup(\'' + item.id + '\')" style="background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:#fff;border:none;padding:7px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;">✨ ' + _attnEsc(item.actionLabel) + '</button>';
+  }
+  /* Default: open_lead */
+  return '<button onclick="openLead(\'' + item.id + '\')" style="background:#fff;color:#553c9a;border:1px solid #ddd6fe;padding:7px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;">' + _attnEsc(item.actionLabel) + ' →</button>';
+}
+
+/* Action: open the lead, then the AI follow-up modal in one click. The
+   existing openLeadFollowupModal() reads currentLeadId, which openLead()
+   sets, so we just chain them. */
+function _attnRunFollowup(leadId){
+  try { openLead(leadId); } catch(e){ console.warn('[attn] openLead failed:', e); return; }
+  /* Small delay so the lead overlay is fully open before launching the
+     modal on top — otherwise the modal can race the lead profile data. */
+  setTimeout(function(){
+    if(typeof openLeadFollowupModal === 'function') openLeadFollowupModal();
+  }, 220);
+}
+
+function toggleNeedsAttention(){
+  var panel = document.getElementById('needs-attention-panel');
+  if(!panel) return;
+  panel.style.display = 'none';
+  localStorage.setItem('hnc_needs_attn_collapsed', '1');
+  /* Show a small "Show attention list" pill at the top so it's not lost forever */
+  var pipeView = document.getElementById('view-pipeline');
+  if(pipeView && !document.getElementById('needs-attn-restore')){
+    var btn = document.createElement('button');
+    btn.id = 'needs-attn-restore';
+    btn.textContent = '⚡ Show attention list';
+    btn.style.cssText = 'background:#fef3c7;border:1px solid #fcd34d;color:#78350f;padding:6px 14px;border-radius:8px;font-size:12px;cursor:pointer;font-weight:600;margin-bottom:14px;';
+    btn.onclick = function(){
+      localStorage.removeItem('hnc_needs_attn_collapsed');
+      btn.remove();
+      renderNeedsAttention();
+    };
+    /* Insert right after the metrics row */
+    var metrics = pipeView.querySelector('.metrics');
+    if(metrics && metrics.parentNode) metrics.parentNode.insertBefore(btn, metrics.nextSibling);
+  }
 }
 
 /**

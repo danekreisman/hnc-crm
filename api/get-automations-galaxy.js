@@ -142,7 +142,7 @@ export default async function handler(req, res) {
     // 1. All automations
     const { data: automations, error: aErr } = await db
       .from('lead_automations')
-      .select('id, name, trigger_type, trigger_config, actions, is_enabled, total_runs, total_succeeded, total_failed, last_run_at, created_at')
+      .select('id, name, trigger_type, trigger_config, actions, is_enabled, created_at')
       .order('created_at', { ascending: true });
     if (aErr) throw aErr;
 
@@ -175,9 +175,23 @@ export default async function handler(req, res) {
       });
     }
 
-    // 4. Group runs by automation_id, take top 10 per
+    // 4. Group runs by automation_id, take top 10 per, AND derive aggregate stats
     const runsByAuto = {};
+    const statsByAuto = {}; // {autoId: {total, success, failed, last_at}}
     (recentRuns || []).forEach(r => {
+      // Stats: count every run we have, regardless of recency cap
+      if (!statsByAuto[r.automation_id]) {
+        statsByAuto[r.automation_id] = { total: 0, success: 0, failed: 0, last_at: null };
+      }
+      const s = statsByAuto[r.automation_id];
+      s.total++;
+      if (r.status === 'success') s.success++;
+      else if (r.status === 'failed') s.failed++;
+      const ts = r.completed_at || r.started_at;
+      if (ts && (!s.last_at || ts > s.last_at)) s.last_at = ts;
+
+      // Recent runs cap: top 10 per automation (preserves ordering since runs
+      // are pre-sorted DESC by started_at)
       if (!runsByAuto[r.automation_id]) runsByAuto[r.automation_id] = [];
       if (runsByAuto[r.automation_id].length < 10) {
         const actionCount = Array.isArray(r.actions_executed) ? r.actions_executed.length : 0;
@@ -196,6 +210,7 @@ export default async function handler(req, res) {
     // 5. Compose response
     const result = automations.map(a => {
       const cfg = a.trigger_config || {};
+      const s = statsByAuto[a.id] || { total: 0, success: 0, failed: 0, last_at: null };
       return {
         id: a.id,
         name: a.name || 'Untitled',
@@ -208,10 +223,10 @@ export default async function handler(req, res) {
         },
         steps: _buildSteps(a),
         stats: {
-          total_fires: a.total_runs || 0,
-          success: a.total_succeeded || 0,
-          failed: a.total_failed || 0,
-          last_fired_at: a.last_run_at || null,
+          total_fires: s.total,
+          success: s.success,
+          failed: s.failed,
+          last_fired_at: s.last_at,
         },
         recent_runs: runsByAuto[a.id] || [],
       };

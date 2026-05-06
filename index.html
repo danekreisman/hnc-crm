@@ -2980,6 +2980,103 @@ async function dbLoadLeads(){
   return data||[];
 }
 
+// === REALTIME LEAD SUBSCRIPTION ===
+// Live INSERT/UPDATE/DELETE on the leads table → instant pipeline updates
+// without manual refresh. Single source of truth for the row→leadDB shape
+// (used by both initial load and realtime events) so they can never drift.
+//
+// REQUIRES: `leads` table enabled in Supabase publication `supabase_realtime`.
+// Enable via Supabase Dashboard → Database → Publications → supabase_realtime
+// → toggle on the `leads` table. Or run:
+//   ALTER PUBLICATION supabase_realtime ADD TABLE leads;
+var _leadsRealtimeChan = null;
+
+function _leadRowToDb(l){
+  return {
+    name:l.name, contact:l.contact_name||l.name,
+    phone:l.phone||'—', email:l.email||'—',
+    address:l.address||'—', value:l.estimated_value||'TBD',
+    service:l.service||'—', sqft:l.sqft||'—',
+    source:l.source||'—',
+    date:new Date(l.created_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}),
+    stage:l.stage||'New inquiry',
+    action:l.next_action||'Follow up',
+    due:l.due_date||'TBD',
+    assigned:l.assigned_to||'VA',
+    notes:l.notes||'—',
+    quoteData: l.quote_data||null,
+    quoteTotal: l.quote_total||null,
+    quoteSentAt: l.quote_sent_at||null,
+    beds:      l.beds!=null?l.beds:((l.notes&&/Beds:\s*(\S+)/.exec(l.notes))?/Beds:\s*(\S+)/.exec(l.notes)[1]:null),
+    baths:     l.baths!=null?l.baths:((l.notes&&/Baths:\s*(\S+)/.exec(l.notes))?/Baths:\s*(\S+)/.exec(l.notes)[1]:null),
+    frequency: l.frequency||((l.notes&&/Frequency:\s*([^\n]+)/.exec(l.notes))?/Frequency:\s*([^\n]+)/.exec(l.notes)[1].trim():null),
+    condition: l.condition!=null?l.condition:((l.notes&&/Condition:\s*(\d+)/.exec(l.notes))?/Condition:\s*(\d+)/.exec(l.notes)[1]:null),
+    doNotContact: !!l.do_not_contact,
+    updatedAt: l.updated_at || null,
+  };
+}
+
+function _subscribeLeadsRealtime(){
+  if(_leadsRealtimeChan) return; // idempotent — loadAllData can be called multiple times
+  if(typeof db === 'undefined' || !db || typeof db.channel !== 'function') return;
+  try {
+    _leadsRealtimeChan = db.channel('leads-pipeline-rt')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'leads' }, function(payload){
+        try {
+          var l = payload && payload['new'];
+          if(!l || !l.id) return;
+          if(l.stage === 'Deleted') return;
+          leadDB[l.id] = _leadRowToDb(l);
+          if(typeof renderLeadsPipeline === 'function') renderLeadsPipeline();
+          if(typeof updateDashboardStats === 'function') updateDashboardStats();
+          if(typeof showToast === 'function') showToast('New lead: ' + (l.name || 'unnamed'));
+          if(typeof playNotificationSound === 'function') playNotificationSound();
+        } catch(e){ console.warn('[leads-rt] insert handler failed:', e); }
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'leads' }, function(payload){
+        try {
+          var l = payload && payload['new'];
+          var prev = (payload && payload['old']) || {};
+          if(!l || !l.id) return;
+          // Soft-delete: drop from pipeline
+          if(l.stage === 'Deleted'){
+            delete leadDB[l.id];
+            if(typeof renderLeadsPipeline === 'function') renderLeadsPipeline();
+            if(typeof updateDashboardStats === 'function') updateDashboardStats();
+            return;
+          }
+          var prevStage = (leadDB[l.id] && leadDB[l.id].stage) || prev.stage || null;
+          leadDB[l.id] = _leadRowToDb(l);
+          if(typeof renderLeadsPipeline === 'function') renderLeadsPipeline();
+          if(typeof updateDashboardStats === 'function') updateDashboardStats();
+          if(prevStage && l.stage && prevStage !== l.stage){
+            if(typeof showToast === 'function') showToast((l.name || 'Lead') + ' → ' + l.stage);
+            if(typeof playNotificationSound === 'function') playNotificationSound();
+          }
+        } catch(e){ console.warn('[leads-rt] update handler failed:', e); }
+      })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'leads' }, function(payload){
+        try {
+          var l = payload && payload['old'];
+          if(!l || !l.id) return;
+          delete leadDB[l.id];
+          if(typeof renderLeadsPipeline === 'function') renderLeadsPipeline();
+          if(typeof updateDashboardStats === 'function') updateDashboardStats();
+        } catch(e){ console.warn('[leads-rt] delete handler failed:', e); }
+      })
+      .subscribe(function(status){
+        console.log('[leads-rt] subscription status:', status);
+        if(status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED'){
+          // Reset so next loadAllData re-attempts
+          _leadsRealtimeChan = null;
+        }
+      });
+  } catch(e){
+    console.warn('[leads-rt] subscribe failed:', e);
+    _leadsRealtimeChan = null;
+  }
+}
+
 async function dbSaveInvoice(data){
   const {error}=await db.from('invoices').insert([{
     client_name:data.clientName, service:data.service||null,
@@ -3175,40 +3272,14 @@ async function loadAllData(){
     // appointments processing (which is the expensive part). leadDB is
     // independent of clientDB/cleanerDB; we render the pipeline immediately
     // after to unblock the view the user is most likely watching.
-    leads.forEach(function(l){
-      leadDB[l.id]={
-        name:l.name, contact:l.contact_name||l.name,
-        phone:l.phone||'—', email:l.email||'—',
-        address:l.address||'—', value:l.estimated_value||'TBD',
-        service:l.service||'—', sqft:l.sqft||'—',
-        source:l.source||'—',
-        date:new Date(l.created_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}),
-        stage:l.stage||'New inquiry',
-        action:l.next_action||'Follow up',
-        due:l.due_date||'TBD',
-        assigned:l.assigned_to||'VA',
-        notes:l.notes||'—',
-        // Quote data from auto-quote flow
-        quoteData: l.quote_data||null,
-        quoteTotal: l.quote_total||null,
-        quoteSentAt: l.quote_sent_at||null,
-        // Parse beds/baths/frequency/condition from notes for manual leads
-        beds:      l.beds!=null?l.beds:((l.notes&&/Beds:\s*(\S+)/.exec(l.notes))?/Beds:\s*(\S+)/.exec(l.notes)[1]:null),
-        baths:     l.baths!=null?l.baths:((l.notes&&/Baths:\s*(\S+)/.exec(l.notes))?/Baths:\s*(\S+)/.exec(l.notes)[1]:null),
-        frequency: l.frequency||((l.notes&&/Frequency:\s*([^\n]+)/.exec(l.notes))?/Frequency:\s*([^\n]+)/.exec(l.notes)[1].trim():null),
-        condition: l.condition!=null?l.condition:((l.notes&&/Condition:\s*(\d+)/.exec(l.notes))?/Condition:\s*(\d+)/.exec(l.notes)[1]:null),
-        // Automation exclusion flag — when true, all crons (Quoted→Follow-up,
-        // days_since_response, broadcasts) and the AI follow-up button skip
-        // this lead. Toggleable via the pill on the lead profile.
-        doNotContact: !!l.do_not_contact,
-        // Raw updated_at timestamp — used by the closed-leads tables to show
-        // an accurate "Date lost" / "Date won" column. The `date` field above
-        // is created_at, which is wrong for closed-lead views.
-        updatedAt: l.updated_at || null,
-      };
-    });
+    // Lead row → leadDB shape is centralized in _leadRowToDb so realtime
+    // INSERT/UPDATE handlers produce identical objects (no field drift).
+    leads.forEach(function(l){ leadDB[l.id] = _leadRowToDb(l); });
     // Pipeline can render NOW. Don't make the user wait for appointments.
     try { renderLeadsPipeline(); } catch(e) { console.error('[loadAllData] early renderLeadsPipeline failed:', e); }
+    // Hook up live updates so new leads / stage changes appear instantly
+    // without a manual refresh. Idempotent — safe to call on re-loads.
+    try { _subscribeLeadsRealtime(); } catch(e) { console.warn('[loadAllData] realtime subscribe failed:', e); }
 
     // ── Process appointments — resolve names via FK now that clientDB/cleanerDB are populated
     _rebuildAppointmentsFromDB(appts);

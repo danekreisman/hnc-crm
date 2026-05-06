@@ -111,7 +111,31 @@ body{font-family:'Inter','SF Pro Text',-apple-system,BlinkMacSystemFont,'Segoe U
 .btn:active{transform:translateY(1px);}
 .btn:focus-visible{outline:none;box-shadow:var(--ring);}
 .btn-primary{background:linear-gradient(135deg,var(--brand-500),var(--brand-400));color:var(--text-on-brand);border:1px solid transparent;box-shadow:0 6px 18px -6px rgba(59,184,227,.55),inset 0 1px 0 rgba(255,255,255,.3);}
-.btn-primary:hover{filter:brightness(1.04);box-shadow:var(--glow);}
+.btn-primary:hover{filter:brightness(1.04);box-shadow:0 8px 24px -4px rgba(59,184,227,.7),inset 0 1px 0 rgba(255,255,255,.3);animation:hnc-pulse-glow 1.6s ease-in-out infinite;}
+/* Opt-in glow class for any non-.btn button. Add class="hnc-glow" to enable. */
+.hnc-glow{transition:box-shadow .25s ease, transform .15s ease, filter .15s ease;}
+.hnc-glow:hover{filter:brightness(1.06);box-shadow:0 0 0 4px rgba(59,184,227,.18), 0 6px 22px -6px rgba(59,184,227,.6);animation:hnc-pulse-glow 1.6s ease-in-out infinite;}
+.hnc-glow:active{transform:translateY(1px) scale(.98);}
+@keyframes hnc-pulse-glow{
+  0%, 100% { box-shadow:0 6px 18px -6px rgba(59,184,227,.55), inset 0 1px 0 rgba(255,255,255,.3); }
+  50%      { box-shadow:0 10px 30px -4px rgba(59,184,227,.85), inset 0 1px 0 rgba(255,255,255,.3); }
+}
+@media (prefers-reduced-motion: reduce){
+  .btn-primary:hover, .hnc-glow:hover{animation:none;}
+}
+/* Hot-lead pulse — applied to attention cards in the highest-urgency tier
+   (lead replied recently). A soft red breathe to convey "this is alive".
+   Subtle on purpose — no flashing, just a slow fade. */
+@keyframes hnc-hot-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.0), 0 1px 3px rgba(0,0,0,.06); }
+  50%      { box-shadow: 0 0 0 6px rgba(220, 38, 38, 0.10), 0 4px 14px rgba(220, 38, 38, .12); }
+}
+.hnc-hot-card {
+  animation: hnc-hot-pulse 2.4s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce){
+  .hnc-hot-card{animation:none;}
+}
 .content{flex:1;overflow-y:auto;padding:20px;}
 .vc{display:none;}.vc.active{display:block;}
 .metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:18px;}
@@ -617,10 +641,13 @@ body:not(.hnc-assistant-user) .assistant-only{display:none!important;}
       <!-- PIPELINE -->
       <div id="view-pipeline" class="vc">
         <!-- TEMP: test button for animation previews. Remove once Dane has seen each animation. -->
-        <div id="anim-test-bar" style="background:#fef3c7;border:1px solid #fcd34d;border-radius:10px;padding:10px 14px;margin-bottom:14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-          <span style="font-size:12px;color:#78350f;font-weight:600;">🎨 Animation preview:</span>
-          <button onclick="_hncConfetti()" style="background:#fff;border:1px solid #fcd34d;color:#78350f;padding:5px 12px;border-radius:7px;font-size:12px;cursor:pointer;font-weight:600;">🎉 Confetti</button>
-          <span style="font-size:11px;color:#92400e;margin-left:auto;">temporary — will be removed</span>
+        <div id="anim-test-bar" style="background:#fef3c7;border:1px solid #fcd34d;border-radius:10px;padding:10px 14px;margin-bottom:14px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+          <span style="font-size:12px;color:#78350f;font-weight:600;">🎨 Preview:</span>
+          <button onclick="_hncConfetti()" class="hnc-glow" style="background:#fff;border:1px solid #fcd34d;color:#78350f;padding:5px 12px;border-radius:7px;font-size:12px;cursor:pointer;font-weight:600;">🎉 Confetti</button>
+          <button onclick="_animPreviewTickers()" class="hnc-glow" style="background:#fff;border:1px solid #fcd34d;color:#78350f;padding:5px 12px;border-radius:7px;font-size:12px;cursor:pointer;font-weight:600;">🔢 Tickers</button>
+          <button onclick="_animPreviewCascade()" class="hnc-glow" style="background:#fff;border:1px solid #fcd34d;color:#78350f;padding:5px 12px;border-radius:7px;font-size:12px;cursor:pointer;font-weight:600;">⬇ Cascade demo</button>
+          <button onclick="_animPreviewHotPulse()" class="hnc-glow" style="background:#fff;border:1px solid #fcd34d;color:#78350f;padding:5px 12px;border-radius:7px;font-size:12px;cursor:pointer;font-weight:600;">💗 Hot pulse</button>
+          <span style="font-size:11px;color:#92400e;margin-left:auto;">Hover any button to see #3 glow</span>
         </div>
         <div class="metrics" style="grid-template-columns:repeat(3,minmax(0,1fr));">
           <div class="metric"><div class="metric-label">Total pipeline</div><div class="metric-value" id="pipe-total-val">—</div><div class="metric-sub" id="pipe-total-sub"></div></div>
@@ -3836,7 +3863,7 @@ function renderNeedsAttention(){
     var stage = l.stage || '';
     var phone = (l.phone && l.phone !== '—') ? l.phone : '';
     return ''
-      + '<div data-attn-lead="' + item.id + '" style="background:#fff;border-left:3px solid ' + tone + ';border-radius:8px;padding:10px 14px;margin-bottom:6px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">'
+      + '<div data-attn-lead="' + item.id + '" class="' + (item.tone === 'hot' ? 'hnc-hot-card' : '') + '" style="background:#fff;border-left:3px solid ' + tone + ';border-radius:8px;padding:10px 14px;margin-bottom:6px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">'
       +   '<div style="flex:1;min-width:200px;cursor:pointer;" onclick="openLead(\'' + item.id + '\')">'
       +     '<div style="font-weight:600;font-size:13px;color:#1f2937;">' + _attnEsc(name)
       +       '<span style="background:#f3f4f6;color:#6b7280;font-size:10px;padding:2px 7px;border-radius:999px;font-weight:500;margin-left:6px;vertical-align:middle;">' + _attnEsc(stage) + '</span>'
@@ -4051,6 +4078,125 @@ function _hncConfetti(opts){
   rafId = requestAnimationFrame(frame);
 }
 
+/* ────────────────────────────────────────────────────────────────────────
+   NUMBER TICKER — animates a numeric element from its current value to a
+   target over a short duration. Works with element textContent. Skipped if
+   target equals current (no animation when nothing changed) and respects
+   prefers-reduced-motion. Used for dashboard metrics so they "tick up"
+   on load instead of just popping into place.
+
+   Call: _hncTicker(el, 47) or _hncTicker(el, 1234.56, { prefix: '$', decimals: 2 })
+   ──────────────────────────────────────────────────────────────────────── */
+function _hncTicker(el, target, opts){
+  if(!el) return;
+  opts = opts || {};
+  var prefix = opts.prefix || '';
+  var suffix = opts.suffix || '';
+  var decimals = opts.decimals != null ? opts.decimals : 0;
+  var duration = opts.durationMs || 800;
+  var prefersReduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /* Parse current value out of the element's existing text. */
+  var currentText = (el.textContent || '').trim();
+  var match = currentText.match(/-?[\d.]+/);
+  var current = match ? parseFloat(match[0]) : 0;
+  if(isNaN(current)) current = 0;
+  var targetNum = parseFloat(target);
+  if(isNaN(targetNum)) targetNum = 0;
+
+  /* Format helper — keeps consistent commas + decimals across animation frames. */
+  function fmt(n){
+    var fixed = decimals > 0 ? n.toFixed(decimals) : Math.round(n).toString();
+    var parts = fixed.split('.');
+    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    return prefix + parts.join('.') + suffix;
+  }
+
+  /* No-op if same, or reduced motion — just write the final value. */
+  if(prefersReduced || current === targetNum){
+    el.textContent = fmt(targetNum);
+    return;
+  }
+
+  /* Cancel any in-flight ticker on this element so we don't fight ourselves. */
+  if(el._tickerRaf) cancelAnimationFrame(el._tickerRaf);
+
+  var startTime = performance.now();
+  function step(){
+    var elapsed = performance.now() - startTime;
+    var t = Math.min(1, elapsed / duration);
+    /* Ease-out cubic — fast at start, slows on landing */
+    var eased = 1 - Math.pow(1 - t, 3);
+    var value = current + (targetNum - current) * eased;
+    el.textContent = fmt(value);
+    if(t < 1){
+      el._tickerRaf = requestAnimationFrame(step);
+    } else {
+      el.textContent = fmt(targetNum);
+      el._tickerRaf = null;
+    }
+  }
+  el._tickerRaf = requestAnimationFrame(step);
+}
+
+/* ────────────────────────────────────────────────────────────────────────
+   ANIMATION PREVIEW HELPERS
+   Wired to buttons in the temporary preview bar. Lets Dane trigger each
+   animation in isolation without waiting for real data. Remove these
+   functions when removing the preview bar.
+   ──────────────────────────────────────────────────────────────────────── */
+function _animPreviewTickers(){
+  /* Pick the visible metric values on Pipeline + Dashboard, reset them,
+     and re-tick to a random target so the animation re-fires. */
+  var ids = ['pipe-total-val','pipe-commercial-val','dash-active-clients','dash-open-leads'];
+  ids.forEach(function(id){
+    var el = document.getElementById(id);
+    if(!el) return;
+    el.textContent = '0';
+    var targetNum = Math.floor(Math.random() * 80) + 20;
+    var suffix = (id === 'pipe-total-val') ? ' open' : '';
+    _hncTicker(el, targetNum, { suffix: suffix, durationMs: 900 });
+  });
+}
+
+function _animPreviewCascade(){
+  /* Drop a row of 6 demo "cards" into the page and cascade them in.
+     Cleans up after 4 seconds. */
+  var existing = document.getElementById('anim-cascade-demo');
+  if(existing) existing.remove();
+  var wrap = document.createElement('div');
+  wrap.id = 'anim-cascade-demo';
+  wrap.style.cssText = 'background:#fff;border:1px solid var(--border);border-radius:12px;padding:14px;margin:14px 0;';
+  wrap.innerHTML = '<div style="font-size:12px;color:var(--text-muted);margin-bottom:10px;font-weight:600;">↓ Cascade demo (auto-clears in 4s)</div>'
+    + Array.from({length:6}).map(function(_,i){
+        return '<div data-cascade-card style="background:#f8fafc;border:1px solid #e2e8f0;border-left:3px solid #8b5cf6;border-radius:8px;padding:10px 14px;margin-bottom:6px;font-size:13px;color:#475569;opacity:0;transform:translateY(12px);transition:opacity .35s ease, transform .35s ease;">Demo card '+(i+1)+'</div>';
+      }).join('');
+  /* Insert just below the test bar */
+  var bar = document.getElementById('anim-test-bar');
+  if(bar && bar.parentNode) bar.parentNode.insertBefore(wrap, bar.nextSibling);
+  /* Cascade in */
+  wrap.querySelectorAll('[data-cascade-card]').forEach(function(card, idx){
+    setTimeout(function(){ card.style.opacity = '1'; card.style.transform = 'translateY(0)'; }, idx * 80);
+  });
+  /* Auto-remove */
+  setTimeout(function(){ wrap.remove(); }, 4000);
+}
+
+function _animPreviewHotPulse(){
+  /* Drop a single demo "hot" card so Dane can see the pulse. Auto-clears. */
+  var existing = document.getElementById('anim-hot-demo');
+  if(existing) existing.remove();
+  var card = document.createElement('div');
+  card.id = 'anim-hot-demo';
+  card.className = 'hnc-hot-card';
+  card.style.cssText = 'background:#fff;border-left:3px solid #dc2626;border-radius:8px;padding:14px 18px;margin:14px 0;font-size:13px;color:#1f2937;';
+  card.innerHTML = '<div style="font-weight:600;margin-bottom:2px;">💗 Hot-lead pulse demo <span style="background:#fee2e2;color:#dc2626;font-size:10px;padding:2px 8px;border-radius:999px;font-weight:700;margin-left:6px;">Replied 2h ago</span></div>'
+    + '<div style="font-size:12px;color:var(--text-muted);">Replied recently — awaiting your response (auto-clears in 6s)</div>';
+  var bar = document.getElementById('anim-test-bar');
+  if(bar && bar.parentNode) bar.parentNode.insertBefore(card, bar.nextSibling);
+  setTimeout(function(){ card.remove(); }, 6000);
+}
+
 async function loadDailyList(){
   var listEl = document.getElementById('dl-list');
   var subEl = document.getElementById('dl-subtitle');
@@ -4105,6 +4251,23 @@ async function loadDailyList(){
       + (byAction.skip ? byAction.skip + ' to skip' : '').replace(/ · $/, '');
 
     listEl.innerHTML = recs.map(_dlCardHTML).join('');
+    /* Cascade-in: each card fades + slides into place with a small stagger,
+       so the page feels curated rather than dumped. ~50ms between cards
+       keeps the total wait under 1s even with 15 cards. Honors
+       prefers-reduced-motion by skipping the animation entirely. */
+    var prefersReduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if(!prefersReduced){
+      var cards = listEl.querySelectorAll('[data-rec-id]');
+      cards.forEach(function(card, idx){
+        card.style.opacity = '0';
+        card.style.transform = 'translateY(12px)';
+        card.style.transition = 'opacity .35s ease, transform .35s ease';
+        setTimeout(function(){
+          card.style.opacity = '1';
+          card.style.transform = 'translateY(0)';
+        }, idx * 55);
+      });
+    }
     _dlLastLoadedAt = Date.now();
   } catch (e){
     console.error('[daily-list] load failed:', e);
@@ -4470,17 +4633,17 @@ function updateDashboardStats(){
 
   var totalCleaners=cleanerEntries.length;
 
-  // Dashboard metrics
+  // Dashboard metrics — animated tickers tick up from current to target
   var el;
-  el=document.getElementById('dash-active-clients');if(el)el.textContent=activeClients||totalClients||'0';
+  el=document.getElementById('dash-active-clients');if(el)_hncTicker(el, parseInt(activeClients||totalClients||0,10));
   el=document.getElementById('dash-active-clients-sub');if(el){el.textContent=totalClients+' total';el.className='metric-sub';}
-  el=document.getElementById('dash-open-leads');if(el)el.textContent=openLeads||'0';
+  el=document.getElementById('dash-open-leads');if(el)_hncTicker(el, parseInt(openLeads||0,10));
   el=document.getElementById('dash-open-leads-sub');if(el){el.textContent=commercialLeads+' commercial';el.className='metric-sub';}
 
   // Pipeline metrics
-  el=document.getElementById('pipe-total-val');if(el)el.textContent=openLeads+' open';
+  el=document.getElementById('pipe-total-val');if(el){_hncTicker(el, parseInt(openLeads||0,10), { suffix: ' open' });}
   el=document.getElementById('pipe-total-sub');if(el)el.textContent=openLeads+' leads';
-  el=document.getElementById('pipe-commercial-val');if(el)el.textContent=commercialLeads;
+  el=document.getElementById('pipe-commercial-val');if(el)_hncTicker(el, parseInt(commercialLeads||0,10));
   el=document.getElementById('pipe-commercial-sub');if(el)el.textContent='commercial leads';
 
   // Clients view metrics

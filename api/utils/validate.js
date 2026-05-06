@@ -134,6 +134,7 @@ export const SCHEMAS = {
     taskId: { required: true, rules: [is.uuid], message: 'taskId must be a valid UUID' },
     leadId: { required: true, rules: [is.uuid], message: 'leadId must be a valid UUID' },
     amount: { required: true, rules: [(v) => is.positiveNumber(Number(v)) && Number(v) < 100000], message: 'Amount must be a positive number under 100000' },
+  },
 
   aiSummary: {
     prompt: { required: false, rules: [is.nonEmpty, is.maxLength(8000)], message: 'Prompt must be a non-empty string (max 8000 chars)' },

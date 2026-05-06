@@ -9518,44 +9518,69 @@ function _applyAutomationTab(name){
    the per-feature card in the other tabs, where the labels are richer.
    ───────────────────────────────────────────────────────────────────────── */
 
-/* Static catalog of legacy toggles. Hand-curated — there are ~15 and they
-   change rarely. New legacy toggle? Add a row here. */
-var _AUDIT_LEGACY_CATALOG = [
-  // Inbound (lead form submission)
-  {key:'auto_quote_enabled',              label:'Auto-quote → email + SMS to lead',         category:'Inbound',   trigger:'Lead form submitted',                          file:'api/lead-capture.js'},
-  {key:'janitorial_enabled',              label:'Janitorial walkthrough request',           category:'Inbound',   trigger:'Janitorial lead form submitted',                file:'api/lead-capture.js'},
-  {key:'new_lead_owner_email_enabled',    label:'New-lead notification → owner email',      category:'Inbound',   trigger:'Lead form submitted',                          file:'api/lead-capture.js'},
-  {key:'new_lead_owner_sms_enabled',      label:'New-lead notification → owner SMS',        category:'Inbound',   trigger:'Lead form submitted',                          file:'api/lead-capture.js'},
-  {key:'auto_book_admin_sms_enabled',     label:'Auto-book → admin SMS',                    category:'Inbound',   trigger:'Lead self-books an appointment',                file:'api/lead-book.js'},
-  // Daily VA-task crons
-  {key:'va_task_quote_day1_enabled',      label:'Day-1 quote follow-up VA task',            category:'Cron · daily',  trigger:'Quote sent ~24h ago',                       file:'api/run-task-automations.js'},
-  {key:'va_task_quote_day5_enabled',      label:'Day-5 re-engagement VA task',              category:'Cron · daily',  trigger:'Quote sent ~5d ago, no booking',            file:'api/run-task-automations.js'},
-  {key:'va_task_post_first_clean_enabled',label:'Post-first-clean call VA task',            category:'Cron · hourly', trigger:'First completed appointment',                file:'api/run-job-completions.js'},
-  {key:'task_created_email_enabled',      label:'Task created → email assignee',            category:'Internal',  trigger:'New VA task created',                           file:'api/tasks.js'},
-  {key:'task_created_sms_enabled',        label:'Task created → SMS assignee',              category:'Internal',  trigger:'New VA task created',                           file:'api/tasks.js'},
-  // Customer-facing crons
-  {key:'booking_confirm_enabled',         label:'Booking confirmation email/SMS',           category:'Client',    trigger:'New appointment booked',                        file:'api/lead-book.js'},
-  {key:'review_sms_enabled',              label:'Post-clean review request SMS',            category:'Cron · daily',  trigger:'Appointment completed ~24h ago',            file:'api/run-review-requests.js'},
-  {key:'post_clean_thankyou_enabled',     label:'Post-clean thank-you email',               category:'Client',    trigger:'Appointment marked completed',                  file:'api/run-job-completions.js'},
-  {key:'invoice_reminder_enabled',        label:'Unpaid invoice reminder SMS',              category:'Cron · daily',  trigger:'Invoice still unpaid 24h+ after sending',   file:'api/run-invoice-reminders.js'},
-  {key:'policy_reminder_enabled',         label:'Policy agreement reminder',                category:'Cron · daily',  trigger:'New client without policy on file',         file:'api/run-policy-reminders.js'},
-  {key:'policy_first_booking_sms_enabled',label:'First-booking policy SMS',                 category:'Client',    trigger:'New client books their first appointment',      file:'api/lead-book.js'},
-];
+async function renderAutomationsAudit(){
+  var host = document.getElementById('auto-audit-host');
+  if(!host) return;
 
-function _auditFmtTimeAgo(iso){
-  if(!iso) return '<span style="color:var(--text-muted);">never</span>';
+  /* If a previous galaxy is animating, kill it cleanly so we don't leak rAF
+     loops across re-renders (e.g. tab switches). */
+  if(window._galaxyState){
+    try { cancelAnimationFrame(window._galaxyState.rafId); } catch(_e){}
+    if(window._galaxyState.pollTimer) clearInterval(window._galaxyState.pollTimer);
+    window._galaxyState = null;
+  }
+
+  /* Read mode preference. */
+  var mode = localStorage.getItem('hnc_galaxy_mode') || 'replay';
+  if(mode !== 'live' && mode !== 'replay') mode = 'replay';
+
+  /* Top bar — view title + mode toggle. The galaxy itself is full-bleed
+     canvas below this. */
+  host.innerHTML =
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:12px;">'
+    + '<div style="display:flex;align-items:center;gap:10px;">'
+    +   '<button id="galaxy-back" style="display:none;background:rgba(139,92,246,0.12);border:1px solid rgba(139,92,246,0.3);color:#c4b5fd;padding:6px 12px;border-radius:8px;font-size:12px;cursor:pointer;font-weight:500;">← Galaxy view</button>'
+    +   '<div id="galaxy-title" style="font-size:14px;font-weight:600;color:var(--text);">Automation galaxy</div>'
+    + '</div>'
+    + '<div style="display:flex;gap:6px;background:var(--bg-soft);padding:4px;border-radius:10px;border:1px solid var(--border);">'
+    +   '<button class="galaxy-mode-btn" data-mode="live" style="font-size:12px;padding:6px 14px;border-radius:7px;border:none;cursor:pointer;font-weight:500;background:'+(mode==='live'?'#10b981':'transparent')+';color:'+(mode==='live'?'#fff':'var(--text-muted)')+';">● Live</button>'
+    +   '<button class="galaxy-mode-btn" data-mode="replay" style="font-size:12px;padding:6px 14px;border-radius:7px;border:none;cursor:pointer;font-weight:500;background:'+(mode==='replay'?'#8b5cf6':'transparent')+';color:'+(mode==='replay'?'#fff':'var(--text-muted)')+';">↻ Replay last 10</button>'
+    + '</div>'
+    + '</div>'
+    + '<div id="galaxy-stage" style="position:relative;width:100%;height:580px;border-radius:14px;overflow:hidden;background:radial-gradient(ellipse at 30% 20%, #1a0033 0%, #0a0e27 50%, #02020a 100%);box-shadow:inset 0 0 80px rgba(139,92,246,0.08);"></div>'
+    + '<div id="galaxy-status" style="margin-top:10px;font-size:11px;color:var(--text-muted);text-align:center;">Loading galaxy data…</div>';
+
+  /* Wire mode buttons */
+  host.querySelectorAll('.galaxy-mode-btn').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      localStorage.setItem('hnc_galaxy_mode', btn.getAttribute('data-mode'));
+      renderAutomationsAudit();
+    });
+  });
+
+  /* Fetch */
+  var data;
   try {
-    var diff = Date.now() - new Date(iso).getTime();
-    if(diff < 0) return new Date(iso).toLocaleString();
-    var m = Math.floor(diff/60000);
-    if(m < 1) return 'just now';
-    if(m < 60) return m+'m ago';
-    var h = Math.floor(m/60);
-    if(h < 24) return h+'h ago';
-    var d = Math.floor(h/24);
-    if(d < 30) return d+'d ago';
-    return new Date(iso).toLocaleDateString();
-  } catch(_e){ return iso; }
+    var resp = await fetch('/api/get-automations-galaxy', {headers:{'Cache-Control':'no-cache'}});
+    if(!resp.ok) throw new Error('HTTP '+resp.status);
+    data = await resp.json();
+  } catch(e){
+    document.getElementById('galaxy-status').innerHTML = '<span style="color:var(--danger);">Failed to load: '+_auditEsc(e.message||e)+'</span>';
+    return;
+  }
+
+  if(!data.automations || data.automations.length === 0){
+    document.getElementById('galaxy-stage').innerHTML =
+      '<div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:#cbd5e1;text-align:center;font-size:13px;">'
+      + '<div style="font-size:36px;margin-bottom:10px;opacity:0.6;">✨</div>'
+      + 'No automations to visualize yet.<br><span style="opacity:0.6;font-size:11px;">Create one in the Leads/Clients/Cleaners tabs to see it here.</span>'
+      + '</div>';
+    document.getElementById('galaxy-status').innerHTML = '';
+    return;
+  }
+
+  /* Boot the galaxy. State stashed on window so we can clean up on re-render. */
+  _initAutomationGalaxy(data, mode);
 }
 
 function _auditEsc(s){
@@ -9564,385 +9589,665 @@ function _auditEsc(s){
   });
 }
 
-function _auditPill(state){
-  var styles = {
-    on:    'background:#dcfce7;color:#166534;border:1px solid #bbf7d0;',
-    off:   'background:#f3f4f6;color:#6b7280;border:1px solid #e5e7eb;',
-    custom:'background:#dbeafe;color:#1e40af;border:1px solid #bfdbfe;'
-  };
-  var labels = {on:'On', off:'Off', custom:'Custom'};
-  return '<span style="font-size:11px;padding:2px 8px;border-radius:999px;font-weight:600;'+(styles[state]||styles.off)+'">'+labels[state]+'</span>';
-}
+/* ────────────────────────────────────────────────────────────────────────
+   AUTOMATION GALAXY — Canvas rendering, layered animation, zoom transitions
+   ──────────────────────────────────────────────────────────────────────── */
+function _initAutomationGalaxy(data, mode){
+  var stage = document.getElementById('galaxy-stage');
+  if(!stage) return;
+  var statusEl = document.getElementById('galaxy-status');
+  var titleEl = document.getElementById('galaxy-title');
+  var backBtn = document.getElementById('galaxy-back');
 
-async function renderAutomationsAudit(){
-  var host = document.getElementById('auto-audit-host');
-  if(!host) return;
-
-  /* Lazy-load d3 + d3-sankey on first open. ~70KB combined, only paid when
-     someone actually clicks the Audit tab. Subsequent opens reuse. */
-  if(!window._d3SankeyLoading && (typeof d3 === 'undefined' || !d3.sankey)){
-    window._d3SankeyLoading = true;
-    host.innerHTML = '<div style="padding:48px;text-align:center;color:var(--text-muted);font-size:13px;">Loading visualization…</div>';
-    try {
-      await _loadScript('https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js');
-      await _loadScript('https://cdn.jsdelivr.net/npm/d3-sankey@0.12/dist/d3-sankey.min.js');
-    } catch(e){
-      host.innerHTML = '<div style="padding:24px;text-align:center;color:var(--danger);">Failed to load visualization library: '+_auditEsc(e.message||e)+'</div>';
-      window._d3SankeyLoading = false;
-      return;
-    }
-    window._d3SankeyLoading = false;
-  }
-  /* If a previous call started loading and is still in flight, bail; the
-     completion callback will re-render. (Edge case — fast tab toggling.) */
-  if(window._d3SankeyLoading) return;
-
-  /* Read the current time-range selection (default 90 days). */
-  var days = parseInt(localStorage.getItem('hnc_audit_days') || '90', 10);
-  if(![30,60,90,180].includes(days)) days = 90;
-
-  host.innerHTML =
-    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px;">'
-    + '<div style="display:flex;gap:6px;background:var(--bg-soft);padding:4px;border-radius:10px;border:1px solid var(--border);">'
-    +   [30,60,90,180].map(function(d){
-          var active = (d === days);
-          return '<button class="audit-range-btn" data-days="'+d+'" style="font-size:12px;padding:6px 12px;border-radius:7px;border:none;cursor:pointer;font-weight:500;background:'+(active?'var(--brand-500)':'transparent')+';color:'+(active?'#fff':'var(--text-muted)')+';">'+d+'d</button>';
-        }).join('')
-    + '</div>'
-    + '<div id="audit-stats" style="display:flex;gap:12px;font-size:12px;color:var(--text-muted);"></div>'
-    + '</div>'
-    + '<div id="audit-sankey-host" style="background:var(--panel,#fff);border:1px solid var(--border);border-radius:12px;padding:20px;min-height:480px;position:relative;overflow:hidden;"></div>'
-    + '<div id="audit-legend" style="display:flex;gap:16px;flex-wrap:wrap;margin-top:12px;font-size:11px;color:var(--text-muted);"></div>'
-    + '<div id="audit-help" style="margin-top:8px;font-size:11px;color:var(--text-muted);line-height:1.5;"></div>';
-
-  /* Wire range buttons */
-  host.querySelectorAll('.audit-range-btn').forEach(function(btn){
-    btn.addEventListener('click', function(){
-      var d = parseInt(btn.getAttribute('data-days'), 10);
-      localStorage.setItem('hnc_audit_days', String(d));
-      renderAutomationsAudit();
-    });
-  });
-
-  /* Fetch flow data */
-  var data;
-  try {
-    var resp = await fetch('/api/get-automations-flow?days='+days, {headers:{'Cache-Control':'no-cache'}});
-    if(!resp.ok) throw new Error('HTTP '+resp.status);
-    data = await resp.json();
-  } catch(e){
-    document.getElementById('audit-sankey-host').innerHTML =
-      '<div style="padding:48px;text-align:center;color:var(--danger);">Failed to load flow data: '+_auditEsc(e.message||e)+'</div>';
-    return;
-  }
-
-  /* Stats line */
-  var statsEl = document.getElementById('audit-stats');
-  if(statsEl && data.stats){
-    statsEl.innerHTML =
-        '<span><b style="color:var(--text);">'+data.stats.total_leads+'</b> leads</span>'
-      + '<span><b style="color:var(--text);">'+data.stats.total_transitions+'</b> transitions</span>'
-      + '<span><b style="color:var(--text);">'+data.stats.total_automation_fires+'</b> automation fires</span>';
-  }
-
-  /* Render the Sankey */
-  _renderAuditSankey(data, document.getElementById('audit-sankey-host'));
-
-  /* Legend */
-  var legendEl = document.getElementById('audit-legend');
-  if(legendEl){
-    legendEl.innerHTML =
-        _legendDot('#3b82f6','Lead source')
-      + _legendDot('#10b981','Active stage')
-      + _legendDot('#94a3b8','Closed lost')
-      + _legendDot('#f59e0b','Closed won')
-      + _legendDot('#8b5cf6','Automation')
-      + '<div style="margin-left:auto;display:flex;align-items:center;gap:6px;"><div style="width:24px;height:2px;background:linear-gradient(90deg,#94a3b8,#94a3b8);border-radius:2px;"></div>Lead flow</div>'
-      + '<div style="display:flex;align-items:center;gap:6px;"><div style="width:24px;height:2px;background:linear-gradient(90deg,#8b5cf6,#8b5cf6);border-radius:2px;"></div>Automation fired</div>';
-  }
-
-  /* Help line */
-  var helpEl = document.getElementById('audit-help');
-  if(helpEl){
-    var msg = '';
-    if(!data.stats || !data.stats.has_enough_data){
-      msg = '<b>Building flow data:</b> the visualization gets sharper as more leads move through stages. Stage events have only been recorded since May 5 (when the Phase 1 trigger shipped) — leads that pre-date that show source → current-stage only.';
-    } else {
-      msg = 'Hover any node or link for details. Line thickness is proportional to lead volume. Animated dots represent leads currently flowing through that path.';
-    }
-    helpEl.innerHTML = msg;
-  }
-}
-
-function _legendDot(color, label){
-  return '<div style="display:flex;align-items:center;gap:6px;"><div style="width:10px;height:10px;background:'+color+';border-radius:2px;"></div>'+label+'</div>';
-}
-
-function _loadScript(src){
-  return new Promise(function(resolve, reject){
-    /* Skip if already loaded */
-    if(document.querySelector('script[src="'+src+'"]')){ resolve(); return; }
-    var s = document.createElement('script');
-    s.src = src;
-    s.onload = function(){ resolve(); };
-    s.onerror = function(){ reject(new Error('Failed to load '+src)); };
-    document.head.appendChild(s);
-  });
-}
-
-function _auditNodeColor(node){
-  if(node.type === 'source') return '#3b82f6';
-  if(node.type === 'automation') return '#8b5cf6';
-  if(node.type === 'always') return '#a855f7';
-  if(node.type === 'stage'){
-    if(node.stage === 'Closed won') return '#f59e0b';
-    if(node.stage === 'Closed lost') return '#94a3b8';
-    if(node.stage === 'Follow-up') return '#06b6d4';
-    return '#10b981';
-  }
-  return '#64748b';
-}
-
-function _renderAuditSankey(data, container){
-  if(!data || !data.nodes || data.nodes.length === 0){
-    container.innerHTML = '<div style="padding:48px;text-align:center;color:var(--text-muted);">No flow data in this range yet. Try a wider window or check back after a few leads have moved through stages.</div>';
-    return;
-  }
-  if(!data.links || data.links.length === 0){
-    container.innerHTML = '<div style="padding:48px;text-align:center;color:var(--text-muted);">No stage transitions recorded in this range. The DB trigger writes events on stage changes — once leads start moving, this will populate.</div>';
-    return;
-  }
-
-  /* Clean any prior SVG/canvas */
-  container.innerHTML = '';
-
-  /* Inner positioning shell so SVG and canvas share the same origin. The
-     outer container has padding:20px which would cause the canvas (positioned
-     absolute) to drift relative to SVG content. Inner div has no padding. */
-  var inner = document.createElement('div');
-  inner.style.position = 'relative';
-  inner.style.width = '100%';
-  container.appendChild(inner);
-
-  var width = inner.clientWidth || 800;
-  var height = Math.max(480, Math.min(720, data.nodes.length * 28));
-
-  /* SVG for nodes + static links + labels */
-  var svg = d3.select(inner).append('svg')
-    .attr('width', width)
-    .attr('height', height)
-    .style('display','block');
-
-  /* Canvas overlay (positioned absolute over the SVG) for animated particles
-     — Canvas is dramatically faster than SVG circles for hundreds of moving
-     dots. Same dimensions and origin as the SVG. */
+  /* Canvas setup — devicePixelRatio for crispness on retina */
   var canvas = document.createElement('canvas');
-  canvas.width = width;
-  canvas.height = height;
-  canvas.style.position = 'absolute';
-  canvas.style.top = '0';
-  canvas.style.left = '0';
-  canvas.style.pointerEvents = 'none';
-  inner.appendChild(canvas);
+  canvas.style.width = '100%';
+  canvas.style.height = '100%';
+  canvas.style.cursor = 'pointer';
+  stage.appendChild(canvas);
+
+  var dpr = window.devicePixelRatio || 1;
+  var W = stage.clientWidth || 800;
+  var H = stage.clientHeight || 580;
+  canvas.width = W * dpr;
+  canvas.height = H * dpr;
   var ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
 
-  /* Build sankey graph. Note: d3-sankey mutates node/link objects in place,
-     so we deep-clone first. */
-  var graph = {
-    nodes: data.nodes.map(function(n,i){ return Object.assign({index:i}, n); }),
-    links: data.links.map(function(l){ return Object.assign({}, l); }),
-  };
+  /* ── Build galaxy layout ──
+     Each automation = a star system. Position systems on a soft grid in
+     the middle-zone of the canvas, with random jitter so it doesn't look
+     mechanical. Reserve outer rings for parallax stars. */
+  var autos = data.automations.slice();
+  var systems = autos.map(function(a, i){
+    /* Position via a deterministic hash so the same automation always lands
+       in the same place across re-renders. Better UX than random shuffling. */
+    var seed = _hashStr(a.id || a.name || ('auto'+i));
+    var rng = _seededRng(seed);
+    var n = autos.length;
+    /* Distribute on a sunflower-style spiral so they're well-spaced even
+       with arbitrary counts. Center the spiral, scale to fit. */
+    var goldenAngle = Math.PI * (3 - Math.sqrt(5));
+    var idx = i;
+    var radius = Math.sqrt(idx / Math.max(1, n - 1)) * Math.min(W, H) * 0.36;
+    var theta = idx * goldenAngle + rng() * 0.4;
+    var x = W/2 + Math.cos(theta) * radius;
+    var y = H/2 + Math.sin(theta) * radius;
+    /* Star color/size based on activity. Active automations = warmer/brighter. */
+    var fires = a.stats.total_fires || 0;
+    var coreRadius = 12 + Math.min(14, Math.log(fires + 1) * 3);
+    var enabled = a.is_enabled;
+    return {
+      auto: a,
+      x: x, y: y,
+      coreRadius: coreRadius,
+      enabled: enabled,
+      hue: enabled ? (190 + rng()*70) : 250, // teal-blue family if active, violet if dormant
+      pulsePhase: rng() * Math.PI * 2,
+      orbitRadius: coreRadius + 22 + rng() * 16,
+      orbitSpeed: 0.0003 + rng() * 0.0004,
+      hovered: false,
+      seed: seed,
+    };
+  });
 
-  var sankey = d3.sankey()
-    .nodeWidth(14)
-    .nodePadding(14)
-    .extent([[8, 8], [width - 8, height - 8]])
-    .nodeAlign(d3.sankeyJustify);
-
-  try {
-    sankey(graph);
-  } catch(e){
-    container.innerHTML = '<div style="padding:48px;text-align:center;color:var(--danger);">Sankey layout failed: '+(e.message||e)+'<br><small>Usually means a cycle in the flow data — try a shorter time range.</small></div>';
-    return;
+  /* Build starfield (3 parallax layers). */
+  var stars = [];
+  var starCount = 220;
+  for(var i = 0; i < starCount; i++){
+    stars.push({
+      x: Math.random() * W,
+      y: Math.random() * H,
+      r: 0.3 + Math.random() * 1.4,
+      layer: Math.floor(Math.random() * 3),
+      twinkle: Math.random() * Math.PI * 2,
+    });
   }
 
-  /* Tooltip */
-  var tooltip = d3.select(inner).append('div')
-    .style('position','absolute')
-    .style('background','#1f2937')
-    .style('color','#fff')
-    .style('padding','8px 12px')
-    .style('border-radius','8px')
-    .style('font-size','12px')
-    .style('font-weight','500')
-    .style('pointer-events','none')
-    .style('opacity',0)
-    .style('transition','opacity .12s')
-    .style('white-space','nowrap')
-    .style('z-index',100)
-    .style('box-shadow','0 4px 12px rgba(0,0,0,.2)');
-
-  /* Links — gradient-stroked paths. Different stroke for automation-fire vs flow. */
-  var linkGroup = svg.append('g').attr('fill','none');
-  var linkPaths = linkGroup.selectAll('path')
-    .data(graph.links)
-    .enter().append('path')
-      .attr('d', d3.sankeyLinkHorizontal())
-      .attr('stroke', function(d){ return d.kind === 'fired' ? '#8b5cf6' : '#cbd5e1'; })
-      .attr('stroke-opacity', function(d){ return d.kind === 'fired' ? 0.45 : 0.35; })
-      .attr('stroke-width', function(d){ return Math.max(1, d.width); })
-      .style('mix-blend-mode','multiply')
-      .style('cursor','pointer');
-
-  linkPaths
-    .on('mouseover', function(ev, d){
-      d3.select(this).attr('stroke-opacity', 0.7);
-      var fromName = d.source.label || d.source.id;
-      var toName = d.target.label || d.target.id;
-      var label = (d.kind === 'fired'
-        ? '⚙ '+fromName+' fired '+toName+' — <b>'+d.value+'</b> time'+(d.value!==1?'s':'')
-        : fromName+' → '+toName+' — <b>'+d.value+'</b> lead'+(d.value!==1?'s':''));
-      tooltip.html(label).style('opacity',1);
-    })
-    .on('mousemove', function(ev){
-      var rect = inner.getBoundingClientRect();
-      tooltip.style('left',(ev.clientX - rect.left + 12)+'px')
-             .style('top',(ev.clientY - rect.top + 12)+'px');
-    })
-    .on('mouseout', function(ev, d){
-      d3.select(this).attr('stroke-opacity', d.kind === 'fired' ? 0.45 : 0.35);
-      tooltip.style('opacity',0);
-    });
-
-  /* Nodes */
-  var nodeGroup = svg.append('g');
-  var nodes = nodeGroup.selectAll('g')
-    .data(graph.nodes)
-    .enter().append('g')
-      .attr('transform', function(d){ return 'translate('+d.x0+','+d.y0+')'; });
-
-  nodes.append('rect')
-    .attr('height', function(d){ return Math.max(2, d.y1 - d.y0); })
-    .attr('width', function(d){ return d.x1 - d.x0; })
-    .attr('fill', _auditNodeColor)
-    .attr('rx', 3)
-    .style('cursor','pointer')
-    .on('mouseover', function(ev, d){
-      var inFlow = (d.targetLinks||[]).reduce(function(s,l){ return s + (l.kind==='flow'?l.value:0); }, 0);
-      var outFlow = (d.sourceLinks||[]).reduce(function(s,l){ return s + (l.kind==='flow'?l.value:0); }, 0);
-      var fired = (d.sourceLinks||[]).reduce(function(s,l){ return s + (l.kind==='fired'?l.value:0); }, 0);
-      var lines = ['<b>'+(d.label||d.id)+'</b>'];
-      if(d.type === 'source') lines.push((d.count||0)+' leads from this source');
-      else if(d.type === 'automation') lines.push((d.enabled?'✓ Enabled':'✗ Disabled')+' · '+(d.fires||0)+' fires');
-      else if(d.type === 'stage'){
-        lines.push(inFlow+' entered, '+outFlow+' exited');
-        if(fired) lines.push('Triggered '+fired+' automation run'+(fired!==1?'s':''));
-      }
-      tooltip.html(lines.join('<br>')).style('opacity',1);
-    })
-    .on('mousemove', function(ev){
-      var rect = inner.getBoundingClientRect();
-      tooltip.style('left',(ev.clientX - rect.left + 12)+'px')
-             .style('top',(ev.clientY - rect.top + 12)+'px');
-    })
-    .on('mouseout', function(){ tooltip.style('opacity',0); });
-
-  /* Labels — placed left or right of node depending on x position to stay onscreen */
-  nodes.append('text')
-    .attr('x', function(d){ return d.x0 < width / 2 ? (d.x1 - d.x0) + 6 : -6; })
-    .attr('y', function(d){ return (d.y1 - d.y0) / 2; })
-    .attr('dy', '0.35em')
-    .attr('text-anchor', function(d){ return d.x0 < width / 2 ? 'start' : 'end'; })
-    .style('font-size','11px')
-    .style('font-weight','500')
-    .style('fill','var(--text)')
-    .style('pointer-events','none')
-    .text(function(d){
-      var label = d.label || d.id;
-      /* Truncate long automation names to keep layout clean */
-      if(label.length > 32) label = label.slice(0,30) + '…';
-      return label;
-    });
-
-  /* ── Animated particles ────────────────────────────────────────────────
-     Each link gets a count of particles proportional to log(value).
-     Each particle has a random offset along the path's length, and on each
-     frame we sample the path at (offset + speed * t) % length to get x,y.
-     Canvas redraw is one clearRect + N fillCircles per frame — 60fps for
-     hundreds of particles is fine on modern hardware. */
-  var particles = [];
-  graph.links.forEach(function(link){
-    if(!link.value || !linkPaths) return;
-    /* Generate a sample of points along the path to interpolate. d3-sankey
-       links are SVG paths — extract the SVG path string and use a temp
-       SVGPathElement to get total length + point at offset. */
-    var pathStr = d3.sankeyLinkHorizontal()(link);
-    if(!pathStr) return;
-    var tmp = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-    tmp.setAttribute('d', pathStr);
-    var totalLength = 0;
-    try { totalLength = tmp.getTotalLength(); } catch(_e){ return; }
-    if(!totalLength || !isFinite(totalLength)) return;
-
-    /* Sample N points along the path. More samples = smoother but more
-       memory. 80 is plenty for typical Sankey curves. */
-    var SAMPLES = 80;
-    var pts = [];
-    for(var s = 0; s <= SAMPLES; s++){
-      var p = tmp.getPointAtLength((s / SAMPLES) * totalLength);
-      pts.push([p.x, p.y]);
-    }
-
-    /* Particle count: scale with link value, capped. */
-    var particleCount = Math.max(1, Math.min(8, Math.ceil(Math.log(link.value + 1) * 1.5)));
-    /* Speed: tune for "lazy river" feel — about 4 seconds end-to-end for
-       a typical link. Faster for thicker links to imply higher throughput. */
-    var speed = 0.0015 + Math.min(0.0025, link.value / 4000);
-    var color = link.kind === 'fired' ? '#8b5cf6' : '#94a3b8';
-    var radius = link.kind === 'fired' ? 2 : 1.6;
-    for(var i = 0; i < particleCount; i++){
-      particles.push({
-        pts: pts,
-        offset: Math.random(),     // 0..1 along path
-        speed: speed,
-        color: color,
-        radius: radius,
-        kind: link.kind,
+  /* Build particles (leads as comets) per system based on recent runs. */
+  function _makeOrbitalsForSystem(sys){
+    /* In replay mode, spawn N comets that loop around the system continuously,
+       one per recent run. In live mode, the same — but we'll add new comets
+       when polls bring fresh runs. */
+    var orbitals = [];
+    var runs = sys.auto.recent_runs || [];
+    runs.slice(0, 10).forEach(function(run, idx){
+      var phase = (idx / Math.max(1, runs.length)) * Math.PI * 2;
+      orbitals.push({
+        run: run,
+        phase: phase,
+        speed: 0.0006 + Math.random() * 0.0006,
+        radius: sys.orbitRadius + (idx % 3) * 6,
+        size: 1.6 + Math.random() * 0.8,
+        tail: [], // recent positions for trail
       });
+    });
+    return orbitals;
+  }
+  systems.forEach(function(s){ s.orbitals = _makeOrbitalsForSystem(s); });
+
+  /* ── State machine ──
+     view='galaxy'  → all systems visible, leads orbiting.
+     view='system'  → zoomed in on one automation, showing its trigger→action constellation
+                       with leads traveling node-to-node along edges.
+     Transitions are animated via easing on view.zoom + view.cx/cy. */
+  var view = {
+    mode: 'galaxy', // 'galaxy' or 'system'
+    targetMode: 'galaxy',
+    selectedSystem: null,
+    zoom: 1.0,
+    targetZoom: 1.0,
+    cx: W/2, cy: H/2,
+    targetCx: W/2, targetCy: H/2,
+    transitionStart: null, // performance.now() when transition began
+  };
+
+  /* For system view — laid out as a horizontal constellation of step nodes. */
+  function _buildSystemNodes(sys){
+    var steps = sys.auto.steps || [];
+    var n = steps.length;
+    if(n === 0) return [];
+    var pad = 80;
+    var stepW = (W - pad*2) / Math.max(1, n - 1);
+    return steps.map(function(step, i){
+      return {
+        step: step,
+        x: pad + stepW * i,
+        y: H * 0.5,
+        baseRadius: step.kind === 'trigger' ? 22 : (step.kind === 'exit' ? 16 : 18),
+        pulsePhase: i * 0.7,
+        flashUntil: 0, // ms when current flash effect ends
+      };
+    });
+  }
+
+  /* System-view comets: each lead traverses node[0] → node[1] → ... → node[n-1].
+     We loop the comets continuously on a long cycle so there's always motion. */
+  function _buildSystemComets(sys, sysNodes){
+    var runs = (sys.auto.recent_runs || []).slice(0, 10);
+    if(runs.length === 0 || sysNodes.length < 2) return [];
+    return runs.map(function(run, idx){
+      return {
+        run: run,
+        progress: -idx * 0.15, // staggered start, negative so first ones already on the path
+        speed: 0.00012 + Math.random() * 0.00006, // very slow — ~8s per traversal
+        size: 2.2,
+        tail: [],
+      };
+    });
+  }
+
+  /* Click handling — galaxy: click system to zoom in. system: click empty to zoom out. */
+  function _hitTestSystem(mx, my){
+    /* Generous radius — easier to click planets on touch */
+    for(var i = 0; i < systems.length; i++){
+      var s = systems[i];
+      var dx = s.x - mx, dy = s.y - my;
+      if(dx*dx + dy*dy < (s.coreRadius + s.orbitRadius) * (s.coreRadius + s.orbitRadius)) {
+        return s;
+      }
+    }
+    return null;
+  }
+
+  canvas.addEventListener('click', function(ev){
+    var rect = canvas.getBoundingClientRect();
+    var mx = ev.clientX - rect.left;
+    var my = ev.clientY - rect.top;
+    /* Account for current zoom transform */
+    if(view.mode === 'galaxy'){
+      var hit = _hitTestSystem(mx, my);
+      if(hit){ _zoomToSystem(hit); }
     }
   });
 
-  /* Animation loop. Use rAF; cancel on tab change to free CPU. */
-  var animationId = null;
+  canvas.addEventListener('mousemove', function(ev){
+    if(view.mode !== 'galaxy') { canvas.style.cursor = 'default'; return; }
+    var rect = canvas.getBoundingClientRect();
+    var mx = ev.clientX - rect.left;
+    var my = ev.clientY - rect.top;
+    var hit = _hitTestSystem(mx, my);
+    canvas.style.cursor = hit ? 'pointer' : 'default';
+    systems.forEach(function(s){ s.hovered = (s === hit); });
+  });
+
+  function _zoomToSystem(sys){
+    view.targetMode = 'system';
+    view.selectedSystem = sys;
+    /* Build the system's node layout fresh on entry */
+    sys.systemNodes = _buildSystemNodes(sys);
+    sys.systemComets = _buildSystemComets(sys, sys.systemNodes);
+    view.transitionStart = performance.now();
+    view.targetZoom = 1.0; // we draw system view in its own coordinate space, no zoom needed on the galaxy layer
+    if(titleEl){
+      titleEl.innerHTML = '<span style="opacity:0.6;font-weight:400;">'+(sys.auto.is_enabled?'✓ Active':'○ Disabled')+' ·</span> '+_auditEsc(sys.auto.name);
+    }
+    if(backBtn){ backBtn.style.display = ''; }
+    _updateStatus();
+  }
+
+  function _zoomToGalaxy(){
+    view.targetMode = 'galaxy';
+    view.selectedSystem = null;
+    view.transitionStart = performance.now();
+    if(titleEl){ titleEl.textContent = 'Automation galaxy'; }
+    if(backBtn){ backBtn.style.display = 'none'; }
+    _updateStatus();
+  }
+
+  if(backBtn){
+    backBtn.addEventListener('click', _zoomToGalaxy);
+  }
+
+  function _updateStatus(){
+    if(!statusEl) return;
+    if(view.mode === 'galaxy' || view.targetMode === 'galaxy'){
+      var n = systems.length;
+      var active = systems.filter(function(s){ return s.enabled; }).length;
+      var modeLabel = mode === 'live' ? 'live · polling every 30s' : 'replay · last 10 runs per automation';
+      statusEl.innerHTML = n+' automation'+(n!==1?'s':'')+' · '+active+' active · '+modeLabel+'<br><span style="opacity:0.7;">click any star system to dive in</span>';
+    } else {
+      var sys = view.selectedSystem;
+      if(!sys) return;
+      var s = sys.auto.stats;
+      statusEl.innerHTML = (s.total_fires||0)+' total fires · '+(s.success||0)+' successful · '+(s.failed||0)+' failed' + (s.last_fired_at ? ' · last fire: '+new Date(s.last_fired_at).toLocaleString() : '');
+    }
+  }
+  _updateStatus();
+
+  /* ── Live polling (30s) — only matters in live mode ── */
+  var pollTimer = null;
+  if(mode === 'live'){
+    pollTimer = setInterval(async function(){
+      try {
+        var resp = await fetch('/api/get-automations-galaxy', {headers:{'Cache-Control':'no-cache'}});
+        if(!resp.ok) return;
+        var fresh = await resp.json();
+        /* Detect new runs by run id; spawn fresh comets for any new ones */
+        var freshById = {};
+        (fresh.automations || []).forEach(function(a){ freshById[a.id] = a; });
+        systems.forEach(function(sys){
+          var fa = freshById[sys.auto.id];
+          if(!fa) return;
+          var oldRunIds = new Set((sys.auto.recent_runs || []).map(function(r){ return r.id; }));
+          var newRuns = (fa.recent_runs || []).filter(function(r){ return !oldRunIds.has(r.id); });
+          /* Update underlying data */
+          sys.auto = fa;
+          /* If we got new runs, drop a fresh comet at phase=0 for each */
+          newRuns.forEach(function(r){
+            sys.orbitals.unshift({
+              run: r,
+              phase: 0,
+              speed: 0.0008,
+              radius: sys.orbitRadius,
+              size: 2.4,
+              tail: [],
+              fresh: performance.now(),
+            });
+          });
+          if(sys.orbitals.length > 14) sys.orbitals.length = 14;
+          /* If currently zoomed into this system, refresh its comets too */
+          if(view.selectedSystem === sys){
+            sys.systemNodes = _buildSystemNodes(sys);
+            sys.systemComets = _buildSystemComets(sys, sys.systemNodes);
+          }
+        });
+        _updateStatus();
+      } catch(_e){ /* silent */ }
+    }, 30000);
+  }
+
+  /* ── Animation loop ── */
   var startTime = performance.now();
-  /* Account for the SVG → canvas offset. The SVG content area starts
-     at (0,0) inside its <svg>, but the canvas is positioned (20,20)
-     inside container (matching #audit-sankey-host's padding). Sankey
-     coordinates are in SVG space, so canvas needs no offset. */
-  function draw(){
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    var t = (performance.now() - startTime);
-    for(var i = 0; i < particles.length; i++){
-      var p = particles[i];
-      var pos = (p.offset + p.speed * t) % 1;
-      var idx = Math.min(p.pts.length - 1, Math.floor(pos * (p.pts.length - 1)));
-      var pt = p.pts[idx];
+  var rafId = null;
+
+  /* Easing for view transitions */
+  function easeOutCubic(t){ return 1 - Math.pow(1-t, 3); }
+
+  function tick(){
+    var t = performance.now();
+    var elapsed = t - startTime;
+
+    /* Resolve view transitions */
+    var transitioning = view.mode !== view.targetMode;
+    var trProgress = 1;
+    if(transitioning && view.transitionStart){
+      trProgress = Math.min(1, (t - view.transitionStart) / 600); // 600ms transition
+      if(trProgress >= 1){
+        view.mode = view.targetMode;
+        view.transitionStart = null;
+      }
+    }
+
+    /* Clear with a subtle fade so old comet trails leave a soft afterimage */
+    ctx.fillStyle = 'rgba(2, 2, 10, 0.18)';
+    ctx.fillRect(0, 0, W, H);
+
+    /* Starfield (always drawn, in galaxy view it's the deep background) */
+    _drawStarfield(ctx, stars, t, W, H);
+
+    if(view.mode === 'galaxy' && !transitioning){
+      _drawGalaxy(ctx, systems, t, W, H);
+    } else if(view.mode === 'system' && !transitioning){
+      _drawSystem(ctx, view.selectedSystem, t, W, H);
+    } else if(transitioning){
+      /* Cross-fade between views during transition */
+      var ease = easeOutCubic(trProgress);
+      if(view.targetMode === 'system'){
+        ctx.globalAlpha = 1 - ease;
+        _drawGalaxy(ctx, systems, t, W, H);
+        ctx.globalAlpha = ease;
+        _drawSystem(ctx, view.selectedSystem, t, W, H);
+      } else {
+        ctx.globalAlpha = 1 - ease;
+        _drawSystem(ctx, view.selectedSystem, t, W, H);
+        ctx.globalAlpha = ease;
+        _drawGalaxy(ctx, systems, t, W, H);
+      }
+      ctx.globalAlpha = 1;
+    }
+
+    rafId = requestAnimationFrame(tick);
+  }
+  rafId = requestAnimationFrame(tick);
+
+  /* Stash for cleanup */
+  window._galaxyState = { rafId: rafId, pollTimer: pollTimer, canvas: canvas };
+}
+
+/* ── Drawers ──────────────────────────────────────────────────────────── */
+
+function _drawStarfield(ctx, stars, t, W, H){
+  for(var i = 0; i < stars.length; i++){
+    var s = stars[i];
+    /* Slow parallax drift — back layer barely moves */
+    var driftX = (t * 0.001 * (s.layer + 1) * 0.4) % (W + 10);
+    var x = (s.x + driftX) % W;
+    var twinkle = 0.5 + 0.5 * Math.sin(s.twinkle + t * 0.001);
+    var alpha = 0.25 + (s.layer * 0.18) + twinkle * 0.25;
+    ctx.beginPath();
+    ctx.arc(x, s.y, s.r, 0, Math.PI*2);
+    ctx.fillStyle = 'rgba(220, 230, 255, ' + alpha.toFixed(3) + ')';
+    ctx.fill();
+  }
+}
+
+function _drawGalaxy(ctx, systems, t, W, H){
+  /* Soft nebulae — radial gradients in the back */
+  var grad = ctx.createRadialGradient(W*0.7, H*0.3, 30, W*0.7, H*0.3, 280);
+  grad.addColorStop(0, 'rgba(139, 92, 246, 0.18)');
+  grad.addColorStop(1, 'rgba(139, 92, 246, 0)');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, W, H);
+  var grad2 = ctx.createRadialGradient(W*0.2, H*0.8, 30, W*0.2, H*0.8, 240);
+  grad2.addColorStop(0, 'rgba(59, 130, 246, 0.12)');
+  grad2.addColorStop(1, 'rgba(59, 130, 246, 0)');
+  ctx.fillStyle = grad2;
+  ctx.fillRect(0, 0, W, H);
+
+  /* Each system: draw orbit ring, orbiting comets, then the star itself, then label */
+  for(var i = 0; i < systems.length; i++){
+    var s = systems[i];
+    var pulse = 1 + 0.08 * Math.sin(t * 0.002 + s.pulsePhase);
+    var glowR = s.coreRadius * 2.4 * pulse;
+
+    /* Outer glow */
+    var glow = ctx.createRadialGradient(s.x, s.y, s.coreRadius * 0.3, s.x, s.y, glowR);
+    var hue = s.hue;
+    var alpha = s.enabled ? 0.6 : 0.25;
+    if(s.hovered) alpha = Math.min(1, alpha * 1.6);
+    glow.addColorStop(0, 'hsla('+hue+', 80%, 65%, '+alpha+')');
+    glow.addColorStop(0.5, 'hsla('+hue+', 80%, 55%, '+(alpha*0.4)+')');
+    glow.addColorStop(1, 'hsla('+hue+', 80%, 55%, 0)');
+    ctx.fillStyle = glow;
+    ctx.fillRect(s.x - glowR, s.y - glowR, glowR*2, glowR*2);
+
+    /* Orbit ring (thin, faint) */
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, s.orbitRadius, 0, Math.PI*2);
+    ctx.strokeStyle = 'hsla('+hue+', 60%, 70%, '+(s.hovered?0.45:0.22)+')';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    /* Orbiting comets (leads) */
+    if(s.orbitals && s.orbitals.length){
+      for(var j = 0; j < s.orbitals.length; j++){
+        var o = s.orbitals[j];
+        o.phase += o.speed * 16; /* approx 16ms per frame at 60fps */
+        var angle = o.phase + (t * o.speed * 0.5);
+        var ox = s.x + Math.cos(angle) * o.radius;
+        var oy = s.y + Math.sin(angle) * o.radius;
+
+        /* Trail history */
+        o.tail.push({x: ox, y: oy});
+        if(o.tail.length > 14) o.tail.shift();
+        for(var k = 0; k < o.tail.length; k++){
+          var tt = o.tail[k];
+          var ta = (k / o.tail.length) * 0.7;
+          ctx.beginPath();
+          ctx.arc(tt.x, tt.y, o.size * (k / o.tail.length), 0, Math.PI*2);
+          ctx.fillStyle = 'hsla('+hue+', 90%, 80%, '+ta+')';
+          ctx.fill();
+        }
+
+        /* Comet head */
+        var headColor = (o.run && o.run.status === 'failed') ? 'hsla(0, 90%, 70%, 1)' : 'hsla('+hue+', 95%, 85%, 1)';
+        ctx.beginPath();
+        ctx.arc(ox, oy, o.size, 0, Math.PI*2);
+        ctx.fillStyle = headColor;
+        ctx.shadowColor = headColor;
+        ctx.shadowBlur = 8;
+        ctx.fill();
+        ctx.shadowBlur = 0;
+
+        /* Fresh-arrival flash (live mode) */
+        if(o.fresh){
+          var age = t - o.fresh;
+          if(age < 1500){
+            var flashAlpha = Math.max(0, 1 - age / 1500);
+            ctx.beginPath();
+            ctx.arc(ox, oy, o.size + 12 * (1 - flashAlpha), 0, Math.PI*2);
+            ctx.strokeStyle = 'hsla('+hue+', 90%, 85%, '+(flashAlpha*0.8)+')';
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+          }
+        }
+      }
+    }
+
+    /* Star core */
+    var coreGrad = ctx.createRadialGradient(s.x - s.coreRadius*0.3, s.y - s.coreRadius*0.3, 1, s.x, s.y, s.coreRadius);
+    coreGrad.addColorStop(0, 'hsla('+hue+', 100%, 92%, 1)');
+    coreGrad.addColorStop(0.6, 'hsla('+hue+', 90%, 65%, 1)');
+    coreGrad.addColorStop(1, 'hsla('+hue+', 80%, 40%, 1)');
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, s.coreRadius * pulse, 0, Math.PI*2);
+    ctx.fillStyle = coreGrad;
+    ctx.fill();
+
+    /* Disabled state: dim overlay */
+    if(!s.enabled){
       ctx.beginPath();
-      ctx.arc(pt[0], pt[1], p.radius, 0, Math.PI * 2);
-      ctx.fillStyle = p.color;
-      ctx.globalAlpha = p.kind === 'fired' ? 0.85 : 0.7;
+      ctx.arc(s.x, s.y, s.coreRadius * pulse, 0, Math.PI*2);
+      ctx.fillStyle = 'rgba(2, 6, 23, 0.55)';
       ctx.fill();
     }
-    ctx.globalAlpha = 1;
-    animationId = requestAnimationFrame(draw);
-  }
-  draw();
 
-  /* Cancel animation when leaving Audit tab (saves battery on phones). */
-  /* Stash on container so we can cancel before next render. */
-  if(container._auditAnimId) cancelAnimationFrame(container._auditAnimId);
-  container._auditAnimId = animationId;
+    /* Label */
+    var labelY = s.y + s.coreRadius + s.orbitRadius + 14;
+    var name = s.auto.name || 'Automation';
+    if(name.length > 28) name = name.slice(0, 26) + '…';
+    ctx.font = '600 11px -apple-system, BlinkMacSystemFont, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    /* Label glow on hover */
+    if(s.hovered){
+      ctx.shadowColor = 'hsla('+hue+', 90%, 70%, 0.8)';
+      ctx.shadowBlur = 8;
+    }
+    ctx.fillStyle = s.enabled ? 'rgba(220, 230, 255, 0.92)' : 'rgba(160, 170, 200, 0.55)';
+    ctx.fillText(name, s.x, labelY);
+    ctx.shadowBlur = 0;
+    /* Sub-label: fire count */
+    if(s.auto.stats && s.auto.stats.total_fires){
+      ctx.font = '400 10px -apple-system, BlinkMacSystemFont, sans-serif';
+      ctx.fillStyle = 'rgba(180, 190, 220, 0.55)';
+      ctx.fillText(s.auto.stats.total_fires + ' fire'+(s.auto.stats.total_fires!==1?'s':''), s.x, labelY + 14);
+    }
+  }
 }
+
+function _drawSystem(ctx, sys, t, W, H){
+  if(!sys || !sys.systemNodes) return;
+  var nodes = sys.systemNodes;
+  if(nodes.length === 0) return;
+
+  /* Draw connecting lines first (behind nodes) */
+  for(var i = 0; i < nodes.length - 1; i++){
+    var a = nodes[i], b = nodes[i+1];
+    var grad = ctx.createLinearGradient(a.x, a.y, b.x, b.y);
+    grad.addColorStop(0, 'rgba(139, 92, 246, 0.5)');
+    grad.addColorStop(1, 'rgba(59, 130, 246, 0.5)');
+    ctx.strokeStyle = grad;
+    ctx.lineWidth = 1.5;
+    ctx.shadowColor = 'rgba(139, 92, 246, 0.5)';
+    ctx.shadowBlur = 6;
+    ctx.beginPath();
+    ctx.moveTo(a.x, a.y);
+    /* Slight upward arc for visual interest */
+    var midX = (a.x + b.x) / 2;
+    var midY = (a.y + b.y) / 2 - 30;
+    ctx.quadraticCurveTo(midX, midY, b.x, b.y);
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+  }
+
+  /* Travel comets (one per recent run) */
+  if(sys.systemComets){
+    for(var ci = 0; ci < sys.systemComets.length; ci++){
+      var c = sys.systemComets[ci];
+      c.progress += c.speed * 16;
+      if(c.progress > 1.05) c.progress = -0.05; // loop with gap
+      if(c.progress < 0) continue;
+
+      /* Determine which segment we're on, and t within segment */
+      var totalSegs = nodes.length - 1;
+      var segIdx = Math.min(totalSegs - 1, Math.floor(c.progress * totalSegs));
+      var segT = (c.progress * totalSegs) - segIdx;
+      var p0 = nodes[segIdx];
+      var p1 = nodes[segIdx + 1];
+      if(!p0 || !p1) continue;
+      /* Quadratic curve sample */
+      var midX = (p0.x + p1.x) / 2;
+      var midY = (p0.y + p1.y) / 2 - 30;
+      var u = segT, iu = 1 - u;
+      var px = iu*iu*p0.x + 2*iu*u*midX + u*u*p1.x;
+      var py = iu*iu*p0.y + 2*iu*u*midY + u*u*p1.y;
+
+      /* Tail */
+      c.tail.push({x: px, y: py});
+      if(c.tail.length > 18) c.tail.shift();
+      for(var k = 0; k < c.tail.length; k++){
+        var tt = c.tail[k];
+        var ta = (k / c.tail.length) * 0.6;
+        ctx.beginPath();
+        ctx.arc(tt.x, tt.y, c.size * (k / c.tail.length), 0, Math.PI*2);
+        ctx.fillStyle = (c.run && c.run.status === 'failed') ? 'rgba(248, 113, 113, '+ta+')' : 'rgba(167, 250, 230, '+ta+')';
+        ctx.fill();
+      }
+      /* Head with bloom */
+      var headColor = (c.run && c.run.status === 'failed') ? 'rgba(248, 113, 113, 1)' : 'rgba(167, 250, 230, 1)';
+      ctx.beginPath();
+      ctx.arc(px, py, c.size, 0, Math.PI*2);
+      ctx.fillStyle = headColor;
+      ctx.shadowColor = headColor;
+      ctx.shadowBlur = 12;
+      ctx.fill();
+      ctx.shadowBlur = 0;
+
+      /* Trigger node flashes when comet leaves it */
+      if(segT < 0.1 && p0.flashUntil < t) p0.flashUntil = t + 600;
+      /* Destination node flashes when comet arrives */
+      if(segT > 0.92 && p1.flashUntil < t) p1.flashUntil = t + 600;
+    }
+  }
+
+  /* Draw nodes */
+  for(var ni = 0; ni < nodes.length; ni++){
+    var node = nodes[ni];
+    var step = node.step;
+    var pulse = 1 + 0.06 * Math.sin(t * 0.003 + node.pulsePhase);
+    var flashing = node.flashUntil > t;
+    var flashAge = flashing ? Math.max(0, 1 - (node.flashUntil - t) / 600) : 0;
+    var R = node.baseRadius * pulse * (1 + flashAge * 0.25);
+
+    /* Color by step kind */
+    var color = '#8b5cf6'; // default purple
+    if(step.kind === 'trigger') color = '#3b82f6'; // blue
+    else if(step.kind === 'delay') color = '#f59e0b'; // amber
+    else if(step.kind === 'action'){
+      if(step.action_type === 'sms')              color = '#10b981';
+      else if(step.action_type === 'email')       color = '#06b6d4';
+      else if(step.action_type === 'create_va_task') color = '#a855f7';
+      else color = '#8b5cf6';
+    } else if(step.kind === 'exit') color = '#64748b';
+
+    /* Outer glow */
+    var rgb = _hexToRgb(color);
+    var glowR = R * 2.4;
+    var glow = ctx.createRadialGradient(node.x, node.y, R*0.3, node.x, node.y, glowR);
+    glow.addColorStop(0, 'rgba('+rgb.r+','+rgb.g+','+rgb.b+', 0.6)');
+    glow.addColorStop(1, 'rgba('+rgb.r+','+rgb.g+','+rgb.b+', 0)');
+    ctx.fillStyle = glow;
+    ctx.fillRect(node.x - glowR, node.y - glowR, glowR*2, glowR*2);
+
+    /* Flash ripple */
+    if(flashing){
+      ctx.beginPath();
+      ctx.arc(node.x, node.y, R + 18 * (1 - flashAge), 0, Math.PI*2);
+      ctx.strokeStyle = 'rgba('+rgb.r+','+rgb.g+','+rgb.b+', '+(flashAge*0.7)+')';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+
+    /* Node body — saturn-style ring for action nodes */
+    if(step.kind === 'action'){
+      ctx.beginPath();
+      ctx.ellipse(node.x, node.y, R + 5, (R + 5) * 0.4, -0.3, 0, Math.PI*2);
+      ctx.strokeStyle = 'rgba('+rgb.r+','+rgb.g+','+rgb.b+', 0.55)';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+    }
+    var coreGrad = ctx.createRadialGradient(node.x - R*0.3, node.y - R*0.3, 1, node.x, node.y, R);
+    coreGrad.addColorStop(0, 'rgba(255, 255, 255, 0.95)');
+    coreGrad.addColorStop(0.4, 'rgba('+rgb.r+','+rgb.g+','+rgb.b+', 0.95)');
+    coreGrad.addColorStop(1, 'rgba('+Math.floor(rgb.r*0.5)+','+Math.floor(rgb.g*0.5)+','+Math.floor(rgb.b*0.5)+', 1)');
+    ctx.beginPath();
+    ctx.arc(node.x, node.y, R, 0, Math.PI*2);
+    ctx.fillStyle = coreGrad;
+    ctx.fill();
+
+    /* Special icons inside nodes */
+    if(step.kind === 'delay'){
+      ctx.fillStyle = 'rgba(0,0,0,0.65)';
+      ctx.font = '700 13px -apple-system, BlinkMacSystemFont, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      var delayShort = step.label.replace('Wait ','');
+      ctx.fillText(delayShort, node.x, node.y);
+    }
+
+    /* Label below node */
+    ctx.font = '600 11px -apple-system, BlinkMacSystemFont, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    ctx.fillStyle = 'rgba(220, 230, 255, 0.95)';
+    var label = step.label;
+    if(label.length > 22) label = label.slice(0, 20) + '…';
+    ctx.fillText(label, node.x, node.y + R + 10);
+    /* Detail line (smaller, dimmer) */
+    if(step.detail){
+      ctx.font = '400 10px -apple-system, BlinkMacSystemFont, sans-serif';
+      ctx.fillStyle = 'rgba(160, 175, 210, 0.7)';
+      var d = step.detail;
+      if(d.length > 30) d = d.slice(0, 28) + '…';
+      ctx.fillText(d, node.x, node.y + R + 26);
+    }
+  }
+
+  /* Lead-name flyer captions: when a comet passes a node, briefly show the lead name floating up.
+     For simplicity we'll show the most recent lead near the bottom of the canvas as a status strip. */
+  if(sys.systemComets && sys.systemComets.length){
+    var visibleRuns = sys.systemComets.filter(function(c){ return c.progress >= 0 && c.progress <= 1; });
+    if(visibleRuns.length){
+      ctx.font = '500 11px -apple-system, BlinkMacSystemFont, sans-serif';
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'top';
+      ctx.fillStyle = 'rgba(167, 250, 230, 0.85)';
+      var label = 'In flight: ' + visibleRuns.slice(0, 3).map(function(c){ return c.run.lead_name; }).join(' · ');
+      ctx.fillText(label, 20, H - 30);
+    }
+  }
+}
+
+/* ── Tiny helpers ─────────────────────────────────────────────────────── */
+function _hexToRgb(hex){
+  var m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  return m ? { r: parseInt(m[1],16), g: parseInt(m[2],16), b: parseInt(m[3],16) } : {r:200,g:200,b:255};
+}
+function _hashStr(s){
+  var h = 5381;
+  for(var i = 0; i < s.length; i++) h = ((h << 5) + h) + s.charCodeAt(i);
+  return Math.abs(h);
+}
+function _seededRng(seed){
+  var s = seed || 1;
+  return function(){
+    s = (s * 9301 + 49297) % 233280;
+    return s / 233280;
+  };
+}
+
 
 
 

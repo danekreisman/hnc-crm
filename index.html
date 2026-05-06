@@ -714,6 +714,7 @@ body:not(.hnc-assistant-user) .assistant-only{display:none!important;}
           <button onclick="bulkSelectByStage('Follow-up')" style="background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.35);color:#fff;padding:5px 11px;border-radius:14px;font-size:12px;cursor:pointer;font-weight:500;">All Follow-up</button>
           <button onclick="bulkClearSelection()" style="background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.35);color:#fff;padding:5px 11px;border-radius:14px;font-size:12px;cursor:pointer;font-weight:500;">Clear</button>
           <button id="bulk-followup-btn" onclick="openBulkFollowupModal()" style="margin-left:auto;background:#fff;color:#553c9a;border:none;padding:7px 16px;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;" disabled>&#x2728; AI follow-up</button>
+          <button id="bulk-move-btn" onclick="openBulkMoveMenu(this)" style="background:#fff;color:#553c9a;border:none;padding:7px 16px;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;position:relative;" disabled>&#x21AA; Move to&hellip;</button>
         </div>
 
         <!-- ACTIVE PIPELINE -->
@@ -19657,6 +19658,7 @@ function _bulkRefreshAllCards(){
 function _bulkUpdateActionBar(){
   var label = document.getElementById('bulk-count-label');
   var btn = document.getElementById('bulk-followup-btn');
+  var moveBtn = document.getElementById('bulk-move-btn');
   var n = window._bulkSelected.size;
   if(label) label.textContent = n + ' selected';
   if(btn){
@@ -19664,6 +19666,125 @@ function _bulkUpdateActionBar(){
     btn.style.opacity = n === 0 ? '.55' : '1';
     btn.style.cursor = n === 0 ? 'not-allowed' : 'pointer';
     btn.textContent = n === 0 ? '\u2728 AI follow-up' : ('\u2728 AI follow-up to ' + n + ' lead' + (n>1?'s':''));
+  }
+  if(moveBtn){
+    moveBtn.disabled = (n === 0);
+    moveBtn.style.opacity = n === 0 ? '.55' : '1';
+    moveBtn.style.cursor = n === 0 ? 'not-allowed' : 'pointer';
+    moveBtn.innerHTML = n === 0 ? '&#x21AA; Move to\u2026' : ('&#x21AA; Move ' + n + ' to\u2026');
+  }
+}
+
+/* ── Bulk stage move ─────────────────────────────────────────────────────
+   Opens a small menu of target stages. Picking one writes stage=X to every
+   selected lead in parallel, refreshes the pipeline render, and toasts the
+   result. 'Closed won' is intentionally NOT in this menu — won leads go
+   through the booking flow which creates a client + appointment; bulk-
+   moving to won would skip all of that. For one-off won, click into the
+   lead and use the booking button.
+   ──────────────────────────────────────────────────────────────────────── */
+function openBulkMoveMenu(anchorBtn){
+  if(!window._bulkSelected || window._bulkSelected.size === 0) return;
+
+  /* Remove any existing menu so re-clicks toggle */
+  var existing = document.getElementById('bulk-move-menu');
+  if(existing){ existing.remove(); return; }
+
+  var stages = [
+    { value: 'New inquiry',           emoji: '\ud83d\udd35', label: 'New inquiry' },
+    { value: 'Quoted',                emoji: '\ud83d\udcb0', label: 'Quoted' },
+    { value: 'Walkthrough requested', emoji: '\ud83d\udd0d', label: 'Walkthrough requested' },
+    { value: 'Follow-up',             emoji: '\u23f0',       label: 'Follow-up' },
+    { value: 'Closed lost',           emoji: '\u274c',       label: 'Closed lost' }
+  ];
+
+  var menu = document.createElement('div');
+  menu.id = 'bulk-move-menu';
+  menu.style.cssText = 'position:absolute;background:#fff;border:1px solid var(--border);border-radius:10px;box-shadow:0 12px 32px rgba(0,0,0,.18);padding:6px;z-index:1200;min-width:220px;';
+  menu.innerHTML = stages.map(function(s){
+    return '<button onclick="executeBulkMove(\'' + s.value + '\')" style="display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;background:transparent;border:none;border-radius:6px;cursor:pointer;font-size:13px;color:var(--text);text-align:left;font-weight:500;">'
+      + '<span style="font-size:15px;">' + s.emoji + '</span>'
+      + '<span>' + s.label + '</span>'
+      + '</button>';
+  }).join('');
+
+  /* Position relative to the anchor button */
+  var rect = anchorBtn.getBoundingClientRect();
+  menu.style.top = (rect.bottom + window.scrollY + 6) + 'px';
+  menu.style.left = (rect.left + window.scrollX) + 'px';
+  document.body.appendChild(menu);
+
+  /* Click-outside-to-close: defer so the click that opened the menu
+     doesn't immediately close it */
+  setTimeout(function(){
+    var closeOnOutside = function(e){
+      if(!menu.contains(e.target) && e.target !== anchorBtn){
+        menu.remove();
+        document.removeEventListener('mousedown', closeOnOutside, true);
+      }
+    };
+    document.addEventListener('mousedown', closeOnOutside, true);
+  }, 50);
+}
+
+async function executeBulkMove(targetStage){
+  /* Snapshot the IDs before clearing — clearing happens on success */
+  var ids = Array.from(window._bulkSelected);
+  if(ids.length === 0) return;
+
+  var menu = document.getElementById('bulk-move-menu');
+  if(menu) menu.remove();
+
+  /* Quick confirm — bulk operations deserve a sanity check */
+  var msg = 'Move ' + ids.length + ' lead' + (ids.length>1?'s':'') + ' to "' + targetStage + '"?';
+  if(targetStage === 'Closed lost') msg += '\n\nLost leads stay in the database for reporting but disappear from the active pipeline.';
+  if(!confirm(msg)) return;
+
+  var btn = document.getElementById('bulk-move-btn');
+  if(btn){ btn.disabled = true; btn.innerHTML = 'Moving\u2026'; }
+
+  try {
+    /* Update Supabase in parallel — Promise.all so we don't wait on each
+       one sequentially. If any one fails, we still report the partial
+       success rather than rolling everything back. */
+    var results = await Promise.all(ids.map(function(id){
+      return db.from('leads').update({ stage: targetStage }).eq('id', id)
+        .then(function(r){ return { id: id, ok: !r.error, error: r.error }; });
+    }));
+
+    var succeeded = results.filter(function(r){ return r.ok; });
+    var failed = results.filter(function(r){ return !r.ok; });
+
+    /* Update local leadDB so the next render reflects reality without
+       a full reload. */
+    succeeded.forEach(function(r){
+      if(typeof leadDB !== 'undefined' && leadDB[r.id]){
+        leadDB[r.id].stage = targetStage;
+      }
+    });
+
+    /* Activity log — one line per move so audit trail captures them all */
+    if(typeof logActivity === 'function'){
+      succeeded.forEach(function(r){
+        var lead = (typeof leadDB !== 'undefined') ? leadDB[r.id] : null;
+        try { logActivity('lead_stage_change', { leadId: r.id, leadName: lead ? lead.name : '(unknown)', newStage: targetStage, viaBulk: true }); } catch(_e){}
+      });
+    }
+
+    /* Clear selection + close select mode + re-render */
+    window._bulkSelected.clear();
+    if(typeof renderLeadsPipeline === 'function') renderLeadsPipeline();
+
+    if(failed.length === 0){
+      if(typeof showToast === 'function') showToast('\u2713 Moved ' + succeeded.length + ' lead' + (succeeded.length>1?'s':'') + ' to "' + targetStage + '"');
+    } else {
+      if(typeof showToast === 'function') showToast('Moved ' + succeeded.length + ' / ' + ids.length + ' \u2014 ' + failed.length + ' failed', true);
+      console.error('[bulk-move] failures:', failed);
+    }
+  } catch(err){
+    console.error('[bulk-move] error:', err);
+    if(typeof showToast === 'function') showToast('Bulk move failed: ' + (err.message || err), true);
+    if(btn){ btn.disabled = false; btn.innerHTML = '&#x21AA; Move to\u2026'; }
   }
 }
 

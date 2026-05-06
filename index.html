@@ -120,8 +120,24 @@ body{font-family:'Inter','SF Pro Text',-apple-system,BlinkMacSystemFont,'Segoe U
   0%, 100% { box-shadow:0 6px 18px -6px rgba(59,184,227,.55), inset 0 1px 0 rgba(255,255,255,.3); }
   50%      { box-shadow:0 10px 30px -4px rgba(59,184,227,.85), inset 0 1px 0 rgba(255,255,255,.3); }
 }
+/* Universal button feedback — every <button> in the app gets a gentle lift
+   and soft glow on hover. Scoped via :not() to opt out tabs (which have
+   their own active/inactive states) and close-X buttons. The .btn-primary
+   rule above wins over this for the heavier pulse on primary actions. */
+button:not(.btn):not(.btn-primary):not(.template-tab):not(.stab):not(.chat-tab):not(.pay-tab):not(.auto-tab):not(.ctab-btn):not(.close-btn):not([disabled]) {
+  transition: transform .12s ease, box-shadow .2s ease, filter .15s ease;
+}
+button:not(.btn):not(.btn-primary):not(.template-tab):not(.stab):not(.chat-tab):not(.pay-tab):not(.auto-tab):not(.ctab-btn):not(.close-btn):not([disabled]):hover {
+  filter: brightness(1.05);
+  box-shadow: 0 0 0 3px rgba(59,184,227,.12), 0 4px 14px -4px rgba(59,184,227,.4);
+  transform: translateY(-1px);
+}
+button:not(.btn):not(.btn-primary):not(.template-tab):not(.stab):not(.chat-tab):not(.pay-tab):not(.auto-tab):not(.ctab-btn):not(.close-btn):not([disabled]):active {
+  transform: translateY(0) scale(.98);
+}
 @media (prefers-reduced-motion: reduce){
   .btn-primary:hover, .hnc-glow:hover{animation:none;}
+  button:hover { transform:none !important; box-shadow:none !important; }
 }
 /* Hot-lead pulse — applied to attention cards in the highest-urgency tier
    (lead replied recently). A soft red breathe to convey "this is alive".

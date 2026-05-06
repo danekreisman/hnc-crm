@@ -670,7 +670,7 @@ body:not(.hnc-assistant-user) .assistant-only{display:none!important;}
           <button onclick="_animPreviewHotPulse()" class="hnc-glow" style="background:#fff;border:1px solid #fcd34d;color:#78350f;padding:5px 10px;border-radius:7px;font-size:12px;cursor:pointer;font-weight:600;">💗 Hot pulse</button>
           <button onclick="_animPreviewShimmer()" class="hnc-glow" style="background:#fff;border:1px solid #fcd34d;color:#78350f;padding:5px 10px;border-radius:7px;font-size:12px;cursor:pointer;font-weight:600;">✨ AI shimmer</button>
           <button onclick="_animPreviewRocket(this)" class="hnc-glow" style="background:#fff;border:1px solid #fcd34d;color:#78350f;padding:5px 10px;border-radius:7px;font-size:12px;cursor:pointer;font-weight:600;">🚀 Rocket</button>
-          <button onclick="_hncCoinRain()" class="hnc-glow" style="background:#fff;border:1px solid #fcd34d;color:#78350f;padding:5px 10px;border-radius:7px;font-size:12px;cursor:pointer;font-weight:600;">🪙 Coins</button>
+          <button onclick="_hncCoinRain()" class="hnc-glow" style="background:#fff;border:1px solid #fcd34d;color:#78350f;padding:5px 10px;border-radius:7px;font-size:12px;cursor:pointer;font-weight:600;">💰 Coins</button>
           <button onclick="_hncConfetti({origin:'center',count:180,colors:['#fbbf24','#f59e0b','#22c55e','#10b981','#3BB8E3','#ffffff']})" class="hnc-glow" style="background:#fff;border:1px solid #fcd34d;color:#78350f;padding:5px 10px;border-radius:7px;font-size:12px;cursor:pointer;font-weight:600;">🏆 Won</button>
           <span style="font-size:11px;color:#92400e;margin-left:auto;">Try typing "aloha" anywhere 🌺</span>
         </div>
@@ -4285,20 +4285,38 @@ function _hncCoinRain(opts){
   for(var i = 0; i < count; i++){
     (function(idx){
       var coin = document.createElement('div');
-      var size = 18 + Math.random() * 10;
+      var size = 22 + Math.random() * 12;
       var leftOffset = Math.random() * 80; // px from right edge
       var fallDuration = 1400 + Math.random() * 900;
       var delay = idx * 90;
-      coin.textContent = '🪙';
+      /* Real gold coin via CSS — radial gradient gives the metallic shine,
+         inset rim creates depth, $ in the center. Avoids the cross-platform
+         emoji rendering issue where 🪙 looked like a gray rock on some OSes. */
       coin.style.cssText =
         'position:absolute;'
         + 'right:' + leftOffset + 'px;'
         + 'top:-40px;'
-        + 'font-size:' + size + 'px;'
+        + 'width:' + size + 'px;'
+        + 'height:' + size + 'px;'
+        + 'border-radius:50%;'
+        + 'background:radial-gradient(circle at 35% 30%, #fef3c7 0%, #fbbf24 35%, #d97706 75%, #92400e 100%);'
+        + 'box-shadow:'
+        +   'inset -2px -3px 4px rgba(120,53,15,.45),'
+        +   'inset 2px 2px 3px rgba(255,251,235,.7),'
+        +   '0 2px 6px rgba(217,119,6,.45);'
+        + 'display:flex;'
+        + 'align-items:center;'
+        + 'justify-content:center;'
+        + 'color:#78350f;'
+        + 'font-weight:900;'
+        + 'font-size:' + Math.round(size * 0.55) + 'px;'
+        + 'font-family:Georgia,serif;'
+        + 'text-shadow:0 1px 0 rgba(255,255,255,.3);'
         + 'opacity:0;'
         + 'transform:rotate(0deg);'
         + 'transition:transform ' + fallDuration + 'ms cubic-bezier(.45,0,.55,1), top ' + fallDuration + 'ms cubic-bezier(.45,0,.55,1), opacity .3s ease;'
         + 'will-change:transform,top;';
+      coin.textContent = '$';
       wrap.appendChild(coin);
       setTimeout(function(){
         coin.style.opacity = '1';

@@ -115,7 +115,16 @@ export default async function handler(req, res) {
             throw new Error(`/api/send-sms returned non-JSON (HTTP ${smsRes.status}): ${preview}`);
           }
           if (smsData?.success) smsSent = true;
-          else errors.push('SMS failed: ' + (smsData?.error || `HTTP ${smsRes.status}`));
+          else {
+            /* Try every plausible location for the real OpenPhone error
+               so we never surface a misleading 'HTTP 200'. */
+            const realErr = smsData?.error
+              || smsData?.data?.message
+              || smsData?.data?.error
+              || (Array.isArray(smsData?.data?.errors) && smsData.data.errors[0]?.message)
+              || `OpenPhone returned status ${smsData?.status || smsRes.status}`;
+            errors.push('SMS failed: ' + realErr);
+          }
         } catch (smsErr) {
           errors.push('SMS error: ' + smsErr.message);
         }

@@ -53,6 +53,19 @@ export default async function handler(req, res) {
         status: response.status,
         response: data
       });
+      /* Pull the most specific error message we can from OpenPhone's response.
+         Their failure shape varies — sometimes data.message, sometimes
+         data.errors[0].message, sometimes just data.error. Fall back to a
+         status-based string so callers always see something useful. */
+      var errMsg = (data && (data.message || data.error
+        || (Array.isArray(data.errors) && data.errors[0] && (data.errors[0].message || data.errors[0].title))
+      )) || `OpenPhone HTTP ${response.status}`;
+      return res.status(200).json({
+        success: false,
+        status: response.status,
+        error: errMsg,
+        data: data
+      });
     } else {
       // Log every successful SMS send to activity_logs so it shows in the timeline.
       // Broadcasts don't send SMS, so this naturally only catches per-recipient automations.

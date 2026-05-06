@@ -3934,6 +3934,116 @@ function toggleNeedsAttention(){
 
 var _dlLastLoadedAt = 0;
 var _dlLeadIndex = {}; // lead_id → joined lead row data, populated on load
+var _dlPrevCount = null; // last-known rec count, used to detect "you just cleared the list"
+
+/* ────────────────────────────────────────────────────────────────────────
+   CONFETTI — small canvas-based particle burst. Used when the assistant
+   clears the last daily-list card, when an invoice gets paid, etc. No
+   external library — single self-contained function. Reusable everywhere.
+   Call: _hncConfetti() for a default burst, or _hncConfetti({ origin:'center'|'top',
+   colors:[...], count: 120, gravity:.6, durationMs:3000 }) to customize.
+   ──────────────────────────────────────────────────────────────────────── */
+function _hncConfetti(opts){
+  opts = opts || {};
+  /* Prefer reduced-motion users get a tame version (3 fewer particles, no gravity).
+     This is an accessibility courtesy for users who set "prefers-reduced-motion". */
+  var prefersReduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var count = opts.count || (prefersReduced ? 30 : 140);
+  var gravity = opts.gravity != null ? opts.gravity : (prefersReduced ? 0.2 : 0.55);
+  var durationMs = opts.durationMs || 3200;
+  var palette = opts.colors || ['#3BB8E3','#22c55e','#fbbf24','#a855f7','#f472b6','#fb923c','#ffffff'];
+
+  /* Canvas overlay — full-screen, fixed position, top of stacking context.
+     Pointer-events:none so it never blocks user interaction. */
+  var c = document.createElement('canvas');
+  c.style.cssText = 'position:fixed;inset:0;width:100vw;height:100vh;pointer-events:none;z-index:99999;';
+  c.width = window.innerWidth;
+  c.height = window.innerHeight;
+  document.body.appendChild(c);
+  var ctx = c.getContext('2d');
+
+  /* Origin: where particles spawn from. Default = top-center burst. */
+  var origin = opts.origin || 'top';
+  var ox, oy;
+  if(origin === 'center'){ ox = c.width/2; oy = c.height/2; }
+  else if(origin === 'bottom'){ ox = c.width/2; oy = c.height; }
+  else { ox = c.width/2; oy = -10; } // 'top' default — drop in from above
+
+  /* Build particles. Each has position, velocity, rotation, size, color. */
+  var particles = [];
+  for(var i = 0; i < count; i++){
+    var angle, speed;
+    if(origin === 'center'){
+      angle = Math.random() * Math.PI * 2;
+      speed = 6 + Math.random() * 10;
+    } else if(origin === 'bottom'){
+      angle = -Math.PI/2 + (Math.random() - 0.5) * 1.4;
+      speed = 12 + Math.random() * 12;
+    } else { // top — fan out and down
+      angle = Math.PI/2 + (Math.random() - 0.5) * 1.6;
+      speed = 4 + Math.random() * 8;
+    }
+    particles.push({
+      x: ox + (Math.random() - 0.5) * 60,
+      y: oy + (Math.random() - 0.5) * 30,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      rotation: Math.random() * Math.PI * 2,
+      vRotation: (Math.random() - 0.5) * 0.3,
+      size: 6 + Math.random() * 8,
+      color: palette[Math.floor(Math.random() * palette.length)],
+      shape: Math.random() < 0.5 ? 'rect' : 'circle',
+      life: 1, // 0..1 — fades out toward 0
+    });
+  }
+
+  var startTime = performance.now();
+  var rafId;
+  function frame(){
+    var now = performance.now();
+    var elapsed = now - startTime;
+    var lifeFraction = elapsed / durationMs;
+
+    ctx.clearRect(0, 0, c.width, c.height);
+
+    var anyAlive = false;
+    for(var i = 0; i < particles.length; i++){
+      var p = particles[i];
+      /* Physics: velocity, gravity, drag */
+      p.x += p.vx;
+      p.y += p.vy;
+      p.vy += gravity;
+      p.vx *= 0.99;
+      p.rotation += p.vRotation;
+      p.life = Math.max(0, 1 - lifeFraction);
+      if(p.y > c.height + 50 || p.life <= 0) continue;
+      anyAlive = true;
+
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.rotation);
+      ctx.globalAlpha = Math.min(1, p.life * 1.5);
+      ctx.fillStyle = p.color;
+      if(p.shape === 'rect'){
+        ctx.fillRect(-p.size/2, -p.size/3, p.size, p.size * 0.7);
+      } else {
+        ctx.beginPath();
+        ctx.arc(0, 0, p.size/2, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+
+    if(anyAlive && elapsed < durationMs){
+      rafId = requestAnimationFrame(frame);
+    } else {
+      /* Cleanup */
+      cancelAnimationFrame(rafId);
+      c.remove();
+    }
+  }
+  rafId = requestAnimationFrame(frame);
+}
 
 async function loadDailyList(){
   var listEl = document.getElementById('dl-list');
@@ -3966,8 +4076,15 @@ async function loadDailyList(){
         + '<div style="font-size:13px;color:#15803d;">No leads need follow-up right now. New recommendations are generated twice daily (8am + 2pm HST).</div>'
         + '</div>';
       subEl.textContent = 'All caught up.';
+      /* Confetti! Only fire if we just went from "had work" to "all done" —
+         not on initial page loads where there was never any work. */
+      if(_dlPrevCount !== null && _dlPrevCount > 0){
+        try { _hncConfetti({ origin: 'top', count: 160, durationMs: 3500 }); } catch(_e){}
+      }
+      _dlPrevCount = 0;
       return;
     }
+    _dlPrevCount = recs.length;
 
     /* Build the lead index for the action handlers */
     _dlLeadIndex = {};

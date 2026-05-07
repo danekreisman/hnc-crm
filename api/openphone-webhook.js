@@ -358,6 +358,98 @@ export default async function handler(req, res) {
   }
 
   /**
+   * SMS-specific lead extractor. Tide Phase 7 (2026-05-07).
+   *
+   * Single-message version of classifyAndExtractCallLead. Called when an
+   * inbound SMS arrives from an unknown number (not a lead, not a client)
+   * with at least 20 characters of body. Classifies whether it's a real
+   * cleaning inquiry and extracts whatever lead fields are inferable from
+   * the message text.
+   *
+   * Returns same shape as classifyAndExtractCallLead so downstream task
+   * creation can reuse the same flow:
+   *   { is_lead: bool, confidence, extracted: {...}, reasoning }
+   */
+  async function classifyAndExtractSmsLead({ messageBody, senderPhone }) {
+    const prompt = [
+      'You are classifying an inbound SMS to Hawaii Natural Clean (a residential and commercial cleaning business in Hawaii). Your job is two-fold:',
+      '  (1) Decide if this sender is a real lead - someone inquiring about cleaning services for themselves or their property.',
+      '  (2) If they are, extract whatever lead fields you can confidently parse from what was actually said. SMS messages are short - most fields will be null.',
+      '',
+      'NOT a lead (is_lead = false):',
+      '  - Other cleaners or service providers pitching us',
+      '  - Sales/marketing/advertising spam',
+      '  - Wrong number ("sorry wrong number")',
+      '  - Existing customer messaging about an existing booking',
+      '  - Vendor messages (suppliers, accountants, etc)',
+      '  - Personal messages clearly not about cleaning ("hey what time u free")',
+      '  - Generic test messages, "test", single emojis, etc.',
+      '',
+      'IS a lead (is_lead = true):',
+      '  - Asks about cleaning service or pricing',
+      '  - Mentions a property type (house, condo, airbnb, apartment, office) in context of wanting it cleaned',
+      '  - Mentions move-out / move-in / deep clean / regular cleaning interest',
+      '  - References our website/ad/referral and asks for info',
+      '',
+      'Confidence:',
+      '  - "high": clear cleaning inquiry with specifics (property type, location, or scope)',
+      '  - "medium": cleaning intent is implied but vague',
+      '  - "low": ambiguous - could go either way',
+      '',
+      'Only is_lead=true with confidence != low will create a task. Low-confidence leads are silently skipped.',
+      '',
+      'Extracted fields (set to null when uncertain - never hallucinate):',
+      '  - name: sender name if mentioned in the message',
+      '  - service: one of "Move-out Cleaning", "Deep Cleaning", "Regular Cleaning", "Airbnb Turnover", "Janitorial Cleaning", or null',
+      '  - address: full or partial address if mentioned',
+      '  - beds: integer if mentioned',
+      '  - baths: number if mentioned',
+      '  - sqft: integer if mentioned',
+      '  - frequency: weekly/biweekly/monthly/one-time if mentioned',
+      '  - notes: anything the sender said that doesn\'t fit other fields but matters (timeline, special requests, who they are)',
+      '',
+      'Return ONLY a JSON object - first character must be { and last must be }. No preamble, no markdown.',
+      'Format: {"is_lead": <bool>, "confidence": "high"|"medium"|"low", "reasoning": "<one short sentence>", "extracted": {"name": <string|null>, "service": <string|null>, "address": <string|null>, "beds": <int|null>, "baths": <number|null>, "sqft": <int|null>, "frequency": <string|null>, "notes": <string|null>}}',
+      '',
+      `Sender phone: ${senderPhone || 'unknown'}`,
+      `SMS body: """${messageBody}"""`,
+    ].join('\n');
+
+    const aiResp = await fetchWithTimeout('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': process.env.ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 500,
+        messages: [{ role: 'user', content: prompt }],
+      }),
+    }, TIMEOUTS.ANTHROPIC);
+    if (!aiResp.ok) throw new Error('Anthropic API HTTP ' + aiResp.status);
+    const data = await aiResp.json();
+    const text = data?.content?.[0]?.text || '';
+    if (!text) throw new Error('AI returned empty response');
+
+    // Same brace-tracking JSON extractor as the other classifiers
+    const start = text.indexOf('{');
+    if (start === -1) throw new Error('No JSON in AI response');
+    let depth = 0, inString = false, escape = false, jsonStr = null;
+    for (let i = start; i < text.length; i++) {
+      const ch = text[i];
+      if (escape) { escape = false; continue; }
+      if (inString) { if (ch === '\\') { escape = true; continue; } if (ch === '"') inString = false; continue; }
+      if (ch === '"') { inString = true; continue; }
+      if (ch === '{') depth++;
+      else if (ch === '}') { depth--; if (depth === 0) { jsonStr = text.slice(start, i + 1); break; } }
+    }
+    if (!jsonStr) throw new Error('Unbalanced JSON in AI response');
+    return JSON.parse(jsonStr);
+  }
+
+  /**
    * SMS-specific quote extractor. Tide Phase 7 (2026-05-07).
    *
    * Called when an OUTBOUND SMS from HNC to a known lead contains a $
@@ -550,6 +642,112 @@ export default async function handler(req, res) {
             // Never fail the webhook on AI errors — classification is bonus
             console.warn('[openphone-webhook] AI classification failed:', aiErr.message);
           }
+        }
+      }
+
+      // ── Unknown-sender SMS lead detection (Tide Phase 7) ──────────────────
+      // If the SMS came from a number that's neither a lead nor a client,
+      // classify whether it's a real cleaning inquiry. Same pattern as the
+      // call-based review_call_lead flow but with a smaller AI prompt.
+      // Reuses the review_call_lead task type so the existing UI buttons
+      // ("Review & create" / "Not a lead") and accept-call-lead.js endpoint
+      // work identically.
+      //
+      // Skip cases (cheap pre-filters BEFORE the AI call):
+      //   - Sender is already a known lead (handled by lost-intent above)
+      //   - Sender is an existing client (clients aren't leads)
+      //   - Body is too short (<20 chars - "hi" / "thanks" / single emoji)
+      //   - Open review_call_lead task already exists for this phone
+      //     (idempotency across multiple SMSes from the same unknown sender)
+      if (!lead && !client && body && body.trim().length >= 20 && process.env.ANTHROPIC_API_KEY) {
+        try {
+          // Idempotency: skip if there's already an open review_call_lead
+          // task with this phone in extracted_data. Postgrest JSONB filter
+          // is exact-match on the inner string field.
+          const existingTaskResp = await fetch(
+            `${SUPABASE_URL}/rest/v1/tasks?type=eq.review_call_lead&status=eq.open&extracted_data->>phone=eq.${encodeURIComponent(from)}&select=id&limit=1`,
+            { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }
+          );
+          const existingTaskRows = await existingTaskResp.json().catch(() => []);
+          if (Array.isArray(existingTaskRows) && existingTaskRows.length > 0) {
+            console.log('[openphone-webhook] open review_call_lead task already exists for phone', from, '- skipping SMS lead-classify');
+          } else {
+            const verdict = await classifyAndExtractSmsLead({
+              messageBody: body,
+              senderPhone: from,
+            });
+            console.log('[openphone-webhook] SMS lead-classify verdict for', from, ':', JSON.stringify(verdict).slice(0, 400));
+
+            if (verdict && verdict.is_lead === true && verdict.confidence !== 'low') {
+              const extracted = verdict.extracted || {};
+              const senderName = extracted.name || ('SMS from ' + from);
+              const today = new Date().toISOString().split('T')[0];
+              const truncatedBody = body.length > 300 ? body.slice(0, 297) + '...' : body;
+
+              const taskInsertRes = await supabaseInsert('tasks', {
+                title: 'New SMS lead - ' + senderName,
+                type: 'review_call_lead',
+                priority: verdict.confidence === 'high' ? 'high' : 'medium',
+                due_date: today,
+                description:
+                  'Inbound SMS from ' + from + '\n\n' +
+                  'AI read: ' + (verdict.reasoning || 'looks like a lead inquiry') + ' (confidence: ' + verdict.confidence + ')\n\n' +
+                  'Message: "' + truncatedBody + '"',
+                status: 'open',
+                extracted_data: {
+                  name: extracted.name || null,
+                  phone: from || null,
+                  service: extracted.service || null,
+                  address: extracted.address || null,
+                  beds: extracted.beds || null,
+                  baths: extracted.baths || null,
+                  sqft: extracted.sqft || null,
+                  condition: null, // SMS rarely mentions property condition
+                  frequency: extracted.frequency || null,
+                  notes: extracted.notes || '',
+                  // No quote info from SMS lead detection - SMS lead messages
+                  // are inquiries, not quotes. accept-call-lead.js will skip
+                  // the quote-chain step when these fields are null/none.
+                  quote_amount: null,
+                  quote_confidence: 'none',
+                  sms_message_id: data.id || null,
+                  ai_confidence: verdict.confidence,
+                  ai_reasoning: verdict.reasoning || null,
+                  source: 'SMS',
+                },
+              });
+
+              if (!taskInsertRes.ok) {
+                const errBody = await taskInsertRes.text().catch(() => '<unreadable>');
+                console.error('[openphone-webhook] SMS review_call_lead insert FAILED status=' + taskInsertRes.status + ' body=' + errBody.slice(0, 500));
+                await logError('openphone-webhook:sms-review_call_lead', new Error('Task insert ' + taskInsertRes.status), {
+                  phone: from, body: errBody.slice(0, 500),
+                });
+              } else {
+                console.log('[openphone-webhook] Created review_call_lead task (SMS-source) for phone', from);
+                // Push fan-out — same pattern as call-source lead detection
+                try {
+                  const { sendPushToAllSubscribed } = await import('./utils/send-push.js');
+                  const pushRes = await sendPushToAllSubscribed({
+                    title: 'New SMS lead - ' + senderName,
+                    body: 'AI read: ' + (verdict.reasoning || 'looks like a lead').slice(0, 100),
+                    url: '/#tasks',
+                    tag: 'sms-lead-' + (data.id || from),
+                    requireInteraction: verdict.confidence === 'high',
+                  });
+                  console.log('[openphone-webhook] SMS lead push fanout:', JSON.stringify(pushRes));
+                } catch (pushErr) {
+                  console.warn('[openphone-webhook] SMS lead push failed:', pushErr.message);
+                }
+              }
+            }
+          }
+        } catch (smsLeadErr) {
+          console.warn('[openphone-webhook] SMS lead classification failed:', smsLeadErr.message);
+          await logError('openphone-webhook:sms-lead-classify', smsLeadErr, {
+            phone: from,
+            body_length: body ? body.length : 0,
+          });
         }
       }
     }

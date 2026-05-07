@@ -323,6 +323,15 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: 'Could not save your request. Please call (808) 468-5356.' });
     }
 
+    // Capture the new task's id so the notification can deep-link the admin
+    // straight into the review modal (otherwise lead_inquiry routes to the
+    // lead profile, which only has a generic "Book appointment" button).
+    let taskRowId = null;
+    try {
+      const taskRows = await taskRes.json();
+      if (Array.isArray(taskRows) && taskRows[0] && taskRows[0].id) taskRowId = taskRows[0].id;
+    } catch (_e) { /* non-fatal */ }
+
     // ── 5. Best-effort: OpenPhone contact (dedupes naturally by phone) ──────
     if (b.path === 'new_quote' && leadIsNew) {
       fetchWithTimeout(`${BASE_URL}/api/openphone-create-contact`, {
@@ -349,7 +358,7 @@ export default async function handler(req, res) {
         title: 'New booking request: ' + cleanName + rushTag,
         body: prettyReq + ' \u00b7 ' + b.service + (b.frequency ? ' (' + b.frequency + ')' : '') + (displayTotal != null ? ' \u00b7 $' + displayTotal.toFixed(2) : ''),
         url: '/#tasks',
-        metadata: { source: 'public_booking', leadId, clientId: b.clientId || null, name: cleanName, phone: cleanPhoneDigits, service: b.service, path: b.path, requestedDate: b.date, requestedTime: b.time, rushFee: rushFee },
+        metadata: { source: 'public_booking', taskId: taskRowId, leadId, clientId: b.clientId || null, name: cleanName, phone: cleanPhoneDigits, service: b.service, path: b.path, requestedDate: b.date, requestedTime: b.time, rushFee: rushFee },
       }),
     }).catch((err) => console.warn('[submit-public-booking] in-app notify failed:', err && err.message));
 

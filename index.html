@@ -20161,9 +20161,24 @@ function _pbrPrettyDate(iso){
   catch (_e){ return iso; }
 }
 
-function openPublicBookingReview(taskId) {
+async function openPublicBookingReview(taskId) {
+  // Look in the in-memory cache first; that's the path from the tasks-queue
+  // inline button. From a notification click the cache may not be populated
+  // yet (we route to /#tasks but loadTasks is async), so fall back to
+  // pulling the row directly from Supabase.
   var task = (_tasks && _tasks.open || []).find(function(t){ return t.id === taskId; });
+  if (!task) {
+    try {
+      var { data, error } = await db
+        .from('tasks')
+        .select('id,type,status,title,description,extracted_data,due_date,priority,related_lead_id,related_client_id')
+        .eq('id', taskId)
+        .maybeSingle();
+      if (!error && data) task = data;
+    } catch (_e) { /* fall through to the not-found toast */ }
+  }
   if (!task) { showToast('Task not found', true); return; }
+  if (task.status !== 'open') { showToast('This booking has already been processed', true); return; }
   var x = task.extracted_data || {};
 
   document.getElementById('pbr-task-id').value = task.id;
@@ -21797,6 +21812,22 @@ async function handleNotifClick(id, url) {
       _gotoView('calendar');
       // Brief delay so the calendar view has painted before the overlay opens
       setTimeout(function(){ _openApptByDbId(meta.apptId); }, 120);
+      return;
+    }
+    // Public-booking review notifications carry source='public_booking' and
+    // the new task's id in metadata.taskId. Route those straight into the
+    // review modal — it has Accept/Edit/Deny actions on the booking. The
+    // generic lead_inquiry → openLead fallback below opens the lead profile
+    // instead, which is what was happening before this branch was added.
+    if (et === 'lead_inquiry' && meta.source === 'public_booking' && meta.taskId) {
+      _gotoView('tasks');
+      // 250ms gives loadTasks a chance to populate _tasks.open before
+      // openPublicBookingReview goes looking for the row.
+      setTimeout(function(){
+        if (typeof openPublicBookingReview === 'function') {
+          openPublicBookingReview(meta.taskId);
+        }
+      }, 250);
       return;
     }
     if (et === 'lead_inquiry' && meta.leadId) {

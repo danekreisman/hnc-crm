@@ -160,6 +160,22 @@ body{background:linear-gradient(160deg,#eaf7fb 0%,#f7fbfc 40%,#eaf7fb 100%)}
 .error-banner{background:#fef2f2;border:1px solid #fca5a5;border-radius:10px;padding:14px;font-size:13px;color:#b91c1c;margin-top:12px;text-align:center}
 .loading-msg{text-align:center;padding:20px;color:var(--muted);font-size:13px}
 
+/* Public-flow form inputs (lookup gate + new-quote inline form) */
+.field input[type=text],.field input[type=email],.field input[type=tel],.field input[type=number],.field select{width:100%;padding:11px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-family:inherit;color:var(--text);background:#fff;transition:border-color .2s}
+.field input[type=text]:focus,.field input[type=email]:focus,.field input[type=tel]:focus,.field input[type=number]:focus,.field select:focus{outline:none;border-color:var(--blue)}
+.field-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.field-help{font-size:12px;color:var(--muted);margin-top:4px;line-height:1.45}
+
+/* Public-flow option cards (existing quote / existing property / new quote) */
+.opt-card{display:block;width:100%;text-align:left;background:#fff;border:1.5px solid var(--border);border-radius:12px;padding:16px 18px;margin-bottom:10px;cursor:pointer;font-family:inherit;color:var(--text);transition:border-color .2s,background .2s,box-shadow .2s}
+.opt-card:hover{border-color:var(--blue);background:var(--blue-light);box-shadow:0 4px 18px rgba(59,184,227,.15)}
+.opt-card .opt-title{font-size:14px;font-weight:700;color:var(--text);margin-bottom:4px;display:flex;align-items:center;gap:8px}
+.opt-card .opt-meta{font-size:12px;color:var(--muted);line-height:1.5}
+.opt-card .opt-price{font-size:14px;font-weight:700;color:var(--blue-dark);margin-top:6px}
+.opt-card.new-quote{border-style:dashed;border-color:var(--blue-border)}
+.opt-card.new-quote:hover{border-style:solid}
+.area-notice{font-size:12px;color:var(--muted);margin-top:14px;text-align:center;line-height:1.5}
+
 /* Success */
 .success-screen{text-align:center;padding:40px 24px}
 .success-icon{font-size:52px;margin-bottom:16px}
@@ -196,6 +212,14 @@ var SEL_DATE = null;
 var SEL_TIME = null;
 var RUSH_FEE = 0;
 
+// Public-flow state — only used when TOKEN is absent. Stays null/false
+// for the existing token-link flow so nothing about that path changes.
+var IS_PUBLIC      = !TOKEN;
+var PUBLIC_PATH    = null;  // 'new_quote' | 'existing_property' once user picks
+var LOOKUP_RESULT  = null;  // response from /api/lookup-customer-bookings
+var PUBLIC_QUOTE   = null;  // calculate-quote response for new_quote path
+var PUBLIC_CLIENT  = null;  // matched client for existing_property path
+
 var ALL_SLOTS = ['8:00 AM','9:00 AM','10:00 AM','11:00 AM','12:00 PM','1:00 PM','2:00 PM','3:00 PM','4:00 PM'];
 var TAX_RATE  = 0.04712;
 
@@ -228,9 +252,31 @@ function toISO(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,
 
 // ─── Boot ─────────────────────────────────────────────────────────────────
 if(!TOKEN){
-  $('app').innerHTML='<div class="card"><div class="card-body"><div class="error-banner">No booking link detected. Please use the link from your quote email.</div><p style="text-align:center;color:var(--muted);font-size:13px;margin-top:14px">Questions? Call or text <strong>(808) 468-5356</strong></p></div></div>';
+  // Public flow — no quote token in the URL. Start with the email/phone
+  // lookup gate, branch into cards, then either redirect (existing quote)
+  // or proceed through the same step 2/3 UI used for the token flow.
+  loadPublicEntry();
 } else {
   loadLead();
+}
+
+// Load policies + checklists once for the public flow (token flow loads
+// these inside loadLead). Cached on window so we don't re-fetch.
+async function ensurePublicChecklists(){
+  if (POLICIES.length || CHECKLISTS) return;
+  try {
+    var results = await Promise.all([
+      fetch('/api/get-policies').then(function(r){return r.json();}).catch(function(){return {policies:[]};}),
+      fetch('/api/get-checklists').then(function(r){return r.json();}).catch(function(){return {};})
+    ]);
+    POLICIES = (results[0] && results[0].policies) || [];
+    CHECKLISTS = results[1] || {};
+  } catch(e){ /* non-blocking */ }
+}
+
+async function loadPublicEntry(){
+  await ensurePublicChecklists();
+  renderLookupGate();
 }
 
 async function loadLead(){
@@ -296,8 +342,311 @@ function renderStep1(){
 
 function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c];}); }
 
+// ═════════════════════════════════════════════════════════════════════════
+// PUBLIC FLOW (no token) — lookup gate → cards → either redirect to
+// the token flow OR build a synthetic LEAD and continue through step 1/2/3.
+// ═════════════════════════════════════════════════════════════════════════
+
+function renderLookupGate(prefill){
+  setStep(1);
+  prefill = prefill || {};
+  $('app').innerHTML = '<div class="card">'
+    +'<div class="card-head"><h2>Book a cleaning</h2>'
+    +'<p>Enter your email and phone number to get started. If we have a quote on file we will pull it up. Otherwise we will create a new one for you.</p></div>'
+    +'<div class="card-body">'
+    +'<div class="field"><label>Email</label>'
+    +'<input type="email" id="lk-email" autocomplete="email" placeholder="you@example.com" value="'+esc(prefill.email||'')+'"></div>'
+    +'<div class="field"><label>Phone</label>'
+    +'<input type="tel" id="lk-phone" autocomplete="tel" placeholder="(808) 555-0100" value="'+esc(prefill.phone||'')+'"></div>'
+    +'<div id="lk-error"></div>'
+    +'<button class="btn-primary" id="lk-btn" onclick="submitLookup()">Continue &rarr;</button>'
+    +'<div class="area-notice">Hawaii Natural Clean services Oahu and Maui only.</div>'
+    +'</div></div>';
+}
+
+async function submitLookup(){
+  var emailEl = $('lk-email'), phoneEl = $('lk-phone'), btn = $('lk-btn'), errEl = $('lk-error');
+  var email = (emailEl ? emailEl.value : '').trim();
+  var phone = (phoneEl ? phoneEl.value : '').trim();
+  errEl.innerHTML = '';
+
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    errEl.innerHTML = '<div class="error-banner">Please enter a valid email address.</div>';
+    return;
+  }
+  if (phone.replace(/\D/g,'').length < 10) {
+    errEl.innerHTML = '<div class="error-banner">Please enter a valid 10-digit phone number.</div>';
+    return;
+  }
+
+  btn.disabled = true; btn.textContent = 'Looking you up\u2026';
+  try {
+    var r = await fetch('/api/lookup-customer-bookings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: email, phone: phone })
+    });
+    var j = await r.json();
+    if (!r.ok) throw new Error(j.error || 'Lookup failed');
+    LOOKUP_RESULT = j;
+    LOOKUP_RESULT._email = email;
+    LOOKUP_RESULT._phone = phone;
+    renderCardsGrid();
+  } catch(e){
+    btn.disabled = false; btn.textContent = 'Continue \u2192';
+    errEl.innerHTML = '<div class="error-banner">'+esc(e.message)+'</div>';
+  }
+}
+
+function renderCardsGrid(){
+  setStep(1);
+  var quotes = (LOOKUP_RESULT && LOOKUP_RESULT.existingQuotes) || [];
+  var client = LOOKUP_RESULT && LOOKUP_RESULT.existingClient;
+  var lastAppt = client && client.lastAppt;
+  var greeting = client ? 'Welcome back, '+esc((client.name||'').split(' ')[0])+'!' : 'Let\u2019s get you booked';
+  var subline = client
+    ? 'We found your account. Pick an option below to continue.'
+    : 'We didn\u2019t find a quote on file. No problem — pick \u201cGet a new quote\u201d below to get one started right now.';
+
+  var cardsHtml = '';
+
+  // (1) Existing quotes — clicking redirects to the token-link flow so
+  // those bookings keep their auto-book behavior. We do NOT route them
+  // through the pending-review flow.
+  quotes.forEach(function(q){
+    var totalLine = q.quoteTotal != null ? '$'+Number(q.quoteTotal).toFixed(2)+' (pre-tax)' : null;
+    var metaBits = [q.service, q.frequency, q.beds||q.baths?((q.beds||'?')+'bd / '+(q.baths||'?')+'ba'):null].filter(Boolean).join(' \u00b7 ');
+    cardsHtml += '<button class="opt-card" onclick="pickExistingQuote(\''+esc(q.bookingToken)+'\')">'
+      +'<div class="opt-title">\uD83D\uDCC4 Use my saved quote</div>'
+      +'<div class="opt-meta">'+esc(metaBits)+'</div>'
+      +(q.address?'<div class="opt-meta">'+esc(q.address)+'</div>':'')
+      +(totalLine?'<div class="opt-price">'+totalLine+'</div>':'')
+      +'</button>';
+  });
+
+  // (2) Existing property card — only for matched clients with a prior appt
+  if (client && lastAppt) {
+    var lpTotal = lastAppt.totalPrice != null ? '$'+Number(lastAppt.totalPrice).toFixed(2)+' (your usual price)' : null;
+    var lpMeta = [lastAppt.service, lastAppt.frequency,
+      lastAppt.beds||lastAppt.baths ? ((lastAppt.beds||'?')+'bd / '+(lastAppt.baths||'?')+'ba') : null
+    ].filter(Boolean).join(' \u00b7 ');
+    cardsHtml += '<button class="opt-card" onclick="pickExistingProperty()">'
+      +'<div class="opt-title">\uD83C\uDFE0 Book your usual cleaning</div>'
+      +'<div class="opt-meta">'+esc(lpMeta||'Returning customer')+'</div>'
+      +(lastAppt.address?'<div class="opt-meta">'+esc(lastAppt.address)+'</div>':(client.address?'<div class="opt-meta">'+esc(client.address)+'</div>':''))
+      +(lpTotal?'<div class="opt-price">'+lpTotal+'</div>':'')
+      +'</button>';
+  }
+
+  // (3) Always-present "Get a new quote" card
+  cardsHtml += '<button class="opt-card new-quote" onclick="pickNewQuote()">'
+    +'<div class="opt-title">\u2728 Get a new quote'+(client?' for a different property':'')+'</div>'
+    +'<div class="opt-meta">Tell us about your space and we\u2019ll price it instantly. Standard, deep clean, or move-out.</div>'
+    +'</button>';
+
+  $('app').innerHTML = '<div class="card">'
+    +'<div class="card-head"><h2>'+greeting+'</h2><p>'+esc(subline)+'</p></div>'
+    +'<div class="card-body">'
+    +cardsHtml
+    +'<button class="btn-ghost" onclick="renderLookupGate({email:LOOKUP_RESULT._email,phone:LOOKUP_RESULT._phone})">&larr; Use a different email or phone</button>'
+    +'</div></div>';
+}
+
+function pickExistingQuote(bookingToken){
+  // Redirect into the existing token-link flow — no public-form review path,
+  // since this quote was already vetted when Dane sent it.
+  window.location.href = '/book.html?bt=' + encodeURIComponent(bookingToken);
+}
+
+function pickExistingProperty(){
+  PUBLIC_PATH = 'existing_property';
+  var client = LOOKUP_RESULT.existingClient;
+  PUBLIC_CLIENT = client;
+  var la = client.lastAppt || {};
+  var preTaxFromTotal = la.totalPrice != null ? +(Number(la.totalPrice)/(1+TAX_RATE)).toFixed(2) : null;
+
+  // Synthesize a LEAD-shaped object so step 1/2/3 render the same way as
+  // the token flow. quoteData drives the step-1 price box; quoteTotal
+  // is the pre-tax base price.
+  LEAD = {
+    name:       client.name,
+    firstName:  (client.name || '').split(' ')[0] || 'there',
+    email:      client.email || LOOKUP_RESULT._email,
+    phone:      client.phone || LOOKUP_RESULT._phone,
+    address:    la.address || client.address || '',
+    service:    la.service || client.service || 'Regular Cleaning',
+    frequency:  la.frequency || client.frequency || null,
+    beds:       la.beds || client.beds || null,
+    baths:      la.baths || client.baths || null,
+    sqft:       la.sqft || client.sqft || null,
+    condition:  null,
+    island:     'Oahu',
+    quoteTotal: preTaxFromTotal,
+    quoteData:  preTaxFromTotal != null ? {
+      service:      la.service || client.service || 'Regular Cleaning',
+      subtotal:     preTaxFromTotal,
+      discount:     0,
+      discount_pct: 0,
+      total:        preTaxFromTotal,
+      duration_minutes: la.durationHours ? Math.round(Number(la.durationHours)*60) : null,
+    } : null,
+    _publicClientId: client.id,
+    _publicPath:     'existing_property',
+    _publicLastApptTotal: la.totalPrice != null ? Number(la.totalPrice) : null,
+  };
+  renderStep1();
+}
+
+function pickNewQuote(){
+  PUBLIC_PATH = 'new_quote';
+  renderNewQuoteForm();
+}
+
+function renderNewQuoteForm(){
+  setStep(1);
+  $('app').innerHTML = '<div class="card">'
+    +'<div class="card-head"><h2>Get a new quote</h2><p>Tell us about your space and we will price it instantly.</p></div>'
+    +'<div class="card-body">'
+    +'<div class="field"><label>Service type</label>'
+    +'<select id="nq-service" onchange="updateNqFields()">'
+    +'<option value="">-- Select a service --</option>'
+    +'<option value="Regular Cleaning">Regular Cleaning</option>'
+    +'<option value="Deep Cleaning">Deep Cleaning</option>'
+    +'<option value="Move-out Cleaning">Move-out Cleaning</option>'
+    +'</select></div>'
+
+    // Returning customer info comes from lookup. Cold lead enters fresh.
+    +'<div id="nq-name-row" class="field"><label>Your name</label>'
+    +'<input type="text" id="nq-name" placeholder="Full name" value="'+esc((LOOKUP_RESULT.existingClient && LOOKUP_RESULT.existingClient.name) || '')+'"></div>'
+
+    +'<div class="field"><label>Service address</label>'
+    +'<input type="text" id="nq-address" placeholder="123 Main St, Honolulu, HI 96813"></div>'
+    +'<div class="field-help">We service Oahu and Maui only. Out-of-area requests will be declined.</div>'
+
+    +'<div id="nq-fields"></div>'
+
+    +'<div class="field" id="nq-freq-row" style="display:none"><label>How often?</label>'
+    +'<select id="nq-freq">'
+    +'<option value="One-time">One-time</option>'
+    +'<option value="Weekly">Weekly (20% off)</option>'
+    +'<option value="Biweekly">Biweekly (15% off)</option>'
+    +'<option value="Monthly">Monthly (10% off)</option>'
+    +'</select></div>'
+
+    +'<div id="nq-error"></div>'
+    +'<button class="btn-primary" id="nq-btn" onclick="calcNewQuote()">Calculate price &rarr;</button>'
+    +'<button class="btn-ghost" onclick="renderCardsGrid()">&larr; Back</button>'
+    +'</div></div>';
+
+  // Hide the name field if we already have a matched client
+  if (LOOKUP_RESULT.existingClient && LOOKUP_RESULT.existingClient.name) {
+    var nameRow = $('nq-name-row');
+    if (nameRow) nameRow.style.display = 'none';
+  }
+}
+
+function updateNqFields(){
+  var svc = $('nq-service').value;
+  var fieldsEl = $('nq-fields');
+  var freqRow = $('nq-freq-row');
+  if (!svc) { fieldsEl.innerHTML = ''; if(freqRow) freqRow.style.display='none'; return; }
+
+  if (svc === 'Regular Cleaning') {
+    fieldsEl.innerHTML = ''
+      +'<div class="field-row">'
+      +'<div class="field"><label>Bedrooms</label>'
+      +'<select id="nq-beds"><option value="">-- Beds --</option>'
+      +'<option value="0">Studio (0)</option>'
+      +'<option value="1">1</option><option value="2">2</option><option value="3">3</option>'
+      +'<option value="4">4</option><option value="5">5</option><option value="6">6+</option>'
+      +'</select></div>'
+      +'<div class="field"><label>Bathrooms</label>'
+      +'<select id="nq-baths"><option value="">-- Baths --</option>'
+      +'<option value="1">1</option><option value="1.5">1.5</option><option value="2">2</option>'
+      +'<option value="2.5">2.5</option><option value="3">3</option><option value="3.5">3.5</option>'
+      +'<option value="4">4</option><option value="4.5">4.5</option><option value="5">5</option>'
+      +'</select></div>'
+      +'</div>';
+    if (freqRow) freqRow.style.display = '';
+  } else if (svc === 'Deep Cleaning' || svc === 'Move-out Cleaning') {
+    fieldsEl.innerHTML = ''
+      +'<div class="field"><label>Square footage</label>'
+      +'<input type="number" id="nq-sqft" min="100" max="20000" placeholder="e.g. 1200"></div>'
+      +'<div class="field"><label>Condition <span>(1 = spotless, 10 = very dirty)</span></label>'
+      +'<select id="nq-condition">'
+      +'<option value="3">3 — Light maintenance</option>'
+      +'<option value="5" selected>5 — Average</option>'
+      +'<option value="7">7 — Heavy buildup</option>'
+      +'<option value="9">9 — Very dirty / move-out heavy</option>'
+      +'</select></div>';
+    if (freqRow) freqRow.style.display = 'none';
+  }
+}
+
+async function calcNewQuote(){
+  var btn = $('nq-btn'), errEl = $('nq-error');
+  errEl.innerHTML = '';
+
+  var service = $('nq-service').value;
+  if (!service) { errEl.innerHTML = '<div class="error-banner">Please select a service type.</div>'; return; }
+
+  var nameEl = $('nq-name');
+  var name = nameEl && nameEl.value ? nameEl.value.trim() : ((LOOKUP_RESULT.existingClient && LOOKUP_RESULT.existingClient.name) || '');
+  if (!name) { errEl.innerHTML = '<div class="error-banner">Please enter your name.</div>'; return; }
+
+  var address = ($('nq-address').value || '').trim();
+  if (!address) { errEl.innerHTML = '<div class="error-banner">Please enter your service address.</div>'; return; }
+
+  var beds = null, baths = null, sqft = null, condition = null, frequency = null;
+  if (service === 'Regular Cleaning') {
+    beds  = $('nq-beds').value;
+    baths = $('nq-baths').value;
+    if (!beds || !baths) { errEl.innerHTML = '<div class="error-banner">Please pick bedrooms and bathrooms.</div>'; return; }
+    frequency = $('nq-freq').value || 'One-time';
+  } else {
+    sqft = $('nq-sqft').value;
+    condition = $('nq-condition').value || '5';
+    if (!sqft || Number(sqft) <= 0) { errEl.innerHTML = '<div class="error-banner">Please enter the square footage.</div>'; return; }
+  }
+
+  btn.disabled = true; btn.textContent = 'Calculating\u2026';
+  try {
+    var r = await fetch('/api/calculate-quote', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ serviceType: service, beds: beds, baths: baths, sqft: sqft, condition: condition, frequency: frequency })
+    });
+    var j = await r.json();
+    if (!r.ok || j.error) throw new Error(j.error || 'Could not compute a price');
+    PUBLIC_QUOTE = j;
+
+    // Synthesize a LEAD-shaped object so step 1/2/3 render unchanged.
+    LEAD = {
+      name:       name,
+      firstName:  name.split(' ')[0] || 'there',
+      email:      LOOKUP_RESULT._email,
+      phone:      LOOKUP_RESULT._phone,
+      address:    address,
+      service:    service,
+      frequency:  frequency,
+      beds:       beds,
+      baths:      baths,
+      sqft:       sqft,
+      condition:  condition,
+      island:     'Oahu',
+      quoteTotal: j.custom_quote ? null : j.total,
+      quoteData:  j.custom_quote ? null : j,
+      _publicPath: 'new_quote',
+    };
+    renderStep1();
+  } catch(e){
+    btn.disabled = false; btn.textContent = 'Calculate price \u2192';
+    errEl.innerHTML = '<div class="error-banner">'+esc(e.message)+'</div>';
+  }
+}
+
 // ─────────────────────────────────────────────────────────────────────────
-// STEP 2 — Checklist + Before we arrive + Policies
+// STEP 1 — Quote summary
 // ─────────────────────────────────────────────────────────────────────────
 
 // (POLICIES + CHECKLISTS loaded in loadLead). Move-out requirements get
@@ -577,6 +926,10 @@ function getRushInfo(ds){
 function drawRushFee(ds){
   var rushEl = $('rush-area');
   if(!rushEl) return;
+  // Public flow goes through pending review — no rush-fee auto-charge.
+  // Dane decides if same-day is feasible during review and applies any fee
+  // manually at confirmation time.
+  if (IS_PUBLIC) { RUSH_FEE = 0; rushEl.innerHTML = ''; return; }
   var r = getRushInfo(ds);
   RUSH_FEE = r.fee;
   if(!r.fee){ rushEl.innerHTML=''; return; }
@@ -616,14 +969,50 @@ async function submitBooking(){
   btn.disabled=true; btn.textContent='Sending\u2026';
 
   try {
-    var r = await fetch('/api/lead-book',{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ token:TOKEN, date:SEL_DATE, time:SEL_TIME, notes:notes, service:LEAD.service, rushFee:RUSH_FEE, policiesAgreed: true })
-    });
-    var j = await r.json();
-    if(!r.ok) throw new Error(j.error||'Something went wrong');
-    renderSuccess(j);
+    var r, j;
+    if (IS_PUBLIC) {
+      // Public flow → pending-review submit
+      var payload = {
+        path:     PUBLIC_PATH,
+        name:     LEAD.name,
+        email:    LEAD.email,
+        phone:    LEAD.phone,
+        address:  LEAD.address,
+        service:  LEAD.service,
+        frequency: LEAD.frequency || null,
+        beds:     LEAD.beds ? String(LEAD.beds) : null,
+        baths:    LEAD.baths ? String(LEAD.baths) : null,
+        sqft:     LEAD.sqft ? String(LEAD.sqft) : null,
+        condition: LEAD.condition ? String(LEAD.condition) : null,
+        date:     SEL_DATE,
+        time:     SEL_TIME,
+        notes:    notes,
+        policiesAgreed: true,
+      };
+      if (PUBLIC_PATH === 'existing_property') {
+        payload.clientId = LEAD._publicClientId || null;
+        payload.propertyAddress = LEAD.address;
+        if (LEAD._publicLastApptTotal != null) payload.priceTotal = LEAD._publicLastApptTotal;
+      }
+      r = await fetch('/api/submit-public-booking', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      j = await r.json();
+      if (!r.ok) throw new Error(j.error || 'Something went wrong');
+      renderPublicSuccess(j);
+    } else {
+      // Token-link flow (unchanged) → auto-book
+      r = await fetch('/api/lead-book',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ token:TOKEN, date:SEL_DATE, time:SEL_TIME, notes:notes, service:LEAD.service, rushFee:RUSH_FEE, policiesAgreed: true })
+      });
+      j = await r.json();
+      if(!r.ok) throw new Error(j.error||'Something went wrong');
+      renderSuccess(j);
+    }
   } catch(e){
     btn.disabled=false; btn.textContent='Confirm booking request \u2192';
     if(errEl) errEl.innerHTML='<div class="error-banner">'+esc(e.message)+'</div>';
@@ -642,6 +1031,20 @@ function renderSuccess(result){
     +'<p>Your cleaning is confirmed for <strong>'+esc(result.date || SEL_DATE)+'</strong> at <strong>'+esc(result.time || SEL_TIME)+'</strong>.'
     +(rush ? ' A '+rush.label.toLowerCase()+' fee of '+fmt(rush.fee)+' applies.' : '')
     +'<br><br>A confirmation has been sent to your email. Our team will be in touch with your cleaner assignment shortly. Questions? Call or text <strong>(808) 468-5356</strong>. We look forward to seeing you! &#127946;</p>'
+    +'</div></div>';
+}
+
+// Pending-review variant — public-flow submit
+function renderPublicSuccess(result){
+  $('steps-bar').style.display='none';
+  var dateStr = SEL_DATE;
+  try { dateStr = new Date(SEL_DATE+'T12:00:00').toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'}); } catch(e){}
+  $('app').innerHTML = '<div class="card"><div class="success-screen">'
+    +'<div class="success-icon">\uD83D\uDCE9</div>'
+    +'<h2>Booking request received!</h2>'
+    +'<p>Thanks '+esc(LEAD.firstName||'')+'! We got your request for <strong>'+esc(dateStr)+'</strong> at <strong>'+esc(SEL_TIME)+'</strong>.'
+    +'<br><br>Our team will review the details and confirm your booking within 24 hours. You\u2019ll get a confirmation email once a cleaner is assigned.'
+    +'<br><br>Questions? Call or text <strong>(808) 468-5356</strong>. Mahalo! &#127946;</p>'
     +'</div></div>';
 }
 </script>

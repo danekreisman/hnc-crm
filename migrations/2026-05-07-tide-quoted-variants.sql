@@ -25,7 +25,7 @@
 --   • "Regular Cleaning"
 -- (Other svc values: "Airbnb Turnover" / "Janitorial Cleaning" are intentionally
 -- NOT covered by these variants. Janitorial uses the Walkthrough flow. Airbnb
--- defaults to no automation in v1; treat manually for now.)
+-- defaults to no automation in v1, treat manually for now.)
 --
 -- ── AI personalization ──
 -- All SMS and email actions have ai_personalize=true so each send adapts to
@@ -75,10 +75,7 @@ VALUES (
   'Tide · Quoted · Move-Out · Day 4 SMS + call',
   'stage_entered',
   '{"stage": "Quoted", "service_type": "Move-out Cleaning", "delay_minutes": 5760}'::jsonb,
-  '[
-    {"type":"sms","ai_personalize":true,"message":"Hi {firstName} — wanted to make sure the move-out quote came through. Want me to hold the date for you?"},
-    {"type":"create_va_task","title":"Call {firstName} — 2nd move-out attempt","task_type":"call_lead","priority":"high","description":"Day 4. Quote sent, no booking. Move-out is deadline-driven — friendly but firmer push toward decision. If voicemail, leave a clear message about capacity."}
-  ]'::jsonb,
+  '[{"type":"sms","ai_personalize":true,"message":"Hi {firstName} — wanted to make sure the move-out quote came through. Want me to hold the date for you?"},{"type":"create_va_task","title":"Call {firstName} — 2nd move-out attempt","task_type":"call_lead","priority":"high","description":"Day 4. Quote sent, no booking. Move-out is deadline-driven — friendly but firmer push toward decision. If voicemail, leave a clear message about capacity."}]'::jsonb,
   false
 ) ON CONFLICT (name) DO UPDATE SET trigger_type = EXCLUDED.trigger_type, trigger_config = EXCLUDED.trigger_config, actions = EXCLUDED.actions;
 
@@ -123,10 +120,7 @@ VALUES (
   'Tide · Quoted · Deep Clean · Day 4 SMS + email',
   'stage_entered',
   '{"stage": "Quoted", "service_type": "Deep Cleaning", "delay_minutes": 5760}'::jsonb,
-  '[
-    {"type":"sms","ai_personalize":true,"message":"Hi {firstName}, did the quote work for you? Happy to walk through what''s included if helpful."},
-    {"type":"email","ai_personalize":true,"subject":"What''s included in your deep clean","message":"Hi {firstName},\n\nWanted to follow up on the deep clean quote we sent. Quick rundown of what a deep clean covers with us:\n\n• Inside fridge, oven, and microwave\n• Baseboards, vents, and ceiling fans\n• Cabinet exteriors and door tops\n• Detailed bathroom (grout, fixtures, behind toilet)\n• Window sills and tracks\n\nTakes us about twice as long as a regular clean — and the difference is night and day. If you have any questions or want to lock in a date, just reply or text us at {phone}.\n\nMahalo,\nHawaii Natural Clean"}
-  ]'::jsonb,
+  '[{"type":"sms","ai_personalize":true,"message":"Hi {firstName}, did the quote work for you? Happy to walk through what''s included if helpful."},{"type":"email","ai_personalize":true,"subject":"What''s included in your deep clean","message":"Hi {firstName},\n\nWanted to follow up on the deep clean quote we sent. Quick rundown of what a deep clean covers with us:\n\n• Inside fridge, oven, and microwave\n• Baseboards, vents, and ceiling fans\n• Cabinet exteriors and door tops\n• Detailed bathroom (grout, fixtures, behind toilet)\n• Window sills and tracks\n\nTakes us about twice as long as a regular clean — and the difference is night and day. If you have any questions or want to lock in a date, just reply or text us at {phone}.\n\nMahalo,\nHawaii Natural Clean"}]'::jsonb,
   false
 ) ON CONFLICT (name) DO UPDATE SET trigger_type = EXCLUDED.trigger_type, trigger_config = EXCLUDED.trigger_config, actions = EXCLUDED.actions;
 
@@ -234,6 +228,6 @@ VALUES (
 --          (trigger_config->>'delay_minutes')::int / 1440 AS day_offset
 --     FROM lead_automations
 --    WHERE name LIKE 'Tide · Quoted · %'
---    ORDER BY trigger_config->>'service_type', (trigger_config->>'delay_minutes')::int;
+--    ORDER BY trigger_config->>'service_type', (trigger_config->>'delay_minutes')::int
 -- 
 -- Sanity: should be 16 rows, all is_enabled=false, three service buckets.

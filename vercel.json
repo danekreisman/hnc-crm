@@ -14,7 +14,11 @@
     },
     {
       "source": "/portal",
-      "destination": "/portal.html"
+      "destination": "/portal-select.html"
+    },
+    {
+      "source": "/client-portal",
+      "destination": "/client-portal.html"
     },
     {
       "source": "/agree",

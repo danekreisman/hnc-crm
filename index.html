@@ -10447,6 +10447,54 @@ function _routeFromHash() {
   </div>
 </div>
 
+<!-- PUBLIC BOOKING REVIEW OVERLAY (review_public_booking task → accept + schedule flow) -->
+<div class="overlay hidden" id="public-booking-review-overlay" onclick="closeOverlay('public-booking-review-overlay')">
+  <div class="panel panel-wide" onclick="event.stopPropagation()">
+    <div class="panel-header">
+      <div class="panel-title">Booking request</div>
+      <button class="close-btn" onclick="closeOverlay('public-booking-review-overlay')">&#x2715;</button>
+    </div>
+    <div class="panel-body">
+      <div id="pbr-rush-banner" style="display:none;background:#fee2e2;border:1px solid #fca5a5;border-radius:10px;padding:10px 12px;margin-bottom:12px;font-size:13px;font-weight:600;color:#b91c1c;text-align:center;"></div>
+      <div id="pbr-summary" style="background:#eaf7fb;border:1px solid #9adcf0;border-radius:10px;padding:12px 14px;margin-bottom:14px;font-size:13px;color:#0f1c24;line-height:1.6;"></div>
+
+      <div class="panel-section">Customer</div>
+      <div id="pbr-customer-block" style="font-size:13px;line-height:1.7;color:var(--text);margin-bottom:14px;"></div>
+
+      <div class="panel-section">Property &amp; service</div>
+      <div id="pbr-service-block" style="font-size:13px;line-height:1.7;color:var(--text);margin-bottom:14px;"></div>
+
+      <div class="panel-section">Schedule (editable)</div>
+      <div class="form-two">
+        <div class="form-row"><label>Date</label><input type="date" id="pbr-date"></div>
+        <div class="form-row"><label>Time</label><input type="text" id="pbr-time" placeholder="e.g. 9:00 AM"></div>
+      </div>
+
+      <div class="panel-section">Pricing</div>
+      <div id="pbr-pricing-block" style="font-size:13px;line-height:1.7;color:var(--text);margin-bottom:14px;"></div>
+
+      <div id="pbr-customer-notes-row" style="display:none;">
+        <div class="panel-section">Customer notes</div>
+        <div id="pbr-customer-notes" style="background:#fafafa;border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-size:13px;color:var(--text);white-space:pre-wrap;margin-bottom:14px;"></div>
+      </div>
+
+      <div class="form-row"><label>Admin notes (optional)</label><textarea id="pbr-admin-notes" style="min-height:60px;" placeholder="Anything you want appended to the appointment notes..."></textarea></div>
+
+      <div class="form-row" style="display:flex;align-items:center;gap:8px;margin-top:6px;">
+        <input type="checkbox" id="pbr-send-email" style="width:16px;height:16px;cursor:pointer;">
+        <label for="pbr-send-email" style="margin:0;font-size:13px;font-weight:500;cursor:pointer;">Send confirmation email to customer (off during testing)</label>
+      </div>
+
+      <input type="hidden" id="pbr-task-id">
+      <div class="save-bar">
+        <button class="btn btn-primary" id="pbr-accept-btn" onclick="confirmPublicBookingAccept()">Accept &amp; schedule</button>
+        <button class="btn" onclick="closeOverlay('public-booking-review-overlay')">Cancel</button>
+      </div>
+      <div id="pbr-error" style="display:none;background:#fee2e2;border:1px solid #fca5a5;border-radius:8px;padding:9px 12px;color:#b91c1c;font-size:12px;margin-top:10px;"></div>
+    </div>
+  </div>
+</div>
+
 <!-- NEW CLEANER OVERLAY -->
 <div class="overlay hidden" id="new-cleaner-overlay" onclick="closeOverlay('new-cleaner-overlay')">
   <div class="panel" onclick="event.stopPropagation()">
@@ -19748,8 +19796,8 @@ function renderTasks() {
 function renderTaskCard(t, done) {
   var today = new Date().toISOString().split('T')[0];
   var isOverdue = !done && t.due_date && t.due_date < today;
-  var typeLabel = {invoice:'Invoice',call_lead:'Call lead',call_client:'Call client',project:'Project',other:'Task',review_lead_response:'Lead reply',review_call_lead:'New call lead',review_quote_sent:'Confirm quote'}[t.type] || 'Task';
-  var typeColor = {invoice:'#3b82f6',call_lead:'#f59e0b',call_client:'#8b5cf6',project:'#10b981',other:'#6b7280',review_lead_response:'#dc2626',review_call_lead:'#7c3aed',review_quote_sent:'#059669'}[t.type] || '#6b7280';
+  var typeLabel = {invoice:'Invoice',call_lead:'Call lead',call_client:'Call client',project:'Project',other:'Task',review_lead_response:'Lead reply',review_call_lead:'New call lead',review_quote_sent:'Confirm quote',review_public_booking:'New booking request'}[t.type] || 'Task';
+  var typeColor = {invoice:'#3b82f6',call_lead:'#f59e0b',call_client:'#8b5cf6',project:'#10b981',other:'#6b7280',review_lead_response:'#dc2626',review_call_lead:'#7c3aed',review_quote_sent:'#059669',review_public_booking:'#3BB8E3'}[t.type] || '#6b7280';
   var priorityDot = {high:'\uD83D\uDD34',medium:'\uD83D\uDFE1',low:'\uD83D\uDFE2'}[t.priority] || '';
   var relName = (t.leads && t.leads.name) || (t.clients && t.clients.name) || '';
   var dueStr = t.due_date ? new Date(t.due_date + 'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'}) : '';
@@ -19819,6 +19867,17 @@ function renderTaskCard(t, done) {
       + '<button data-task-id="' + t.id + '" data-lead-id="' + t.related_lead_id + '" data-amount="' + qAmt + '" onclick="confirmQuoteSent(this.dataset.taskId, this.dataset.leadId, this.dataset.amount)" style="flex:1;min-width:120px;padding:7px 12px;background:#059669;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;">Confirm $' + qAmt + '</button>'
       + '<button data-task-id="' + t.id + '" data-lead-id="' + t.related_lead_id + '" data-amount="' + qAmt + '" onclick="editAndConfirmQuoteSent(this.dataset.taskId, this.dataset.leadId, this.dataset.amount)" style="padding:7px 12px;background:#fff;color:var(--text);border:1.5px solid var(--border);border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;">Edit</button>'
       + '<button data-task-id="' + t.id + '" onclick="dismissQuoteSent(this.dataset.taskId)" style="padding:7px 12px;background:#fff;color:var(--text-muted);border:1.5px solid var(--border);border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;">Not a quote</button>'
+      + '</div>';
+  }
+
+  // For review_public_booking tasks: "Review & accept" opens the
+  // public-booking-review-overlay with all the customer's submitted
+  // booking details, and pressing Accept turns it into a real
+  // appointment. "Decline" silently dismisses the task.
+  if (!done && t.type === 'review_public_booking' && t.extracted_data) {
+    reviewActions = '<div style="display:flex;gap:8px;margin-top:10px;">'
+      + '<button data-task-id="' + t.id + '" onclick="openPublicBookingReview(this.dataset.taskId)" style="flex:1;padding:7px 12px;background:#3BB8E3;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;">Review &amp; accept</button>'
+      + '<button data-task-id="' + t.id + '" onclick="dismissPublicBooking(this.dataset.taskId)" style="flex:1;padding:7px 12px;background:#fff;color:var(--text);border:1.5px solid var(--border);border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;">Decline</button>'
       + '</div>';
   }
 
@@ -20084,6 +20143,152 @@ async function confirmCallLeadAccept() {
 async function dismissCallLead(taskId) {
   // Caller wasn't a real lead. Just complete the task. We don't prompt —
   // the action is reversible (undo via the toast on completeTaskById).
+  await completeTaskById(taskId);
+}
+
+/* ──────────────────────────────────────────────────────────────────────
+   review_public_booking task actions — "Review & accept / Decline" on
+   tasks created when a customer submits a request via book.html. Accept
+   creates a real appointment from the task's extracted_data via
+   /api/accept-public-booking. Decline silently dismisses.
+   ────────────────────────────────────────────────────────────────────── */
+
+function _pbrEsc(s){ return String(s == null ? '' : s).replace(/[&<>"]/g, function(c){ return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c]; }); }
+function _pbrFmt$(n){ return n == null || isNaN(Number(n)) ? '\u2014' : '$' + Number(n).toFixed(2); }
+function _pbrPrettyDate(iso){
+  if (!iso) return '\u2014';
+  try { return new Date(iso + 'T12:00:00').toLocaleDateString('en-US', { weekday:'long', month:'long', day:'numeric', year:'numeric' }); }
+  catch (_e){ return iso; }
+}
+
+function openPublicBookingReview(taskId) {
+  var task = (_tasks && _tasks.open || []).find(function(t){ return t.id === taskId; });
+  if (!task) { showToast('Task not found', true); return; }
+  var x = task.extracted_data || {};
+
+  document.getElementById('pbr-task-id').value = task.id;
+
+  // Top summary banner — date, service, price (this is the "I want to see
+  // what date the customer wanted" fix at-a-glance).
+  var summaryHtml = ''
+    + '<div style="font-size:15px;font-weight:700;margin-bottom:4px;">' + _pbrEsc(_pbrPrettyDate(x.requested_date)) + ' \u00b7 ' + _pbrEsc(x.requested_time || '') + '</div>'
+    + '<div>' + _pbrEsc(x.service || '') + (x.frequency ? ' \u00b7 ' + _pbrEsc(x.frequency) : '')
+    + (x.quote_total_with_tax != null ? ' \u00b7 <strong>' + _pbrFmt$(x.quote_total_with_tax) + '</strong>' : '')
+    + '</div>';
+  document.getElementById('pbr-summary').innerHTML = summaryHtml;
+
+  // Rush banner (only shows if same-day / next-day / 2-day)
+  var rushBanner = document.getElementById('pbr-rush-banner');
+  if (x.rush_fee && Number(x.rush_fee) > 0) {
+    var rushLabel = Number(x.rush_fee) === 200 ? 'SAME-DAY' : Number(x.rush_fee) === 100 ? 'NEXT-DAY' : '2-DAY';
+    rushBanner.innerHTML = '\u26A1 ' + rushLabel + ' booking \u2014 includes $' + Number(x.rush_fee).toFixed(2) + ' rush fee';
+    rushBanner.style.display = 'block';
+  } else {
+    rushBanner.style.display = 'none';
+  }
+
+  // Customer block
+  var custLines = [
+    '<div><strong>' + _pbrEsc(x.name || '') + '</strong></div>',
+    x.phone  ? '<div>' + _pbrEsc(x.phone) + ' \u00b7 <a href="tel:' + _pbrEsc(x.phone) + '" style="color:var(--blue);">Call</a> \u00b7 <a href="sms:' + _pbrEsc(x.phone) + '" style="color:var(--blue);">Text</a></div>' : '',
+    x.email  ? '<div><a href="mailto:' + _pbrEsc(x.email) + '" style="color:var(--blue);">' + _pbrEsc(x.email) + '</a></div>' : '',
+    x.address? '<div style="color:var(--text-muted);">' + _pbrEsc(x.address) + '</div>' : '',
+    x.path === 'existing_property'
+      ? '<div style="margin-top:6px;font-size:11px;color:#059669;font-weight:600;text-transform:uppercase;letter-spacing:.05em;">\u2713 Returning client</div>'
+      : '<div style="margin-top:6px;font-size:11px;color:#7c3aed;font-weight:600;text-transform:uppercase;letter-spacing:.05em;">New lead</div>',
+  ].filter(Boolean).join('');
+  document.getElementById('pbr-customer-block').innerHTML = custLines;
+
+  // Property/service block
+  var propBits = [
+    x.beds ? (x.beds + ' bed') : null,
+    x.baths ? (x.baths + ' bath') : null,
+    x.sqft ? (x.sqft + ' sqft') : null,
+    x.condition ? ('Condition ' + x.condition + '/10') : null,
+  ].filter(Boolean).join(' \u00b7 ');
+  document.getElementById('pbr-service-block').innerHTML = ''
+    + '<div><strong>' + _pbrEsc(x.service || '') + '</strong>' + (x.frequency ? ' \u00b7 ' + _pbrEsc(x.frequency) : '') + '</div>'
+    + (propBits ? '<div style="color:var(--text-muted);">' + _pbrEsc(propBits) + '</div>' : '');
+
+  // Editable schedule
+  document.getElementById('pbr-date').value = x.requested_date || '';
+  document.getElementById('pbr-time').value = x.requested_time || '';
+
+  // Pricing block (read-only — base + tax + rush + total)
+  var priceLines = [];
+  if (x.quote_total_pretax != null) priceLines.push('<div>Base (pre-tax): <strong>' + _pbrFmt$(x.quote_total_pretax) + '</strong></div>');
+  if (x.quote_tax != null)          priceLines.push('<div>Hawaii GET (4.712%): <strong>' + _pbrFmt$(x.quote_tax) + '</strong></div>');
+  if (x.rush_fee && Number(x.rush_fee) > 0) priceLines.push('<div>Rush fee: <strong>' + _pbrFmt$(x.rush_fee) + '</strong></div>');
+  if (x.quote_total_with_tax != null) priceLines.push('<div style="margin-top:4px;padding-top:4px;border-top:1px dashed var(--border);">Total: <strong style="color:var(--blue-dark);">' + _pbrFmt$(x.quote_total_with_tax) + '</strong></div>');
+  document.getElementById('pbr-pricing-block').innerHTML = priceLines.length ? priceLines.join('') : '<div style="color:var(--text-muted);">Custom quote</div>';
+
+  // Customer notes (only show row if present)
+  var custNotesRow = document.getElementById('pbr-customer-notes-row');
+  if (x.customer_notes) {
+    document.getElementById('pbr-customer-notes').textContent = x.customer_notes;
+    custNotesRow.style.display = '';
+  } else {
+    custNotesRow.style.display = 'none';
+  }
+
+  // Reset Admin notes + email checkbox + state
+  document.getElementById('pbr-admin-notes').value = '';
+  document.getElementById('pbr-send-email').checked = false;
+  var errEl = document.getElementById('pbr-error'); if (errEl) errEl.style.display = 'none';
+  var btn = document.getElementById('pbr-accept-btn'); if (btn) { btn.disabled = false; btn.textContent = 'Accept & schedule'; }
+
+  openOverlay('public-booking-review-overlay');
+}
+
+async function confirmPublicBookingAccept() {
+  var btn = document.getElementById('pbr-accept-btn');
+  var errEl = document.getElementById('pbr-error');
+  if (errEl) errEl.style.display = 'none';
+
+  var taskId = document.getElementById('pbr-task-id').value;
+  var date   = (document.getElementById('pbr-date').value || '').trim();
+  var time   = (document.getElementById('pbr-time').value || '').trim();
+  var notes  = (document.getElementById('pbr-admin-notes').value || '').trim();
+  var sendEmail = !!document.getElementById('pbr-send-email').checked;
+
+  if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    if (errEl) { errEl.textContent = 'Date is required (YYYY-MM-DD).'; errEl.style.display = 'block'; }
+    return;
+  }
+  if (!time) {
+    if (errEl) { errEl.textContent = 'Time is required.'; errEl.style.display = 'block'; }
+    return;
+  }
+
+  if (btn) { btn.disabled = true; btn.textContent = 'Scheduling\u2026'; }
+  try {
+    var sess = await db.auth.getSession();
+    var tok = sess.data.session ? sess.data.session.access_token : '';
+    var resp = await fetch('/api/accept-public-booking', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + tok },
+      body: JSON.stringify({ taskId: taskId, date: date, time: time, notes: notes || undefined, sendEmail: sendEmail }),
+    });
+    var data = await resp.json().catch(function(){ return {}; });
+    if (!resp.ok || !data.success) {
+      if (errEl) { errEl.textContent = data.error || ('HTTP ' + resp.status); errEl.style.display = 'block'; }
+      if (btn) { btn.disabled = false; btn.textContent = 'Accept & schedule'; }
+      return;
+    }
+    closeOverlay('public-booking-review-overlay');
+    showToast('\u2713 Booking accepted \u2014 appointment scheduled', false);
+    // Refresh tasks + appointments so the calendar + task queue update.
+    try { if (typeof loadTasks === 'function') loadTasks(); } catch (_) {}
+    try { if (typeof _refreshAppointmentsFromDB === 'function') _refreshAppointmentsFromDB(); } catch (_) {}
+  } catch (e) {
+    if (errEl) { errEl.textContent = 'Network error: ' + e.message; errEl.style.display = 'block'; }
+    if (btn) { btn.disabled = false; btn.textContent = 'Accept & schedule'; }
+  }
+}
+
+async function dismissPublicBooking(taskId) {
+  // Customer's request isn't going to be fulfilled — just close the task.
+  // Reversible via the completeTaskById undo toast.
   await completeTaskById(taskId);
 }
 

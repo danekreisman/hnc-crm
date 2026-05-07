@@ -202,6 +202,15 @@ export const SCHEMAS = {
     rushFee:         { required: false, rules: [(v) => v == null || (is.number(Number(v)) && Number(v) >= 0 && Number(v) <= 500)],   message: 'rushFee must be a non-negative number under 500 if provided' },
   },
 
+  acceptPublicBooking: {
+    taskId:    { required: true,  rules: [is.uuid],     message: 'taskId must be a valid UUID' },
+    // Optional Dane-supplied overrides applied at acceptance time
+    date:      { required: false, rules: [is.date],     message: 'date must be a valid date (YYYY-MM-DD) if provided' },
+    time:      { required: false, rules: [is.nonEmpty, is.maxLength(20)], message: 'time must be a non-empty string under 20 chars if provided' },
+    notes:     { required: false, rules: [is.maxLength(2000)],            message: 'notes must be under 2000 chars if provided' },
+    sendEmail: { required: false, rules: [is.boolean],  message: 'sendEmail must be boolean if provided' },
+  },
+
 };
 
 /**

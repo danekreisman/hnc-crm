@@ -10192,7 +10192,66 @@ async function disablePushOnThisDevice() {
 window.addEventListener('DOMContentLoaded', function(){
   // Initial render — fires once on page load
   setTimeout(_renderPushStatus, 1000);
+  // Hash-route handler — fires once on page load to handle notification
+  // cold-start. See _routeFromHash for the rationale.
+  setTimeout(_routeFromHash, 2000);
 });
+
+/* ────────────────────────────────────────────────────────────────────
+   Notification cold-start hash routing
+   ────────────────────────────────────────────────────────────────────
+   Bug fix 2026-05-08: tapping a notification on the phone home screen
+   should open the PWA straight to the relevant task. It wasn't.
+
+   Two failure modes existed:
+   1. PWA was already open / backgrounded → SW's notificationclick
+      handler postMessage's {type:'deep-link', url:'/#tasks'} to the
+      existing tab. The message listener at line 9800 receives it and
+      calls sv('tasks', navItem). THIS PATH WORKS.
+   2. PWA was closed entirely → SW falls through to clients.openWindow
+      ('/#tasks'). The OS opens the PWA at that URL. The page
+      bootstraps. NOTHING reads window.location.hash, so the user
+      lands on the default Calendar view and has to navigate to Tasks
+      manually. THIS PATH IS THE BUG.
+
+   Fix: on every page load, read window.location.hash. If it matches
+   a known nav route, switch to that view via the same sv() function
+   the in-app message handler uses. Calls loadTasks() after switching
+   to ensure fresh data.
+
+   Timing: 2-second delay to wait for the data bootstrap to start
+   populating clientDB / leadDB / etc. The view will switch
+   immediately, and the tasks list will populate when the underlying
+   data finishes loading.
+   ──────────────────────────────────────────────────────────────────── */
+function _routeFromHash() {
+  try {
+    var hash = window.location.hash;
+    if (!hash || hash.length < 2) return;
+    // Strip the leading # and any query/path segments after the route
+    // name. So '#tasks', '#tasks/123', and '#tasks?x=1' all route to
+    // 'tasks'. Future per-task deep-linking (e.g. opening task 123 on
+    // arrival) would extend this to read the trailing ID.
+    var route = hash.slice(1).split('?')[0].split('/')[0];
+    if (!route) return;
+    // Don't route on auth-callback hashes (they have access_token=...)
+    if (hash.indexOf('access_token') >= 0 || hash.indexOf('error_description') >= 0) return;
+    if (typeof sv !== 'function') return;
+    var navItem = document.querySelector('.nav-item[onclick*="\'' + route + '\'"]');
+    if (!navItem) return;
+    sv(route, navItem);
+    // Force-refresh the tasks list when arriving via notification — the
+    // notification was almost certainly triggered by a NEW task being
+    // created server-side, and we want the user to see it immediately
+    // even if the realtime subscription hasn't pushed it yet.
+    if (route === 'tasks' && typeof loadTasks === 'function') {
+      loadTasks();
+    }
+    console.log('[hash-route] routed cold-start to', route);
+  } catch (e) {
+    console.warn('[hash-route] failed:', e);
+  }
+}
 </script>
 
 <!-- NEW LEAD OVERLAY -->

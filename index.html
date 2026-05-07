@@ -2067,6 +2067,19 @@ Mahalo 🌺</textarea>
               </label>
               <input type="number" id="na-price-override-val" placeholder="Custom $" min="0" step="0.01" style="width:120px;display:none;" oninput="calcPrice()">
             </div>
+            <div style="margin-top:6px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+              <label style="font-size:13px;color:var(--text-muted);font-weight:normal;display:flex;align-items:center;gap:6px;cursor:pointer;">
+                <input type="checkbox" id="na-discount-chk" onchange="calcPrice()"> Apply discount
+              </label>
+              <div id="na-discount-controls" style="display:none;align-items:center;gap:6px;">
+                <input type="number" id="na-discount-val" placeholder="0" min="0" step="0.01" style="width:90px;" oninput="calcPrice()">
+                <div style="display:inline-flex;border:1px solid var(--border-strong);border-radius:8px;overflow:hidden;font-size:12px;">
+                  <button type="button" id="na-discount-pct-btn" onclick="setDiscountType('pct')" style="border:none;background:var(--brand-500);color:#fff;padding:5px 10px;cursor:pointer;font-weight:600;">%</button>
+                  <button type="button" id="na-discount-dollar-btn" onclick="setDiscountType('dollar')" style="border:none;background:#fff;color:var(--text-muted);padding:5px 10px;cursor:pointer;font-weight:600;border-left:1px solid var(--border-strong);">$</button>
+                </div>
+                <input type="text" id="na-discount-reason" placeholder="Reason (optional)" maxlength="80" style="flex:1;min-width:140px;font-size:12px;">
+              </div>
+            </div>
             <div style="margin-top:6px;display:flex;align-items:center;gap:10px;">
               <label style="font-size:13px;color:var(--text-muted);font-weight:normal;display:flex;align-items:center;gap:6px;cursor:pointer;">
                 <input type="checkbox" id="na-cleaner-pay-override-chk" onchange="calcPrice()"> Override cleaner pay
@@ -3005,7 +3018,13 @@ async function dbLoadCleaners(){
     notes:data.notes||null,
     recurring:data.recurring||false,
     duration_hours:parseFloat(data.duration)||null,
-    tip_amount:Math.max(0,parseFloat(data.tipAmount)||0)
+    tip_amount:Math.max(0,parseFloat(data.tipAmount)||0),
+    /* Manual discount — null when none was applied. NUMERIC NULL is cheap
+       and keeps reports clean (sum() ignores NULL). Reason capped to a
+       reasonable length client-side (saveNewAppt slices to 200 chars). */
+    manual_discount_amount: (data.manualDiscountAmount != null && parseFloat(data.manualDiscountAmount) > 0)
+      ? parseFloat(data.manualDiscountAmount) : null,
+    manual_discount_reason: data.manualDiscountReason || null
   };
   if(data.seriesId) row.series_id=data.seriesId;
   if(data.seriesIndex!=null) row.series_index=data.seriesIndex;
@@ -7800,6 +7819,24 @@ function _applyNaTipToDisplay(){
 
    Any field can be null/undefined — the renderer hides rows it can't fill.
    ──────────────────────────────────────────────────────────────────────── */
+/* Manual booking discount — toggle between percent and dollar amount.
+   Stored in window._naDiscountType so calcPrice picks it up on every
+   recalculation. Default is 'pct' to match how frequency discount works. */
+window._naDiscountType = window._naDiscountType || 'pct';
+function setDiscountType(t){
+  window._naDiscountType = (t === 'dollar') ? 'dollar' : 'pct';
+  var pctBtn = document.getElementById('na-discount-pct-btn');
+  var dollarBtn = document.getElementById('na-discount-dollar-btn');
+  if(pctBtn && dollarBtn){
+    var active = 'background:var(--brand-500);color:#fff;';
+    var inactive = 'background:#fff;color:var(--text-muted);';
+    var common = 'border:none;padding:5px 10px;cursor:pointer;font-weight:600;';
+    pctBtn.setAttribute('style', common + (window._naDiscountType === 'pct' ? active : inactive));
+    dollarBtn.setAttribute('style', common + 'border-left:1px solid var(--border-strong);' + (window._naDiscountType === 'dollar' ? active : inactive));
+  }
+  if(typeof calcPrice === 'function') calcPrice();
+}
+
 function renderPricingBreakdown(targetId, d){
   var target = typeof targetId === 'string' ? document.getElementById(targetId) : targetId;
   if(!target) return;
@@ -7869,6 +7906,12 @@ function renderPricingBreakdown(targetId, d){
     html += '<div class="hnc-pc-row hnc-pc-discount">'
       + '<span class="k">Frequency discount (' + ($(d.discountPct) || 0) + '%)</span>'
       + '<span class="v">−' + fmt(d.discountAmount) + '</span>'
+      + '</div>';
+  }
+  if($(d.manualDiscountAmount) > 0){
+    html += '<div class="hnc-pc-row hnc-pc-discount">'
+      + '<span class="k">' + (d.manualDiscountLabel || 'Manual discount') + '</span>'
+      + '<span class="v">−' + fmt(d.manualDiscountAmount) + '</span>'
       + '</div>';
   }
   html += '<div class="hnc-pc-divider"></div>';
@@ -8014,7 +8057,33 @@ function calcPrice(){
   var freqDiscount=_freqDiscPct(freqVal);
   var discountAmt=Math.round(base*freqDiscount*100)/100;
   var discountedBase=Math.round((base-discountAmt)*100)/100;
-  var tax=Math.round(discountedBase*0.04712*100)/100;
+
+  /* Manual booking discount — applied AFTER frequency discount, BEFORE tax.
+     Stacking order: base → frequency discount → manual discount → tax.
+     Mode toggles between 'pct' (percent of post-frequency subtotal) and
+     'dollar' (flat dollar amount). Show/hide the input row from here so
+     the controls track the checkbox without a separate handler. */
+  var manualDiscChk = document.getElementById('na-discount-chk');
+  var manualDiscControls = document.getElementById('na-discount-controls');
+  var manualDiscVal = document.getElementById('na-discount-val');
+  var manualDiscEnabled = manualDiscChk && manualDiscChk.checked;
+  if(manualDiscControls) manualDiscControls.style.display = manualDiscEnabled ? 'inline-flex' : 'none';
+  var manualDiscAmt = 0;
+  var manualDiscType = window._naDiscountType || 'pct';
+  if(manualDiscEnabled && manualDiscVal && manualDiscVal.value){
+    var rawDisc = parseFloat(manualDiscVal.value) || 0;
+    if(manualDiscType === 'pct'){
+      /* Cap percent at 100 just in case */
+      rawDisc = Math.min(Math.max(rawDisc, 0), 100);
+      manualDiscAmt = Math.round(discountedBase * (rawDisc / 100) * 100) / 100;
+    } else {
+      /* Cap dollar discount at the subtotal — can't go below zero */
+      manualDiscAmt = Math.min(Math.max(rawDisc, 0), discountedBase);
+      manualDiscAmt = Math.round(manualDiscAmt * 100) / 100;
+    }
+  }
+  var subtotalAfterManual = Math.round((discountedBase - manualDiscAmt) * 100) / 100;
+  var tax=Math.round(subtotalAfterManual*0.04712*100)/100;
   var total;
   if(isOverride&&overrideValEl&&overrideValEl.value){
     var _ovrBase=parseFloat(overrideValEl.value)||0;
@@ -8024,12 +8093,15 @@ function calcPrice(){
     document.getElementById('price-breakdown').textContent=hrs+' est hrs — custom price override';
     console.log('[calcPrice] override='+total+' hrs='+hrs+' svc='+svcType);
   } else {
-    total=Math.round((discountedBase+tax)*100)/100;
+    total=Math.round((subtotalAfterManual+tax)*100)/100;
     document.getElementById('price-val').textContent='$'+total.toFixed(2);
     var discountText=freqDiscount>0?' − '+(freqDiscount*100)+'% '+freqVal.toLowerCase()+' discount ($'+discountAmt.toFixed(2)+')':'';
+    var manualDiscText = manualDiscAmt > 0
+      ? ' − ' + (manualDiscType === 'pct' ? (parseFloat(manualDiscVal.value)||0) + '% ' : '') + 'discount ($' + manualDiscAmt.toFixed(2) + ')'
+      : '';
     var _baseLabel=hrsManuallySet?(hrs+' hrs × $'+_hourlyRate+' = $'+base.toFixed(2)):(hrs+' est hrs · $'+base.toFixed(2)+' base');
-    document.getElementById('price-breakdown').textContent=_baseLabel+discountText+' + tax $'+tax.toFixed(2);
-    console.log('[calcPrice] total=$'+total+' hrs='+hrs+' base=$'+base+' svc='+svcType+(isCommercial?' (commercial)':'')+(freqDiscount>0?' freq='+freqVal+' disc='+freqDiscount:''));
+    document.getElementById('price-breakdown').textContent=_baseLabel+discountText+manualDiscText+' + tax $'+tax.toFixed(2);
+    console.log('[calcPrice] total=$'+total+' hrs='+hrs+' base=$'+base+' svc='+svcType+(isCommercial?' (commercial)':'')+(freqDiscount>0?' freq='+freqVal+' disc='+freqDiscount:'')+(manualDiscAmt>0?' manualDisc=$'+manualDiscAmt:''));
   }
   // Cleaner pay display — use .value (cleaner name) so getCleanerRate can match cleanerDB
   var cleanerEl=document.getElementById('na-cleaner');
@@ -8102,7 +8174,16 @@ function calcPrice(){
         basePrice: base,
         discountPct: freqDiscount > 0 ? Math.round(freqDiscount * 1000) / 10 : 0,
         discountAmount: discountAmt,
-        subtotal: discountedBase,
+        manualDiscountAmount: manualDiscAmt,
+        manualDiscountLabel: manualDiscAmt > 0
+          ? (manualDiscType === 'pct'
+              ? 'Manual discount (' + (parseFloat(manualDiscVal.value) || 0) + '%)'
+              : 'Manual discount')
+            + (manualDiscChk && document.getElementById('na-discount-reason') && document.getElementById('na-discount-reason').value
+                ? ' — ' + document.getElementById('na-discount-reason').value
+                : '')
+          : null,
+        subtotal: subtotalAfterManual,
         tax: tax,
         total: total,
         cleanerName: _bdCleanerHasReal ? _bdCleanerName : null,
@@ -8305,6 +8386,44 @@ async function saveNewAppt(){
   var overrideChk=document.getElementById('na-price-override-chk');
   var overrideValEl=document.getElementById('na-price-override-val');
   var apptPriceOverride=(overrideChk&&overrideChk.checked&&overrideValEl&&overrideValEl.value)?overrideValEl.value:'';
+  /* Manual discount capture — read the same controls calcPrice uses so the
+     persisted value matches what was on screen when the user clicked Book.
+     Compute the dollar amount here too (calcPrice's local var doesn't escape)
+     so the value we store is the actual deduction, not the percent. */
+  var apptManualDiscAmt = 0;
+  var apptManualDiscReason = '';
+  var _mdChk = document.getElementById('na-discount-chk');
+  var _mdVal = document.getElementById('na-discount-val');
+  var _mdReason = document.getElementById('na-discount-reason');
+  if(_mdChk && _mdChk.checked && _mdVal && _mdVal.value){
+    var _mdRaw = parseFloat(_mdVal.value) || 0;
+    var _mdType = window._naDiscountType || 'pct';
+    if(_mdType === 'pct'){
+      /* Need the post-frequency-discount subtotal to convert pct → $. We can
+         re-derive from _lastCalcHrs/base via the price-val element which
+         already reflects total — simplest: read from the breakdown render
+         which stored basePrice and discountAmount. But to avoid coupling,
+         recompute from the same lookup tables calcPrice uses. */
+      var _mdSvcEl = document.getElementById('na-service');
+      var _mdSvcType = _mdSvcEl ? _mdSvcEl.value : 'regular';
+      var _mdQ = _quotePrice({
+        service: _mdSvcType,
+        beds: (document.getElementById('na-beds')||{}).value,
+        baths: (document.getElementById('na-baths')||{}).value,
+        sqft: (document.getElementById('na-sqft')||{}).value,
+        condition: (document.getElementById('na-cond')||{}).value,
+        commercialHrs: (document.getElementById('na-commercial-hrs')||{}).value,
+      });
+      var _mdBase = _mdQ ? _mdQ.price : 0;
+      var _mdFreqVal = (document.getElementById('na-freq')||{}).value || 'One-time';
+      var _mdFreqDisc = _freqDiscPct(_mdFreqVal);
+      var _mdSubtotal = _mdBase * (1 - _mdFreqDisc);
+      apptManualDiscAmt = Math.round(_mdSubtotal * (Math.min(Math.max(_mdRaw, 0), 100) / 100) * 100) / 100;
+    } else {
+      apptManualDiscAmt = Math.round(Math.max(_mdRaw, 0) * 100) / 100;
+    }
+  }
+  if(_mdReason && _mdReason.value) apptManualDiscReason = _mdReason.value.trim().slice(0, 200);
   var apptNotes=(document.getElementById('na-notes')||{}).value||'';
   // Tip (optional, customer-arranged at booking time). Per-occurrence — for
   // recurring bookings, applied only to the FIRST occurrence (sidx===0) below.
@@ -8493,7 +8612,9 @@ async function saveNewAppt(){
       cleanerPay:apptCleanerPay, notes:apptNotes, recurring:false, duration:apptDuration,
       cleanerName2:_naPair.name2, cleanerPay2:_naPair2Pay,
       cleanerName3:_naPair.name3, cleanerPay3:_naPair3Pay,
-      tipAmount:apptTip
+      tipAmount:apptTip,
+      manualDiscountAmount: apptManualDiscAmt > 0 ? apptManualDiscAmt : null,
+      manualDiscountReason: apptManualDiscAmt > 0 ? (apptManualDiscReason || null) : null
     }).then(function(sbRes){
       if(!sbRes.error&&sbRes.data&&sbRes.data[0]){
         apptObj.dbId=sbRes.data[0].id;
@@ -8554,6 +8675,11 @@ async function saveNewAppt(){
         // recurring series. Subsequent occurrences start with 0 — the customer
         // can add a tip per-instance via the appointment overlay's tip controls.
         tip_amount: sidx===0 ? apptTip : 0,
+        /* Manual discount applies to EVERY occurrence of the recurring series —
+           if you give Mary 10% off as a friend rate, it should keep applying.
+           This differs from tip, which is one-time per-instance. */
+        manual_discount_amount: apptManualDiscAmt > 0 ? apptManualDiscAmt : null,
+        manual_discount_reason: apptManualDiscAmt > 0 ? (apptManualDiscReason || null) : null,
         series_id:apptSeriesId,
         series_index:sidx
       };

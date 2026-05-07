@@ -19838,6 +19838,10 @@ function renderTasks() {
     }
   }
 
+  if (doneList) {
+    doneList.innerHTML = _tasks.done.slice(0, 20).map(t => renderTaskCard(t, true)).join('');
+  }
+
   // Keep the calendar-view banner in sync with the task queue. It only
   // shows review_public_booking tasks, so any change here may add or
   // remove rows — call it on every renderTasks pass.
@@ -19906,10 +19910,6 @@ function renderPublicBookingBanner() {
     + rowsHtml
     + '</div>';
   el.style.display = 'block';
-}
-  if (doneList) {
-    doneList.innerHTML = _tasks.done.slice(0, 20).map(t => renderTaskCard(t, true)).join('');
-  }
 }
 
 function renderTaskCard(t, done) {

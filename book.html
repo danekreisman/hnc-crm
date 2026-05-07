@@ -176,6 +176,14 @@ body{background:linear-gradient(160deg,#eaf7fb 0%,#f7fbfc 40%,#eaf7fb 100%)}
 .opt-card.new-quote:hover{border-style:solid}
 .area-notice{font-size:12px;color:var(--muted);margin-top:14px;text-align:center;line-height:1.5}
 
+/* Places autocomplete dropdown (used by the new-quote address field) */
+.bk-pac-wrap{position:relative}
+.bk-pac-dropdown{position:absolute;left:0;right:0;top:100%;background:#fff;border:1px solid var(--blue-border);border-radius:10px;box-shadow:0 4px 20px rgba(0,0,0,.12);z-index:9999;max-height:220px;overflow-y:auto;margin-top:2px}
+.bk-pac-item{padding:10px 14px;cursor:pointer;font-size:14px;color:var(--text);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px}
+.bk-pac-item:last-child{border-bottom:none}
+.bk-pac-item:hover,.bk-pac-item.active{background:var(--blue-light)}
+.bk-pac-pin{color:var(--blue);flex-shrink:0}
+
 /* Success */
 .success-screen{text-align:center;padding:40px 24px}
 .success-icon{font-size:52px;margin-bottom:16px}
@@ -520,7 +528,7 @@ function renderNewQuoteForm(){
     +'<input type="text" id="nq-name" placeholder="Full name" value="'+esc((LOOKUP_RESULT.existingClient && LOOKUP_RESULT.existingClient.name) || '')+'"></div>'
 
     +'<div class="field"><label>Service address</label>'
-    +'<input type="text" id="nq-address" placeholder="123 Main St, Honolulu, HI 96813"></div>'
+    +'<div class="bk-pac-wrap"><input type="text" id="nq-address" autocomplete="off" placeholder="Start typing your address\u2026"></div></div>'
     +'<div class="field-help">We service Oahu and Maui only. Out-of-area requests will be declined.</div>'
 
     +'<div id="nq-fields"></div>'
@@ -543,6 +551,77 @@ function renderNewQuoteForm(){
     var nameRow = $('nq-name-row');
     if (nameRow) nameRow.style.display = 'none';
   }
+
+  // Wire Places autocomplete on the address field. The input is freshly
+  // rendered by innerHTML each time renderNewQuoteForm runs, so we attach
+  // listeners after insertion (not on DOMContentLoaded).
+  initBkAddressField();
+}
+
+// ─── Places autocomplete (ported from lead-form.html) ────────────────────
+// Self-contained: keeps a single dropdown in the page at a time, mounted
+// into the input's wrapping `.bk-pac-wrap` container.
+var _bkPacDropdown = null;
+var _bkPacTimer = null;
+var _bkPacActive = -1;
+
+function _bkPacRemove(){
+  if (_bkPacDropdown && _bkPacDropdown.parentNode) _bkPacDropdown.parentNode.removeChild(_bkPacDropdown);
+  _bkPacDropdown = null; _bkPacActive = -1;
+}
+
+function _bkPacBuild(input, predictions){
+  _bkPacRemove();
+  if (!predictions.length) return;
+  var dd = document.createElement('div');
+  dd.className = 'bk-pac-dropdown';
+  predictions.forEach(function(p){
+    var item = document.createElement('div');
+    item.className = 'bk-pac-item';
+    item.innerHTML = '<svg class="bk-pac-pin" width="14" height="14" viewBox="0 0 16 16"><path d="M8 1a5 5 0 0 1 5 5c0 3.5-5 9-5 9S3 9.5 3 6a5 5 0 0 1 5-5zm0 3a2 2 0 1 0 0 4A2 2 0 0 0 8 4z" fill="currentColor"/></svg>' + esc(p.description || '');
+    item.addEventListener('mousedown', function(e){
+      e.preventDefault();
+      input.value = p.description;
+      _bkPacRemove();
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    dd.appendChild(item);
+  });
+  var wrap = input.parentNode; // .bk-pac-wrap
+  if (wrap) wrap.appendChild(dd);
+  _bkPacDropdown = dd; _bkPacActive = -1;
+}
+
+function initBkAddressField(){
+  var input = $('nq-address');
+  if (!input || input._bkInit) return;
+  input._bkInit = true;
+
+  input.addEventListener('input', function(){
+    clearTimeout(_bkPacTimer);
+    var val = input.value.trim();
+    if (val.length < 2) { _bkPacRemove(); return; }
+    _bkPacTimer = setTimeout(function(){
+      fetch('/api/places-autocomplete?input=' + encodeURIComponent(val))
+        .then(function(r){ return r.json(); })
+        .then(function(data){ _bkPacBuild(input, (data && data.predictions) || []); })
+        .catch(function(){ _bkPacRemove(); });
+    }, 200);
+  });
+
+  input.addEventListener('keydown', function(e){
+    if (!_bkPacDropdown) return;
+    var items = _bkPacDropdown.querySelectorAll('.bk-pac-item');
+    if (e.key === 'ArrowDown'){ e.preventDefault(); _bkPacActive = Math.min(_bkPacActive+1, items.length-1); items.forEach(function(el,i){ el.classList.toggle('active', i === _bkPacActive); }); }
+    else if (e.key === 'ArrowUp'){ e.preventDefault(); _bkPacActive = Math.max(_bkPacActive-1, 0);          items.forEach(function(el,i){ el.classList.toggle('active', i === _bkPacActive); }); }
+    else if (e.key === 'Enter' && _bkPacActive >= 0){ e.preventDefault(); items[_bkPacActive].dispatchEvent(new MouseEvent('mousedown')); }
+    else if (e.key === 'Escape'){ _bkPacRemove(); }
+  });
+
+  document.addEventListener('click', function(e){
+    if (!_bkPacDropdown) return;
+    if (!input.contains(e.target) && !_bkPacDropdown.contains(e.target)) _bkPacRemove();
+  });
 }
 
 function updateNqFields(){
@@ -926,10 +1005,6 @@ function getRushInfo(ds){
 function drawRushFee(ds){
   var rushEl = $('rush-area');
   if(!rushEl) return;
-  // Public flow goes through pending review — no rush-fee auto-charge.
-  // Dane decides if same-day is feasible during review and applies any fee
-  // manually at confirmation time.
-  if (IS_PUBLIC) { RUSH_FEE = 0; rushEl.innerHTML = ''; return; }
   var r = getRushInfo(ds);
   RUSH_FEE = r.fee;
   if(!r.fee){ rushEl.innerHTML=''; return; }
@@ -987,6 +1062,7 @@ async function submitBooking(){
         date:     SEL_DATE,
         time:     SEL_TIME,
         notes:    notes,
+        rushFee:  RUSH_FEE || 0,
         policiesAgreed: true,
       };
       if (PUBLIC_PATH === 'existing_property') {

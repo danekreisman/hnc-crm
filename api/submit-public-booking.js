@@ -79,13 +79,15 @@ export default async function handler(req, res) {
   const firstName = cleanName.split(/\s+/)[0] || cleanName;
 
   try {
+    const rushFee = (typeof b.rushFee === 'number' || (b.rushFee != null && !isNaN(Number(b.rushFee)))) ? Math.max(0, Number(b.rushFee)) : 0;
+
     // ── 2. Resolve quote (price + duration) ───────────────────────────────
     // For 'new_quote' we recompute server-side via /api/calculate-quote.
     // Never trust client-supplied price.
     let quoteResult = null;       // calculate-quote response (subtotal/discount/total/duration_minutes)
     let preTaxTotal = null;        // pre-tax pre-rush price (number) — for review task
     let computedTax = null;
-    let displayTotal = null;       // total inc. tax (number) for review task summary
+    let displayTotal = null;       // total inc. tax + rush (number) for review task summary
 
     if (b.path === 'new_quote') {
       const calcRes = await fetchWithTimeout(`${BASE_URL}/api/calculate-quote`, {
@@ -108,7 +110,7 @@ export default async function handler(req, res) {
       if (!calcJson.custom_quote && calcJson.total != null) {
         preTaxTotal = Number(calcJson.total);
         computedTax = +(preTaxTotal * TAX_RATE).toFixed(2);
-        displayTotal = +(preTaxTotal + computedTax).toFixed(2);
+        displayTotal = +(preTaxTotal + computedTax + rushFee).toFixed(2);
       }
     } else {
       // existing_property: price comes from the client request body
@@ -117,11 +119,13 @@ export default async function handler(req, res) {
       // number when he reviews.
       const candidatePrice = b.priceTotal != null ? Number(b.priceTotal) : null;
       if (candidatePrice && !isNaN(candidatePrice)) {
-        // Price from lastAppt total_price is post-tax. Pull back into pre-tax
-        // for the review task to keep storage consistent.
-        displayTotal = +candidatePrice.toFixed(2);
-        preTaxTotal = +(candidatePrice / (1 + TAX_RATE)).toFixed(2);
-        computedTax = +(displayTotal - preTaxTotal).toFixed(2);
+        // Price from lastAppt total_price is post-tax (no rush in the
+        // historical price). Pull back into pre-tax for storage; rush gets
+        // added on top for the displayed total.
+        const histPostTax = +candidatePrice.toFixed(2);
+        preTaxTotal = +(histPostTax / (1 + TAX_RATE)).toFixed(2);
+        computedTax = +(histPostTax - preTaxTotal).toFixed(2);
+        displayTotal = +(histPostTax + rushFee).toFixed(2);
       }
     }
 
@@ -246,7 +250,8 @@ export default async function handler(req, res) {
       b.condition  ? 'Condition: ' + b.condition + '/10' : null,
       '',
       'Requested: ' + b.date + ' at ' + b.time,
-      displayTotal != null ? 'Quote:     $' + displayTotal.toFixed(2) + ' (incl. tax)' : 'Quote:     custom',
+      rushFee > 0 ? 'Rush fee:  $' + rushFee.toFixed(2) + ' (' + (rushFee === 200 ? 'same-day' : rushFee === 100 ? 'next-day' : '2-day') + ')' : null,
+      displayTotal != null ? 'Quote:     $' + displayTotal.toFixed(2) + ' (incl. tax' + (rushFee > 0 ? ' + rush' : '') + ')' : 'Quote:     custom',
       '',
       b.notes ? 'Customer notes: ' + b.notes : null,
       '',
@@ -256,6 +261,15 @@ export default async function handler(req, res) {
     ].filter((x) => x !== null).join('\n');
 
     const today = new Date().toISOString().split('T')[0];
+    // Pretty date for notifications (e.g. "Wed May 7 at 9:00 AM")
+    let prettyReq = b.date + ' at ' + b.time;
+    try {
+      const _d = new Date(b.date + 'T12:00:00');
+      const _wd = _d.toLocaleDateString('en-US', { weekday: 'short' });
+      const _md = _d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      prettyReq = _wd + ' ' + _md + ' at ' + b.time;
+    } catch (_e) { /* fall back to ISO format */ }
+    const rushTag = rushFee > 0 ? ' \u26A1 ' + (rushFee === 200 ? 'SAME-DAY' : rushFee === 100 ? 'NEXT-DAY' : '2-DAY') : '';
 
     const taskRes = await fetch(`${process.env.SUPABASE_URL}/rest/v1/tasks`, {
       method: 'POST',
@@ -289,6 +303,7 @@ export default async function handler(req, res) {
           customer_notes: b.notes || null,
           quote_total_pretax:    preTaxTotal,
           quote_tax:             computedTax,
+          rush_fee:              rushFee,
           quote_total_with_tax:  displayTotal,
           quote_data:            quoteResult || null,
           lead_id:               leadId,
@@ -331,18 +346,18 @@ export default async function handler(req, res) {
       },
       body: JSON.stringify({
         event_type: 'lead_inquiry',
-        title: 'New booking request: ' + cleanName,
-        body: summaryLine + ' — requested ' + b.date + ' ' + b.time,
+        title: 'New booking request: ' + cleanName + rushTag,
+        body: prettyReq + ' \u00b7 ' + b.service + (b.frequency ? ' (' + b.frequency + ')' : '') + (displayTotal != null ? ' \u00b7 $' + displayTotal.toFixed(2) : ''),
         url: '/#tasks',
-        metadata: { source: 'public_booking', leadId, clientId: b.clientId || null, name: cleanName, phone: cleanPhoneDigits, service: b.service, path: b.path },
+        metadata: { source: 'public_booking', leadId, clientId: b.clientId || null, name: cleanName, phone: cleanPhoneDigits, service: b.service, path: b.path, requestedDate: b.date, requestedTime: b.time, rushFee: rushFee },
       }),
     }).catch((err) => console.warn('[submit-public-booking] in-app notify failed:', err && err.message));
 
     // ── 7. Best-effort: push fan-out ───────────────────────────────────────
     import('./utils/send-push.js').then(({ sendPushToAllSubscribed }) => {
       return sendPushToAllSubscribed({
-        title: 'New booking request — ' + cleanName,
-        body: summaryLine + ' · ' + b.date + ' ' + b.time,
+        title: 'Booking request \u2014 ' + cleanName + rushTag,
+        body: prettyReq + ' \u00b7 ' + b.service + (displayTotal != null ? ' \u00b7 $' + displayTotal.toFixed(2) : ''),
         url: '/#tasks',
         tag: 'public-booking-' + (leadId || b.clientId || phone10),
         urgency: 'high',

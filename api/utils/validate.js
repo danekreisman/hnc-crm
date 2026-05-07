@@ -199,6 +199,7 @@ export const SCHEMAS = {
     clientId:        { required: false, rules: [is.uuid],                                  message: 'clientId must be a valid UUID if provided' },
     propertyAddress: { required: false, rules: [is.maxLength(300)],                        message: 'propertyAddress must be under 300 chars' },
     priceTotal:      { required: false, rules: [(v) => v == null || (is.number(Number(v)) && Number(v) >= 0 && Number(v) < 100000)], message: 'priceTotal must be a non-negative number under 100000 if provided' },
+    rushFee:         { required: false, rules: [(v) => v == null || (is.number(Number(v)) && Number(v) >= 0 && Number(v) <= 500)],   message: 'rushFee must be a non-negative number under 500 if provided' },
   },
 
 };

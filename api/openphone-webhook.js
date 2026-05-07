@@ -592,7 +592,20 @@ export default async function handler(req, res) {
         // task for Dane to review. We do NOT auto-flip the stage — the
         // boundary between 'lost' and 'cold/deferred' is fuzzy and
         // false positives would silently lose customers.
-        if (body && body.trim() && process.env.ANTHROPIC_API_KEY) {
+        //
+        // CLIENT-MATCH GUARD (added 2026-05-08): when a lead converts to a
+        // client (stage='Closed won' + client row created), the original
+        // lead row stays in the DB for history. findLeadByPhone returns
+        // it on every subsequent SMS — so a routine text from an active
+        // customer (e.g. Justin Cornair confirming today's booking) was
+        // being classified as a lead-response and creating false-positive
+        // 'high intent' tasks. Fix: if the sender is ALSO matched as a
+        // client, skip lead classification entirely. The response_count
+        // bump above is harmless metadata so we leave it. Only the AI
+        // classifier and task creation are gated.
+        if (client) {
+          console.log('[openphone-webhook] sender matched as client (' + client.name + '), skipping lead-response classifier despite lead match');
+        } else if (body && body.trim() && process.env.ANTHROPIC_API_KEY) {
           try {
             const verdict = await classifyLeadResponse(body, lead.name);
             console.log('[openphone-webhook] AI verdict for lead', lead.id, ':', JSON.stringify(verdict));

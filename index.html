@@ -779,7 +779,7 @@ body:not(.hnc-assistant-user) .assistant-only{display:none!important;}
         <div id="bulk-action-bar" style="display:none;margin-bottom:12px;padding:10px 14px;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:#fff;border-radius:10px;display:none;align-items:center;gap:10px;flex-wrap:wrap;">
           <span id="bulk-count-label" style="font-weight:600;font-size:14px;">0 selected</span>
           <button onclick="bulkSelectByStage('Quoted')" style="background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.35);color:#fff;padding:5px 11px;border-radius:14px;font-size:12px;cursor:pointer;font-weight:500;">All Quoted</button>
-          <button onclick="bulkSelectByStage('Follow-up')" style="background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.35);color:#fff;padding:5px 11px;border-radius:14px;font-size:12px;cursor:pointer;font-weight:500;">All Follow-up</button>
+          <button onclick="bulkSelectByStage('Long-Term Follow-Up')" style="background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.35);color:#fff;padding:5px 11px;border-radius:14px;font-size:12px;cursor:pointer;font-weight:500;">All Follow-up</button>
           <button onclick="bulkClearSelection()" style="background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.35);color:#fff;padding:5px 11px;border-radius:14px;font-size:12px;cursor:pointer;font-weight:500;">Clear</button>
           <button id="bulk-followup-btn" onclick="openBulkFollowupModal()" style="margin-left:auto;background:#fff;color:#553c9a;border:none;padding:7px 16px;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;" disabled>&#x2728; AI follow-up</button>
           <button id="bulk-move-btn" onclick="openBulkMoveMenu(this)" style="background:#fff;color:#553c9a;border:none;padding:7px 16px;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;position:relative;" disabled>&#x21AA; Move to&hellip;</button>
@@ -789,7 +789,7 @@ body:not(.hnc-assistant-user) .assistant-only{display:none!important;}
         <div id="pipe-board" class="pipeline">
           <div class="pipe-col"><div class="pipe-header"><span class="pipe-label">New inquiry</span><span class="pipe-count" id="count-inquiry">0</span></div></div>
           <div class="pipe-col"><div class="pipe-header"><span class="pipe-label">Quoted</span><span class="pipe-count" id="count-quoted">0</span></div></div>
-          <div class="pipe-col"><div class="pipe-header"><span class="pipe-label">Follow-up</span><span class="pipe-count" id="count-followup">0</span></div></div>
+          <div class="pipe-col"><div class="pipe-header"><span class="pipe-label">Long-Term Follow-Up</span><span class="pipe-count" id="count-followup">0</span></div></div>
         </div>
 
         <!-- CLOSED LEADS -->
@@ -2507,7 +2507,7 @@ Mahalo 🌺</textarea>
         <div class="form-row"><label>Address</label><input type="text" id="led-address"></div>
         <div class="form-row"><label>Est. monthly value ($)</label><input type="number" id="led-value"></div>
         <div class="form-row"><label>Service type</label><select id="led-service"><option>Regular Clean</option><option>Deep Clean</option><option>Move Out Clean</option><option>Airbnb Turnover</option><option>Janitorial Clean</option></select></div>
-        <div class="form-row"><label>Stage</label><select id="led-stage"><option>New inquiry</option><option>Quoted</option><option>Walkthrough requested</option><option>Follow-up</option></select></div>
+        <div class="form-row"><label>Stage</label><select id="led-stage"><option>New inquiry</option><option>Quoted</option><option>Walkthrough requested</option><option>Long-Term Follow-Up</option></select></div>
         <div class="form-row"><label>Lead source</label><select id="led-source"><option>Google SEO</option><option>Referral</option><option>Cold outreach</option><option>Walk-in</option><option>Social media</option></select></div>
         <div class="form-row"><label>Next action</label><input type="text" id="led-action"></div>
         <div class="form-row"><label>Due date</label><input type="date" id="led-due"></div>
@@ -3715,7 +3715,7 @@ function renderLeadsPipeline(){
     if(!view)return;
     view.querySelectorAll('.pipe-col .deal-card').forEach(function(c){c.remove();});
   });
-  var stageMap={'New inquiry':0,'Quoted':1,'Walkthrough requested':1,'Follow-up':2};
+  var stageMap={'New inquiry':0,'Quoted':1,'Walkthrough requested':1,'Long-Term Follow-Up':2};
   /* Hot-detection counters for visibility — logged at end of render */
   var _renderHotCount = 0;
   var _renderHotNames = [];
@@ -3941,15 +3941,15 @@ function _scoreLeadForAttention(id, l){
     };
   }
 
-  /* ── Tier 6: stuck in Follow-up stage. */
-  if(l.stage === 'Follow-up'){
+  /* ── Tier 6: stuck in Long-Term Follow-Up stage. */
+  if(l.stage === 'Long-Term Follow-Up'){
     var d2 = _daysAgo(l.updatedAt || l.createdAt);
     /* Only surface if it's been at least 3 days since something changed —
        otherwise you'd see the same lead the day after you moved them here. */
     if(d2 >= 3){
       return {
         score: 350 - Math.min(300, (d2 - 3) * 5),
-        reason: 'In Follow-up for ' + Math.round(d2) + 'd — decide: nudge or close out',
+        reason: 'In Long-Term Follow-Up for ' + Math.round(d2) + 'd — decide: nudge or close out',
         actionLabel: 'Send AI follow-up',
         actionType: 'ai_followup',
         tone: 'cold',
@@ -6923,7 +6923,7 @@ function openLead(id){
   document.getElementById('lead-name').textContent=d.name;
   document.getElementById('lead-type-line').textContent=d.service+' · '+d.sqft;
   var sb=document.getElementById('lead-stage-badge');sb.textContent=d.stage;
-  var stageColors={'New inquiry':'background:#ebf5ff;color:#2b6cb0;','Quoted':'background:#fffbeb;color:#b7791f;','Walkthrough requested':'background:#f0fff4;color:#276749;','Follow-up':'background:#fff5f5;color:#c53030;','Closed won':'background:var(--brand-50);color:#276749;','Closed lost':'background:var(--bg-soft);color:var(--text-muted);'};
+  var stageColors={'New inquiry':'background:#ebf5ff;color:#2b6cb0;','Quoted':'background:#fffbeb;color:#b7791f;','Walkthrough requested':'background:#f0fff4;color:#276749;','Long-Term Follow-Up':'background:#fff5f5;color:#c53030;','Closed won':'background:var(--brand-50);color:#276749;','Closed lost':'background:var(--bg-soft);color:var(--text-muted);'};
   sb.style.cssText=stageColors[d.stage]||'';
   ['contact','phone','email','address','service','sqft','source','date','action','due','assigned','notes'].forEach(function(f){
     var el=document.getElementById('lead-'+f);if(el)el.textContent=d[f]||'—';
@@ -9944,7 +9944,7 @@ window.hncDisableNotifications = async function() {
       <div class="form-two">
         <div class="form-row"><label>Stage</label>
           <select id="nl-stage">
-            <option>New inquiry</option><option>Quoted</option><option>Follow-up</option>
+            <option>New inquiry</option><option>Quoted</option><option>Long-Term Follow-Up</option>
           </select>
         </div>
         <div class="form-row"><label>Assigned to</label>
@@ -10155,7 +10155,7 @@ function saveNewLead(){
     quoteSentAt:null
   };
   // Add card to correct pipeline column in both dashboard and pipeline views
-  var stageMap={'New inquiry':0,'Quoted':1,'Walkthrough requested':1,'Follow-up':2};
+  var stageMap={'New inquiry':0,'Quoted':1,'Walkthrough requested':1,'Long-Term Follow-Up':2};
   var colIdx=stageMap[stage]||0;
   ['view-dashboard','view-pipeline'].forEach(function(viewId){
     var view=document.getElementById(viewId);
@@ -10530,7 +10530,7 @@ function generateAgentResponse(text){
     lines=['**Pipeline summary — '+leads.length+' leads**',''];
     Object.keys(byStage).forEach(function(s){lines.push('- '+s+': **'+byStage[s]+'**');});
     lines.push('','Estimated pipeline value: **$'+totalVal.toLocaleString()+'/mo**');
-    var hotLeads=leads.filter(function(l){return l.stage==='Follow-up';});
+    var hotLeads=leads.filter(function(l){return l.stage==='Long-Term Follow-Up';});
     if(hotLeads.length>0){lines.push('','Leads needing follow-up:');hotLeads.forEach(function(l){lines.push('- '+l.name+' ('+l.value+') — action: '+l.action);});}
     return lines.join('\n');
   }
@@ -11693,7 +11693,7 @@ function updateTriggerExtra(){
     else if(trigger === 'scheduled') { label.textContent = 'Time of day (HH:MM, e.g. 09:00)'; if(input) input.placeholder = '09:00'; }
     else if(trigger === 'booking_completed') { label.textContent = 'Hours after booking completed'; if(input) input.placeholder = 'e.g. 24'; }
     else if(trigger === 'days_in_segment') { label.textContent = 'Segment and days (format: segment:days)'; if(input) input.placeholder = 'nurture:30  or  canceled:60  or  one_time:30'; }
-    else if(trigger === 'stage_entered') { label.textContent = 'Stage and days after entry (format: stage:days)'; if(input) input.placeholder = 'Quoted:1   Closed lost:30   Follow-up:7'; }
+    else if(trigger === 'stage_entered') { label.textContent = 'Stage and days after entry (format: stage:days)'; if(input) input.placeholder = 'Quoted:1   Closed lost:30   Long-Term Follow-Up:7'; }
   } else {
     extraDiv.style.display = 'none';
   }
@@ -15919,21 +15919,21 @@ async function reactivateLead(id){
 
   // Update in Supabase FIRST so optimistic UI doesn't get out of sync
   if(id && id.length > 20){
-    var reactRes = await db.from('leads').update({stage:'Follow-up'}).eq('id', id);
+    var reactRes = await db.from('leads').update({stage:'Long-Term Follow-Up'}).eq('id', id);
     if(reactRes && reactRes.error){
       console.error('[reactivateLead] DB update failed:', reactRes.error);
       showToast('Could not reactivate: ' + (reactRes.error.message || 'database error'), true);
       return;
     }
   }
-  lead.stage = 'Follow-up';
+  lead.stage = 'Long-Term Follow-Up';
 
   // Remove from lost table row
   document.querySelectorAll('#lost-leads-tbody tr').forEach(function(row){
     if(row.textContent.indexOf(lead.name) >= 0) row.remove();
   });
 
-  // Add back to pipeline Follow-up column
+  // Add back to pipeline Long-Term Follow-Up column
   var cols = document.querySelectorAll('#view-pipeline .pipe-col');
   if(cols[2]){
     var card = document.createElement('div');
@@ -15947,7 +15947,7 @@ async function reactivateLead(id){
     cols[2].appendChild(card);
   }
 
-  showPaymentToast(lead.name + ' reactivated and moved to Follow-up!', null, 'success');
+  showPaymentToast(lead.name + ' reactivated and moved to Long-Term Follow-Up!', null, 'success');
 }
 
 // Update scheduleLeadAppointment to add to won table
@@ -19474,7 +19474,7 @@ async function reviewTaskMarkLost(taskId, leadId) {
 
 async function reviewTaskNotLost(taskId) {
   // No DB lead update needed — just close the task. The lead stays in
-  // whatever stage it was already in (Quoted, Follow-up, etc).
+  // whatever stage it was already in (Quoted, Long-Term Follow-Up, etc).
   await completeTaskById(taskId);
 }
 
@@ -20192,7 +20192,7 @@ function openBulkMoveMenu(anchorBtn){
     { value: 'New inquiry',           emoji: '\ud83d\udd35', label: 'New inquiry' },
     { value: 'Quoted',                emoji: '\ud83d\udcb0', label: 'Quoted' },
     { value: 'Walkthrough requested', emoji: '\ud83d\udd0d', label: 'Walkthrough requested' },
-    { value: 'Follow-up',             emoji: '\u23f0',       label: 'Follow-up' },
+    { value: 'Long-Term Follow-Up',             emoji: '\u23f0',       label: 'Long-Term Follow-Up' },
     { value: 'Closed lost',           emoji: '\u274c',       label: 'Closed lost' }
   ];
 

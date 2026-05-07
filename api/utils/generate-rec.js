@@ -93,9 +93,9 @@ function buildPrompt(lead, history, assistantName) {
     stageContext = 'They replied at some point — READ THE SMS HISTORY before recommending. Respond to what they actually said. If they asked a question, answer it. If they raised an objection, address it. Don\'t pretend the conversation didn\'t happen.';
   } else if (stage === 'Walkthrough requested') {
     stageContext = 'They asked for a walkthrough but haven\'t locked in a date/time. These leads are HOT — they\'ve self-identified as serious. Priority is getting on their calendar TODAY. A call beats a text here.';
-  } else if (stage === 'Follow-up' && hasPriceEvidence) {
+  } else if (stage === 'Long-Term Follow-Up' && hasPriceEvidence) {
     stageContext = 'Cold lead in active follow-up. They got a quote and went silent. Light, no-pressure check-in. The aim is to leave the door open without being pushy.';
-  } else if (stage === 'Follow-up' && !hasPriceEvidence) {
+  } else if (stage === 'Long-Term Follow-Up' && !hasPriceEvidence) {
     stageContext = 'Cold lead in follow-up, no clear quote on record. May have been a phone-only conversation. Open-ended re-engagement only. Don\'t claim to have sent an estimate. Keep it warm and short.';
   } else {
     stageContext = 'Standard follow-up. Be specific to their actual situation from notes/history.';
@@ -171,7 +171,7 @@ ${recentCalls.length === 0 ? '(no calls)' : recentCalls.map(c => `  [${c.directi
 1-2: HOT — they replied in last 48h OR walkthrough requested OR brand-new today. Act today, ideally within hours.
 3-4: WARM — Quoted 1-4 days ago no reply, normal follow-up cadence.
 5-6: COOLING — Quote 5-10 days old no reply, going cold. Last-chance window.
-7-8: COLD — Quote 11+ days, in Follow-up stage. Long-shot nudge.
+7-8: COLD — Quote 11+ days, in Long-Term Follow-Up stage. Long-shot nudge.
 9-10: SKIP — wait-state, recently contacted, low-value, or do-nothing.
 
 ==== HOW TO DRAFT THE MESSAGE (for text/email actions) ====

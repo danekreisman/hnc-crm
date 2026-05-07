@@ -68,15 +68,15 @@ VALUES (
   trigger_config = EXCLUDED.trigger_config,
   actions        = EXCLUDED.actions;
 
--- ── 3. Follow-up → Day-3 SMS nudge ───────────────────────────────────────────
--- When a lead is parked in "Follow-up", send a friendly SMS check-in 3 days
+-- ── 3. Long-Term Follow-Up → Day-3 SMS nudge ─────────────────────────────────
+-- When a lead is parked in "Long-Term Follow-Up", send a friendly SMS check-in 3 days
 -- later. AI-personalized so it doesn't sound canned. Pause Phase 3 will
 -- prevent this from firing if the lead replies in the meantime.
 INSERT INTO lead_automations (name, trigger_type, trigger_config, actions, is_enabled)
 VALUES (
-  'Stage: Follow-up — Day 3 SMS nudge',
+  'Stage: Long-Term Follow-Up — Day 3 SMS nudge',
   'stage_entered',
-  '{"stage": "Follow-up", "delay_minutes": 4320}'::jsonb,
+  '{"stage": "Long-Term Follow-Up", "delay_minutes": 4320}'::jsonb,
   '[
     {
       "type": "sms",

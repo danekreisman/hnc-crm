@@ -17,7 +17,7 @@
  *
  * 3. Post-first-appointment call lives in run-job-completions.js (hourly cron).
  *
- * 4. Pipeline stage advance: Quoted → Follow-up after 3 days of no reply.
+ * 4. Pipeline stage advance: Quoted → Long-Term Follow-Up after 3 days of no reply.
  *    - Pure DB write, no kill switch (low blast radius).
  *    - Leads with last_responded_at set are skipped (they're being handled).
  *
@@ -291,7 +291,7 @@ export default async function handler(req, res) {
     }
     } // end of day5Enabled block
 
-    // ── 3. Pipeline stage advance: Quoted → Follow-up after 3 days of silence ──
+    // ── 3. Pipeline stage advance: Quoted → Long-Term Follow-Up after 3 days of silence ──
     // Pure DB write, no SMS/email side effects. Always runs (no kill switch).
     // Criteria: stage='Quoted' AND quote_sent_at is 3+ days old AND no inbound
     // reply tracked AND not blacklisted. Leads who replied stay in Quoted (the
@@ -312,12 +312,12 @@ export default async function handler(req, res) {
         const ids = stale.map(r => r.id);
         const { error: updateErr } = await db
           .from('leads')
-          .update({ stage: 'Follow-up' })
+          .update({ stage: 'Long-Term Follow-Up' })
           .in('id', ids);
         if (updateErr) {
           console.warn('[run-task-automations] stage-advance update error:', updateErr.message);
         } else {
-          console.log(`[run-task-automations] Advanced ${ids.length} leads from Quoted → Follow-up`);
+          console.log(`[run-task-automations] Advanced ${ids.length} leads from Quoted → Long-Term Follow-Up`);
           results.stage_advanced_to_followup = ids.length;
         }
       } else {

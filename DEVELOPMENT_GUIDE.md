@@ -126,6 +126,27 @@ if(myEl) myEl.textContent = d.myField || '—';
 ```
 
 
+## Pipeline Stages — Tide Canonical Map
+
+The Tide pipeline design (May 2026) defines 7 canonical lead stages. To avoid a high-risk mass rename of every code reference, **Tide adopts the existing DB stage values as canonical** rather than renaming them all. The one exception is `Follow-up` → `Long-Term Follow-Up`, which was renamed because the existing generic-followup semantics conflicted with Tide's specific "lead asked for time, set a wake-up date" semantics.
+
+**Canonical stages (= literal `leads.stage` values):**
+
+| Tide name | DB value (use this in code) | Notes |
+|---|---|---|
+| New Inquiry | `New inquiry` | Lowercase 'i' — matches lead-capture default |
+| Walkthrough Scheduled | `Walkthrough requested` | Set when lead asks for walkthrough; cleared after walkthrough → Quoted |
+| Quoted | `Quoted` | Auto-quote sets `quote_sent_at` and stamps this stage |
+| Long-Term Follow-Up | `Long-Term Follow-Up` | Renamed from `Follow-up` on 2026-05-07 (see Known Gotchas) |
+| Lost | `Closed lost` | Terminal except for Day-30 reactivation automation |
+| Won | `Closed won` | Terminal — exits lead pipeline, enters client lifecycle |
+| (DNC) | (no stage — use `do_not_contact` boolean) | Excludes from cron automations; not a separate pipeline stage |
+
+When writing new code that filters or sets stage, **always use the DB value** (right column). Never write `'Long Term Follow Up'`, `'long-term follow-up'`, etc. — string equality is the only match the cron uses, and a typo silently breaks the automation.
+
+The canonical Quoted cadence has three planned variants (Move-Out / Deep Clean / Regular) selected by `service_type` — those don't need separate stage values; they branch inside the `stage_entered` automation set. See the Tide build plan for the cadence specifics.
+
+
 ## Auth
 
 The CRM uses Supabase Auth with two sign-in methods, both granting the same session:
@@ -440,6 +461,7 @@ Run through this checklist:
 - **Lead form condition is a 5-tier picker, NOT a 1-10 slider** (changed April 2026). `lead-form.html` shows 5 photo cards (Extreme / Very dirty / Moderately dirty / Decent / Pristine), each with a photo, tier name, and short description (e.g. "Cleaned weekly. Almost no visible dust, dirt, or wear."). The descriptions are decision-support for self-classification — keep them concise (1-2 sentences) and frequency-based where possible. The cards map to numeric values 2 / 4 / 6 / 8 / 10 respectively. The numeric value is what gets sent to `/api/lead-capture` as `condition` and what `pricing_condition.score_min/score_max` looks up — backend pricing logic is unchanged. The mapping lives in the `data-value` attribute on each `.tier-card` in the form. After tier selection, a warning modal appears reminding the customer that misrepresented condition triggers an on-arrival upcharge — this is intentional, do not auto-dismiss it. Cards have a hover-zoom effect (scale 1.12 + lift) gated by `@media (hover:hover)` so it's desktop-only and doesn't break on touch devices. Tier photos for Extreme / Very dirty / Moderately dirty / Decent live in `/tier-photos/*.jpg` in the repo (real HNC job photos, resized to 800px wide, ~70-100KB each); Pristine still uses a Pexels CDN URL until a real after-shot replaces it. To swap a photo: replace the file in `tier-photos/` (keep the same filename) and commit — Vercel auto-serves it.
 - **Cleaner-arrival tier mismatch escalation is currently MANUAL.** When a cleaner arrives and the actual condition exceeds what the customer described, the cleaner texts the office via OpenPhone with photos and the office handles the re-quote / cancellation conversation manually. There is no automated layer-3 workflow yet (no in-CRM submission, no auto-SMS to the customer). Don't build automation around it without confirming with Dane first.
 - **Quote-locking via customer photo upload is NOT yet implemented** — only the tier picker + warning modal shipped. The "upload photos to lock your quote" feature was discussed but deferred. When building it, the photos will need a Supabase Storage bucket (`lead-photos` is the proposed name, not yet created) and a corresponding column on the `leads` table (also not yet added).
+- **`Follow-up` was renamed to `Long-Term Follow-Up` on 2026-05-07** as Phase 1 of the Tide pipeline alignment. The migration `migrations/2026-05-07-rename-followup-stage.sql` updates `leads.stage` for affected rows AND updates the seeded automation in `lead_automations` (matched by old name OR by `trigger_config->>'stage' = 'Follow-up'`). **Must be run in Supabase before deploying** — otherwise the running cron looks for stage `'Follow-up'` which no longer exists in the leads table (because the code change updated the literal it sets). Code references in `index.html`, `api/run-task-automations.js`, `api/lead-followup-generate.js`, `api/utils/generate-rec.js`, `api/lead-capture.js`, and `supabase/migrations/006_seed_stage_entered_defaults.sql` were all updated in the same commit. Historical `lead_stage_events` rows (with `to_stage = 'Follow-up'` from past transitions) are intentionally left as-is to preserve the audit trail. If you query stage history and see both spellings, that's why.
 - **Waiver page (`agree.html`) AND booking page step 2 (`book.html`) both load policies + checklists from `settings` table** (added April 2026). Two endpoints power both: `/api/get-policies` returns `settings.policy_items`, and `/api/get-checklists` returns `settings.service_checklists`. Both have hardcoded fallback defaults in their `.js` files so the pages never break if the DB rows aren't seeded. To edit waiver content live without code changes, edit the JSONB in those two `settings` rows directly in Supabase — changes flow to BOTH pages.
 
   Service checklists are organized as `{services:[{id,label,intro?,required?,sections:[{heading,items:[]}],notIncluded?,footnote?}],beforeArrival:[]}`. The `required` array (only on move-out today) is NOT rendered inside the service card when the booked/filtered service is move-out — instead its items are joined into a single bulleted policy checkbox titled "Move-out preparation requirements" so the customer must acknowledge them as one item. The `notIncluded` array renders as a dashed-border gray block at the bottom of the service card. The `id` field on each service maps to an emoji in `SERVICE_EMOJI` — adding a new service requires updating that map in BOTH `agree.html` and `book.html`.

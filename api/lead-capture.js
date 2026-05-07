@@ -276,7 +276,7 @@ export default async function handler(req, res) {
       console.log('[lead-capture] janitorial SMS sent:', smsRes.status);
     } catch(err) { console.error('[lead-capture] janitorial SMS failed:', err.message); }
 
-    // Park them in their own stage so the Quoted→Follow-up cron (which
+    // Park them in their own stage so the Quoted→Long-Term Follow-Up cron (which
     // targets stage='Quoted') doesn't sweep them into the regular follow-up
     // flow. Janitorial leads convert via in-person walkthrough, not text
     // follow-up. Try to record walkthrough_request_sent_at if the column

@@ -439,34 +439,38 @@ tr.clickable:hover td{background:var(--brand-50);cursor:pointer;}
 .price-preview-val{font-size:22px;font-weight:700;color:var(--brand-500);}
 .price-preview-breakdown{font-size:11px;color:var(--text-muted);margin-top:4px;}
 /* PRICING BREAKDOWN — stacked 3-section panel used on lead profile + booking modal.
-   Job spec (gray) → Client pricing (sky blue) → Your margin (green). Same visual
-   language so admins immediately recognize the breakdown wherever it appears. */
-.hnc-pricing-stack{display:flex;flex-direction:column;gap:10px;}
-.hnc-pricing-card{border-radius:10px;padding:12px 14px;border:1px solid;}
-.hnc-pricing-card .hnc-pc-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;opacity:.75;}
-.hnc-pricing-card .hnc-pc-row{display:flex;justify-content:space-between;align-items:baseline;padding:3px 0;font-size:13px;line-height:1.5;}
-.hnc-pricing-card .hnc-pc-row .k{color:var(--text);}
-.hnc-pricing-card .hnc-pc-row .v{font-variant-numeric:tabular-nums;font-weight:600;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;}
+   Job spec → Client pricing → Your margin. Typography matches the rest of the
+   CRM (Inter, 11px uppercase labels, system letter-spacing). No monospace —
+   numbers right-align via flexbox + tabular-nums on the .v cells. */
+.hnc-pricing-stack{display:flex;flex-direction:column;gap:10px;font-family:inherit;}
+.hnc-pricing-card{border-radius:10px;padding:12px 14px;border:1px solid var(--border);background:#fff;}
+.hnc-pricing-card .hnc-pc-label{font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px;}
+.hnc-pricing-card .hnc-pc-row{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:3px 0;font-size:13px;line-height:1.55;color:var(--text);}
+.hnc-pricing-card .hnc-pc-row .k{color:var(--text-muted);}
+.hnc-pricing-card .hnc-pc-row .v{font-variant-numeric:tabular-nums;font-weight:600;color:var(--text);text-align:right;white-space:nowrap;}
 .hnc-pricing-card .hnc-pc-row.hnc-pc-discount .v{color:#059669;}
-.hnc-pricing-card .hnc-pc-divider{height:1px;background:currentColor;opacity:.15;margin:6px 0;}
-.hnc-pricing-card .hnc-pc-divider-bold{opacity:.3;height:1.5px;}
+.hnc-pricing-card .hnc-pc-divider{height:1px;background:var(--border);margin:8px 0;}
+.hnc-pricing-card .hnc-pc-divider-bold{background:var(--border-strong);}
 .hnc-pricing-card .hnc-pc-row.hnc-pc-total{padding-top:4px;}
-.hnc-pricing-card .hnc-pc-row.hnc-pc-total .k{font-weight:700;}
-.hnc-pricing-card .hnc-pc-big{font-size:18px;font-weight:700;}
-.hnc-pricing-card .hnc-pc-row.hnc-pc-tiny{font-size:11px;color:var(--text-muted);padding-top:2px;}
+.hnc-pricing-card .hnc-pc-row.hnc-pc-total .k{color:var(--text);font-weight:600;}
+.hnc-pricing-card .hnc-pc-row.hnc-pc-total .v{font-size:18px;font-weight:700;}
+.hnc-pricing-card .hnc-pc-row.hnc-pc-tiny{font-size:11px;padding-top:2px;}
 .hnc-pricing-card .hnc-pc-row.hnc-pc-tiny .v{font-size:11px;font-weight:500;color:var(--text-muted);}
-.hnc-pricing-card .hnc-pc-row.hnc-pc-hours .v{font-size:18px;color:#7c2d12;}
-/* Section-specific tints */
-.hnc-pc-spec{background:#f8fafc;border-color:#e2e8f0;color:#334155;}
-.hnc-pc-spec .hnc-pc-label{color:#64748b;}
-.hnc-pc-client{background:#eff6ff;border-color:#bfdbfe;color:#1e3a8a;}
-.hnc-pc-client .hnc-pc-label{color:#1e40af;}
-.hnc-pc-client .hnc-pc-row.hnc-pc-total .v{color:#1d4ed8;}
-.hnc-pc-margin{background:#f0fdf4;border-color:#bbf7d0;color:#14532d;}
-.hnc-pc-margin .hnc-pc-label{color:#15803d;}
+.hnc-pricing-card .hnc-pc-row.hnc-pc-hours .v{font-size:18px;font-weight:700;color:var(--text);}
+/* 2x2 spec grid — beds, baths, sqft, condition each get their own labeled cell.
+   Replaces the long jumbled inline list that looked terrible on Sagar's profile. */
+.hnc-pc-spec-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;}
+.hnc-pc-spec-cell{background:var(--bg-soft);border-radius:8px;padding:8px 10px;}
+.hnc-pc-spec-cell-label{font-size:10px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;}
+.hnc-pc-spec-cell-value{font-size:13px;font-weight:600;color:var(--text);margin-top:1px;}
+/* Section accent borders — subtle, just a left edge so the cards still feel
+   like info blocks but each section is identifiable at a glance */
+.hnc-pc-spec{border-left:3px solid #94a3b8;}
+.hnc-pc-client{border-left:3px solid var(--brand-500);}
+.hnc-pc-margin{border-left:3px solid #22c55e;}
 .hnc-pc-margin .hnc-pc-row.hnc-pc-total .v{color:#15803d;}
-.hnc-pc-margin-empty{background:#fafafa;border-color:#e5e7eb;color:#9ca3af;}
-.hnc-pc-margin-empty .hnc-pc-label{color:#9ca3af;}
+.hnc-pc-margin-empty{border-left-color:var(--border-strong);background:var(--bg-soft);}
+.hnc-pc-margin-empty .hnc-pc-row{color:var(--text-muted);}
 /* MESSAGING INBOX */
 .inbox-layout{display:grid;grid-template-columns:260px 1fr;height:calc(100vh - 120px);background:#fff;border:1px solid var(--border);border-radius:10px;overflow:hidden;}
 .inbox-list{border-right:1px solid var(--border);overflow-y:auto;}
@@ -7808,21 +7812,15 @@ function renderPricingBreakdown(targetId, d){
     if(v === null) return '—';
     return '$' + v.toFixed(2);
   };
+  var fmtSqft = function(n){
+    var v = $(n);
+    if(v === null) return null;
+    return v.toLocaleString() + ' sqft';
+  };
   var hasMargin = d.cleanerName && $(d.cleanerPay) !== null && $(d.cleanerPay) > 0;
   var marginAmount = hasMargin ? ($(d.subtotal) || 0) - ($(d.cleanerPay) || 0) : null;
   var marginPerHour = (hasMargin && $(d.hours) > 0) ? marginAmount / $(d.hours) : null;
   var clientPerHour = ($(d.total) && $(d.hours) > 0) ? $(d.total) / $(d.hours) : null;
-
-  /* Property spec line */
-  var spec = [];
-  if(d.beds  != null && d.beds  !== '') spec.push(d.beds + ' bed');
-  if(d.baths != null && d.baths !== '') spec.push(d.baths + ' bath');
-  if(d.sqft  != null && d.sqft  !== '') spec.push((typeof d.sqft === 'number' ? d.sqft.toLocaleString() : d.sqft) + ' sqft');
-  if(d.condition != null && d.condition !== '') {
-    var c = parseInt(d.condition);
-    var tier = (c <= 4 ? 'Tough' : c <= 6 ? 'Moderate' : 'Standard');
-    spec.push('condition: ' + tier + ' (' + c + '/10)');
-  }
 
   /* Build HTML — 3 stacked sections */
   var html = '<div class="hnc-pricing-stack">';
@@ -7832,12 +7830,34 @@ function renderPricingBreakdown(targetId, d){
     + '<div class="hnc-pc-label">Job spec</div>'
     + '<div class="hnc-pc-row"><span class="k">Service</span><span class="v">' + (d.service || '—') + '</span></div>'
     + '<div class="hnc-pc-row"><span class="k">Frequency</span><span class="v">' + (d.frequency || 'One-time') + '</span></div>';
-  if(spec.length){
-    html += '<div class="hnc-pc-row"><span class="k">Property</span><span class="v" style="font-size:12px;">' + spec.join(' · ') + '</span></div>';
+
+  /* Property attributes as a 2×2 grid — beds, baths, sqft, condition. Only
+     renders cells we have data for. Looks much cleaner than the inline list. */
+  var specCells = [];
+  if(d.beds  != null && d.beds  !== '' && d.beds  !== '—') specCells.push({ label: 'Beds',  value: d.beds });
+  if(d.baths != null && d.baths !== '' && d.baths !== '—') specCells.push({ label: 'Baths', value: d.baths });
+  var sqftV = fmtSqft(d.sqft);
+  if(sqftV) specCells.push({ label: 'Sqft', value: sqftV });
+  if(d.condition != null && d.condition !== '' && d.condition !== '—'){
+    var c = parseInt(d.condition);
+    if(!isNaN(c)){
+      var tier = (c <= 4 ? 'Tough' : c <= 6 ? 'Moderate' : 'Standard');
+      specCells.push({ label: 'Condition', value: tier + ' (' + c + '/10)' });
+    }
   }
-  html += '<div class="hnc-pc-row hnc-pc-hours">'
+  if(specCells.length){
+    html += '<div class="hnc-pc-spec-grid" style="margin-top:10px;">';
+    specCells.forEach(function(cell){
+      html += '<div class="hnc-pc-spec-cell">'
+        + '<div class="hnc-pc-spec-cell-label">' + cell.label + '</div>'
+        + '<div class="hnc-pc-spec-cell-value">' + cell.value + '</div>'
+        + '</div>';
+    });
+    html += '</div>';
+  }
+  html += '<div class="hnc-pc-row hnc-pc-hours" style="border-top:1px solid var(--border);margin-top:8px;padding-top:10px;">'
     + '<span class="k">Estimated hours</span>'
-    + '<span class="v hnc-pc-big">' + ($(d.hours) !== null ? $(d.hours) + ' hrs' : '—') + '</span>'
+    + '<span class="v">' + ($(d.hours) !== null ? $(d.hours) + ' hrs' : '—') + '</span>'
     + '</div>';
   html += '</div>';
 
@@ -7857,7 +7877,7 @@ function renderPricingBreakdown(targetId, d){
   html += '<div class="hnc-pc-divider hnc-pc-divider-bold"></div>';
   html += '<div class="hnc-pc-row hnc-pc-total">'
     + '<span class="k">Total</span>'
-    + '<span class="v hnc-pc-big">' + fmt(d.total) + '</span>'
+    + '<span class="v">' + fmt(d.total) + '</span>'
     + '</div>';
   if(clientPerHour !== null){
     html += '<div class="hnc-pc-row hnc-pc-tiny"><span class="k">Effective rate</span><span class="v">$' + clientPerHour.toFixed(2) + '/hr</span></div>';
@@ -7868,7 +7888,7 @@ function renderPricingBreakdown(targetId, d){
   html += '<div class="hnc-pricing-card hnc-pc-margin' + (hasMargin ? '' : ' hnc-pc-margin-empty') + '">'
     + '<div class="hnc-pc-label">Your margin</div>';
   if(!hasMargin){
-    html += '<div class="hnc-pc-row" style="justify-content:center;color:var(--text-muted);font-style:italic;font-size:12px;padding:14px 0;">'
+    html += '<div class="hnc-pc-row" style="justify-content:center;padding:14px 0;font-size:12px;">'
       + 'Assign a cleaner during booking to see your margin'
       + '</div>';
   } else {
@@ -7883,12 +7903,12 @@ function renderPricingBreakdown(targetId, d){
     html += '<div class="hnc-pc-divider"></div>';
     html += '<div class="hnc-pc-row hnc-pc-total">'
       + '<span class="k">Your gross margin</span>'
-      + '<span class="v hnc-pc-big">' + fmt(marginAmount) + '</span>'
+      + '<span class="v">' + fmt(marginAmount) + '</span>'
       + '</div>';
     if(marginPerHour !== null){
       html += '<div class="hnc-pc-row hnc-pc-tiny"><span class="k">Your $/hour</span><span class="v">$' + marginPerHour.toFixed(2) + '/hr</span></div>';
     }
-    html += '<div class="hnc-pc-row hnc-pc-tiny" style="color:var(--text-muted);"><span class="k" style="font-size:10px;">GET tax of ' + fmt(d.tax) + ' is paid through to the state — not part of your margin.</span><span class="v"></span></div>';
+    html += '<div class="hnc-pc-row hnc-pc-tiny"><span class="k" style="font-size:10px;">GET tax of ' + fmt(d.tax) + ' is paid through to the state.</span><span class="v"></span></div>';
   }
   html += '</div>';
 

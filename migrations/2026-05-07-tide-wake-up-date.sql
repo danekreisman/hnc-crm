@@ -5,29 +5,31 @@
 -- wake-up mechanic.
 --
 -- Flow:
---   1. Lead asks for time ("call me back in 3 months").
+--   1. Lead asks for time (call me back in 3 months).
 --   2. Cleaner moves them to Long-Term Follow-Up stage and sets
 --      tide_wake_up_date in the lead profile UI (date input + quick-pick
 --      buttons +30d/+60d/+90d/+180d).
 --   3. The daily run-task-automations cron checks for leads where
---      stage = 'Long-Term Follow-Up' AND tide_wake_up_date <= today, moves
---      them back to 'New inquiry' stage, and clears tide_wake_up_date.
---   4. Re-entering 'New inquiry' fires the New Inquiry Tide cadence
+--      stage = "Long-Term Follow-Up" AND tide_wake_up_date <= today, moves
+--      them back to New inquiry stage, and clears tide_wake_up_date.
+--   4. Re-entering New inquiry fires the New Inquiry Tide cadence
 --      (stage_entered automations: Day 1 call, Day 3 SMS, Day 5 call+SMS,
 --      Day 7 SMS final).
 --
 -- A partial index on the column (NULL excluded) keeps the daily cron query
 -- fast as the leads table grows. Most leads will have NULL for this field.
+--
+-- HISTORY: original version of this migration used an em-dash in the COMMENT
+-- string and Supabase SQL Editor silently rolled back the entire transaction
+-- (including the ALTER TABLE) without error. Rewritten to use plain ASCII
+-- only in all statement bodies. Idempotent: safe to re-run.
 -- ─────────────────────────────────────────────────────────────────────────────
 
-ALTER TABLE leads
-  ADD COLUMN IF NOT EXISTS tide_wake_up_date DATE;
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS tide_wake_up_date DATE;
 
-COMMENT ON COLUMN leads.tide_wake_up_date IS 'Tide Long-Term Follow-Up wake-up date — when set and the current date is on/after this, run-task-automations moves the lead to New inquiry and clears this field.';
+CREATE INDEX IF NOT EXISTS idx_leads_tide_wake_up_date ON leads(tide_wake_up_date) WHERE tide_wake_up_date IS NOT NULL;
 
-CREATE INDEX IF NOT EXISTS idx_leads_tide_wake_up_date
-  ON leads(tide_wake_up_date)
-  WHERE tide_wake_up_date IS NOT NULL;
+COMMENT ON COLUMN leads.tide_wake_up_date IS 'Tide Long-Term Follow-Up wake-up date - when set and the current date is on/after this, run-task-automations moves the lead to New inquiry and clears this field.';
 
 -- Verification:
 --   SELECT column_name, data_type

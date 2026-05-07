@@ -166,6 +166,41 @@ export const SCHEMAS = {
     token: { required: true, rules: [is.nonEmpty, is.maxLength(64)], message: 'Invite token is required' },
   },
 
+  publicBookingLookup: {
+    email: { required: true, rules: [is.email,    is.maxLength(200)], message: 'A valid email address is required' },
+    phone: { required: true, rules: [is.phone,    is.maxLength(20)],  message: 'A valid phone number is required (10+ digits)' },
+  },
+
+  publicBookingSubmit: {
+    // Customer
+    name:    { required: true,  rules: [is.nonEmpty, is.maxLength(100)], message: 'Name is required (max 100 chars)' },
+    email:   { required: true,  rules: [is.email,    is.maxLength(200)], message: 'A valid email address is required' },
+    phone:   { required: true,  rules: [is.phone,    is.maxLength(20)],  message: 'A valid phone number is required (10+ digits)' },
+    address: { required: true,  rules: [is.nonEmpty, is.maxLength(300)], message: 'Address is required (max 300 chars)' },
+
+    // Service + property details (used for new-quote path)
+    service:    { required: true, rules: [is.nonEmpty, is.maxLength(60)], message: 'Service type is required' },
+    frequency:  { required: false, rules: [is.maxLength(50)],              message: 'Frequency must be under 50 chars' },
+    beds:       { required: false, rules: [is.maxLength(20)],              message: 'Beds must be under 20 chars' },
+    baths:      { required: false, rules: [is.maxLength(20)],              message: 'Baths must be under 20 chars' },
+    sqft:       { required: false, rules: [is.maxLength(20)],              message: 'Sqft must be under 20 chars' },
+    condition:  { required: false, rules: [is.maxLength(20)],              message: 'Condition must be under 20 chars' },
+
+    // Path discriminator: 'new_quote' (cold lead) | 'existing_property' (returning client)
+    path:       { required: true,  rules: [is.oneOf(['new_quote', 'existing_property'])], message: 'path must be new_quote or existing_property' },
+
+    // Booking choices
+    date:           { required: true,  rules: [is.date],                                   message: 'Date must be a valid date (YYYY-MM-DD)' },
+    time:           { required: true,  rules: [is.nonEmpty, is.maxLength(20)],             message: 'Time is required' },
+    notes:          { required: false, rules: [is.maxLength(2000)],                        message: 'Notes must be under 2000 characters' },
+    policiesAgreed: { required: true,  rules: [(v) => v === true],                         message: 'You must agree to all policies to complete your booking' },
+
+    // Existing-property path: client_id of the matched returning customer
+    clientId:        { required: false, rules: [is.uuid],                                  message: 'clientId must be a valid UUID if provided' },
+    propertyAddress: { required: false, rules: [is.maxLength(300)],                        message: 'propertyAddress must be under 300 chars' },
+    priceTotal:      { required: false, rules: [(v) => v == null || (is.number(Number(v)) && Number(v) >= 0 && Number(v) < 100000)], message: 'priceTotal must be a non-negative number under 100000 if provided' },
+  },
+
 };
 
 /**

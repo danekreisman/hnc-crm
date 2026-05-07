@@ -8631,6 +8631,25 @@ async function saveNewAppt(){
   var priceEl=document.getElementById('price-val');
   var total=0;
   if(priceEl){total=parseFloat(priceEl.textContent.replace('$','').replace(',',''))||0;}
+  // ── DEFENSIVE GUARD against accidental $0 appointments ─────────────────
+  // Companion to the saveApptEdit guard (commit 0dfe6b2). saveNewAppt
+  // reads total from price-val.textContent in the DOM — same fragile pattern.
+  // If user fills out the booking form but somehow the price never gets
+  // computed (missing beds/baths/sqft for residential, missing duration for
+  // commercial, or a transient calcPrice failure), this would silently
+  // save a $0 appointment.
+  // Guard: block the save with a clear error unless the user EXPLICITLY
+  // intends $0 (override checkbox checked AND override value is 0).
+  // Unlike the edit guard, we can't fall back to a previous price for new
+  // appointments — there isn't one — so we have to refuse the save.
+  var _naOvrChk=document.getElementById('na-price-override-chk');
+  var _naOvrVal=document.getElementById('na-price-override-val');
+  var _naOvrExplicit=!!(_naOvrChk&&_naOvrChk.checked&&_naOvrVal&&_naOvrVal.value!=='');
+  if(total===0 && !_naOvrExplicit){
+    showToast('Price could not be computed. Please verify property details (beds/baths/sqft/condition for residential, or duration for commercial) or check the price override box and enter a custom amount.','error');
+    console.error('[saveNewAppt] BLOCKED $0 save. total=0, override not explicitly set. priceEl text="'+(priceEl?priceEl.textContent:'(no element)')+'"');
+    return;
+  }
   var apptTax=Math.round((total-total/1.04712)*100)/100;
   var apptBase=Math.round((total-apptTax)*100)/100;
   var apptDuration=_lastCalcHrs; // from calcPrice() — initially total LABOR hours

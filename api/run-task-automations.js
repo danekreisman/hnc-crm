@@ -333,6 +333,61 @@ export default async function handler(req, res) {
       results.stage_advanced_to_followup = 0;
     }
 
+    // ── 4. Tide Long-Term Follow-Up wake-up advance ─────────────────────────
+    // Tide Phase 6 (2026-05-07): leads in 'Long-Term Follow-Up' with a
+    // tide_wake_up_date on/before today get auto-moved back to 'New inquiry'
+    // and have their wake_up_date cleared. The stage move generates a
+    // lead_stage_events row with to_stage='New inquiry', which (per the
+    // existing run-automations stage_entered handler) will fire the New
+    // Inquiry Tide cadence on the cron's next tick.
+    //
+    // Pure DB write — no contact side effects. Always runs (no kill switch).
+    // Test mode does NOT apply: this is stage-only, no messages go out.
+    try {
+      const todayDate = new Date().toISOString().slice(0, 10);
+      const { data: ready, error: readyErr } = await db
+        .from('leads')
+        .select('id, name, tide_wake_up_date')
+        .eq('stage', 'Long-Term Follow-Up')
+        .lte('tide_wake_up_date', todayDate)
+        .not('tide_wake_up_date', 'is', null);
+
+      if (readyErr) {
+        // If the column doesn't exist yet (migration not run), readyErr will
+        // be a 42703 / "column does not exist". Log and skip — don't crash
+        // the rest of the cron run.
+        console.warn('[run-task-automations] wake-up query error:', readyErr.message);
+        results.tide_wake_up_advanced = 0;
+      } else if (ready && ready.length) {
+        const ids = ready.map(r => r.id);
+        const { error: wuUpdErr } = await db
+          .from('leads')
+          .update({ stage: 'New inquiry', tide_wake_up_date: null })
+          .in('id', ids);
+        if (wuUpdErr) {
+          console.warn('[run-task-automations] wake-up update error:', wuUpdErr.message);
+          results.tide_wake_up_advanced = 0;
+        } else {
+          console.log(`[run-task-automations] Woke up ${ids.length} leads from Long-Term Follow-Up → New inquiry`);
+          results.tide_wake_up_advanced = ids.length;
+          // Best-effort activity log for each woken lead — useful for
+          // verifying the cron worked tomorrow when Dane checks his logs.
+          for (const r of ready) {
+            try {
+              await logActivity('lead_stage_changed', `Tide wake-up: ${r.name} → New inquiry (was Long-Term Follow-Up, scheduled for ${r.tide_wake_up_date})`, { lead_id: r.id, automation: 'tide_wake_up' });
+            } catch (logErr) {
+              // Non-fatal: stage change is what matters; log entries are nice-to-have.
+            }
+          }
+        }
+      } else {
+        results.tide_wake_up_advanced = 0;
+      }
+    } catch (wuErr) {
+      console.warn('[run-task-automations] wake-up unexpected error:', wuErr.message);
+      results.tide_wake_up_advanced = 0;
+    }
+
     return res.status(200).json({ success: true, ...results });
 
   } catch (err) {

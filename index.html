@@ -2452,6 +2452,29 @@ Mahalo 🌺</textarea>
           <div class="info-row"><span class="info-label">Due date</span><span class="info-val" id="lead-due">—</span></div>
           <div class="info-row"><span class="info-label">Assigned to</span><span class="info-val" id="lead-assigned">—</span></div>
         </div>
+        <!-- Tide wake-up date — only shown when stage === 'Long-Term Follow-Up'.
+             openLead() toggles display based on stage. saveTideWakeUp /
+             clearTideWakeUp / setTideWakeUpDays handlers in JS. -->
+        <div id="tide-wakeup-wrap" style="display:none;">
+          <div class="panel-section" style="display:flex;align-items:center;justify-content:space-between;">
+            <span>Tide wake-up date</span>
+            <span id="tide-wakeup-status" style="font-size:11px;color:var(--text-muted);font-weight:400;"></span>
+          </div>
+          <div class="info-block" style="padding:10px 13px;">
+            <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:10px;">
+              <input type="date" id="tide-wakeup-input" style="flex:1;min-width:130px;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;">
+              <button onclick="saveTideWakeUp()" style="padding:6px 12px;background:var(--brand-500);color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;">Save</button>
+              <button onclick="clearTideWakeUp()" id="tide-wakeup-clear-btn" style="display:none;padding:6px 12px;background:#fff;color:var(--text-muted);border:1.5px solid var(--border);border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;">Clear</button>
+            </div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;">
+              <button onclick="setTideWakeUpDays(30)" style="padding:5px 10px;background:#fff;color:var(--text);border:1px solid var(--border);border-radius:6px;font-size:11px;font-weight:500;cursor:pointer;">+30 days</button>
+              <button onclick="setTideWakeUpDays(60)" style="padding:5px 10px;background:#fff;color:var(--text);border:1px solid var(--border);border-radius:6px;font-size:11px;font-weight:500;cursor:pointer;">+60 days</button>
+              <button onclick="setTideWakeUpDays(90)" style="padding:5px 10px;background:#fff;color:var(--text);border:1px solid var(--border);border-radius:6px;font-size:11px;font-weight:500;cursor:pointer;">+90 days</button>
+              <button onclick="setTideWakeUpDays(180)" style="padding:5px 10px;background:#fff;color:var(--text);border:1px solid var(--border);border-radius:6px;font-size:11px;font-weight:500;cursor:pointer;">+180 days</button>
+            </div>
+            <div style="font-size:11px;color:var(--text-muted);margin-top:8px;line-height:1.5;">When this date arrives, the lead auto-moves to <strong>New inquiry</strong> and the New Inquiry Tide cadence kicks off.</div>
+          </div>
+        </div>
         <div class="panel-section" style="display:flex;align-items:center;justify-content:space-between;">
           <span>AI summary</span>
           <button id="lead-ai-btn" class="ai-sum-btn" onclick="toggleLeadSummary()">&#x2728; Generate</button>
@@ -3222,6 +3245,11 @@ function _leadRowToDb(l){
     createdAt: l.created_at || null,
     lastRespondedAt: l.last_responded_at || null,
     attentionSnoozedUntil: l.attention_snoozed_until || null,
+    /* Tide Phase 6 (2026-05-07): wake-up date for Long-Term Follow-Up leads.
+       Set in the lead profile UI; cleared by run-task-automations.js when
+       the date arrives (lead auto-moves to New inquiry). Stored as ISO date
+       string 'YYYY-MM-DD' or null. */
+    tideWakeUpDate: l.tide_wake_up_date || null,
   };
 }
 
@@ -6884,6 +6912,113 @@ function _renderLeadDncPill(){
   }
 }
 
+/* ──────────────────────────────────────────────────────────────────────
+   Tide Long-Term Follow-Up wake-up date — Phase 6 (2026-05-07).
+   
+   Lead profile shows a date input + quick-pick buttons (+30/+60/+90/+180d)
+   only when stage === 'Long-Term Follow-Up'. Cleaner sets the date when
+   moving a lead to LTF (or anytime after), then the daily cron in
+   api/run-task-automations.js auto-moves them back to 'New inquiry' on
+   that date and clears the field.
+   
+   Stored as 'YYYY-MM-DD' in leads.tide_wake_up_date column. The leadDB
+   in-memory cache uses camelCase: lead.tideWakeUpDate.
+   ────────────────────────────────────────────────────────────────────── */
+
+function _renderTideWakeUpSection(d){
+  // Show the wake-up date section only for Long-Term Follow-Up leads.
+  // d is the leadDB entry passed in from openLead.
+  var wrap = document.getElementById('tide-wakeup-wrap');
+  if(!wrap) return;
+  if(!d || d.stage !== 'Long-Term Follow-Up'){
+    wrap.style.display = 'none';
+    return;
+  }
+  wrap.style.display = '';
+
+  var input = document.getElementById('tide-wakeup-input');
+  var statusEl = document.getElementById('tide-wakeup-status');
+  var clearBtn = document.getElementById('tide-wakeup-clear-btn');
+  if(!input || !statusEl || !clearBtn) return;
+
+  if(d.tideWakeUpDate){
+    input.value = d.tideWakeUpDate;
+    clearBtn.style.display = '';
+    // Friendly relative-day status: "wakes up in 47 days" / "today" / "5 days ago"
+    var today = new Date();
+    today.setHours(0,0,0,0);
+    var wake = new Date(d.tideWakeUpDate + 'T00:00:00');
+    var diffDays = Math.round((wake - today) / 86400000);
+    var pretty;
+    if(diffDays > 1)        pretty = 'wakes up in ' + diffDays + ' days';
+    else if(diffDays === 1) pretty = 'wakes up tomorrow';
+    else if(diffDays === 0) pretty = 'wakes up today';
+    else if(diffDays === -1)pretty = 'overdue by 1 day — should advance on next cron';
+    else                    pretty = 'overdue by ' + Math.abs(diffDays) + ' days — should advance on next cron';
+    statusEl.textContent = pretty;
+    statusEl.style.color = diffDays < 0 ? '#dc2626' : 'var(--text-muted)';
+  } else {
+    input.value = '';
+    clearBtn.style.display = 'none';
+    statusEl.textContent = 'not set';
+    statusEl.style.color = 'var(--text-muted)';
+  }
+}
+
+function setTideWakeUpDays(daysAhead){
+  // Quick-pick: set the date input to today + N days. Doesn't save until
+  // user clicks Save — gives a chance to tweak before committing.
+  var input = document.getElementById('tide-wakeup-input');
+  if(!input) return;
+  var d = new Date();
+  d.setDate(d.getDate() + daysAhead);
+  // toISOString gives UTC; we want local date. Pad month/day to 2 digits.
+  var iso = d.getFullYear() + '-'
+    + String(d.getMonth() + 1).padStart(2, '0') + '-'
+    + String(d.getDate()).padStart(2, '0');
+  input.value = iso;
+}
+
+async function saveTideWakeUp(){
+  if(!currentLeadId){ showToast('No lead selected', true); return; }
+  var lead = leadDB[currentLeadId];
+  if(!lead){ showToast('Lead not found', true); return; }
+  var input = document.getElementById('tide-wakeup-input');
+  if(!input) return;
+  var dateStr = input.value;
+  if(!dateStr){ showToast('Pick a date first', true); return; }
+
+  // DB-first, optimistic-after pattern (matches reactivateLead at line ~15916).
+  var upd = await db.from('leads').update({ tide_wake_up_date: dateStr }).eq('id', currentLeadId);
+  if(upd && upd.error){
+    console.error('[saveTideWakeUp] DB update failed:', upd.error);
+    showToast('Could not save: ' + (upd.error.message || 'database error'), true);
+    return;
+  }
+  lead.tideWakeUpDate = dateStr;
+  _renderTideWakeUpSection(lead);
+  showToast('Wake-up date saved \u2713', false);
+}
+
+async function clearTideWakeUp(){
+  if(!currentLeadId){ showToast('No lead selected', true); return; }
+  var lead = leadDB[currentLeadId];
+  if(!lead){ showToast('Lead not found', true); return; }
+  if(!lead.tideWakeUpDate){ return; } // nothing to clear
+
+  if(!window.confirm('Clear the wake-up date? The lead will stay in Long-Term Follow-Up indefinitely until you manually move them or set a new date.')) return;
+
+  var upd = await db.from('leads').update({ tide_wake_up_date: null }).eq('id', currentLeadId);
+  if(upd && upd.error){
+    console.error('[clearTideWakeUp] DB update failed:', upd.error);
+    showToast('Could not clear: ' + (upd.error.message || 'database error'), true);
+    return;
+  }
+  lead.tideWakeUpDate = null;
+  _renderTideWakeUpSection(lead);
+  showToast('Wake-up date cleared', false);
+}
+
 async function toggleLeadDoNotContact(){
   if(!currentLeadId){ showToast('No lead selected', true); return; }
   var lead = leadDB[currentLeadId];
@@ -6944,6 +7079,10 @@ function openLead(id){
   document.getElementById('quote-success') && document.getElementById('quote-success').classList.remove('show');
   // Render the do_not_contact pill state for this lead
   _renderLeadDncPill();
+  // Tide wake-up date section: only visible when stage is Long-Term Follow-Up.
+  // Populates the date input + status text from leadDB. See saveTideWakeUp /
+  // clearTideWakeUp / setTideWakeUpDays handlers below.
+  _renderTideWakeUpSection(d);
   hideLeadEdit();
   // Reset summary button — new lead means stale summary should be cleared
   var leadSumBtn = document.getElementById('lead-ai-btn');

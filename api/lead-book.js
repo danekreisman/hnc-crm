@@ -230,7 +230,7 @@ export default async function handler(req, res) {
       await fetchWithTimeout(`${BASE_URL}/api/send-sms`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ to: '+18083484888', message: adminSms })
+        body: JSON.stringify({ to: '+18084685356', message: adminSms })
       }, TIMEOUTS.OPENPHONE);
     } catch (err) {
       await logError('lead-book:admin-sms', err, { leadId: lead.id });

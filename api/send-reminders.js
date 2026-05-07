@@ -27,7 +27,7 @@ async function logActivity(action, description, metadata={}) {
 const BASE_URL      = 'https://hnc-crm.vercel.app';
 const BUSINESS_NAME = 'Hawaii Natural Clean';
 const BUSINESS_PHONE = '(808) 468-5356';
-const ADMIN_PHONE   = '+18083484888';
+const ADMIN_PHONE   = '+18084685356';
 
 
 async function isNotifEnabled(db, clientId, key) {

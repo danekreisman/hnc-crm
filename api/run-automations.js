@@ -601,6 +601,12 @@ export default async function handler(req, res) {
                       related_lead_id: lead.id,
                       status: 'open',
                       ai_brief: aiBrief,
+                      // Tide Phase 5 (2026-05-07): structured one-tap-send payload.
+                      // When the action carries a suggested_message + channel,
+                      // copy them onto the task so the UI can render a Send
+                      // button without regex-parsing the description.
+                      suggested_message: action.suggested_message ? interpolate(action.suggested_message) : null,
+                      suggested_channel: action.suggested_channel || null,
                     }]);
                     if (taskErr) throw taskErr;
                     actionsExecuted.push({

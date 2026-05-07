@@ -51,7 +51,7 @@ VALUES (
   'Tide · New Inquiry · Day 3 SMS',
   'stage_entered',
   '{"stage": "New inquiry", "delay_minutes": 4320}'::jsonb,
-  '[{"type":"create_va_task","title":"Send SMS to {firstName} — inquiry Day 3 check-in","task_type":"other","priority":"high","description":"Suggested SMS to send via OpenPhone:\n\n\"Hey {firstName}, following up — wanted to make sure you got the info we sent over. Anything else I can help with?\"\n\nReview, edit if needed, send, then mark this task done."}]'::jsonb,
+  '[{"type":"create_va_task","title":"Send SMS to {firstName} — inquiry Day 3 check-in","task_type":"other","priority":"high","description":"Suggested SMS to send via OpenPhone:\n\n\"Hey {firstName}, following up — wanted to make sure you got the info we sent over. Anything else I can help with?\"\n\nReview, edit if needed, send, then mark this task done.","suggested_message":"Hey {firstName}, following up — wanted to make sure you got the info we sent over. Anything else I can help with?","suggested_channel":"sms"}]'::jsonb,
   false
 ) ON CONFLICT (name) DO UPDATE SET trigger_type = EXCLUDED.trigger_type, trigger_config = EXCLUDED.trigger_config, actions = EXCLUDED.actions;
 
@@ -61,7 +61,7 @@ VALUES (
   'Tide · New Inquiry · Day 5 call + SMS',
   'stage_entered',
   '{"stage": "New inquiry", "delay_minutes": 7200}'::jsonb,
-  '[{"type":"create_va_task","title":"Call {firstName} — 2nd inquiry attempt","task_type":"call_lead","priority":"high","description":"Day 5. Lead inquired but no quote sent yet — they''ve gone quiet. Try a call to figure out what they need so we can move them forward."},{"type":"create_va_task","title":"Send SMS to {firstName} — inquiry Day 5","task_type":"other","priority":"high","description":"Suggested SMS to send via OpenPhone (after call attempt):\n\n\"Hey {firstName}, tried calling — gimme a shout when you have a sec. Happy to walk through pricing or answer any questions.\"\n\nReview, edit if needed, send, then mark this task done."}]'::jsonb,
+  '[{"type":"create_va_task","title":"Call {firstName} — 2nd inquiry attempt","task_type":"call_lead","priority":"high","description":"Day 5. Lead inquired but no quote sent yet — they''ve gone quiet. Try a call to figure out what they need so we can move them forward."},{"type":"create_va_task","title":"Send SMS to {firstName} — inquiry Day 5","task_type":"other","priority":"high","description":"Suggested SMS to send via OpenPhone (after call attempt):\n\n\"Hey {firstName}, tried calling — gimme a shout when you have a sec. Happy to walk through pricing or answer any questions.\"\n\nReview, edit if needed, send, then mark this task done.","suggested_message":"Hey {firstName}, tried calling — gimme a shout when you have a sec. Happy to walk through pricing or answer any questions.","suggested_channel":"sms"}]'::jsonb,
   false
 ) ON CONFLICT (name) DO UPDATE SET trigger_type = EXCLUDED.trigger_type, trigger_config = EXCLUDED.trigger_config, actions = EXCLUDED.actions;
 
@@ -71,7 +71,7 @@ VALUES (
   'Tide · New Inquiry · Day 7 SMS final',
   'stage_entered',
   '{"stage": "New inquiry", "delay_minutes": 10080}'::jsonb,
-  '[{"type":"create_va_task","title":"Send final SMS to {firstName} — inquiry Day 7","task_type":"other","priority":"high","description":"Suggested final SMS to send via OpenPhone:\n\n\"Hey {firstName}, last check in — still looking for cleaning help? If yes, just reply and I''ll get you sorted.\"\n\nReview, edit if needed, send, then mark this task done. If no response after this, manually move the lead to Closed lost."}]'::jsonb,
+  '[{"type":"create_va_task","title":"Send final SMS to {firstName} — inquiry Day 7","task_type":"other","priority":"high","description":"Suggested final SMS to send via OpenPhone:\n\n\"Hey {firstName}, last check in — still looking for cleaning help? If yes, just reply and I''ll get you sorted.\"\n\nReview, edit if needed, send, then mark this task done. If no response after this, manually move the lead to Closed lost.","suggested_message":"Hey {firstName}, last check in — still looking for cleaning help? If yes, just reply and I''ll get you sorted.","suggested_channel":"sms"}]'::jsonb,
   false
 ) ON CONFLICT (name) DO UPDATE SET trigger_type = EXCLUDED.trigger_type, trigger_config = EXCLUDED.trigger_config, actions = EXCLUDED.actions;
 
@@ -86,7 +86,7 @@ VALUES (
   'Tide · Closed lost · Day 45 email',
   'stage_entered',
   '{"stage": "Closed lost", "delay_minutes": 64800}'::jsonb,
-  '[{"type":"create_va_task","title":"Send re-engagement email to {firstName} — Day 45","task_type":"other","priority":"low","description":"Suggested email — subject: \"Checking in from Hawaii Natural Clean\".\n\nBody:\n---\nHi {firstName},\n\nIt''s been a few weeks — wanted to gently check in and see how things are going. If your cleaning needs have changed or come back up, we''d love to help.\n\nNo pressure either way. Just text us at (808) 468-5356 or reply to this email if you want to chat.\n\nMahalo,\nHawaii Natural Clean\n---\n\nReview, edit if needed, send via your email client, then mark this task done."}]'::jsonb,
+  '[{"type":"create_va_task","title":"Send re-engagement email to {firstName} — Day 45","task_type":"other","priority":"low","description":"Suggested email — subject: \"Checking in from Hawaii Natural Clean\".\n\nBody:\n---\nHi {firstName},\n\nIt''s been a few weeks — wanted to gently check in and see how things are going. If your cleaning needs have changed or come back up, we''d love to help.\n\nNo pressure either way. Just text us at (808) 468-5356 or reply to this email if you want to chat.\n\nMahalo,\nHawaii Natural Clean\n---\n\nReview, edit if needed, send via your email client, then mark this task done.","suggested_message":"Hi {firstName},\n\nIt''s been a few weeks — wanted to gently check in and see how things are going. If your cleaning needs have changed or come back up, we''d love to help.\n\nNo pressure either way. Just text us at (808) 468-5356 or reply to this email if you want to chat.\n\nMahalo,\nHawaii Natural Clean","suggested_channel":"email"}]'::jsonb,
   false
 ) ON CONFLICT (name) DO UPDATE SET trigger_type = EXCLUDED.trigger_type, trigger_config = EXCLUDED.trigger_config, actions = EXCLUDED.actions;
 
@@ -96,7 +96,7 @@ VALUES (
   'Tide · Closed lost · Day 90 email',
   'stage_entered',
   '{"stage": "Closed lost", "delay_minutes": 129600}'::jsonb,
-  '[{"type":"create_va_task","title":"Send re-engagement email to {firstName} — Day 90","task_type":"other","priority":"low","description":"Suggested email — subject: \"A small offer to bring you back\".\n\nBody:\n---\nHi {firstName},\n\nIt''s been about three months. Wanted to share a small thank-you for considering us — if you''re ready to give Hawaii Natural Clean a try, we''ll take 15% off your first clean.\n\nJust reply to this email or text us at (808) 468-5356, mention this note, and we''ll get you scheduled.\n\nMahalo,\nHawaii Natural Clean\n---\n\nReview the offer (Dane: confirm 15% works for this lead before sending), edit if needed, send, then mark this task done.\n\nNote: the run-automations.js cron has a 90-day lookback on lead_stage_events. Day 90 is the latest reachable touch under current infrastructure. Leads who don''t engage by here stay in Closed lost with no further automated touches."}]'::jsonb,
+  '[{"type":"create_va_task","title":"Send re-engagement email to {firstName} — Day 90","task_type":"other","priority":"low","description":"Suggested email — subject: \"A small offer to bring you back\".\n\nBody:\n---\nHi {firstName},\n\nIt''s been about three months. Wanted to share a small thank-you for considering us — if you''re ready to give Hawaii Natural Clean a try, we''ll take 15% off your first clean.\n\nJust reply to this email or text us at (808) 468-5356, mention this note, and we''ll get you scheduled.\n\nMahalo,\nHawaii Natural Clean\n---\n\nReview the offer (Dane: confirm 15% works for this lead before sending), edit if needed, send, then mark this task done.\n\nNote: the run-automations.js cron has a 90-day lookback on lead_stage_events. Day 90 is the latest reachable touch under current infrastructure. Leads who don''t engage by here stay in Closed lost with no further automated touches.","suggested_message":"Hi {firstName},\n\nIt''s been about three months. Wanted to share a small thank-you for considering us — if you''re ready to give Hawaii Natural Clean a try, we''ll take 15% off your first clean.\n\nJust reply to this email or text us at (808) 468-5356, mention this note, and we''ll get you scheduled.\n\nMahalo,\nHawaii Natural Clean","suggested_channel":"email"}]'::jsonb,
   false
 ) ON CONFLICT (name) DO UPDATE SET trigger_type = EXCLUDED.trigger_type, trigger_config = EXCLUDED.trigger_config, actions = EXCLUDED.actions;
 

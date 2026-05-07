@@ -19418,6 +19418,27 @@ function renderTaskCard(t, done) {
       + '</div>';
   }
 
+  // For Tide queue tasks with a structured suggested SMS body: render
+  // "Send SMS" / "Edit & Send" / "Skip" buttons. Only shows when:
+  //   - task is open (not done)
+  //   - suggested_channel === 'sms' (email send not wired yet — copy/paste
+  //     from description for now)
+  //   - suggested_message is non-empty
+  //   - related lead exists in leadDB and has a phone number
+  // The Send button posts to /api/send-sms with the lead's phone and the
+  // suggested_message verbatim. Edit & Send opens a window.prompt with the
+  // message pre-filled. Skip just marks the task done without sending.
+  if (!done && t.suggested_channel === 'sms' && t.suggested_message && t.related_lead_id) {
+    var _lead = leadDB[t.related_lead_id];
+    if (_lead && _lead.phone) {
+      reviewActions = '<div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap;">'
+        + '<button data-task-id="' + t.id + '" data-lead-id="' + t.related_lead_id + '" onclick="sendSuggestedSms(this.dataset.taskId, this.dataset.leadId)" style="flex:1;min-width:120px;padding:7px 12px;background:#059669;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;">Send SMS</button>'
+        + '<button data-task-id="' + t.id + '" data-lead-id="' + t.related_lead_id + '" onclick="editAndSendSuggestedSms(this.dataset.taskId, this.dataset.leadId)" style="padding:7px 12px;background:#fff;color:var(--text);border:1.5px solid var(--border);border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;">Edit &amp; Send</button>'
+        + '<button data-task-id="' + t.id + '" onclick="skipSuggestedSms(this.dataset.taskId)" style="padding:7px 12px;background:#fff;color:var(--text-muted);border:1.5px solid var(--border);border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;">Skip</button>'
+        + '</div>';
+    }
+  }
+
   return '<div class="card" style="padding:14px 16px;margin-bottom:8px;' + borderStyle + '">'
     + '<div style="display:flex;align-items:flex-start;gap:12px;">'
     + checkCol
@@ -19698,6 +19719,87 @@ function editAndConfirmQuoteSent(taskId, leadId, currentAmount) {
 async function dismissQuoteSent(taskId) {
   // AI false positive (no real quote was given) — just close the task.
   // Reversible via the completeTaskById undo toast.
+  await completeTaskById(taskId);
+}
+
+/* ──────────────────────────────────────────────────────────────────────
+   Tide queue task SMS actions — "Send SMS" / "Edit & Send" / "Skip"
+   buttons on tasks that carry a structured suggested_message + 
+   suggested_channel='sms'. Created by Tide cadence automations via the
+   create_va_task action handler in api/run-automations.js.
+   
+   Send button: posts to /api/send-sms with the lead's phone and the
+   suggested_message verbatim, then marks the task done.
+   Edit & Send: window.prompt to edit the message before sending.
+   Skip: marks the task done without sending (reversible via undo toast).
+   ────────────────────────────────────────────────────────────────────── */
+
+async function sendSuggestedSms(taskId, leadId) {
+  if (!taskId || !leadId) return;
+  var task = _tasks.open.find(function(t){ return t.id === taskId; });
+  if (!task) { showToast('Task not found', true); return; }
+  var lead = leadDB[leadId];
+  if (!lead || !lead.phone) { showToast('Lead phone missing — cannot send', true); return; }
+  var message = task.suggested_message;
+  if (!message) { showToast('No suggested message on this task', true); return; }
+
+  // Confirmation — single click sends real SMS to a real customer, so we
+  // show the message body in the confirm dialog as a last review chance.
+  var firstName = (lead.name || '').split(' ')[0] || lead.name || 'lead';
+  if (!window.confirm('Send this SMS to ' + firstName + '?\n\n' + message)) return;
+
+  await _sendSuggestedSmsCore(taskId, lead.phone, message, firstName);
+}
+
+async function editAndSendSuggestedSms(taskId, leadId) {
+  if (!taskId || !leadId) return;
+  var task = _tasks.open.find(function(t){ return t.id === taskId; });
+  if (!task) { showToast('Task not found', true); return; }
+  var lead = leadDB[leadId];
+  if (!lead || !lead.phone) { showToast('Lead phone missing — cannot send', true); return; }
+  var firstName = (lead.name || '').split(' ')[0] || lead.name || 'lead';
+
+  // Prompt with current message pre-filled. Cleaner edits then OK to send.
+  // window.prompt is intentionally minimal here — same UX pattern as
+  // editAndConfirmQuoteSent above. Long messages still fit fine in mobile
+  // prompts on iOS/Android.
+  var edited = window.prompt('Edit and send SMS to ' + firstName + ':', task.suggested_message || '');
+  if (edited == null) return; // user cancelled
+  edited = String(edited).trim();
+  if (!edited) { showToast('Empty message — not sent', true); return; }
+
+  await _sendSuggestedSmsCore(taskId, lead.phone, edited, firstName);
+}
+
+async function _sendSuggestedSmsCore(taskId, phone, message, firstName) {
+  // Phone normalization mirrors the existing pattern (line ~2841): strip
+  // all non-digits/+, prepend +1 if no country code prefix.
+  var clean = (phone || '').replace(/[^0-9+]/g, '');
+  if (!clean.startsWith('+')) clean = '+1' + clean;
+
+  try {
+    var r = await fetch('/api/send-sms', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ to: clean, message: message }),
+    });
+    var data = await r.json().catch(function(){ return {}; });
+    if (!r.ok || !data.success) {
+      showToast('SMS failed: ' + (data.error || ('HTTP ' + r.status)), true);
+      return;
+    }
+    // Success: mark task complete via the canonical path (handles
+    // optimistic UI + DB write + undo toast).
+    await completeTaskById(taskId);
+    showToast('SMS sent to ' + (firstName || 'lead') + ' \u2713', false);
+  } catch (e) {
+    showToast('Network error: ' + e.message, true);
+  }
+}
+
+async function skipSuggestedSms(taskId) {
+  // Mark task done without sending. Reversible via the undo toast that
+  // completeTaskById shows.
   await completeTaskById(taskId);
 }
 

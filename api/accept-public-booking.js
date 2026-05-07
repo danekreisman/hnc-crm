@@ -81,16 +81,37 @@ export default async function handler(req, res) {
     const time = timeOverride || x.requested_time;
     if (!date || !time) return res.status(400).json({ error: 'Task is missing requested_date or requested_time' });
 
+    // Edit-mode overrides (Dane clicked Edit in the modal). These let him
+    // change service / frequency / beds / baths / sqft / total at acceptance
+    // time without round-tripping through the customer. Each falls back to
+    // the original extracted value if not provided.
+    const service   = (typeof req.body.service === 'string' && req.body.service.trim()) || x.service || 'Regular Cleaning';
+    const frequency = req.body.frequency != null ? (req.body.frequency || null) : (x.frequency || null);
+    const beds      = req.body.beds       != null ? (req.body.beds      || null) : (x.beds      || null);
+    const baths     = req.body.baths      != null ? (req.body.baths     || null) : (x.baths     || null);
+    const sqft      = req.body.sqft       != null ? (req.body.sqft      || null) : (x.sqft      || null);
+
     // Pricing — already computed at submit time. We do NOT re-derive from
     // beds/baths here. Pre-tax base, tax, and post-tax+rush total were
     // stored on the task; appointments table needs them in their own
     // columns. duration_hours comes from quote_data.duration_minutes.
-    const basePre   = x.quote_total_pretax != null ? Number(x.quote_total_pretax) : null;
-    const tax       = x.quote_tax != null ? Number(x.quote_tax) : (basePre != null ? +(basePre * TAX_RATE).toFixed(2) : null);
-    const totalPost = x.quote_total_with_tax != null ? Number(x.quote_total_with_tax) : null;
+    let basePre   = x.quote_total_pretax != null ? Number(x.quote_total_pretax) : null;
+    let tax       = x.quote_tax != null ? Number(x.quote_tax) : (basePre != null ? +(basePre * TAX_RATE).toFixed(2) : null);
+    let totalPost = x.quote_total_with_tax != null ? Number(x.quote_total_with_tax) : null;
     const discount  = (x.quote_data && x.quote_data.discount != null) ? Number(x.quote_data.discount) : 0;
     const durationHrs = (x.quote_data && x.quote_data.duration_minutes != null) ? +(Number(x.quote_data.duration_minutes) / 60).toFixed(2) : null;
     const rushFee   = x.rush_fee != null ? Number(x.rush_fee) : 0;
+
+    // If Dane edited the total in the modal, recompute base + tax from it.
+    // Pricing model: total = base + base*TAX_RATE + rushFee
+    //                base  = (total - rushFee) / (1 + TAX_RATE)
+    if (req.body.totalPrice != null && !isNaN(Number(req.body.totalPrice)) && Number(req.body.totalPrice) >= 0) {
+      const tp = Number(req.body.totalPrice);
+      totalPost = +tp.toFixed(2);
+      basePre = +((tp - rushFee) / (1 + TAX_RATE)).toFixed(2);
+      if (basePre < 0) basePre = 0;
+      tax = +(basePre * TAX_RATE).toFixed(2);
+    }
 
     const apptNotesParts = [
       'Booked via public form review',
@@ -102,14 +123,14 @@ export default async function handler(req, res) {
 
     // Common appointment payload shape used by both branches below.
     const apptCommon = {
-      service:        x.service || 'Regular Cleaning',
-      frequency:      x.frequency || null,
+      service:        service,
+      frequency:      frequency || null,
       date:           date,
       time:           time,
       address:        x.address || null,
-      beds:           x.beds || null,
-      baths:          x.baths || null,
-      sqft:           x.sqft ? String(x.sqft) : null,
+      beds:           beds,
+      baths:          baths,
+      sqft:           sqft ? String(sqft) : null,
       status:         'scheduled',
       base_price:     basePre != null ? String(basePre) : null,
       discount:       String(discount || 0),
@@ -126,6 +147,8 @@ export default async function handler(req, res) {
     // ── 2. Branch on path ────────────────────────────────────────────────
     if (x.path === 'new_quote') {
       // Use the existing atomic RPC. Mirrors the lead-book.js flow.
+      // Client record uses the same edit-mode overrides we applied to
+      // the appointment so a new client is created with consistent values.
       const { data: bookingResult, error: bookErr } = await db.rpc('book_lead_atomic', {
         p_lead_id:          leadId,
         p_client_data: {
@@ -134,11 +157,11 @@ export default async function handler(req, res) {
           phone:     x.phone || null,
           address:   x.address || null,
           type:      'Residential',
-          service:   x.service || null,
-          frequency: x.frequency || null,
-          beds:      x.beds || null,
-          baths:     x.baths || null,
-          sqft:      x.sqft ? String(x.sqft) : null,
+          service:   service || null,
+          frequency: frequency || null,
+          beds:      beds || null,
+          baths:     baths || null,
+          sqft:      sqft ? String(sqft) : null,
           status:    'New',
           notes:     'Created automatically from public booking form review',
         },

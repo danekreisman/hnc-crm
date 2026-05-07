@@ -687,6 +687,8 @@ body:not(.hnc-assistant-user) .assistant-only{display:none!important;}
 
       <!-- CALENDAR -->
       <div id="view-calendar" class="vc active">
+        <!-- Public-booking pending-review banner — populated by renderPublicBookingBanner() from _tasks.open. Hidden when there are no open review_public_booking tasks. -->
+        <div id="public-booking-banner" style="display:none;margin:0 0 14px 0;"></div>
         <div class="cal-header">
           <div class="cal-nav">
             <button class="cal-arrow" id="prev-btn">&lsaquo;</button>
@@ -10478,6 +10480,40 @@ function _routeFromHash() {
         <div id="pbr-customer-notes" style="background:#fafafa;border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-size:13px;color:var(--text);white-space:pre-wrap;margin-bottom:14px;"></div>
       </div>
 
+      <!-- EDIT MODE FIELDS — hidden by default; togglePublicBookingEditMode() shows/hides
+           and pbr-service-block / pbr-pricing-block above. Pre-filled from extracted_data
+           in openPublicBookingReview, so just toggling visibility is enough. -->
+      <div id="pbr-edit-fields" style="display:none;">
+        <div class="panel-section">Edit details</div>
+        <div class="form-two">
+          <div class="form-row"><label>Service</label>
+            <select id="pbr-edit-service">
+              <option value="Regular Cleaning">Regular Cleaning</option>
+              <option value="Deep Cleaning">Deep Cleaning</option>
+              <option value="Move-out Cleaning">Move-out Cleaning</option>
+              <option value="Move-in Cleaning">Move-in Cleaning</option>
+              <option value="Vacation Rental Cleaning">Vacation Rental Cleaning</option>
+              <option value="Janitorial Cleaning">Janitorial Cleaning</option>
+            </select>
+          </div>
+          <div class="form-row"><label>Frequency</label>
+            <select id="pbr-edit-frequency">
+              <option value="">One-time</option>
+              <option value="Weekly">Weekly</option>
+              <option value="Biweekly">Biweekly</option>
+              <option value="Monthly">Monthly</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-three">
+          <div class="form-row"><label>Bedrooms</label><input type="text" id="pbr-edit-beds" placeholder="e.g. 3"></div>
+          <div class="form-row"><label>Bathrooms</label><input type="text" id="pbr-edit-baths" placeholder="e.g. 2"></div>
+          <div class="form-row"><label>Sqft</label><input type="text" id="pbr-edit-sqft" placeholder="e.g. 1200"></div>
+        </div>
+        <div class="form-row"><label>Total price <span style="font-weight:400;color:var(--text-muted);">(incl. tax + rush)</span></label><input type="number" id="pbr-edit-total" step="0.01" placeholder="e.g. 285.00"></div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:-6px;margin-bottom:14px;line-height:1.5;">Changes apply when you click Accept. Hawaii GET (4.712%) and the rush fee are recalculated automatically from the total you enter.</div>
+      </div>
+
       <div class="form-row"><label>Admin notes (optional)</label><textarea id="pbr-admin-notes" style="min-height:60px;" placeholder="Anything you want appended to the appointment notes..."></textarea></div>
 
       <div class="form-row" style="display:flex;align-items:center;gap:8px;margin-top:6px;">
@@ -10487,8 +10523,9 @@ function _routeFromHash() {
 
       <input type="hidden" id="pbr-task-id">
       <div class="save-bar">
-        <button class="btn btn-primary" id="pbr-accept-btn" onclick="confirmPublicBookingAccept()">Accept &amp; schedule</button>
-        <button class="btn" onclick="closeOverlay('public-booking-review-overlay')">Cancel</button>
+        <button class="btn btn-primary" id="pbr-accept-btn" onclick="confirmPublicBookingAccept()">Accept</button>
+        <button class="btn" id="pbr-edit-btn" onclick="togglePublicBookingEditMode()">Edit</button>
+        <button class="btn" id="pbr-deny-btn" onclick="confirmPublicBookingDeny()" style="color:#b91c1c;border-color:#fca5a5;">Deny</button>
       </div>
       <div id="pbr-error" style="display:none;background:#fee2e2;border:1px solid #fca5a5;border-radius:8px;padding:9px 12px;color:#b91c1c;font-size:12px;margin-top:10px;"></div>
     </div>
@@ -19788,6 +19825,76 @@ function renderTasks() {
       openList.innerHTML = _tasks.open.map(t => renderTaskCard(t, false)).join('');
     }
   }
+
+  // Keep the calendar-view banner in sync with the task queue. It only
+  // shows review_public_booking tasks, so any change here may add or
+  // remove rows — call it on every renderTasks pass.
+  try { renderPublicBookingBanner(); } catch (_e) { /* non-fatal */ }
+}
+
+/* ── Public-booking pending-review banner ─────────────────────────────
+   Sits at the top of the calendar view. Lists each open
+   review_public_booking task as a clickable row. Click → opens the
+   review modal (same one the tasks-queue inline button opens).
+   Auto-hides when there are no open booking requests. */
+function renderPublicBookingBanner() {
+  var el = document.getElementById('public-booking-banner');
+  if (!el) return;
+  var tasks = ((_tasks && _tasks.open) || []).filter(function(t){
+    return t.type === 'review_public_booking' && t.extracted_data;
+  });
+  if (!tasks.length) { el.style.display = 'none'; el.innerHTML = ''; return; }
+
+  // Sort: rush requests first (highest fee → lowest), then by requested
+  // date ascending so the soonest non-rush bookings surface next.
+  tasks.sort(function(a, b){
+    var ax = a.extracted_data, bx = b.extracted_data;
+    var ar = Number(ax.rush_fee || 0), br = Number(bx.rush_fee || 0);
+    if (br !== ar) return br - ar;
+    return (ax.requested_date || '') < (bx.requested_date || '') ? -1 : 1;
+  });
+
+  var rowsHtml = tasks.map(function(t){
+    var x = t.extracted_data || {};
+    var rushFee = Number(x.rush_fee || 0);
+    var rushTag = rushFee >= 200 ? 'SAME-DAY' : rushFee >= 100 ? 'NEXT-DAY' : rushFee > 0 ? '2-DAY' : null;
+    var rushColor = rushFee >= 200 ? '#b91c1c' : rushFee >= 100 ? '#9a3412' : rushFee > 0 ? '#78350f' : null;
+    var pretty = x.requested_date || '';
+    try { pretty = new Date(x.requested_date + 'T12:00:00').toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric' }); } catch (_e) {}
+    var totalStr = x.quote_total_with_tax != null ? '$' + Number(x.quote_total_with_tax).toFixed(2) : null;
+    var pathLabel = x.path === 'existing_property' ? '\u2713 returning' : 'new lead';
+    var pathColor = x.path === 'existing_property' ? '#059669' : '#7c3aed';
+
+    return '<div data-task-id="' + esc(t.id) + '" onclick="openPublicBookingReview(this.dataset.taskId)" '
+      + 'style="background:#fff;border:1px solid #d0eaf4;border-radius:10px;padding:10px 12px;margin-top:6px;cursor:pointer;display:flex;align-items:center;gap:10px;transition:box-shadow .2s,transform .1s;" '
+      + 'onmouseover="this.style.boxShadow=\'0 4px 14px rgba(59,184,227,.25)\';this.style.transform=\'translateY(-1px)\';" '
+      + 'onmouseout="this.style.boxShadow=\'\';this.style.transform=\'\';">'
+      + '<div style="flex:1;min-width:0;">'
+      + '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:13px;">'
+      + '<strong>' + esc(x.name || '') + '</strong>'
+      + (rushTag ? '<span style="background:' + rushColor + ';color:#fff;padding:2px 7px;border-radius:99px;font-size:10px;font-weight:700;letter-spacing:.04em;">\u26A1 ' + rushTag + '</span>' : '')
+      + '<span style="font-size:10px;color:' + pathColor + ';font-weight:600;text-transform:uppercase;letter-spacing:.05em;">' + pathLabel + '</span>'
+      + '</div>'
+      + '<div style="font-size:12px;color:var(--text-muted,#5b7683);margin-top:3px;">'
+      + esc(pretty) + ' at ' + esc(x.requested_time || '')
+      + ' \u00b7 ' + esc(x.service || '')
+      + (totalStr ? ' \u00b7 <strong>' + totalStr + '</strong>' : '')
+      + '</div>'
+      + '</div>'
+      + '<div style="font-size:20px;color:#3BB8E3;flex-shrink:0;line-height:1;">\u203A</div>'
+      + '</div>';
+  }).join('');
+
+  el.innerHTML = ''
+    + '<div style="background:#eaf7fb;border:1px solid #9adcf0;border-radius:12px;padding:12px 14px;box-shadow:0 2px 8px rgba(15,42,53,.06);">'
+    + '<div style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;color:#16758F;">'
+    + '<span>\uD83D\uDCE5 Booking ' + (tasks.length === 1 ? 'request' : 'requests') + ' pending review</span>'
+    + '<span style="background:#3BB8E3;color:#fff;border-radius:99px;padding:2px 9px;font-size:11px;font-weight:700;min-width:22px;text-align:center;">' + tasks.length + '</span>'
+    + '</div>'
+    + rowsHtml
+    + '</div>';
+  el.style.display = 'block';
+}
   if (doneList) {
     doneList.innerHTML = _tasks.done.slice(0, 20).map(t => renderTaskCard(t, true)).join('');
   }
@@ -20250,9 +20357,48 @@ async function openPublicBookingReview(taskId) {
   document.getElementById('pbr-admin-notes').value = '';
   document.getElementById('pbr-send-email').checked = false;
   var errEl = document.getElementById('pbr-error'); if (errEl) errEl.style.display = 'none';
-  var btn = document.getElementById('pbr-accept-btn'); if (btn) { btn.disabled = false; btn.textContent = 'Accept & schedule'; }
+  var btn = document.getElementById('pbr-accept-btn'); if (btn) { btn.disabled = false; btn.textContent = 'Accept'; }
+
+  // Pre-fill edit-mode inputs (hidden until user clicks Edit). Always
+  // reset edit-mode to OFF when reopening the modal so the read-only
+  // display is what the user sees first.
+  var editFields = document.getElementById('pbr-edit-fields');
+  if (editFields) editFields.style.display = 'none';
+  var serviceBlock = document.getElementById('pbr-service-block'); if (serviceBlock) serviceBlock.style.display = '';
+  var pricingBlock = document.getElementById('pbr-pricing-block'); if (pricingBlock) pricingBlock.style.display = '';
+  var editBtn = document.getElementById('pbr-edit-btn'); if (editBtn) editBtn.textContent = 'Edit';
+  var svcSel = document.getElementById('pbr-edit-service'); if (svcSel) svcSel.value = x.service || 'Regular Cleaning';
+  var freqSel = document.getElementById('pbr-edit-frequency'); if (freqSel) freqSel.value = x.frequency || '';
+  var bedsIn = document.getElementById('pbr-edit-beds'); if (bedsIn) bedsIn.value = x.beds || '';
+  var bathsIn = document.getElementById('pbr-edit-baths'); if (bathsIn) bathsIn.value = x.baths || '';
+  var sqftIn = document.getElementById('pbr-edit-sqft'); if (sqftIn) sqftIn.value = x.sqft || '';
+  var totalIn = document.getElementById('pbr-edit-total'); if (totalIn) totalIn.value = x.quote_total_with_tax != null ? Number(x.quote_total_with_tax).toFixed(2) : '';
 
   openOverlay('public-booking-review-overlay');
+}
+
+/* Toggles the modal between read-only-display and edit-mode. In edit
+   mode the user can change service / frequency / beds / baths / sqft /
+   total price. The values stay in the inputs; when Accept is clicked,
+   confirmPublicBookingAccept reads them and POSTs them as overrides. */
+function togglePublicBookingEditMode() {
+  var editFields = document.getElementById('pbr-edit-fields');
+  var serviceBlock = document.getElementById('pbr-service-block');
+  var pricingBlock = document.getElementById('pbr-pricing-block');
+  var editBtn = document.getElementById('pbr-edit-btn');
+  if (!editFields) return;
+  var nowEditing = editFields.style.display === 'none';
+  if (nowEditing) {
+    editFields.style.display = '';
+    if (serviceBlock) serviceBlock.style.display = 'none';
+    if (pricingBlock) pricingBlock.style.display = 'none';
+    if (editBtn) editBtn.textContent = 'Done editing';
+  } else {
+    editFields.style.display = 'none';
+    if (serviceBlock) serviceBlock.style.display = '';
+    if (pricingBlock) pricingBlock.style.display = '';
+    if (editBtn) editBtn.textContent = 'Edit';
+  }
 }
 
 async function confirmPublicBookingAccept() {
@@ -20275,6 +20421,26 @@ async function confirmPublicBookingAccept() {
     return;
   }
 
+  // Pull edit-mode overrides if Edit was clicked. We only include fields
+  // that actually changed (or were filled in) — empty strings stay null
+  // so the server falls back to extracted_data.
+  var payload = { taskId: taskId, date: date, time: time, notes: notes || undefined, sendEmail: sendEmail };
+  var editFields = document.getElementById('pbr-edit-fields');
+  if (editFields && editFields.style.display !== 'none') {
+    var s  = (document.getElementById('pbr-edit-service').value || '').trim();
+    var f  = (document.getElementById('pbr-edit-frequency').value || '').trim();
+    var bd = (document.getElementById('pbr-edit-beds').value || '').trim();
+    var ba = (document.getElementById('pbr-edit-baths').value || '').trim();
+    var sf = (document.getElementById('pbr-edit-sqft').value || '').trim();
+    var tt = (document.getElementById('pbr-edit-total').value || '').trim();
+    if (s)  payload.service = s;
+    if (f)  payload.frequency = f;
+    if (bd) payload.beds = bd;
+    if (ba) payload.baths = ba;
+    if (sf) payload.sqft = sf;
+    if (tt && !isNaN(Number(tt))) payload.totalPrice = Number(tt);
+  }
+
   if (btn) { btn.disabled = true; btn.textContent = 'Scheduling\u2026'; }
   try {
     var sess = await db.auth.getSession();
@@ -20282,23 +20448,30 @@ async function confirmPublicBookingAccept() {
     var resp = await fetch('/api/accept-public-booking', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + tok },
-      body: JSON.stringify({ taskId: taskId, date: date, time: time, notes: notes || undefined, sendEmail: sendEmail }),
+      body: JSON.stringify(payload),
     });
     var data = await resp.json().catch(function(){ return {}; });
     if (!resp.ok || !data.success) {
       if (errEl) { errEl.textContent = data.error || ('HTTP ' + resp.status); errEl.style.display = 'block'; }
-      if (btn) { btn.disabled = false; btn.textContent = 'Accept & schedule'; }
+      if (btn) { btn.disabled = false; btn.textContent = 'Accept'; }
       return;
     }
     closeOverlay('public-booking-review-overlay');
     showToast('\u2713 Booking accepted \u2014 appointment scheduled', false);
-    // Refresh tasks + appointments so the calendar + task queue update.
+    // Refresh tasks + appointments so the calendar + task queue + banner update.
     try { if (typeof loadTasks === 'function') loadTasks(); } catch (_) {}
     try { if (typeof _refreshAppointmentsFromDB === 'function') _refreshAppointmentsFromDB(); } catch (_) {}
   } catch (e) {
     if (errEl) { errEl.textContent = 'Network error: ' + e.message; errEl.style.display = 'block'; }
-    if (btn) { btn.disabled = false; btn.textContent = 'Accept & schedule'; }
+    if (btn) { btn.disabled = false; btn.textContent = 'Accept'; }
   }
+}
+
+async function confirmPublicBookingDeny() {
+  var taskId = document.getElementById('pbr-task-id').value;
+  if (!taskId) return;
+  closeOverlay('public-booking-review-overlay');
+  await dismissPublicBooking(taskId);
 }
 
 async function dismissPublicBooking(taskId) {

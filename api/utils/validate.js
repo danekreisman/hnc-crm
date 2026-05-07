@@ -209,6 +209,15 @@ export const SCHEMAS = {
     time:      { required: false, rules: [is.nonEmpty, is.maxLength(20)], message: 'time must be a non-empty string under 20 chars if provided' },
     notes:     { required: false, rules: [is.maxLength(2000)],            message: 'notes must be under 2000 chars if provided' },
     sendEmail: { required: false, rules: [is.boolean],  message: 'sendEmail must be boolean if provided' },
+    // Edit-mode overrides (modal "Edit" button) — apply to the appointment
+    // values that get inserted. totalPrice is post-tax + post-rush; the
+    // server splits it back into base + tax using TAX_RATE before the insert.
+    service:    { required: false, rules: [is.nonEmpty, is.maxLength(60)],                                                         message: 'service must be a non-empty string under 60 chars if provided' },
+    frequency:  { required: false, rules: [is.maxLength(50)],                                                                       message: 'frequency must be under 50 chars if provided' },
+    beds:       { required: false, rules: [is.maxLength(20)],                                                                       message: 'beds must be under 20 chars if provided' },
+    baths:      { required: false, rules: [is.maxLength(20)],                                                                       message: 'baths must be under 20 chars if provided' },
+    sqft:       { required: false, rules: [is.maxLength(20)],                                                                       message: 'sqft must be under 20 chars if provided' },
+    totalPrice: { required: false, rules: [(v) => v == null || (is.number(Number(v)) && Number(v) >= 0 && Number(v) < 100000)],     message: 'totalPrice must be a non-negative number under 100000 if provided' },
   },
 
 };

@@ -218,11 +218,16 @@ export default async function handler(req, res) {
   }
 
   function applyVars(template, extra = {}) {
+    const bookingUrl = bookingToken
+      ? `https://book.hawaiinaturalclean.com/book?bt=${bookingToken}`
+      : '';
     return template
       .replace(/\{firstName\}/g, firstName)
       .replace(/\{service\}/g,   d.serviceType || 'cleaning')
       .replace(/\{frequency\}/g, d.frequency   || '')
-      .replace(/\{total\}/g,     extra.total   || '');
+      .replace(/\{total\}/g,     extra.total   || '')
+      .replace(/\{bookingUrl\}/g, bookingUrl)
+      .replace(/\{bookingToken\}/g, bookingToken || '');
   }
 
   // ── 3. Janitorial branch ────────────────────────────────────────────────

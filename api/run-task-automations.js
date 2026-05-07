@@ -291,41 +291,99 @@ export default async function handler(req, res) {
     }
     } // end of day5Enabled block
 
-    // ── 3. Pipeline stage advance: Quoted → Long-Term Follow-Up after 3 days of silence ──
+    // ── 3. Pipeline stage advance: Quoted → Long-Term Follow-Up (variant-aware) ──
     // Pure DB write, no SMS/email side effects. Always runs (no kill switch).
-    // Criteria: stage='Quoted' AND quote_sent_at is 3+ days old AND no inbound
-    // reply tracked AND not blacklisted. Leads who replied stay in Quoted (the
-    // VA-task automations handle the human follow-up for them).
+    //
+    // Tide Phase 3 (2026-05-07): the timeout is now service-type aware so
+    // leads get their full cadence before being moved out of Quoted:
+    //   - Move-out Cleaning: 7 days  (matches Move-Out variant cadence)
+    //   - Deep Cleaning:     10 days (matches Deep Clean variant cadence)
+    //   - Regular Cleaning:  14 days (matches Regular variant cadence)
+    //   - other / null:      14 days (use longest cadence as a safety default)
+    //
+    // Criteria: stage='Quoted' AND quote_sent_at is older than the variant's
+    // timeout AND no inbound reply tracked AND not blacklisted. Leads who
+    // replied stay in Quoted (the human-review tasks from Tide cadences
+    // handle the next step for them).
+    //
+    // Implementation: query each service bucket separately so the timeout
+    // can vary. Slightly more queries but each is indexed (leads.stage,
+    // leads.service) and the result sets are tiny.
     try {
-      const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString();
-      const { data: stale, error: staleErr } = await db
+      const dayMs = 24 * 60 * 60 * 1000;
+      const variantTimeouts = [
+        { service: 'Move-out Cleaning', days: 7 },
+        { service: 'Deep Cleaning',     days: 10 },
+        { service: 'Regular Cleaning',  days: 14 },
+      ];
+      const knownServices = variantTimeouts.map(v => v.service);
+      let totalAdvanced = 0;
+
+      // Per-variant queries
+      for (const v of variantTimeouts) {
+        const cutoff = new Date(Date.now() - v.days * dayMs).toISOString();
+        const { data: stale, error: staleErr } = await db
+          .from('leads')
+          .select('id')
+          .eq('stage', 'Quoted')
+          .eq('service', v.service)
+          .lt('quote_sent_at', cutoff)
+          .is('last_responded_at', null)
+          .eq('do_not_contact', false);
+        if (staleErr) {
+          console.warn(`[run-task-automations] stage-advance query error (${v.service}):`, staleErr.message);
+          continue;
+        }
+        if (stale && stale.length) {
+          const ids = stale.map(r => r.id);
+          const { error: updateErr } = await db
+            .from('leads')
+            .update({ stage: 'Long-Term Follow-Up' })
+            .in('id', ids);
+          if (updateErr) {
+            console.warn(`[run-task-automations] stage-advance update error (${v.service}):`, updateErr.message);
+          } else {
+            console.log(`[run-task-automations] Advanced ${ids.length} ${v.service} leads from Quoted → Long-Term Follow-Up (${v.days}d timeout)`);
+            totalAdvanced += ids.length;
+          }
+        }
+      }
+
+      // Catch-all for services without a Tide variant (Janitorial, Airbnb,
+      // null, anything custom). Uses 14-day timeout as a safety default —
+      // longer than any explicit variant so we never advance a Tide-eligible
+      // lead before its variant's timeout fires.
+      const defaultCutoff = new Date(Date.now() - 14 * dayMs).toISOString();
+      let defaultQuery = db
         .from('leads')
-        .select('id, name')
+        .select('id')
         .eq('stage', 'Quoted')
-        .lt('quote_sent_at', threeDaysAgo)
+        .lt('quote_sent_at', defaultCutoff)
         .is('last_responded_at', null)
         .eq('do_not_contact', false);
-
-      if (staleErr) {
-        console.warn('[run-task-automations] stage-advance query error:', staleErr.message);
-      } else if (stale && stale.length) {
-        const ids = stale.map(r => r.id);
+      // Use Postgrest's not.in for the exclusion; values are quoted by the client
+      defaultQuery = defaultQuery.not('service', 'in', `("${knownServices.join('","')}")`);
+      const { data: staleDefault, error: defaultErr } = await defaultQuery;
+      if (defaultErr) {
+        console.warn('[run-task-automations] stage-advance default query error:', defaultErr.message);
+      } else if (staleDefault && staleDefault.length) {
+        const ids = staleDefault.map(r => r.id);
         const { error: updateErr } = await db
           .from('leads')
           .update({ stage: 'Long-Term Follow-Up' })
           .in('id', ids);
         if (updateErr) {
-          console.warn('[run-task-automations] stage-advance update error:', updateErr.message);
+          console.warn('[run-task-automations] stage-advance default update error:', updateErr.message);
         } else {
-          console.log(`[run-task-automations] Advanced ${ids.length} leads from Quoted → Long-Term Follow-Up`);
-          results.stage_advanced_to_followup = ids.length;
+          console.log(`[run-task-automations] Advanced ${ids.length} non-variant leads from Quoted → Long-Term Follow-Up (14d default)`);
+          totalAdvanced += ids.length;
         }
-      } else {
-        results.stage_advanced_to_followup = 0;
       }
-    } catch (advanceErr) {
-      await logError('run-task-automations:stage-advance', advanceErr, {});
-      results.errors++;
+
+      results.stage_advanced_to_followup = totalAdvanced;
+    } catch (saErr) {
+      console.warn('[run-task-automations] stage-advance unexpected error:', saErr.message);
+      results.stage_advanced_to_followup = 0;
     }
 
     return res.status(200).json({ success: true, ...results });

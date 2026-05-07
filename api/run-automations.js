@@ -284,7 +284,39 @@ export default async function handler(req, res) {
                 .in('stage_event_id', eventIds);
               const alreadyRunSet = new Set((alreadyRun || []).map(r => r.stage_event_id));
 
-              const fresh = events.filter(e => !alreadyRunSet.has(e.id));
+              let fresh = events.filter(e => !alreadyRunSet.has(e.id));
+
+              // ── Tide Phase 2 (2026-05-07): current-stage gate + service_type filter ──
+              // The lead_stage_events table is append-only history. Without a
+              // current-stage check, a lead who entered Quoted on Day 0, then
+              // got moved to Closed lost on Day 4, would still receive the
+              // Day 5+ touches because the original 'Quoted' event still
+              // exists. We don't want stale-cadence fires.
+              //
+              // Optional service_type filter: trigger_config.service_type, when
+              // set, restricts firing to leads whose `service` field matches
+              // (case-insensitive). This is what makes the Tide Quoted variants
+              // (Move-Out / Deep Clean / Regular) work — same stage, different
+              // cadences, branched by service.
+              //
+              // Both checks consolidated into one round trip to leads.
+              if (fresh.length) {
+                const targetServiceType = trigger_config?.service_type || null;
+                const leadIds = fresh.map(e => e.lead_id);
+                const { data: leadRows } = await db
+                  .from('leads')
+                  .select('id, stage, service')
+                  .in('id', leadIds);
+                const matchingSet = new Set(
+                  (leadRows || [])
+                    .filter(l => l.stage === targetStage)
+                    .filter(l => !targetServiceType ||
+                      (l.service || '').toLowerCase() === targetServiceType.toLowerCase())
+                    .map(l => l.id)
+                );
+                fresh = fresh.filter(e => matchingSet.has(e.lead_id));
+              }
+
               matchingLeads = fresh.map(e => ({ id: e.lead_id }));
               // Build a map so the run record below can be stamped with the
               // event id (enables future audit / debug queries).

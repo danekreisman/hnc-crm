@@ -382,7 +382,7 @@ export default async function handler(req, res) {
 
             // Compute once per lead — available to both SMS and email AI personalization
             const bookingUrlForLead = leadData.booking_token
-              ? `${BASE_URL}/book.html?bt=${leadData.booking_token}`
+              ? `https://book.hawaiinaturalclean.com/book?bt=${leadData.booking_token}`
               : null;
 
             console.log(`[${executionId}] Executing ${actions?.length || 0} actions for lead: ${leadData.name}`);

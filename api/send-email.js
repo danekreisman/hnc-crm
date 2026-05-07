@@ -347,8 +347,8 @@ export default async function handler(req, res) {
       const priceTable = `<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">${priceRows.join('')}</table>`;
 
       const finalBookUrl = bookingToken
-        ? `https://hnc-crm.vercel.app/book.html?bt=${bookingToken}`
-        : (bookingUrl || 'https://hnc-crm.vercel.app/book.html');
+        ? `https://book.hawaiinaturalclean.com/book?bt=${bookingToken}`
+        : (bookingUrl || 'https://book.hawaiinaturalclean.com/book');
 
       // Photo encouragement card — placed AFTER the price breakdown so the
       // primary visual flow stays "see price → click Book Now". This is a

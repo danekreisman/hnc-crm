@@ -46,8 +46,16 @@ function last10(phone) {
 }
 
 function toE164(phone) {
-  const digits = String(phone || '').replace(/\D/g, '');
-  return String(phone || '').startsWith('+') ? String(phone).replace(/[^0-9+]/g, '') : '+1' + digits;
+  // Robust normalization: strip everything to digits, drop a leading '1'
+  // if present (US country code), then take last 10. This handles all the
+  // ways a customer might type their number ("808-555-1234", "1 808 555
+  // 1234", "+1 (808) 555-1234", "18085551234", etc.) and produces a
+  // canonical "+1XXXXXXXXXX". Existing callers in the codebase use a
+  // simpler `'+1' + digits` pattern that breaks on 11-digit input.
+  let digits = String(phone || '').replace(/\D/g, '');
+  if (digits.length === 11 && digits.startsWith('1')) digits = digits.slice(1);
+  digits = digits.slice(-10);
+  return '+1' + digits;
 }
 
 export default async function handler(req, res) {
@@ -165,7 +173,12 @@ export default async function handler(req, res) {
           upd.stage = 'Quoted';
         }
         if (b.sqft) upd.sqft = parseInt(b.sqft) || null;
-        await supabase.from('leads').update(upd).eq('id', leadId);
+        const { error: updErr } = await supabase.from('leads').update(upd).eq('id', leadId);
+        if (updErr) {
+          // Non-fatal — task creation below is the critical path. Log so we
+          // can spot stale-lead-info issues later without failing the booking.
+          await logError('submit-public-booking:lead-update', updErr, { leadId, email: cleanEmail });
+        }
       } else {
         // Create a new lead — mirrors lead-capture.js shape.
         leadIsNew = true;

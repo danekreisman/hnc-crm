@@ -5935,6 +5935,24 @@ async function saveApptEdit(mode){
     editBase=Math.round(editTotal/1.04712*100)/100;
     editTax=Math.round((editTotal-editBase)*100)/100;
   }
+  // ── DEFENSIVE GUARD against $0 price corruption ────────────────────────
+  // Bug 2026-05-08: editing an appointment to mark it Unassigned was
+  // sometimes silently zeroing total_price. Root cause: when calcEditPrice
+  // can't reproduce the saved price from currentAppt's beds/baths/sqft/
+  // condition (because those fields aren't always populated on the in-memory
+  // appt object), edit-price-val displays $0. saveApptEdit then read that
+  // $0 from the DOM and saved it.
+  // Guard: never let a previously-saved non-zero price drop to $0 unless
+  // the user explicitly sets a $0 price override. This is non-destructive —
+  // any legitimate $0 save still works (just check the override box and
+  // type 0).
+  var _prevSavedTotal=parseFloat((a&&a.totalPrice)||0)||0;
+  if(editTotal===0 && _prevSavedTotal>0 && !isOverride){
+    console.warn('[saveApptEdit] BLOCKED $0 price overwrite — preserving previous total $'+_prevSavedTotal+'. Cause: calcEditPrice produced $0, likely missing beds/baths/sqft/condition on currentAppt. Use the explicit price override checkbox if you really want to save $0.');
+    editTotal=_prevSavedTotal;
+    editBase=Math.round(editTotal/1.04712*100)/100;
+    editTax=Math.round((editTotal-editBase)*100)/100;
+  }
   // Parse time string
   var hr24=timeVal||'08:00';
   var hh=parseInt(hr24.split(':')[0]);var mm2=parseInt(hr24.split(':')[1])||0;

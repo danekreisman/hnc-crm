@@ -14524,12 +14524,16 @@ function openInviteCleaner(){
     +'<div class="info-row"><span class="info-label">Est. duration</span><span class="info-val">'+(cd.dur||'—')+'</span></div>'
     +'<div class="info-row"><span class="info-label">Bed / bath</span><span class="info-val">'+(cd.bed||'—')+'</span></div>';
 
-  // Build cleaner checkboxes
+  // Build cleaner checkboxes — only show ACTIVE cleaners. Deactivated /
+  // on-leave / inactive cleaners are filtered out so they don't get spam-
+  // invited to jobs they shouldn't be on. The previous crude check
+  // (`notes.indexOf('leave')`) only caught one specific status — we now
+  // use the canonical c.status field set in cleanerDB at line 3516.
   var list=document.getElementById('invite-cleaner-list');
   list.innerHTML='';
   Object.entries(cleanerDB).forEach(function(entry){
     var id=entry[0];var c=entry[1];
-    if(c.notes&&c.notes.indexOf('leave')>=0)return;
+    if(c.status !== 'Active') return;
     var label=document.createElement('label');
     label.style.cssText='display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--bg-soft);border:1px solid var(--border);border-radius:8px;cursor:pointer;font-size:12px;';
     label.innerHTML='<input type="checkbox" value="'+id+'" style="accent-color:var(--brand-500);width:15px;height:15px;" onchange="updateInvitePreview()">'
@@ -14541,7 +14545,10 @@ function openInviteCleaner(){
     list.appendChild(label);
   });
 
-  // Build preview message
+  // Build preview message — reset the user-edited flag first so updateInvitePreview
+  // freshly populates the template for this appointment. Once the textarea is
+  // shown, any user edit will set the flag and protect their work from re-renders.
+  _inviteTemplateUserEdited=false;
   updateInvitePreview();
   document.getElementById('invite-note').value='';
   document.getElementById('invite-success').classList.remove('show');
@@ -14552,19 +14559,17 @@ function updateInvitePreview(){
   if(!currentAppt)return;
   var cd=currentApptData||{};
   var hrs=parseFloat(cd.duration||cd.dur)||3.5;
-  // Determine pay from first checked cleaner, else current appt cleaner
-  var checkedBoxes=document.querySelectorAll('#invite-cleaner-list input[type=checkbox]:checked');
-  var previewCleanerName='';
-  if(checkedBoxes.length>0){
-    var firstId=checkedBoxes[0].value;
-    var firstC=cleanerDB[firstId];
-    if(firstC)previewCleanerName=firstC.name;
-  }
-  if(!previewCleanerName)previewCleanerName=currentAppt.cleaner||'';
-  var previewPay=calcCleanerPay(hrs,previewCleanerName,(cd&&cd.service)||(currentAppt&&currentAppt.service));
-  var payStr=previewPay?'$'+previewPay.toFixed(0):'—';
-  if(checkedBoxes.length>1)payStr+=' (varies by cleaner)';
-  var msg='Aloha! Would you be able to take this job?\n\n'
+  // Build the template ONCE per overlay-open. After that, respect user
+  // edits — re-checking checkboxes shouldn't blow away their changes.
+  // The flag _inviteTemplateUserEdited is reset in openInviteCleaner and
+  // flipped to true by the textarea's oninput handler.
+  var tmplEl=document.getElementById('invite-msg-template');
+  if(!tmplEl) return;
+  if(_inviteTemplateUserEdited && tmplEl.value) return;
+  // Default template uses {firstName} and {pay} placeholders that get
+  // substituted per-cleaner at send time. All other fields are appointment-
+  // level (same for everyone) so they're hardcoded into the template.
+  var msg='Aloha {firstName}! Would you be able to take this job?\n\n'
     +'Client: '+currentAppt.n+'\n'
     +'Service: '+(cd.service||'Regular Cleaning')+'\n'
     +'Date: '+document.getElementById('ai-date').textContent+'\n'
@@ -14572,12 +14577,27 @@ function updateInvitePreview(){
     +'Address: '+(cd.address||'—')+'\n'
     +'Est. duration: '+(cd.dur||hrs+'h')+'\n'
     +'Bed/bath: '+(cd.bed||'—')+'\n'
-    +'Your pay: '+payStr+'\n\n'
+    +'Your pay: {pay}\n\n'
     +'Reply YES to accept or NO to pass. First YES gets the job!\n— Hawaii Natural Clean';
-  var note=document.getElementById('invite-note');
-  if(note&&note.value)msg+='\n\nNote: '+note.value;
-  document.getElementById('invite-msg-preview').textContent=msg;
+  tmplEl.value=msg;
+  _inviteTemplateUserEdited=false;
 }
+
+// Re-render the template when the note changes — only if the user hasn't
+// edited the body yet. Once they edit, they own the body and can append
+// the note themselves.
+function _renderInviteTemplateNote(){
+  var tmplEl=document.getElementById('invite-msg-template');
+  if(!tmplEl || _inviteTemplateUserEdited) return;
+  // No-op for now — the note is appended at send time by sendCleanerInvites.
+  // This stub exists so the textarea's oninput doesn't error out, and is a
+  // future hook if we want a real-time append-note preview.
+}
+
+// Tracks whether the user has edited the textarea. When false,
+// updateInvitePreview can safely repopulate it. When true, it preserves
+// their work.
+var _inviteTemplateUserEdited=false;
 
 function sendCleanerInvites(){
   var checked=document.querySelectorAll('#invite-cleaner-list input[type=checkbox]:checked');
@@ -14587,7 +14607,14 @@ function sendCleanerInvites(){
   }
   var cd=currentApptData||{};
   var hrs=parseFloat(cd.duration||cd.dur)||3.5;
-  var baseMsg=document.getElementById('invite-msg-preview').textContent;
+  // Read user-edited template from the textarea. Falls back to a clean
+  // re-render if somehow empty (shouldn't happen, but defensive).
+  var tmplEl=document.getElementById('invite-msg-template');
+  var template=(tmplEl&&tmplEl.value)||'';
+  if(!template){
+    updateInvitePreview();
+    template=(tmplEl&&tmplEl.value)||'';
+  }
   var note=(document.getElementById('invite-note')||{}).value||'';
   var names=[];
   var now=new Date();
@@ -14599,19 +14626,15 @@ function sendCleanerInvites(){
     if(!c)return;
     names.push(c.name);
 
-    // Build per-cleaner message with their individual pay rate
+    // Per-cleaner substitution of placeholders. firstName is the first
+    // word of the cleaner's display name. pay is computed using the
+    // service-specific rate via calcCleanerPay.
+    var firstName=(c.name||'').split(' ')[0]||c.name||'';
     var cleanerPay=calcCleanerPay(hrs,c.name,(cd&&cd.service)||(currentAppt&&currentAppt.service));
     var payStr=cleanerPay?'$'+cleanerPay.toFixed(0):'—';
-    var msgText='Aloha! Would you be able to take this job?\n\n'
-      +'Client: '+currentAppt.n+'\n'
-      +'Service: '+(cd.service||'Regular Cleaning')+'\n'
-      +'Date: '+document.getElementById('ai-date').textContent+'\n'
-      +'Time: '+document.getElementById('ai-time').textContent+'\n'
-      +'Address: '+(cd.address||'—')+'\n'
-      +'Est. duration: '+(cd.dur||hrs+'h')+'\n'
-      +'Bed/bath: '+(cd.bed||'—')+'\n'
-      +'Your pay: '+payStr+'\n\n'
-      +'Reply YES to accept or NO to pass. First YES gets the job!\n— Hawaii Natural Clean';
+    var msgText=template
+      .replace(/\{firstName\}/g, firstName)
+      .replace(/\{pay\}/g, payStr);
     if(note)msgText+='\n\nNote: '+note;
     console.log('[sendCleanerInvites] '+c.name+' pay='+payStr+' ('+hrs+'h × $'+getCleanerRate(c.name)+'/hr)');
 
@@ -18158,10 +18181,10 @@ Your total will update automatically when you select a payment method.</textarea
       <div id="invite-cleaner-list" style="display:flex;flex-direction:column;gap:7px;margin-bottom:14px;"></div>
       <div class="panel-section">SMS message</div>
       <div style="background:var(--bg-soft);border:1px solid var(--border);border-radius:10px;padding:12px 13px;margin-bottom:12px;">
-        <div style="font-size:11px;color:var(--text-muted);margin-bottom:6px;">Preview — sent to each selected cleaner</div>
-        <div id="invite-msg-preview" style="font-size:13px;color:var(--text);line-height:1.7;white-space:pre-wrap;"></div>
+        <div style="font-size:11px;color:var(--text-muted);margin-bottom:6px;">Editable — use <code>{firstName}</code> and <code>{pay}</code> as per-cleaner placeholders</div>
+        <textarea id="invite-msg-template" style="width:100%;min-height:240px;border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-size:13px;color:var(--text);line-height:1.6;font-family:inherit;background:#fff;resize:vertical;" oninput="_inviteTemplateUserEdited=true"></textarea>
       </div>
-      <div class="form-row"><label>Add a note (optional)</label><textarea id="invite-note" style="min-height:50px;" placeholder="Any special instructions for this job..."></textarea></div>
+      <div class="form-row"><label>Add a note (optional, appended to all messages)</label><textarea id="invite-note" style="min-height:50px;" placeholder="Any special instructions for this job..." oninput="_renderInviteTemplateNote()"></textarea></div>
       <div class="save-bar">
         <button class="btn btn-primary" onclick="sendCleanerInvites()">Send invites</button>
         <button class="btn" onclick="closeOverlay('invite-cleaner-overlay')">Cancel</button>

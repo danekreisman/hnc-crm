@@ -9166,6 +9166,11 @@ function sv(view,el){
   if(view==='reporting'){ try{ repPopulateBucketDropdown(); }catch(e){} repRender(); }
   if(view==='settings'){loadSettings();}
   if(view==='tasks'){loadTasks();};
+  // Calendar view shows the public-booking pending-review banner at the
+  // top, which reads from _tasks.open — load tasks when the user opens
+  // the calendar so the banner is correct, not stale (or empty if this
+  // is the first view they open after page load).
+  if(view==='calendar'){ try{ loadTasks(); }catch(_){} }
   if(view==='payroll')refreshPayrollPeriods();
 }
 
@@ -12709,6 +12714,13 @@ renderAutoList();
 autoLoadRemote().then(function(){ renderAutoList(); });
 loadLeadAutomations(); // Load lead automations from Supabase
 setInterval(autoTick, 60*1000);
+
+// Calendar is the default view on page load. The public-booking banner
+// at the top reads from _tasks.open, which is empty until loadTasks runs.
+// Navigation to other views triggers loadTasks via the view-switch
+// handler, but a fresh page load that stays on calendar doesn't — kick
+// it off here so the banner is correct on first paint.
+try { if (typeof loadTasks === 'function') setTimeout(loadTasks, 400); } catch (_) {}
 
 /* ============================================================
    REPORTS (Weekly / Monthly / Quarterly / Yearly)

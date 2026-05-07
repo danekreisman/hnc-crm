@@ -1630,8 +1630,12 @@ body:not(.hnc-assistant-user) .assistant-only{display:none!important;}
                 <span id="notif-volume-pct" style="font-size:12px;color:var(--text-muted);min-width:36px;text-align:right;">40%</span>
                 <button class="btn" style="font-size:12px;padding:5px 12px;" onclick="testNotificationSound()">Test sound</button>
               </div>
-              <div style="font-size:11px;color:var(--text-muted);background:#f7f9f9;border-radius:6px;padding:8px 10px;">
-                <strong>Coming soon:</strong> push notifications to your phone home screen (so you get alerts even when the CRM tab is closed), and SMS dispatch for the most critical events.
+              <div style="border-top:1px solid var(--border);padding-top:14px;margin-top:4px;">
+                <div style="font-weight:600;font-size:13px;color:var(--text);margin-bottom:6px;">Push notifications</div>
+                <div style="font-size:12px;color:var(--text-muted);line-height:1.5;margin-bottom:10px;">Receive alerts on this device's home screen / lock screen even when the CRM is closed. Each device subscribes separately — enable on phone AND desktop to get pushes everywhere.</div>
+                <div id="push-status" style="font-size:12px;padding:8px 11px;border-radius:6px;margin-bottom:10px;background:#f7f9f9;color:var(--text-muted);">Checking subscription status&hellip;</div>
+                <button class="btn btn-primary" id="push-enable-btn" onclick="enablePushOnThisDevice()" style="font-size:13px;padding:7px 14px;">Enable push on this device</button>
+                <button class="btn" id="push-disable-btn" onclick="disablePushOnThisDevice()" style="font-size:13px;padding:7px 14px;display:none;margin-left:8px;">Disable on this device</button>
               </div>
             </div>
           </div>
@@ -10065,6 +10069,130 @@ window.hncDisableNotifications = async function() {
     return true;
   } catch (e) { console.warn('[push] disable failed:', e); return false; }
 };
+
+/* ────────────────────────────────────────────────────────────────────
+   Settings panel: Push notifications card
+   ────────────────────────────────────────────────────────────────────
+   Bug fix 2026-05-08: Dane reported pushes only landing on his phone,
+   not desktop. Root cause: each browser/device subscribes separately,
+   and the auto-prompt has a 7-day localStorage cooldown if dismissed
+   plus an early-return if permission is 'denied'. Result: if the
+   prompt was missed/dismissed on desktop, there was no in-app way to
+   re-trigger the subscribe. Now the Settings card has explicit Enable
+   / Disable buttons and a status display that's accurate for THIS
+   browser/device.
+   ──────────────────────────────────────────────────────────────────── */
+
+async function _renderPushStatus() {
+  var statusEl = document.getElementById('push-status');
+  var enableBtn = document.getElementById('push-enable-btn');
+  var disableBtn = document.getElementById('push-disable-btn');
+  if (!statusEl) return;
+
+  // Browser support gate
+  if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) {
+    statusEl.style.background = '#fef3f2';
+    statusEl.style.color = '#9b2c2c';
+    statusEl.textContent = 'This browser doesn\'t support push notifications.';
+    if (enableBtn) enableBtn.style.display = 'none';
+    if (disableBtn) disableBtn.style.display = 'none';
+    return;
+  }
+
+  // iOS Safari only supports push inside an installed PWA
+  var isIos = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+  var isStandalone = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || window.navigator.standalone === true;
+  if (isIos && !isStandalone) {
+    statusEl.style.background = '#fffbea';
+    statusEl.style.color = '#7c5a00';
+    statusEl.innerHTML = 'On iOS, push notifications only work after you install this app to your home screen. Tap the Share icon in Safari, then "Add to Home Screen", then open from the home-screen icon.';
+    if (enableBtn) enableBtn.style.display = 'none';
+    if (disableBtn) disableBtn.style.display = 'none';
+    return;
+  }
+
+  // Permission state
+  var perm = Notification.permission;
+  if (perm === 'denied') {
+    statusEl.style.background = '#fef3f2';
+    statusEl.style.color = '#9b2c2c';
+    statusEl.innerHTML = 'Notifications are <strong>blocked</strong> in your browser. To enable: click the lock icon in the address bar &rarr; Site settings &rarr; Notifications &rarr; Allow. Then refresh this page.';
+    if (enableBtn) enableBtn.style.display = 'none';
+    if (disableBtn) disableBtn.style.display = 'none';
+    return;
+  }
+
+  // Check existing subscription
+  try {
+    var reg = await navigator.serviceWorker.ready;
+    var sub = await reg.pushManager.getSubscription();
+    if (sub && perm === 'granted') {
+      statusEl.style.background = '#ecfdf5';
+      statusEl.style.color = '#065f46';
+      statusEl.textContent = '✓ This device is subscribed to push notifications.';
+      if (enableBtn) enableBtn.style.display = 'none';
+      if (disableBtn) disableBtn.style.display = 'inline-block';
+    } else {
+      statusEl.style.background = '#f7f9f9';
+      statusEl.style.color = 'var(--text-muted)';
+      statusEl.textContent = 'This device is not subscribed yet. Click the button below to enable.';
+      if (enableBtn) enableBtn.style.display = 'inline-block';
+      if (disableBtn) disableBtn.style.display = 'none';
+    }
+  } catch (e) {
+    console.warn('[push] status check failed:', e);
+    statusEl.style.background = '#f7f9f9';
+    statusEl.style.color = 'var(--text-muted)';
+    statusEl.textContent = 'Couldn\'t check subscription status. Try clicking Enable.';
+    if (enableBtn) enableBtn.style.display = 'inline-block';
+    if (disableBtn) disableBtn.style.display = 'none';
+  }
+}
+
+async function enablePushOnThisDevice() {
+  var btn = document.getElementById('push-enable-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Enabling…'; }
+  // Clear any localStorage cooldown that might have been set if Dane
+  // dismissed the auto-prompt earlier.
+  try { localStorage.removeItem('hnc_push_prompt_dismissed_at'); } catch(e){}
+  try {
+    var ok = await window.hncEnableNotifications();
+    if (ok === false) {
+      if (btn) { btn.disabled = false; btn.textContent = 'Enable push on this device'; }
+      showToast('Permission denied. Enable in browser settings to retry.', 'error');
+      await _renderPushStatus();
+      return;
+    }
+    showToast('✓ Push notifications enabled on this device.', 'success');
+  } catch (e) {
+    console.error('[push] enable failed:', e);
+    showToast('Couldn\'t enable: ' + e.message, 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Enable push on this device'; }
+    await _renderPushStatus();
+  }
+}
+
+async function disablePushOnThisDevice() {
+  var btn = document.getElementById('push-disable-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Disabling…'; }
+  try {
+    await window.hncDisableNotifications();
+    showToast('Push disabled on this device.', 'success');
+  } catch (e) {
+    console.error('[push] disable failed:', e);
+    showToast('Couldn\'t disable: ' + e.message, 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Disable on this device'; }
+    await _renderPushStatus();
+  }
+}
+
+// Render status whenever Settings panel is shown
+window.addEventListener('DOMContentLoaded', function(){
+  // Initial render — fires once on page load
+  setTimeout(_renderPushStatus, 1000);
+});
 </script>
 
 <!-- NEW LEAD OVERLAY -->

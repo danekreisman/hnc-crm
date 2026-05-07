@@ -596,45 +596,95 @@ export default async function handler(req, res) {
           try {
             const verdict = await classifyLeadResponse(body, lead.name);
             console.log('[openphone-webhook] AI verdict for lead', lead.id, ':', JSON.stringify(verdict));
-            if (verdict && verdict.intent === 'lost' && verdict.confidence !== 'low') {
-              // Create a VA task — surfaces in the Tasks view with Yes/No buttons
+            // Tide Phase 7.2 (2026-05-07): broadened from lost-only to all
+            // actionable intents. lost / engaged / deferred each create a
+            // review_lead_response task with intent stored in extracted_data
+            // so the UI can render intent-appropriate buttons. unclear
+            // intent (and any low-confidence verdict) is still ignored.
+            const intent = verdict && verdict.intent;
+            const isActionable = intent === 'lost' || intent === 'engaged' || intent === 'deferred';
+            if (verdict && isActionable && verdict.confidence !== 'low') {
               const leadFirstName = (lead.name || 'Lead').split(' ')[0];
               const today = new Date().toISOString().split('T')[0];
               const truncatedReply = body.length > 200 ? body.slice(0, 197) + '...' : body;
-              const taskInsertRes = await supabaseInsert('tasks', {
-                title: `${leadFirstName} responded — mark as lost?`,
-                type: 'review_lead_response',
-                priority: verdict.confidence === 'high' ? 'high' : 'medium',
-                due_date: today,
-                description: `Reply: "${truncatedReply}"\n\nAI read: ${verdict.reasoning || 'lead appears lost'} (confidence: ${verdict.confidence})`,
-                related_lead_id: lead.id,
-                status: 'open',
-              });
-              if (!taskInsertRes.ok) {
-                // supabaseInsert is fetch-based and won't throw on 4xx — read the
-                // body so the failure is visible in logs. Previously this fell
-                // through silently when CHECK constraints rejected the type.
-                const errBody = await taskInsertRes.text().catch(() => '<unreadable>');
-                console.error('[openphone-webhook] Task insert FAILED status=' + taskInsertRes.status + ' body=' + errBody.slice(0, 500));
-              } else {
-                console.log('[openphone-webhook] Created review_lead_response task for', lead.id);
 
-                // Fire push notification to all subscribed admins/VAs. Done as a
-                // dynamic import so a missing web-push module / VAPID config
-                // doesn't take the webhook offline — push is bonus on top of
-                // the task creation, not a blocker.
-                try {
-                  const { sendPushToAllSubscribed } = await import('./utils/send-push.js');
-                  const pushRes = await sendPushToAllSubscribed({
-                    title: `${leadFirstName} replied — mark as lost?`,
-                    body: `AI flagged this as likely lost (${verdict.confidence} confidence). "${truncatedReply.slice(0, 80)}${truncatedReply.length > 80 ? '...' : ''}"`,
-                    url: '/#tasks',
-                    tag: 'review-' + lead.id,
-                    requireInteraction: verdict.confidence === 'high',
-                  });
-                  console.log('[openphone-webhook] Push fanout:', JSON.stringify(pushRes));
-                } catch (pushErr) {
-                  console.warn('[openphone-webhook] Push notification failed:', pushErr.message);
+              // Idempotency: skip if there's already an open
+              // review_lead_response task for this lead. The classifier
+              // can fire on multiple replies from the same lead in a
+              // short window; one task is enough for Dane to see the
+              // signal.
+              const existingTaskResp = await fetch(
+                `${SUPABASE_URL}/rest/v1/tasks?related_lead_id=eq.${lead.id}&type=eq.review_lead_response&status=eq.open&select=id&limit=1`,
+                { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }
+              );
+              const existingTaskRows = await existingTaskResp.json().catch(() => []);
+              if (Array.isArray(existingTaskRows) && existingTaskRows.length > 0) {
+                console.log('[openphone-webhook] open review_lead_response task already exists for lead', lead.id, '- skipping');
+              } else {
+                // Per-intent task title and description framing
+                let taskTitle, taskDescription;
+                if (intent === 'lost') {
+                  taskTitle = `${leadFirstName} responded — mark as lost?`;
+                  taskDescription = `Reply: "${truncatedReply}"\n\nAI read: ${verdict.reasoning || 'lead appears lost'} (confidence: ${verdict.confidence})`;
+                } else if (intent === 'engaged') {
+                  taskTitle = `${leadFirstName} is engaged — review reply`;
+                  taskDescription = `Reply: "${truncatedReply}"\n\nAI read: ${verdict.reasoning || 'lead is positively engaging'} (confidence: ${verdict.confidence})\n\nOpen the lead profile to take next action — send quote, schedule, or move stage as appropriate.`;
+                } else { // deferred
+                  taskTitle = `${leadFirstName} wants to defer — review reply`;
+                  taskDescription = `Reply: "${truncatedReply}"\n\nAI read: ${verdict.reasoning || 'lead wants to defer'} (confidence: ${verdict.confidence})\n\nOpen the lead profile to set a wake-up date or move them to Long-Term Follow-Up.`;
+                }
+
+                const taskInsertRes = await supabaseInsert('tasks', {
+                  title: taskTitle,
+                  type: 'review_lead_response',
+                  priority: verdict.confidence === 'high' ? 'high' : 'medium',
+                  due_date: today,
+                  description: taskDescription,
+                  related_lead_id: lead.id,
+                  status: 'open',
+                  extracted_data: {
+                    intent: intent,
+                    confidence: verdict.confidence,
+                    reasoning: verdict.reasoning || null,
+                    reply_excerpt: truncatedReply,
+                    sms_message_id: data.id || null,
+                    current_stage: lead.stage || null,
+                  },
+                });
+                if (!taskInsertRes.ok) {
+                  // supabaseInsert is fetch-based and won't throw on 4xx — read the
+                  // body so the failure is visible in logs. Previously this fell
+                  // through silently when CHECK constraints rejected the type.
+                  const errBody = await taskInsertRes.text().catch(() => '<unreadable>');
+                  console.error('[openphone-webhook] Task insert FAILED status=' + taskInsertRes.status + ' body=' + errBody.slice(0, 500));
+                } else {
+                  console.log('[openphone-webhook] Created review_lead_response task (intent=' + intent + ') for', lead.id);
+
+                  // Push fan-out — same pattern as before, intent-aware copy
+                  try {
+                    const { sendPushToAllSubscribed } = await import('./utils/send-push.js');
+                    let pushTitle, pushBody;
+                    if (intent === 'lost') {
+                      pushTitle = `${leadFirstName} replied — mark as lost?`;
+                      pushBody = `AI flagged this as likely lost (${verdict.confidence} confidence). "${truncatedReply.slice(0, 80)}${truncatedReply.length > 80 ? '...' : ''}"`;
+                    } else if (intent === 'engaged') {
+                      pushTitle = `${leadFirstName} is engaged`;
+                      pushBody = `AI read positive intent (${verdict.confidence}). "${truncatedReply.slice(0, 80)}${truncatedReply.length > 80 ? '...' : ''}"`;
+                    } else {
+                      pushTitle = `${leadFirstName} wants to defer`;
+                      pushBody = `AI read deferral intent (${verdict.confidence}). "${truncatedReply.slice(0, 80)}${truncatedReply.length > 80 ? '...' : ''}"`;
+                    }
+                    const pushRes = await sendPushToAllSubscribed({
+                      title: pushTitle,
+                      body: pushBody,
+                      url: '/#tasks',
+                      tag: 'review-' + lead.id,
+                      requireInteraction: verdict.confidence === 'high' && intent === 'lost', // Only lost is urgent enough to require interaction
+                    });
+                    console.log('[openphone-webhook] Push fanout:', JSON.stringify(pushRes));
+                  } catch (pushErr) {
+                    console.warn('[openphone-webhook] Push notification failed:', pushErr.message);
+                  }
                 }
               }
             }

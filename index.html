@@ -19526,12 +19526,30 @@ function renderTaskCard(t, done) {
   // calls existing markLeadLost flow + completes the task. "Not lost" just
   // completes the task. Only show on open tasks (not done) and only when
   // there's a related lead to act on.
+  //
+  // Tide Phase 7.2 (2026-05-07): broadened to handle three intents from
+  // classifyLeadResponse. The intent is in extracted_data.intent (set by
+  // openphone-webhook) and dictates which buttons render:
+  //   - 'lost' (or undefined for legacy tasks): "Mark as lost" / "Not lost"
+  //   - 'engaged' or 'deferred': "Open lead" / "Dismiss"
+  // Open lead opens the lead profile (where the cleaner can send a quote,
+  // change stage, set wake-up date, etc) and completes the task.
   var reviewActions = '';
   if (!done && t.type === 'review_lead_response' && t.related_lead_id) {
-    reviewActions = '<div style="display:flex;gap:8px;margin-top:10px;">'
-      + '<button data-task-id="' + t.id + '" data-lead-id="' + t.related_lead_id + '" onclick="reviewTaskMarkLost(this.dataset.taskId, this.dataset.leadId)" style="flex:1;padding:7px 12px;background:#dc2626;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;">Mark as lost</button>'
-      + '<button data-task-id="' + t.id + '" onclick="reviewTaskNotLost(this.dataset.taskId)" style="flex:1;padding:7px 12px;background:#fff;color:var(--text);border:1.5px solid var(--border);border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;">Not lost</button>'
-      + '</div>';
+    var _intent = (t.extracted_data && t.extracted_data.intent) || 'lost';
+    if (_intent === 'engaged' || _intent === 'deferred') {
+      var _label = _intent === 'engaged' ? 'engaged' : 'deferring';
+      reviewActions = '<div style="display:flex;gap:8px;margin-top:10px;">'
+        + '<button data-task-id="' + t.id + '" data-lead-id="' + t.related_lead_id + '" onclick="openLeadFromResponseTask(this.dataset.taskId, this.dataset.leadId)" style="flex:1;padding:7px 12px;background:' + (_intent === 'engaged' ? '#059669' : '#d97706') + ';color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;">Open lead (' + _label + ')</button>'
+        + '<button data-task-id="' + t.id + '" onclick="dismissResponseTask(this.dataset.taskId)" style="flex:1;padding:7px 12px;background:#fff;color:var(--text);border:1.5px solid var(--border);border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;">Dismiss</button>'
+        + '</div>';
+    } else {
+      // Default / 'lost' intent: existing "Mark as lost" / "Not lost" buttons
+      reviewActions = '<div style="display:flex;gap:8px;margin-top:10px;">'
+        + '<button data-task-id="' + t.id + '" data-lead-id="' + t.related_lead_id + '" onclick="reviewTaskMarkLost(this.dataset.taskId, this.dataset.leadId)" style="flex:1;padding:7px 12px;background:#dc2626;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;">Mark as lost</button>'
+        + '<button data-task-id="' + t.id + '" onclick="reviewTaskNotLost(this.dataset.taskId)" style="flex:1;padding:7px 12px;background:#fff;color:var(--text);border:1.5px solid var(--border);border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;">Not lost</button>'
+        + '</div>';
+    }
   }
 
   // For review_call_lead tasks: "Review and create" opens an edit sheet
@@ -19635,6 +19653,32 @@ async function reviewTaskMarkLost(taskId, leadId) {
 async function reviewTaskNotLost(taskId) {
   // No DB lead update needed — just close the task. The lead stays in
   // whatever stage it was already in (Quoted, Long-Term Follow-Up, etc).
+  await completeTaskById(taskId);
+}
+
+/* Tide Phase 7.2 (2026-05-07): handlers for engaged/deferred intents on
+   review_lead_response tasks. The cleaner taps "Open lead" → the lead
+   profile opens (where she can send a quote, change stage, set a wake-up
+   date, etc) and the task is marked done. "Dismiss" just closes the task
+   without opening anything (reversible via the standard undo toast). */
+
+async function openLeadFromResponseTask(taskId, leadId) {
+  if (!taskId || !leadId) return;
+  // Open the lead profile first, then complete the task. If openLead is
+  // missing (shouldn't happen but defensive), still complete the task so
+  // it doesn't get stuck.
+  if (typeof openLead === 'function') {
+    try { openLead(leadId); } catch (e) {
+      console.warn('[openLeadFromResponseTask] openLead threw:', e);
+    }
+  }
+  await completeTaskById(taskId);
+}
+
+async function dismissResponseTask(taskId) {
+  // No-op other than closing the task. AI flagged this reply but Dane
+  // doesn't want to act on it — same shape as dismissCallLead /
+  // dismissQuoteSent / reviewTaskNotLost.
   await completeTaskById(taskId);
 }
 

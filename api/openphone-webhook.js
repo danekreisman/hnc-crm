@@ -357,6 +357,86 @@ export default async function handler(req, res) {
     return JSON.parse(jsonStr);
   }
 
+  /**
+   * SMS-specific quote extractor. Tide Phase 7 (2026-05-07).
+   *
+   * Called when an OUTBOUND SMS from HNC to a known lead contains a $
+   * (cheap pre-filter — caller checks first to avoid AI calls on every
+   * "thanks!" reply). The AI confirms whether this is a real committed
+   * quote vs. a soft reference to pricing.
+   *
+   * Different from extractQuoteFromTranscript:
+   *   - Single message context, no dialogue
+   *   - Lower max_tokens (smaller input, smaller output)
+   *   - Stricter on what counts as a real quote (SMS quotes are
+   *     usually shorter and more committal than verbal ones)
+   *
+   * Returns: {quote_discussed: bool, amount: number|null, confidence: 'high'|'medium'|'low', reasoning: string}
+   */
+  async function extractQuoteFromSms({ messageBody, leadName }) {
+    const prompt = [
+      'You are reviewing a single outbound SMS from Hawaii Natural Clean (a residential and commercial cleaning business) to a lead. Your only job is to detect whether this SMS gave the lead a SPECIFIC committed dollar quote they can act on.',
+      '',
+      'Return quote_discussed=true ONLY if the SMS proposes a specific committed price, e.g.:',
+      '  - "Quote for the move-out clean: $450"',
+      '  - "We can do that for $245 total"',
+      '  - "The deep clean would be $380"',
+      '',
+      'Return quote_discussed=false if:',
+      '  - No price is mentioned',
+      '  - Only a hourly rate without total ("$65/hr - depends on scope")',
+      '  - A range was given without commitment ("anywhere from $300-500")',
+      '  - The SMS asks the lead about price rather than offering one',
+      '  - The dollar amount is for something other than a quote (deposit, late fee, etc.)',
+      '',
+      'Confidence:',
+      '  - "high": SMS clearly states a single dollar figure as THE total price for a service',
+      '  - "medium": price is given but with some hedging - still actionable',
+      '  - "low": ambiguous, probably worth a manual review',
+      '',
+      'Amount: extract as a JSON number (no $ sign, no commas). Null if quote_discussed=false.',
+      '',
+      'Return ONLY a JSON object - first character must be { and last must be }. No preamble, no markdown.',
+      'Format: {"quote_discussed": <bool>, "amount": <number|null>, "confidence": "high"|"medium"|"low", "reasoning": "<one short sentence>"}',
+      '',
+      `Lead name: ${leadName || 'unknown'}`,
+      `SMS body: """${messageBody}"""`,
+    ].join('\n');
+
+    const aiResp = await fetchWithTimeout('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': process.env.ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 300,
+        messages: [{ role: 'user', content: prompt }],
+      }),
+    }, TIMEOUTS.ANTHROPIC);
+    if (!aiResp.ok) throw new Error('Anthropic API HTTP ' + aiResp.status);
+    const data = await aiResp.json();
+    const text = data?.content?.[0]?.text || '';
+    if (!text) throw new Error('AI returned empty response');
+
+    // Same brace-tracking JSON extractor as extractQuoteFromTranscript
+    const start = text.indexOf('{');
+    if (start === -1) throw new Error('No JSON in AI response');
+    let depth = 0, inString = false, escape = false, jsonStr = null;
+    for (let i = start; i < text.length; i++) {
+      const ch = text[i];
+      if (escape) { escape = false; continue; }
+      if (inString) { if (ch === '\\') { escape = true; continue; } if (ch === '"') inString = false; continue; }
+      if (ch === '"') { inString = true; continue; }
+      if (ch === '{') depth++;
+      else if (ch === '}') { depth--; if (depth === 0) { jsonStr = text.slice(start, i + 1); break; } }
+    }
+    if (!jsonStr) throw new Error('Unbalanced JSON in AI response');
+    return JSON.parse(jsonStr);
+  }
+
   try {
     const event = req.body;
     const type = event.type;
@@ -469,6 +549,126 @@ export default async function handler(req, res) {
           } catch (aiErr) {
             // Never fail the webhook on AI errors — classification is bonus
             console.warn('[openphone-webhook] AI classification failed:', aiErr.message);
+          }
+        }
+      }
+    }
+
+    // ── Outbound SMS: detect quote-mentioning messages ──────────────────────
+    // Tide Phase 7 (2026-05-07). When HNC sends an SMS to a known lead and
+    // the body contains a $, classify whether it's a real committed quote.
+    // If yes, create a review_quote_sent task so Dane can confirm and stamp
+    // the lead's quote_sent_at + quote_total in one tap. Same task type and
+    // UI buttons as the call-based path.
+    //
+    // Skip cases (cheap pre-filters BEFORE the AI call):
+    //   - Message body has no $ at all (most outbound texts)
+    //   - Recipient isn't a lead in our system (clients, prospects, etc.)
+    //   - Lead already has an open review_quote_sent task (idempotency)
+    //
+    // Why message.delivered and not message.sent? Delivered is the more
+    // reliable lifecycle event — fires only after the carrier ack'd it.
+    // Sent fires earlier and can trigger on messages that ultimately fail.
+    if ((type === 'message.delivered' || type === 'message.sent') && data) {
+      const to = data.to;
+      const body = data.body || data.text || '';
+      const direction = data.direction || 'outbound';
+
+      // Defensive: only handle outbound (HNC → lead). The webhook docs say
+      // delivered/sent are outbound-only but we double-check the field.
+      if (direction !== 'outbound') {
+        console.log('[openphone-webhook]', type, 'with non-outbound direction', direction, '- skipping');
+      } else {
+        // Cheap pre-filter: skip without AI call if no $ in body. Saves
+        // ~95% of outbound texts (most don't contain prices).
+        if (!body || !body.includes('$')) {
+          // Not a quote candidate — nothing to do
+        } else {
+          try {
+            const recipientPhone = Array.isArray(to) ? to[0] : to;
+            const lead = recipientPhone ? await findLeadByPhone(recipientPhone) : null;
+            const client = recipientPhone ? await findClientByPhone(recipientPhone) : null;
+
+            if (client) {
+              console.log('[openphone-webhook]', type, 'to existing client - skipping quote-detect (clients are not quoted, they are paying customers)');
+            } else if (!lead) {
+              console.log('[openphone-webhook]', type, 'to unknown number - skipping quote-detect (no lead to attach task to)');
+            } else if (!process.env.ANTHROPIC_API_KEY) {
+              console.warn('[openphone-webhook] ANTHROPIC_API_KEY not set - skipping SMS quote-detect');
+            } else {
+              // Idempotency check first — don't burn an AI call if there's
+              // already an open task for this lead.
+              const existingTaskResp = await fetch(
+                `${SUPABASE_URL}/rest/v1/tasks?related_lead_id=eq.${lead.id}&type=eq.review_quote_sent&status=eq.open&select=id&limit=1`,
+                { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }
+              );
+              const existingTaskRows = await existingTaskResp.json().catch(() => []);
+              if (Array.isArray(existingTaskRows) && existingTaskRows.length > 0) {
+                console.log('[openphone-webhook] open review_quote_sent task already exists for lead', lead.id, '- skipping SMS quote-detect');
+              } else {
+                const qVerdict = await extractQuoteFromSms({
+                  messageBody: body,
+                  leadName: lead.name || '',
+                });
+                console.log('[openphone-webhook] SMS quote-detect verdict for lead', lead.id, ':', JSON.stringify(qVerdict).slice(0, 300));
+
+                if (qVerdict && qVerdict.quote_discussed === true && qVerdict.confidence !== 'low' && typeof qVerdict.amount === 'number' && qVerdict.amount > 0) {
+                  const today = new Date().toISOString().split('T')[0];
+                  const amount = Number(qVerdict.amount);
+                  const truncatedBody = body.length > 200 ? body.slice(0, 197) + '...' : body;
+                  const taskRes = await supabaseInsert('tasks', {
+                    title: `Confirm $${amount.toFixed(2)} quote for ${lead.name || 'lead'}`,
+                    type: 'review_quote_sent',
+                    priority: qVerdict.confidence === 'high' ? 'high' : 'medium',
+                    due_date: today,
+                    description:
+                      `Detected on outbound SMS to ${lead.name || 'lead'}.\n\n` +
+                      `Message: "${truncatedBody}"\n\n` +
+                      `AI read: ${qVerdict.reasoning || 'price was quoted in SMS'} (confidence: ${qVerdict.confidence})\n\n` +
+                      `Confirm the amount to stamp quote_sent_at on this lead - that's what kicks off the Tide Quoted cadence.`,
+                    status: 'open',
+                    related_lead_id: lead.id,
+                    extracted_data: {
+                      amount: amount,
+                      confidence: qVerdict.confidence,
+                      reasoning: qVerdict.reasoning || null,
+                      sms_message_id: data.id || null,
+                      source: 'sms',
+                    },
+                  });
+                  if (!taskRes.ok) {
+                    const errBody = await taskRes.text().catch(() => '<unreadable>');
+                    console.error('[openphone-webhook] SMS review_quote_sent insert FAILED status=' + taskRes.status + ' body=' + errBody.slice(0, 500));
+                    await logError('openphone-webhook:sms-review_quote_sent', new Error('Task insert ' + taskRes.status), {
+                      lead_id: lead.id, body: errBody.slice(0, 500),
+                    });
+                  } else {
+                    console.log('[openphone-webhook] Created review_quote_sent task (SMS-source) for lead', lead.id, 'amount=$' + amount.toFixed(2));
+                    // Push fan-out — same pattern as call-source quote tasks.
+                    try {
+                      const { sendPushToAllSubscribed } = await import('./utils/send-push.js');
+                      const pushRes = await sendPushToAllSubscribed({
+                        title: `Confirm $${amount.toFixed(2)} quote - ${lead.name || 'lead'}`,
+                        body: `AI read SMS: ${(qVerdict.reasoning || 'price was quoted').slice(0, 100)}`,
+                        url: '/#tasks',
+                        tag: 'quote-sms-' + (data.id || lead.id),
+                        requireInteraction: qVerdict.confidence === 'high',
+                      });
+                      console.log('[openphone-webhook] SMS quote-confirm push fanout:', JSON.stringify(pushRes));
+                    } catch (pushErr) {
+                      console.warn('[openphone-webhook] SMS quote-confirm push failed:', pushErr.message);
+                    }
+                  }
+                }
+              }
+            }
+          } catch (smsQuoteErr) {
+            // Never fail the webhook on quote-detect errors
+            console.warn('[openphone-webhook] SMS quote-detect failed:', smsQuoteErr.message);
+            await logError('openphone-webhook:sms-quote-detect', smsQuoteErr, {
+              event_type: type,
+              has_data: !!data,
+            });
           }
         }
       }

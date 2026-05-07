@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { logError } from './utils/error-logger.js';
+import { generateCallBrief } from './utils/generate-brief.js';
 
 async function logActivity(action, description, metadata={}) {
   try {
@@ -552,6 +553,18 @@ export default async function handler(req, res) {
                   // run-task-automations.js — same `tasks` table, same fields.
                   // The {firstName}, {service}, {stage} placeholders in title
                   // and description are interpolated from the lead.
+                  //
+                  // Tide Phase 4 (2026-05-07): also generates an AI brief
+                  // (lead context: call/SMS history signals, talking points)
+                  // and stores it on the task's `ai_brief` field. The UI
+                  // renders ai_brief as a collapsible "✨ AI brief" panel
+                  // below the description on each task. The brief generation
+                  // is fail-soft — if it fails or is skipped, the task still
+                  // gets created without the brief (just no extra context).
+                  //
+                  // To skip brief generation for a specific automation (e.g.
+                  // a lead-stale internal-notification task that doesn't
+                  // benefit from history), set `action.skip_ai_brief: true`.
                   try {
                     const firstName = (lead.name || lead.contact_name || 'Lead').split(' ')[0];
                     const interpolate = (s) => (s || '')
@@ -560,6 +573,25 @@ export default async function handler(req, res) {
                       .replaceAll('{service}', lead.service || 'cleaning')
                       .replaceAll('{stage}', lead.stage || '');
                     const todayIso = new Date().toISOString().slice(0, 10);
+
+                    // Generate AI brief (fail-soft — null on any error or if skipped)
+                    let aiBrief = null;
+                    if (!action.skip_ai_brief) {
+                      const briefPurpose = action.brief_purpose || briefPurposeForStage(lead.stage);
+                      try {
+                        aiBrief = await generateCallBrief(lead, briefPurpose);
+                      } catch (briefErr) {
+                        // generateCallBrief is itself fail-soft; this catch is
+                        // a defensive belt-and-suspenders so a brief failure
+                        // never blocks task creation.
+                        await logError('run-automations', briefErr, {
+                          stage: 'ai_brief_generation',
+                          leadId: lead.id,
+                          purpose: briefPurpose,
+                        });
+                      }
+                    }
+
                     const { error: taskErr } = await db.from('tasks').insert([{
                       title: interpolate(action.title) || `Follow up with ${firstName}`,
                       type: action.task_type || 'call_lead',
@@ -568,12 +600,14 @@ export default async function handler(req, res) {
                       description: interpolate(action.description) || '',
                       related_lead_id: lead.id,
                       status: 'open',
+                      ai_brief: aiBrief,
                     }]);
                     if (taskErr) throw taskErr;
                     actionsExecuted.push({
                       action_index: i,
                       type: 'create_va_task',
                       status: 'success',
+                      brief_attached: !!aiBrief,
                       executed_at: actionStartTime.toISOString()
                     });
                   } catch (vaErr) {
@@ -672,4 +706,20 @@ function substituteVars(template, leadData) {
     .replace(/\{address\}/g, leadData.address || '')
     .replace(/\{quote_total\}/g, leadData.quote_total || 'custom')
     .replace(/\{phone\}/g, HNC_BUSINESS_PHONE);
+}
+
+// Helper: pick the right brief-purpose hint based on a lead's stage. Used by
+// the create_va_task handler so the AI brief is framed appropriately for the
+// lifecycle moment (a Closed-lost dripback brief reads very differently from
+// a New-inquiry follow-up brief). Override per-action with action.brief_purpose
+// if a Tide row needs something more specific.
+function briefPurposeForStage(stage) {
+  switch (stage) {
+    case 'New inquiry':           return 'tide_inquiry_followup';
+    case 'Quoted':                return 'tide_quoted_followup';
+    case 'Walkthrough requested': return 'tide_walkthrough_confirm';
+    case 'Closed lost':           return 'tide_lost_dripback';
+    case 'Long-Term Follow-Up':   return 'tide_inquiry_followup';
+    default:                      return stage ? `${stage} follow-up` : 'general follow-up';
+  }
 }

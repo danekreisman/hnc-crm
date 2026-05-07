@@ -29,12 +29,8 @@
 
 import { createClient } from '@supabase/supabase-js';
 import { logError } from './utils/error-logger.js';
-import { getOpenPhoneHistory } from './utils/openphone-history.js';
-import { fetchWithTimeout, TIMEOUTS } from './utils/with-timeout.js';
 import { isAutomationEnabled } from './utils/automation-gate.js';
-import { buildSummaryPrompt } from './utils/summary-prompt.js';
-
-const ANTHROPIC_API = 'https://api.anthropic.com/v1/messages';
+import { generateCallBrief } from './utils/generate-brief.js';
 
 // ── TEST MODE: limit task creation to Dane only during rollout ─────────────
 const TASK_AUTOMATIONS_TEST_MODE = false;
@@ -51,55 +47,6 @@ function isTestSafeRecord(record){
   var email = (record.email||'').trim().toLowerCase();
   if(email && email === DANE_EMAIL) return true;
   return false;
-}
-
-async function generateCallBrief(db, lead, purpose) {
-  try {
-    const history = lead.phone ? await getOpenPhoneHistory(lead.phone, {
-      apiKey: process.env.QUO_API_KEY,
-      maxSms: 100,
-      maxCalls: 10,
-    }) : '';
-
-    // Surface the call purpose at the top of the rep's brief by prepending
-    // it to the Notes field — the structured prompt template takes care of
-    // the rest of the format.
-    const purposeNote = purpose === 'reengagement'
-      ? 'CALL PURPOSE: Day-5 re-engagement call. Lead got a quote 5 days ago and has not booked. Surface specific objections and any unanswered questions from their conversation.'
-      : 'CALL PURPOSE: Day-1 follow-up call. Quote went out yesterday — confirm receipt, answer questions, push toward booking.';
-
-    const prompt = buildSummaryPrompt({
-      mode: 'va_brief',
-      data: {
-        name: lead.name,
-        service: lead.service,
-        quote_total: lead.quote_total,
-        address: lead.address,
-        notes: lead.notes ? `${purposeNote}\n\n${lead.notes}` : purposeNote,
-      },
-      history,
-    });
-
-    const resp = await fetchWithTimeout(ANTHROPIC_API, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': process.env.ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 1000,
-        messages: [{ role: 'user', content: prompt }],
-      }),
-    }, 45000); // 45s — Sonnet on heavy OpenPhone history can exceed the 15s default
-
-    const data = await resp.json();
-    return data.content?.[0]?.text || null;
-  } catch (err) {
-    console.error('[run-task-automations] AI brief failed:', err.message);
-    return null;
-  }
 }
 
 async function taskExists(db, type, relatedLeadId) {
@@ -213,7 +160,7 @@ export default async function handler(req, res) {
         const exists = await taskExists(db, 'call_lead', lead.id);
         if (exists) { results.skipped_idempotent++; continue; }
 
-        const brief = await generateCallBrief(db, lead, 'day1');
+        const brief = await generateCallBrief(lead, 'day1');
         const { error: taskErr } = await db.from('tasks').insert([{
           title: `Call ${lead.name} — quote follow-up`,
           type: 'call_lead',
@@ -265,7 +212,7 @@ export default async function handler(req, res) {
         const exists = await taskExists(db, 'call_lead_reengagement', lead.id);
         if (exists) { results.skipped_idempotent++; continue; }
 
-        const brief = await generateCallBrief(db, lead, 'reengagement');
+        const brief = await generateCallBrief(lead, 'reengagement');
         const { error: taskErr } = await db.from('tasks').insert([{
           title: `Call ${lead.name} — 5-day re-engagement`,
           type: 'call_lead_reengagement',

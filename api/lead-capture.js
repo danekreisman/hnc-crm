@@ -346,7 +346,7 @@ export default async function handler(req, res) {
       ? applyVars(customSmsTemplate, extraVars)
       : (isCustom
           ? `Hi ${firstName}! Thanks for reaching out to Hawaii Natural Clean. Your service requires a custom quote — we'll follow up within 24 hours. Questions? Call/text (808) 468-5356 🌺`
-          : `Aloha ${firstName}! Your Hawaii Natural Clean quote is ${totalStr} for ${d.serviceType || 'cleaning'} 🌺\n\nReady to book? Reply or call (808) 468-5356.\n\nOptional: send a few photos and we can fine-tune the quote to match what we see.`);
+          : `Aloha ${firstName}! Your Hawaii Natural Clean quote is ${totalStr} for ${d.serviceType || 'cleaning'} 🌺\n\nReady to book? Reply or call (808) 468-5356.`);
 
     const emailIntro = customEmailIntro ? applyVars(customEmailIntro, extraVars) : null;
 

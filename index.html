@@ -10215,7 +10215,7 @@ async function sendTestPush() {
     resultEl.textContent = 'Sending test push to all your subscribed devices…';
   }
   try {
-    var session = await window.db.auth.getSession();
+    var session = await db.auth.getSession();
     var token = session.data.session ? session.data.session.access_token : null;
     if (!token) {
       throw new Error('Not signed in');

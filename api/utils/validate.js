@@ -177,6 +177,7 @@ export const SCHEMAS = {
     email:   { required: true,  rules: [is.email,    is.maxLength(200)], message: 'A valid email address is required' },
     phone:   { required: true,  rules: [is.phone,    is.maxLength(20)],  message: 'A valid phone number is required (10+ digits)' },
     address: { required: true,  rules: [is.nonEmpty, is.maxLength(300)], message: 'Address is required (max 300 chars)' },
+    island:  { required: false, rules: [is.oneOf(['Oahu', 'Maui'])],     message: 'Island must be Oahu or Maui if provided' },
 
     // Service + property details (used for new-quote path)
     service:    { required: true, rules: [is.nonEmpty, is.maxLength(60)], message: 'Service type is required' },

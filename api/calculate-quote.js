@@ -44,12 +44,25 @@ export default async function handler(req, res) {
 
       let discount_pct = 0;
       if (frequency) {
-        const { data: freqRow } = await db
+        // Case-insensitive match — frequency strings can come from a select
+        // ('Biweekly') or a free-text field on a returning customer's record
+        // ('biweekly', 'Bi-Weekly', etc.). ilike handles all of those.
+        // Also: capture .error and log it. The previous version only
+        // destructured `data` and would silently fall through to 0% discount
+        // on any transient Supabase error, which is the bug that hid 15% off
+        // a Biweekly Regular Cleaning booking on May 7.
+        const { data: freqRow, error: freqErr } = await db
           .from('pricing_frequency_discount')
           .select('*')
-          .eq('frequency', frequency)
+          .ilike('frequency', frequency.trim())
           .maybeSingle();
-        if (freqRow) discount_pct = Number(freqRow.discount_pct);
+        if (freqErr) {
+          console.error('[calculate-quote] frequency lookup failed:', freqErr.message, '— frequency was:', frequency);
+        } else if (freqRow) {
+          discount_pct = Number(freqRow.discount_pct);
+        } else {
+          console.warn('[calculate-quote] no pricing row for frequency=' + JSON.stringify(frequency));
+        }
       }
 
       const discount = +(subtotal * (discount_pct / 100)).toFixed(2);

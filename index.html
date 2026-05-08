@@ -20326,7 +20326,7 @@ async function openPublicBookingReview(taskId) {
     '<div><strong>' + _pbrEsc(x.name || '') + '</strong></div>',
     x.phone  ? '<div>' + _pbrEsc(x.phone) + ' \u00b7 <a href="tel:' + _pbrEsc(x.phone) + '" style="color:var(--blue);">Call</a> \u00b7 <a href="sms:' + _pbrEsc(x.phone) + '" style="color:var(--blue);">Text</a></div>' : '',
     x.email  ? '<div><a href="mailto:' + _pbrEsc(x.email) + '" style="color:var(--blue);">' + _pbrEsc(x.email) + '</a></div>' : '',
-    x.address? '<div style="color:var(--text-muted);">' + _pbrEsc(x.address) + '</div>' : '',
+    x.address? '<div style="color:var(--text-muted);">' + _pbrEsc(x.address) + (x.island ? ' \u00b7 <strong>' + _pbrEsc(x.island) + '</strong>' : '') + '</div>' : '',
     x.path === 'existing_property'
       ? '<div style="margin-top:6px;font-size:11px;color:#059669;font-weight:600;text-transform:uppercase;letter-spacing:.05em;">\u2713 Returning client</div>'
       : '<div style="margin-top:6px;font-size:11px;color:#7c3aed;font-weight:600;text-transform:uppercase;letter-spacing:.05em;">New lead</div>',

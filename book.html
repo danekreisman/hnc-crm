@@ -488,7 +488,9 @@ function pickExistingProperty(){
     baths:      la.baths || client.baths || null,
     sqft:       la.sqft || client.sqft || null,
     condition:  null,
-    island:     'Oahu',
+    // Best effort: derive island from the address. If we can't tell, default
+    // to Oahu — admin will catch any mismatch on review.
+    island:     /\bmaui\b|\blahaina\b|\bkihei\b|\bwailea\b|\bkahului\b|\bhana\b|\bpaia\b|\bmakawao\b/i.test((la.address || client.address || '')) ? 'Maui' : 'Oahu',
     quoteTotal: preTaxFromTotal,
     quoteData:  preTaxFromTotal != null ? {
       service:      la.service || client.service || 'Regular Cleaning',
@@ -529,6 +531,11 @@ function renderNewQuoteForm(){
 
     +'<div class="field"><label>Service address</label>'
     +'<div class="bk-pac-wrap"><input type="text" id="nq-address" autocomplete="off" placeholder="Start typing your address\u2026"></div></div>'
+    +'<div class="field"><label>Island</label>'
+    +'<select id="nq-island">'
+    +'<option value="Oahu" selected>Oahu</option>'
+    +'<option value="Maui">Maui</option>'
+    +'</select></div>'
     +'<div class="field-help">We service Oahu and Maui only. Out-of-area requests will be declined.</div>'
 
     +'<div id="nq-fields"></div>'
@@ -714,7 +721,7 @@ async function calcNewQuote(){
       baths:      baths,
       sqft:       sqft,
       condition:  condition,
-      island:     'Oahu',
+      island:     ($('nq-island') && $('nq-island').value) || 'Oahu',
       quoteTotal: j.custom_quote ? null : j.total,
       quoteData:  j.custom_quote ? null : j,
       _publicPath: 'new_quote',
@@ -1055,6 +1062,7 @@ async function submitBooking(){
         email:    LEAD.email,
         phone:    LEAD.phone,
         address:  LEAD.address,
+        island:   LEAD.island || 'Oahu',
         service:  LEAD.service,
         frequency: LEAD.frequency || null,
         beds:     LEAD.beds ? String(LEAD.beds) : null,

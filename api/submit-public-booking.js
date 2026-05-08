@@ -161,6 +161,7 @@ export default async function handler(req, res) {
         // a new quote so the freshest numbers should land on the row.
         const noteParts = [
           'Service: '   + b.service,
+          b.island     ? 'Island: '    + b.island    : null,
           b.frequency  ? 'Frequency: ' + b.frequency : null,
           b.beds       ? 'Beds: '      + b.beds      : null,
           b.baths      ? 'Baths: '     + b.baths     : null,
@@ -189,6 +190,7 @@ export default async function handler(req, res) {
         const bookingToken = crypto.randomUUID();
         const noteParts = [
           'Service: '   + b.service,
+          b.island     ? 'Island: '    + b.island    : null,
           b.frequency  ? 'Frequency: ' + b.frequency : null,
           b.beds       ? 'Beds: '      + b.beds      : null,
           b.baths      ? 'Baths: '     + b.baths     : null,
@@ -241,7 +243,7 @@ export default async function handler(req, res) {
       'Customer: ' + cleanName,
       'Phone:    ' + cleanPhoneDigits,
       'Email:    ' + cleanEmail,
-      'Address:  ' + b.address,
+      'Address:  ' + b.address + (b.island ? ' (' + b.island + ')' : ''),
       '',
       'Service:   ' + b.service + (b.frequency ? ' (' + b.frequency + ')' : ''),
       b.beds       ? 'Beds:      ' + b.beds       : null,
@@ -292,6 +294,7 @@ export default async function handler(req, res) {
           email:          cleanEmail,
           phone:          cleanPhoneDigits,
           address:        b.address,
+          island:         b.island || null,
           service:        b.service,
           frequency:      b.frequency || null,
           beds:           b.beds || null,

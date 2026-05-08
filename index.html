@@ -1638,6 +1638,8 @@ body:not(.hnc-assistant-user) .assistant-only{display:none!important;}
                 <div id="push-status" style="font-size:12px;padding:8px 11px;border-radius:6px;margin-bottom:10px;background:#f7f9f9;color:var(--text-muted);">Checking subscription status&hellip;</div>
                 <button class="btn btn-primary" id="push-enable-btn" onclick="enablePushOnThisDevice()" style="font-size:13px;padding:7px 14px;">Enable push on this device</button>
                 <button class="btn" id="push-disable-btn" onclick="disablePushOnThisDevice()" style="font-size:13px;padding:7px 14px;display:none;margin-left:8px;">Disable on this device</button>
+                <button class="btn" id="push-test-btn" onclick="sendTestPush()" style="font-size:13px;padding:7px 14px;margin-left:8px;background:#fff;border:1.5px solid var(--border);">Send test push</button>
+                <div id="push-test-result" style="font-size:12px;color:var(--text-muted);margin-top:10px;font-family:monospace;white-space:pre-wrap;display:none;"></div>
               </div>
             </div>
           </div>
@@ -10192,6 +10194,73 @@ async function disablePushOnThisDevice() {
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = 'Disable on this device'; }
     await _renderPushStatus();
+  }
+}
+
+/* Test-push button — fires /api/test-push and renders result inline.
+   Lets Dane (or anyone) verify whether THIS device is currently
+   receiving pushes from the backend, without having to open DevTools.
+   The result panel shows per-subscription delivery status so we can
+   tell whether a specific device's subscription died at FCM/Apple. */
+async function sendTestPush() {
+  var btn = document.getElementById('push-test-btn');
+  var resultEl = document.getElementById('push-test-result');
+  if (btn) { btn.disabled = true; btn.textContent = 'Sending…'; }
+  if (resultEl) {
+    resultEl.style.display = 'block';
+    resultEl.style.background = '#f7f9f9';
+    resultEl.style.color = 'var(--text-muted)';
+    resultEl.style.padding = '10px';
+    resultEl.style.borderRadius = '6px';
+    resultEl.textContent = 'Sending test push to all your subscribed devices…';
+  }
+  try {
+    var session = await window.db.auth.getSession();
+    var token = session.data.session ? session.data.session.access_token : null;
+    if (!token) {
+      throw new Error('Not signed in');
+    }
+    var resp = await fetch('/api/test-push', {
+      headers: { 'Authorization': 'Bearer ' + token }
+    });
+    var data = await resp.json();
+    if (resultEl) {
+      // Format the result nicely so Dane can read it without parsing JSON
+      var lines = [];
+      lines.push('Sent to: ' + (data.user_email || data.user_id || 'unknown'));
+      lines.push('');
+      if (data.subscriptions_before && data.subscriptions_before.length) {
+        lines.push('Subscriptions on file:');
+        data.subscriptions_before.forEach(function(s, i) {
+          var status = s.still_alive_after_send ? '✓ alive' : '✗ DIED (FCM/Apple returned 410/404)';
+          lines.push('  ' + (i+1) + '. ' + (s.user_agent || 'unknown') + ' (...' + s.endpoint_tail + ') — ' + status);
+        });
+      } else {
+        lines.push('⚠ No subscriptions found for this user');
+      }
+      lines.push('');
+      if (data.send_result) {
+        lines.push('Send result: sent=' + data.send_result.sent + ', removed=' + data.send_result.removed);
+        if (data.send_result.errors && data.send_result.errors.length) {
+          lines.push('Errors: ' + JSON.stringify(data.send_result.errors));
+        }
+      }
+      lines.push('');
+      lines.push('A test notification should appear on each "alive" device within ~5 seconds.');
+      lines.push('If sent>0 but you don\'t see a banner, check macOS System Settings → Notifications.');
+      resultEl.textContent = lines.join('\n');
+      resultEl.style.background = '#ecfdf5';
+      resultEl.style.color = '#065f46';
+    }
+  } catch (e) {
+    console.error('[push test] failed:', e);
+    if (resultEl) {
+      resultEl.textContent = 'Error: ' + e.message;
+      resultEl.style.background = '#fef3f2';
+      resultEl.style.color = '#9b2c2c';
+    }
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Send test push'; }
   }
 }
 

@@ -7160,13 +7160,21 @@ async function autofillLeadFromHistory() {
       showToast(data.message || data.error || 'Autofill failed.', 'error');
       return;
     }
-    // Build the preview. Only show fields where: (a) AI suggested a value
-    // AND (b) the lead row currently has that field empty. If neither
-    // condition is true, nothing changes.
+    // Build the preview. Show TWO categories so Dane has full visibility:
+    //   (a) fillable: AI found a value AND the lead row is currently empty
+    //       — these get auto-applied if user clicks OK
+    //   (b) skipped:  AI found a value BUT lead row already has something
+    //       — shown for awareness so user can manually update if AI's
+    //       extraction is more complete (e.g. "Joshua Gana" vs "Josh")
+    //
+    // Bug fix 2026-05-08: email was missing from fieldMap entirely so it
+    // never got extracted or filled. Added to both prompt and field list.
     var suggested = data.suggested || {};
     var emptyFields = data.empty_fields || [];
+    var currentValues = data.current_values || {};
     var fieldLabels = {
       name: 'Name',
+      email: 'Email',
       service: 'Service',
       address: 'Address',
       beds: 'Beds',
@@ -7178,23 +7186,48 @@ async function autofillLeadFromHistory() {
       notes: 'Notes',
     };
     var fillable = [];
+    var skipped = [];
     Object.keys(fieldLabels).forEach(function(key) {
       var val = suggested[key];
+      if (val === null || val === undefined || val === '') return; // AI found nothing
       var isEmpty = emptyFields.indexOf(key) >= 0;
-      if (val !== null && val !== undefined && val !== '' && isEmpty) {
+      if (isEmpty) {
         fillable.push({ key: key, label: fieldLabels[key], value: val });
+      } else {
+        var current = currentValues[key];
+        // Only flag as skipped if AI's value is meaningfully different —
+        // matching values just mean AI confirmed what we already have.
+        if (String(current).trim().toLowerCase() !== String(val).trim().toLowerCase()) {
+          skipped.push({ key: key, label: fieldLabels[key], current: current, value: val });
+        }
       }
     });
-    if (fillable.length === 0) {
+    if (fillable.length === 0 && skipped.length === 0) {
       showToast('AI read ' + (data.history_chars || 0) + ' chars of history but found no new info to fill.', 'info');
       return;
     }
     // Build modal preview
-    var msg = 'AI extracted these fields from call/SMS history:\n\n';
-    fillable.forEach(function(f) {
-      msg += '• ' + f.label + ': ' + f.value + '\n';
-    });
-    msg += '\nApply these to the lead profile?';
+    var msg = '';
+    if (fillable.length > 0) {
+      msg += 'AI extracted these fields from history (will be filled):\n';
+      fillable.forEach(function(f) {
+        msg += '• ' + f.label + ': ' + f.value + '\n';
+      });
+    }
+    if (skipped.length > 0) {
+      if (fillable.length > 0) msg += '\n';
+      msg += 'AI also found these (already populated, NOT changed — edit manually if you want to update):\n';
+      skipped.forEach(function(s) {
+        var currentDisplay = (s.current === null || s.current === undefined || s.current === '') ? '(empty)' : s.current;
+        msg += '• ' + s.label + ': "' + currentDisplay + '" → AI suggests "' + s.value + '"\n';
+      });
+    }
+    if (fillable.length === 0) {
+      // Nothing to apply — just inform
+      alert(msg);
+      return;
+    }
+    msg += '\nApply ' + fillable.length + ' new field' + (fillable.length === 1 ? '' : 's') + ' to the lead profile?';
     if (!confirm(msg)) return;
 
     // Update the lead row. Build a patch object with only the fields we're

@@ -94,7 +94,8 @@ export default async function handler(req, res) {
       'Read the entire history below carefully. Extract every piece of information the lead has shared at any point - across all calls and messages.',
       '',
       'Extract these fields (set to null when not mentioned anywhere - never invent or guess):',
-      '  - name: Lead\'s full name if mentioned',
+      '  - name: Lead\'s FULL name if mentioned (first + last). If only first name, return just the first name.',
+      '  - email: Email address if mentioned anywhere in the conversation',
       '  - service: One of "Move-out Cleaning", "Deep Cleaning", "Regular Cleaning", "Airbnb Turnover", "Janitorial Cleaning", or null. Pick the best match for what they want.',
       '  - address: Full or partial address (street + city if available)',
       '  - beds: Integer (bedrooms)',
@@ -106,7 +107,7 @@ export default async function handler(req, res) {
       '  - notes: Any other useful context that doesn\'t fit above fields - quirks, special requests, who they are, where they heard about us, pets, accessibility, parking, etc.',
       '',
       'Return ONLY a JSON object - first character must be { and last must be }. No preamble, no markdown.',
-      'Format: {"name": <string|null>, "service": <string|null>, "address": <string|null>, "beds": <int|null>, "baths": <number|null>, "sqft": <int|null>, "condition": <string|null>, "frequency": <string|null>, "timeline": <string|null>, "notes": <string|null>}',
+      'Format: {"name": <string|null>, "email": <string|null>, "service": <string|null>, "address": <string|null>, "beds": <int|null>, "baths": <number|null>, "sqft": <int|null>, "condition": <string|null>, "frequency": <string|null>, "timeline": <string|null>, "notes": <string|null>}',
       '',
       'Lead phone: ' + lead.phone,
       'Lead name on file: ' + (lead.name || '(none)'),
@@ -188,6 +189,7 @@ export default async function handler(req, res) {
     //    sqft as the canonical name here matching the leads schema).
     const fieldMap = {
       name: 'name',
+      email: 'email',
       service: 'service',
       address: 'address',
       beds: 'beds',
@@ -199,17 +201,20 @@ export default async function handler(req, res) {
       notes: 'notes',
     };
     const empty_fields = [];
+    const current_values = {};
     for (const [aiKey, leadCol] of Object.entries(fieldMap)) {
       const current = lead[leadCol];
       const isEmpty = current === null || current === undefined || current === '' ||
                       (typeof current === 'object' && Object.keys(current).length === 0);
       if (isEmpty) empty_fields.push(leadCol);
+      current_values[aiKey] = current;
     }
 
     return res.status(200).json({
       ok: true,
       suggested,
       empty_fields,
+      current_values,
       lead_id: leadId,
       history_chars: history.length,
     });

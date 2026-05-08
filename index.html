@@ -2443,7 +2443,10 @@ Mahalo 🌺</textarea>
           <div class="info-row"><span class="info-label">Email</span><span class="info-val" id="lead-email">—</span></div>
           <div class="info-row"><span class="info-label">Address</span><span class="info-val" id="lead-address">—</span></div>
         </div>
-        <div class="panel-section">Opportunity</div>
+        <div class="panel-section" style="display:flex;align-items:center;justify-content:space-between;">
+          <span>Opportunity</span>
+          <button onclick="autofillLeadFromHistory()" id="lead-autofill-btn" style="padding:5px 10px;background:#fff;color:var(--brand-500);border:1.5px solid var(--brand-500);border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;">✨ Auto-fill from history</button>
+        </div>
         <div class="info-block">
           <div class="info-row"><span class="info-label">Quoted price</span><span class="info-val" id="lead-value" style="color:var(--brand-500);font-size:14px;font-weight:600;">—</span></div>
           <div class="info-row"><span class="info-label">Service type</span><span class="info-val" id="lead-service">—</span></div>
@@ -7119,6 +7122,100 @@ function openLead(id){
   setTimeout(loadLeadSummary, 400);
   setTimeout(loadSuggestedQuote, 400);
   setTimeout(loadLeadCommsLog, 500);
+}
+
+/* ────────────────────────────────────────────────────────────────────────
+   Lead autofill from OpenPhone history
+   ────────────────────────────────────────────────────────────────────────
+   Calls /api/lead-autofill which pulls all SMS + call history for this
+   lead's phone number, runs AI extraction over the full conversation,
+   and returns suggested values for empty fields. Shows a preview modal
+   so the user can confirm before any lead row updates happen.
+
+   Default behavior: only fills EMPTY fields. Won't overwrite anything
+   manually entered. The preview shows the AI's suggestions next to
+   current values; user picks Accept All or Cancel.
+   ──────────────────────────────────────────────────────────────────── */
+async function autofillLeadFromHistory() {
+  if (!currentLead) {
+    showToast('No lead selected.', 'error');
+    return;
+  }
+  var btn = document.getElementById('lead-autofill-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Reading history…'; }
+  try {
+    var session = await db.auth.getSession();
+    var token = session.data.session ? session.data.session.access_token : null;
+    if (!token) throw new Error('Not signed in');
+    var resp = await fetch('/api/lead-autofill', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + token
+      },
+      body: JSON.stringify({ leadId: currentLead })
+    });
+    var data = await resp.json();
+    if (!resp.ok || !data.ok) {
+      showToast(data.message || data.error || 'Autofill failed.', 'error');
+      return;
+    }
+    // Build the preview. Only show fields where: (a) AI suggested a value
+    // AND (b) the lead row currently has that field empty. If neither
+    // condition is true, nothing changes.
+    var suggested = data.suggested || {};
+    var emptyFields = data.empty_fields || [];
+    var fieldLabels = {
+      name: 'Name',
+      service: 'Service',
+      address: 'Address',
+      beds: 'Beds',
+      baths: 'Baths',
+      sqft: 'Sqft',
+      condition: 'Condition',
+      frequency: 'Frequency',
+      timeline: 'Timeline',
+      notes: 'Notes',
+    };
+    var fillable = [];
+    Object.keys(fieldLabels).forEach(function(key) {
+      var val = suggested[key];
+      var isEmpty = emptyFields.indexOf(key) >= 0;
+      if (val !== null && val !== undefined && val !== '' && isEmpty) {
+        fillable.push({ key: key, label: fieldLabels[key], value: val });
+      }
+    });
+    if (fillable.length === 0) {
+      showToast('AI read ' + (data.history_chars || 0) + ' chars of history but found no new info to fill.', 'info');
+      return;
+    }
+    // Build modal preview
+    var msg = 'AI extracted these fields from call/SMS history:\n\n';
+    fillable.forEach(function(f) {
+      msg += '• ' + f.label + ': ' + f.value + '\n';
+    });
+    msg += '\nApply these to the lead profile?';
+    if (!confirm(msg)) return;
+
+    // Update the lead row. Build a patch object with only the fields we're
+    // filling. _leadRowToDb whitelist applies, but our keys are already
+    // canonical lead-row column names.
+    var patch = {};
+    fillable.forEach(function(f) { patch[f.key] = f.value; });
+    var updateRes = await db.from('leads').update(patch).eq('id', currentLead);
+    if (updateRes.error) {
+      showToast('Update failed: ' + updateRes.error.message, 'error');
+      return;
+    }
+    showToast('Filled ' + fillable.length + ' field' + (fillable.length === 1 ? '' : 's') + ' from history.', 'success');
+    // Refresh the lead view so the new values appear
+    setTimeout(function() { openLead(currentLead); }, 200);
+  } catch (e) {
+    console.error('[lead-autofill] error:', e);
+    showToast('Error: ' + e.message, 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = '✨ Auto-fill from history'; }
+  }
 }
 
 function showLeadEdit(){

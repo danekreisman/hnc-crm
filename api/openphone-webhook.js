@@ -160,6 +160,149 @@ export default async function handler(req, res) {
     return cleaners.find(c => c.phone && c.phone.replace(/\D/g, '').slice(-10) === digits) || null;
   }
 
+  /* Fetch SMS thread history for a phone number from OpenPhone API.
+     Added 2026-05-08 as the data source for the two-stage SMS lead
+     classifier (Stage 2 — see extractLeadFromSmsThread below).
+
+     OpenPhone exposes message history via GET /v1/messages?participants=<phone>
+     — returns oldest-first by default, paginated. We pull up to 30 most-recent
+     messages (more than enough for context, well under any token limit when
+     fed to Haiku).
+
+     Returns array of {direction, body, createdAt} or [] on any failure.
+     Fail-soft: never throws — Stage 2 falls back to single-message extraction
+     if the thread can't be fetched. */
+  async function fetchSmsThread(phone, ourNumber) {
+    if (!phone || !process.env.QUO_API_KEY) return [];
+    try {
+      const phoneNumberId = process.env.QUO_PHONE_NUMBER_ID; // OpenPhone's internal ID for our line
+      const ourPhone = ourNumber || process.env.QUO_NUMBER;
+      // OpenPhone messages endpoint requires phoneNumberId AND participants.
+      // participants is the OTHER party (the lead), our line is implicit
+      // via phoneNumberId.
+      const url = `https://api.openphone.com/v1/messages?phoneNumberId=${encodeURIComponent(phoneNumberId || '')}&participants[]=${encodeURIComponent(phone)}&maxResults=30`;
+      const res = await fetchWithTimeout(url, {
+        headers: { 'Authorization': process.env.QUO_API_KEY }
+      }, TIMEOUTS.OPENPHONE);
+      if (!res.ok) {
+        console.warn('[openphone-webhook] fetchSmsThread non-ok status=' + res.status);
+        return [];
+      }
+      const data = await res.json();
+      const messages = (data && Array.isArray(data.data)) ? data.data : [];
+      // Normalize: keep only fields we need, sort oldest-first
+      return messages
+        .map(m => ({
+          direction: m.direction === 'outgoing' || m.direction === 'outbound' ? 'outbound' : 'inbound',
+          body: m.body || m.text || '',
+          createdAt: m.createdAt || m.created_at || '',
+        }))
+        .filter(m => m.body && m.body.trim())
+        .sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || ''));
+    } catch (e) {
+      console.warn('[openphone-webhook] fetchSmsThread threw:', e.message);
+      return [];
+    }
+  }
+
+  /* Two-stage SMS lead extractor — Stage 2.
+     Added 2026-05-08 after Dane noted Phase 7.1's single-message extraction
+     leaves most lead fields null because one SMS rarely has all the context.
+
+     Stage 1 (classifyAndExtractSmsLead): cheap, fast, runs on every unknown-
+     sender SMS. Just answers: "is this a lead?" + best-effort extraction
+     from the single message.
+
+     Stage 2 (this function): only runs when Stage 1 says yes. Fetches the
+     full SMS thread for this number and re-extracts ALL the fields with
+     full conversational context. Catches details mentioned in earlier
+     messages (address from message #3, beds from message #5, etc).
+
+     Returns same shape as Stage 1's `extracted` object, but with richer
+     data. Falls back gracefully if the thread fetch fails — caller
+     receives stage1.extracted in that case.
+
+     Why two stages instead of always running Stage 2: Stage 2 costs ~5x
+     more tokens (full thread vs single message) and is slower. Running
+     it on every inbound message including spam/wrong-numbers/irrelevant
+     traffic would be wasteful. Stage 1 is the cheap pre-filter. */
+  async function extractLeadFromSmsThread({ thread, currentMessage, senderPhone, fallback }) {
+    if (!thread || thread.length === 0 || !process.env.ANTHROPIC_API_KEY) {
+      return fallback || {};
+    }
+    // Cap thread length to keep token costs predictable. Most threads
+    // will be under this anyway.
+    const recentThread = thread.slice(-25);
+    const threadText = recentThread.map(m => {
+      const speaker = m.direction === 'outbound' ? 'HNC' : 'Lead';
+      return `[${speaker}]: ${m.body}`;
+    }).join('\n');
+
+    const prompt = [
+      'You are reading a full SMS conversation between Hawaii Natural Clean (HNC, a residential and commercial cleaning business) and a potential lead. Your job is to extract every piece of information the lead has shared across the entire conversation - not just the most recent message.',
+      '',
+      'The conversation is shown chronologically (oldest first). Lines starting with [HNC] are messages our team sent. Lines starting with [Lead] are messages from the prospect.',
+      '',
+      'Extract these fields (set to null when not mentioned in the thread - never invent or guess):',
+      '  - name: Lead\'s name if mentioned anywhere',
+      '  - service: Best match from "Move-out Cleaning", "Deep Cleaning", "Regular Cleaning", "Airbnb Turnover", "Janitorial Cleaning", or null',
+      '  - address: Full or partial address',
+      '  - beds: Integer (bedrooms)',
+      '  - baths: Number (bathrooms, can be 1.5 etc)',
+      '  - sqft: Integer (square feet)',
+      '  - condition: Best match from "Pristine", "Decent", "Moderately dirty", "Very dirty", "Extreme", or null',
+      '  - frequency: One of "weekly", "biweekly", "monthly", "one-time", or null',
+      '  - timeline: When they want service (e.g. "next week", "Friday", "ASAP", or null)',
+      '  - notes: Anything else useful that doesn\'t fit other fields - quirks, special requests, who they are, where they heard about us, etc.',
+      '',
+      'Return ONLY a JSON object - first character must be { and last must be }. No preamble, no markdown.',
+      'Format: {"name": <string|null>, "service": <string|null>, "address": <string|null>, "beds": <int|null>, "baths": <number|null>, "sqft": <int|null>, "condition": <string|null>, "frequency": <string|null>, "timeline": <string|null>, "notes": <string|null>, "verified_lead": <bool>, "verification_reasoning": "<one short sentence>"}',
+      '',
+      'verified_lead: After reading the FULL conversation, is this person actually a real cleaning prospect we should follow up with? Return false if the conversation reveals this is actually a vendor pitch, wrong number, spam, or someone we\'ve already worked with extensively (e.g. messages reference "thanks for last week\'s clean" - they\'re a customer, not a lead).',
+      '',
+      `Sender phone: ${senderPhone || 'unknown'}`,
+      'Conversation:',
+      threadText,
+      '',
+      `Most recent message (just arrived): ${currentMessage}`,
+    ].join('\n');
+
+    try {
+      const aiResp = await fetchWithTimeout('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': process.env.ANTHROPIC_API_KEY,
+          'anthropic-version': '2023-06-01',
+        },
+        body: JSON.stringify({
+          model: 'claude-haiku-4-5-20251001',
+          max_tokens: 700,
+          messages: [{ role: 'user', content: prompt }],
+        }),
+      }, TIMEOUTS.ANTHROPIC);
+      if (!aiResp.ok) throw new Error('Anthropic API HTTP ' + aiResp.status);
+      const data = await aiResp.json();
+      const text = data?.content?.[0]?.text || '';
+      const start = text.indexOf('{');
+      if (start === -1) throw new Error('No JSON in AI response');
+      let depth = 0, inString = false, escape = false, jsonStr = null;
+      for (let i = start; i < text.length; i++) {
+        const ch = text[i];
+        if (escape) { escape = false; continue; }
+        if (inString) { if (ch === '\\') { escape = true; continue; } if (ch === '"') inString = false; continue; }
+        if (ch === '"') { inString = true; continue; }
+        if (ch === '{') depth++;
+        else if (ch === '}') { depth--; if (depth === 0) { jsonStr = text.slice(start, i + 1); break; } }
+      }
+      if (!jsonStr) throw new Error('Unbalanced JSON in AI response');
+      return JSON.parse(jsonStr);
+    } catch (e) {
+      console.warn('[openphone-webhook] extractLeadFromSmsThread failed, using stage1 fallback:', e.message);
+      return fallback || {};
+    }
+  }
+
   /**
    * Classify a lead's inbound SMS using Claude Haiku to detect lost-intent.
    * Cheap (~$0.001/call) and fast. Returns { intent, confidence, reasoning }
@@ -822,7 +965,64 @@ export default async function handler(req, res) {
             console.log('[openphone-webhook] SMS lead-classify verdict for', from, ':', JSON.stringify(verdict).slice(0, 400));
 
             if (verdict && verdict.is_lead === true && verdict.confidence !== 'low') {
-              const extracted = verdict.extracted || {};
+              // ── Stage 2: thread-context extraction ─────────────────────
+              // Stage 1 is single-message only — most fields come back null
+              // because one SMS rarely has all the lead info. Stage 2 fetches
+              // the full SMS thread and re-extracts with conversational
+              // context. Only runs when Stage 1 says yes (saves cost on noise).
+              // Falls back to Stage 1's extraction if thread fetch / Stage 2
+              // AI call fails.
+              const stage1Extracted = verdict.extracted || {};
+              let extracted = stage1Extracted;
+              let stage2Verified = null;
+              let stage2Reasoning = null;
+              let stage2Rejected = false;
+              try {
+                const thread = await fetchSmsThread(from);
+                console.log('[openphone-webhook] fetched ' + thread.length + ' thread messages for stage 2 extraction');
+                if (thread.length > 1) {
+                  const stage2 = await extractLeadFromSmsThread({
+                    thread,
+                    currentMessage: body,
+                    senderPhone: from,
+                    fallback: stage1Extracted,
+                  });
+                  console.log('[openphone-webhook] Stage 2 extraction:', JSON.stringify(stage2).slice(0, 500));
+                  stage2Verified = stage2.verified_lead;
+                  stage2Reasoning = stage2.verification_reasoning || null;
+                  // If Stage 2 reads the whole thread and concludes "not actually
+                  // a lead" (e.g. the AI realizes the prior messages reveal this
+                  // is a vendor / wrong number / existing customer), respect it.
+                  // Set a flag rather than `return` — webhook handler must
+                  // continue to record this event as processed.
+                  if (stage2Verified === false) {
+                    console.log('[openphone-webhook] Stage 2 rejected lead (' + (stage2Reasoning || '<no reason>') + ') — not creating task');
+                    stage2Rejected = true;
+                  }
+                  // Merge Stage 2's richer extraction over Stage 1, preferring
+                  // Stage 2 for any field where Stage 2 found a value.
+                  if (!stage2Rejected) {
+                    extracted = {
+                      name: stage2.name || stage1Extracted.name || null,
+                      service: stage2.service || stage1Extracted.service || null,
+                      address: stage2.address || stage1Extracted.address || null,
+                      beds: stage2.beds || stage1Extracted.beds || null,
+                      baths: stage2.baths || stage1Extracted.baths || null,
+                      sqft: stage2.sqft || stage1Extracted.sqft || null,
+                      condition: stage2.condition || stage1Extracted.condition || null,
+                      frequency: stage2.frequency || stage1Extracted.frequency || null,
+                      timeline: stage2.timeline || null, // Stage 1 didn't extract this
+                      notes: stage2.notes || stage1Extracted.notes || '',
+                    };
+                  }
+                }
+              } catch (s2Err) {
+                console.warn('[openphone-webhook] Stage 2 thread extraction failed, using stage 1 only:', s2Err.message);
+              }
+
+              if (stage2Rejected) {
+                // Skip task + push + bell. Webhook continues normally.
+              } else {
               const senderName = extracted.name || ('SMS from ' + from);
               const today = new Date().toISOString().split('T')[0];
               const truncatedBody = body.length > 300 ? body.slice(0, 297) + '...' : body;
@@ -835,7 +1035,8 @@ export default async function handler(req, res) {
                 description:
                   'Inbound SMS from ' + from + '\n\n' +
                   'AI read: ' + (verdict.reasoning || 'looks like a lead inquiry') + ' (confidence: ' + verdict.confidence + ')\n\n' +
-                  'Message: "' + truncatedBody + '"',
+                  'Message: "' + truncatedBody + '"' +
+                  (stage2Reasoning ? '\n\nStage 2 (thread context): ' + stage2Reasoning : ''),
                 status: 'open',
                 extracted_data: {
                   name: extracted.name || null,
@@ -845,8 +1046,9 @@ export default async function handler(req, res) {
                   beds: extracted.beds || null,
                   baths: extracted.baths || null,
                   sqft: extracted.sqft || null,
-                  condition: null, // SMS rarely mentions property condition
+                  condition: extracted.condition || null,
                   frequency: extracted.frequency || null,
+                  timeline: extracted.timeline || null,
                   notes: extracted.notes || '',
                   // No quote info from SMS lead detection - SMS lead messages
                   // are inquiries, not quotes. accept-call-lead.js will skip
@@ -856,6 +1058,8 @@ export default async function handler(req, res) {
                   sms_message_id: data.id || null,
                   ai_confidence: verdict.confidence,
                   ai_reasoning: verdict.reasoning || null,
+                  stage2_verified: stage2Verified,
+                  stage2_reasoning: stage2Reasoning,
                   source: 'SMS',
                 },
               });
@@ -893,6 +1097,7 @@ export default async function handler(req, res) {
                   console.warn('[openphone-webhook] SMS lead push failed:', pushErr.message);
                 }
               }
+              } // close stage2Rejected else
             }
           }
         } catch (smsLeadErr) {

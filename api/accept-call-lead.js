@@ -48,6 +48,34 @@ export default async function handler(req, res) {
     condition, frequency, notes, quote_amount,
   } = req.body;
 
+  /* Normalize condition input. The leads.condition column is INTEGER (1-10
+     scale where higher = cleaner per lead-form.html canonical tiers). But
+     the AI extractors emit text labels ("Decent", "Pristine", etc) AND
+     legacy task review modals may pass the same labels through unchanged.
+     This helper accepts either form and returns a normalized integer or
+     null. Idempotent — passing 8 returns 8.
+     Mapping pulled from lead-form.html line 579-599 (data-value attrs):
+       Extreme = 2, Very dirty = 4, Moderately dirty = 6, Decent = 8,
+       Pristine = 10. */
+  function normalizeCondition(val) {
+    if (val === null || val === undefined || val === '') return null;
+    if (typeof val === 'number' && val >= 1 && val <= 10) return Math.round(val);
+    const s = String(val).trim().toLowerCase();
+    const labelMap = {
+      'pristine': 10,
+      'decent': 8,
+      'moderately dirty': 6,
+      'moderately_dirty': 6,
+      'very dirty': 4,
+      'very_dirty': 4,
+      'extreme': 2,
+    };
+    if (labelMap[s] !== undefined) return labelMap[s];
+    const asInt = parseInt(s, 10);
+    if (!isNaN(asInt) && asInt >= 1 && asInt <= 10) return asInt;
+    return null;
+  }
+
   const db = createClient(
     process.env.SUPABASE_URL,
     process.env.SUPABASE_SERVICE_ROLE_KEY,
@@ -67,7 +95,7 @@ export default async function handler(req, res) {
       sqft: sqft || null,
       beds: beds || null,
       baths: baths || null,
-      condition: condition || null,
+      condition: normalizeCondition(condition),
       frequency: frequency || null,
       source: 'Phone call',
       stage: 'New inquiry',

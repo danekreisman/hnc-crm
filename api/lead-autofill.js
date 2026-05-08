@@ -154,6 +154,33 @@ export default async function handler(req, res) {
     }
     const suggested = JSON.parse(jsonStr);
 
+    // Normalize condition before suggesting it. AI emits text labels but
+    // the leads.condition column is INTEGER (1-10 per lead-form.html
+    // canonical tiers). Same normalizer as accept-call-lead.js. Done here
+    // so the confirm dialog shows the integer the user will actually see
+    // saved, AND so the patch object the frontend builds is correct.
+    if (suggested.condition !== undefined) {
+      const v = suggested.condition;
+      const labelMap = {
+        'pristine': 10, 'decent': 8, 'moderately dirty': 6,
+        'moderately_dirty': 6, 'very dirty': 4, 'very_dirty': 4,
+        'extreme': 2,
+      };
+      if (typeof v === 'number' && v >= 1 && v <= 10) {
+        suggested.condition = Math.round(v);
+      } else if (v !== null && v !== undefined && v !== '') {
+        const s = String(v).trim().toLowerCase();
+        if (labelMap[s] !== undefined) {
+          suggested.condition = labelMap[s];
+        } else {
+          const asInt = parseInt(s, 10);
+          suggested.condition = (!isNaN(asInt) && asInt >= 1 && asInt <= 10) ? asInt : null;
+        }
+      } else {
+        suggested.condition = null;
+      }
+    }
+
     // 4. Determine which lead fields are currently empty so the UI can
     //    safely default to "only fill empty fields". The mapping from AI
     //    output keys to lead row column names — most are 1:1 but a few

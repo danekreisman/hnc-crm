@@ -91,26 +91,45 @@ export default async function handler(req, res) {
     const baths     = req.body.baths      != null ? (req.body.baths     || null) : (x.baths     || null);
     const sqft      = req.body.sqft       != null ? (req.body.sqft      || null) : (x.sqft      || null);
 
-    // Pricing — already computed at submit time. We do NOT re-derive from
-    // beds/baths here. Pre-tax base, tax, and post-tax+rush total were
-    // stored on the task; appointments table needs them in their own
-    // columns. duration_hours comes from quote_data.duration_minutes.
-    let basePre   = x.quote_total_pretax != null ? Number(x.quote_total_pretax) : null;
-    let tax       = x.quote_tax != null ? Number(x.quote_tax) : (basePre != null ? +(basePre * TAX_RATE).toFixed(2) : null);
-    let totalPost = x.quote_total_with_tax != null ? Number(x.quote_total_with_tax) : null;
+    // Pricing — match the canonical token-flow convention from
+    // api/lead-book.js so reports/invoices stay consistent across all
+    // booking paths:
+    //
+    //   base_price  = SUBTOTAL (gross pre-tax pre-discount)
+    //   discount    = absolute dollar discount
+    //   tax         = (base_price - discount) * TAX_RATE
+    //   total_price = base_price - discount + tax + rushFee
+    //
+    // The earlier draft stored base_price as post-discount net, which
+    // would have made reports under-count revenue whenever a frequency
+    // discount applied. Caught during May 7 audit.
+    const rushFee   = x.rush_fee != null ? Number(x.rush_fee) : 0;
     const discount  = (x.quote_data && x.quote_data.discount != null) ? Number(x.quote_data.discount) : 0;
     const durationHrs = (x.quote_data && x.quote_data.duration_minutes != null) ? +(Number(x.quote_data.duration_minutes) / 60).toFixed(2) : null;
-    const rushFee   = x.rush_fee != null ? Number(x.rush_fee) : 0;
 
-    // If Dane edited the total in the modal, recompute base + tax from it.
-    // Pricing model: total = base + base*TAX_RATE + rushFee
-    //                base  = (total - rushFee) / (1 + TAX_RATE)
+    // Pull subtotal (gross pre-tax) from the original quote. Fall back to
+    // pretax + discount if subtotal isn't on the task (existing_property
+    // path doesn't have a "subtotal" — historical price is its own truth).
+    let baseGross = (x.quote_data && x.quote_data.subtotal != null)
+      ? Number(x.quote_data.subtotal)
+      : (x.quote_total_pretax != null ? Number(x.quote_total_pretax) + discount : null);
+    let netPretax = x.quote_total_pretax != null ? Number(x.quote_total_pretax) : (baseGross != null ? baseGross - discount : null);
+    let tax       = x.quote_tax != null ? Number(x.quote_tax) : (netPretax != null ? +(netPretax * TAX_RATE).toFixed(2) : null);
+    let totalPost = x.quote_total_with_tax != null ? Number(x.quote_total_with_tax) : null;
+
+    // If Dane edited the total in the modal, treat the new value as
+    // authoritative gross. Drop the original discount (it was the formula
+    // discount; Dane's overriding the price entirely now). The math:
+    //   total = base + tax + rush  →  base = (total - rush) / (1 + TAX_RATE)
+    let editedDiscount = discount;
     if (req.body.totalPrice != null && !isNaN(Number(req.body.totalPrice)) && Number(req.body.totalPrice) >= 0) {
       const tp = Number(req.body.totalPrice);
       totalPost = +tp.toFixed(2);
-      basePre = +((tp - rushFee) / (1 + TAX_RATE)).toFixed(2);
-      if (basePre < 0) basePre = 0;
-      tax = +(basePre * TAX_RATE).toFixed(2);
+      baseGross = +((tp - rushFee) / (1 + TAX_RATE)).toFixed(2);
+      if (baseGross < 0) baseGross = 0;
+      netPretax = baseGross;          // edited price absorbs any discount
+      editedDiscount = 0;
+      tax = +(baseGross * TAX_RATE).toFixed(2);
     }
 
     const apptNotesParts = [
@@ -132,8 +151,8 @@ export default async function handler(req, res) {
       baths:          baths,
       sqft:           sqft ? String(sqft) : null,
       status:         'scheduled',
-      base_price:     basePre != null ? String(basePre) : null,
-      discount:       String(discount || 0),
+      base_price:     baseGross != null ? String(baseGross) : null,
+      discount:       String(editedDiscount || 0),
       tax:            tax != null ? String(tax) : null,
       total_price:    totalPost != null ? String(totalPost) : null,
       duration_hours: durationHrs != null ? String(durationHrs) : null,

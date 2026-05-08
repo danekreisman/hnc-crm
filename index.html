@@ -22291,6 +22291,30 @@ function startNotifPolling() {
   _hncSubscribeRealtime('tasks', function(payload){
     if (typeof loadTasks === 'function') loadTasks();
   });
+  // Realtime on automations + lead_automations. If a toggle flips on one
+  // device (phone), the other (laptop) should reflect it without a refresh.
+  _hncSubscribeRealtime('automations', function(payload){
+    try {
+      if (typeof autoLoadRemote === 'function') {
+        autoLoadRemote().then(function(){ if (typeof renderAutoList === 'function') renderAutoList(); });
+      }
+    } catch (_e) { /* non-fatal */ }
+  });
+  _hncSubscribeRealtime('lead_automations', function(payload){
+    try { if (typeof loadLeadAutomations === 'function') loadLeadAutomations(); } catch (_e) {}
+  });
+  // Realtime on lead_recommendations. The assistant's Daily List view reads
+  // from this — if the cron generates new recs while the assistant is
+  // looking at the list, they should appear without a refresh.
+  _hncSubscribeRealtime('lead_recommendations', function(payload){
+    try { if (typeof loadDailyList === 'function') loadDailyList(); } catch (_e) {}
+  });
+  // Realtime on client_tags. Tags are stored client-side in clientDB; the
+  // simplest correct refresh is a full client sync. Tag inserts/deletes are
+  // low-frequency so the cost of refetching is negligible.
+  _hncSubscribeRealtime('client_tags', function(payload){
+    try { if (typeof _hncFullSyncFromRealtime === 'function') _hncFullSyncFromRealtime('client_tags ' + (payload.eventType || 'change')); } catch (_e) {}
+  });
   // Realtime on app_users so deactivating a user evicts them within seconds.
   _hncSubscribeRealtime('app_users', function(payload){
     if (payload.eventType !== 'UPDATE' && payload.eventType !== 'DELETE') return;

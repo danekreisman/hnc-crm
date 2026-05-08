@@ -138,6 +138,28 @@ export default async function handler(req, res) {
     return leads.find(l => l.phone && l.phone.replace(/\D/g, '').slice(-10) === digits) || null;
   }
 
+  /* findCleanerByPhone — added 2026-05-08 after Dane reported a cleaner's
+     SMS being misclassified as a 'New SMS lead'. Mirrors the same shape as
+     findLeadByPhone / findClientByPhone. Used to gate all classifier
+     branches: cleaner messages must NEVER reach the AI lead/quote/intent
+     detectors because cleaners aren't customers and their conversational
+     patterns (logistics, scheduling, expense reports) can superficially
+     resemble lead inquiries to the AI. */
+  async function findCleanerByPhone(phone) {
+    if (!phone) return null;
+    const digits = phone.replace(/\D/g, '').slice(-10);
+    if (digits.length < 10) return null;
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/cleaners?select=id,name,phone&phone=ilike.%25${digits}&limit=5`, {
+      headers: {
+        'apikey': SUPABASE_KEY,
+        'Authorization': `Bearer ${SUPABASE_KEY}`
+      }
+    });
+    const cleaners = await res.json();
+    if (!Array.isArray(cleaners) || cleaners.length === 0) return null;
+    return cleaners.find(c => c.phone && c.phone.replace(/\D/g, '').slice(-10) === digits) || null;
+  }
+
   /**
    * Classify a lead's inbound SMS using Claude Haiku to detect lost-intent.
    * Cheap (~$0.001/call) and fast. Returns { intent, confidence, reasoning }
@@ -600,6 +622,11 @@ export default async function handler(req, res) {
       const body = data.body || '';
       const client = await findClientByPhone(from);
       const lead = await findLeadByPhone(from);
+      // Bug fix 2026-05-08: a cleaner's SMS was being classified as a 'New
+      // SMS lead'. Cleaners aren't customers and shouldn't ever reach the
+      // AI classifier branches. Look up once here, gate every downstream
+      // classifier branch with it.
+      const cleaner = await findCleanerByPhone(from);
 
       await supabaseInsert('messages', {
         thread_id: data.conversationId || from,
@@ -648,6 +675,8 @@ export default async function handler(req, res) {
         // classifier and task creation are gated.
         if (client) {
           console.log('[openphone-webhook] sender matched as client (' + client.name + '), skipping lead-response classifier despite lead match');
+        } else if (cleaner) {
+          console.log('[openphone-webhook] sender matched as cleaner (' + cleaner.name + '), skipping lead-response classifier despite lead match');
         } else if (body && body.trim() && process.env.ANTHROPIC_API_KEY) {
           try {
             const verdict = await classifyLeadResponse(body, lead.name);
@@ -773,7 +802,7 @@ export default async function handler(req, res) {
       //   - Body is too short (<20 chars - "hi" / "thanks" / single emoji)
       //   - Open review_call_lead task already exists for this phone
       //     (idempotency across multiple SMSes from the same unknown sender)
-      if (!lead && !client && body && body.trim().length >= 20 && process.env.ANTHROPIC_API_KEY) {
+      if (!lead && !client && !cleaner && body && body.trim().length >= 20 && process.env.ANTHROPIC_API_KEY) {
         try {
           // Idempotency: skip if there's already an open review_call_lead
           // task with this phone in extracted_data. Postgrest JSONB filter
@@ -910,9 +939,12 @@ export default async function handler(req, res) {
             const recipientPhone = Array.isArray(to) ? to[0] : to;
             const lead = recipientPhone ? await findLeadByPhone(recipientPhone) : null;
             const client = recipientPhone ? await findClientByPhone(recipientPhone) : null;
+            const cleaner = recipientPhone ? await findCleanerByPhone(recipientPhone) : null;
 
             if (client) {
               console.log('[openphone-webhook]', type, 'to existing client - skipping quote-detect (clients are not quoted, they are paying customers)');
+            } else if (cleaner) {
+              console.log('[openphone-webhook]', type, 'to existing cleaner (' + cleaner.name + ') - skipping quote-detect ($ in message to a cleaner is logistics/payroll, not a customer quote)');
             } else if (!lead) {
               console.log('[openphone-webhook]', type, 'to unknown number - skipping quote-detect (no lead to attach task to)');
             } else if (!process.env.ANTHROPIC_API_KEY) {
@@ -1098,7 +1130,14 @@ export default async function handler(req, res) {
           const callerPhone = callRow.phone;
           const existingClient = await findClientByPhone(callerPhone);
           const existingLead = await findLeadByPhone(callerPhone);
-          if (existingClient || existingLead) {
+          // Bug fix 2026-05-08: cleaner calls (logistics, payroll questions,
+          // job confirmation) were being classified as new leads. Cleaners
+          // talk about cleaning a lot — superficially resembles inquiries.
+          // Skip the entire classifier for any call from a cleaner phone.
+          const existingCleaner = await findCleanerByPhone(callerPhone);
+          if (existingCleaner) {
+            console.log('[openphone-webhook] call', data.callId, 'is from existing cleaner (' + existingCleaner.name + ') — skipping lead-classify and quote-detect');
+          } else if (existingClient || existingLead) {
             // Existing-client calls are skipped entirely (clients aren't quoted —
             // they're already paying customers). Existing-lead calls run quote
             // detection: if the rep verbally quoted a price, drop a

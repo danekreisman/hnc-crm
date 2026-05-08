@@ -7223,8 +7223,28 @@ async function autofillLeadFromHistory() {
       });
     }
     if (fillable.length === 0) {
-      // Nothing to apply — just inform
-      alert(msg);
+      // No empty fields to fill — but there may be populated fields where
+      // AI has a different value. Offer to overwrite directly.
+      if (skipped.length === 0) {
+        showToast('AI read history but found no new info to add.', 'info');
+        return;
+      }
+      var directOverwriteMsg = 'No empty fields to fill, but AI has different values for these populated fields:\n\n';
+      skipped.forEach(function(s) {
+        var currentDisplay = (s.current === null || s.current === undefined || s.current === '') ? '(empty)' : s.current;
+        directOverwriteMsg += '• ' + s.label + ': "' + currentDisplay + '" → "' + s.value + '"\n';
+      });
+      directOverwriteMsg += '\nOverwrite these with AI\'s suggestions? (Click Cancel to keep existing values.)';
+      if (!confirm(directOverwriteMsg)) return;
+      var doPatch = {};
+      skipped.forEach(function(s) { doPatch[s.key] = s.value; });
+      var doRes = await db.from('leads').update(doPatch).eq('id', currentLead);
+      if (doRes.error) {
+        showToast('Overwrite failed: ' + doRes.error.message, 'error');
+        return;
+      }
+      showToast('Overwrote ' + skipped.length + ' field' + (skipped.length === 1 ? '' : 's') + ' with AI\'s extraction.', 'success');
+      setTimeout(function() { openLead(currentLead); }, 200);
       return;
     }
     msg += '\nApply ' + fillable.length + ' new field' + (fillable.length === 1 ? '' : 's') + ' to the lead profile?';
@@ -7240,7 +7260,36 @@ async function autofillLeadFromHistory() {
       showToast('Update failed: ' + updateRes.error.message, 'error');
       return;
     }
-    showToast('Filled ' + fillable.length + ' field' + (fillable.length === 1 ? '' : 's') + ' from history.', 'success');
+
+    // Second-stage confirm — offer to overwrite the populated fields with
+    // AI's better extraction. Default behavior never overwrites silently
+    // (safety), but Dane explicitly asked for the option to take AI's
+    // version when it's more complete (e.g. "Joshua Gana" replacing "Josh").
+    var overwriteCount = 0;
+    if (skipped.length > 0) {
+      var overwriteMsg = 'Filled ' + fillable.length + ' empty field' + (fillable.length === 1 ? '' : 's') + '.\n\n';
+      overwriteMsg += 'AI also has different values for these populated fields:\n\n';
+      skipped.forEach(function(s) {
+        var currentDisplay = (s.current === null || s.current === undefined || s.current === '') ? '(empty)' : s.current;
+        overwriteMsg += '• ' + s.label + ': "' + currentDisplay + '" → "' + s.value + '"\n';
+      });
+      overwriteMsg += '\nOverwrite these with AI\'s suggestions? (Click Cancel to keep your existing values.)';
+      if (confirm(overwriteMsg)) {
+        var overwritePatch = {};
+        skipped.forEach(function(s) { overwritePatch[s.key] = s.value; });
+        var overwriteRes = await db.from('leads').update(overwritePatch).eq('id', currentLead);
+        if (overwriteRes.error) {
+          showToast('Overwrite failed: ' + overwriteRes.error.message, 'error');
+        } else {
+          overwriteCount = skipped.length;
+        }
+      }
+    }
+
+    var msg2 = 'Filled ' + fillable.length + ' empty field' + (fillable.length === 1 ? '' : 's');
+    if (overwriteCount > 0) msg2 += ', overwrote ' + overwriteCount;
+    msg2 += '.';
+    showToast(msg2, 'success');
     // Refresh the lead view so the new values appear
     setTimeout(function() { openLead(currentLead); }, 200);
   } catch (e) {

@@ -22000,19 +22000,30 @@ async function handleNotifClick(id, url) {
       return;
     }
     // Public-booking review notifications carry source='public_booking' and
-    // the new task's id in metadata.taskId. Route those straight into the
-    // review modal — it has Accept/Edit/Deny actions on the booking. The
-    // generic lead_inquiry → openLead fallback below opens the lead profile
-    // instead, which is what was happening before this branch was added.
+    // the new task's id in metadata.taskId. Route those to the CALENDAR view
+    // — that's where the pending-review banner lives. Dane explicitly asked
+    // for this UX (May 7): take me to where the banner is, not straight into
+    // the modal. We still trigger a tasks reload so the banner row is fresh,
+    // and we briefly highlight the matching banner row.
     if (et === 'lead_inquiry' && meta.source === 'public_booking' && meta.taskId) {
-      _gotoView('tasks');
-      // 250ms gives loadTasks a chance to populate _tasks.open before
-      // openPublicBookingReview goes looking for the row.
+      _gotoView('calendar');
+      // Reload tasks so the banner is up-to-date for this notification.
+      try { if (typeof loadTasks === 'function') loadTasks(); } catch (_) {}
+      // After a short paint delay, scroll to + flash the matching row.
       setTimeout(function(){
-        if (typeof openPublicBookingReview === 'function') {
-          openPublicBookingReview(meta.taskId);
-        }
-      }, 250);
+        try {
+          var row = document.querySelector('#public-booking-banner [data-task-id="' + meta.taskId + '"]');
+          if (row) {
+            row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            // Two-pulse highlight to draw the eye without auto-opening the modal.
+            row.style.transition = 'box-shadow 0.4s ease';
+            row.style.boxShadow = '0 0 0 3px rgba(59,184,227,.55)';
+            setTimeout(function(){ row.style.boxShadow = '0 0 0 0 rgba(59,184,227,0)'; }, 700);
+            setTimeout(function(){ row.style.boxShadow = '0 0 0 3px rgba(59,184,227,.55)'; }, 1100);
+            setTimeout(function(){ row.style.boxShadow = ''; row.style.transition = ''; }, 1900);
+          }
+        } catch (_e) { /* non-fatal */ }
+      }, 400);
       return;
     }
     if (et === 'lead_inquiry' && meta.leadId) {
@@ -22271,6 +22282,14 @@ function startNotifPolling() {
   });
   _hncSubscribeRealtime('cleaners', function(payload){
     _hncFullSyncFromRealtime('cleaner ' + (payload.eventType || 'change'));
+  });
+  // Realtime on tasks. The public-booking banner above the calendar is
+  // driven by _tasks.open. Without this, a request submitted while the
+  // user is sitting on calendar would not surface until the next view
+  // switch or page reload — exactly what bit Dane on May 7 when his mom
+  // booked herself. loadTasks re-fetches and re-renders the banner.
+  _hncSubscribeRealtime('tasks', function(payload){
+    if (typeof loadTasks === 'function') loadTasks();
   });
   // Realtime on app_users so deactivating a user evicts them within seconds.
   _hncSubscribeRealtime('app_users', function(payload){

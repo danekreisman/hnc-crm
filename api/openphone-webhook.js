@@ -50,6 +50,49 @@ export default async function handler(req, res) {
     return res;
   }
 
+  /* ──────────────────────────────────────────────────────────────────────
+     In-app bell-icon notification helper
+     ──────────────────────────────────────────────────────────────────────
+     Bug fix 2026-05-08: push notifications were firing correctly (banner
+     on phone/desktop) but the in-app bell icon stayed empty. Root cause:
+     push and bell are independent systems. Pushes go via web-push to
+     FCM/Apple. Bell reads from the `notifications` Postgres table —
+     which only ~5 endpoints in the codebase write to (lead-capture,
+     deadline-reminders, stripe-webhook x2, submit-public-booking).
+     None of the openphone-webhook task-creation paths ever inserted
+     a notification row, so review_call_lead / review_quote_sent /
+     review_lead_response tasks fired pushes but never appeared in
+     the bell.
+
+     This helper mirrors every push fanout into the notifications table.
+     Best-effort: if it fails, we log a warning but never block the
+     webhook (push delivery is the critical path; bell is supplementary).
+
+     Pattern matches submit-public-booking.js line 382 — same fields,
+     same Prefer:return=minimal, same .catch(warn) behavior. event_type
+     is the only required differentiator: 'review_call_lead',
+     'review_quote_sent', 'review_lead_response' tell the bell-icon
+     renderer which icon to show via _notifIcon(event_type).
+     ────────────────────────────────────────────────────────────────────── */
+  async function insertNotification({ event_type, title, body, url, metadata }) {
+    try {
+      const res = await supabaseInsert('notifications', {
+        event_type: event_type,
+        title: title,
+        body: body || '',
+        url: url || '/#tasks',
+        metadata: metadata || {},
+      });
+      if (!res.ok) {
+        const errBody = await res.text().catch(() => '<unreadable>');
+        console.warn('[openphone-webhook] insertNotification failed status=' + res.status + ' body=' + errBody.slice(0, 300));
+      }
+    } catch (e) {
+      // Never let a bell-icon failure crash a webhook
+      console.warn('[openphone-webhook] insertNotification threw:', e.message);
+    }
+  }
+
   async function findClientByPhone(phone) {
     if (!phone) return null;
     const digits = phone.replace(/\D/g, '').slice(-10);
@@ -687,6 +730,14 @@ export default async function handler(req, res) {
                       pushTitle = `${leadFirstName} wants to defer`;
                       pushBody = `AI read deferral intent (${verdict.confidence}). "${truncatedReply.slice(0, 80)}${truncatedReply.length > 80 ? '...' : ''}"`;
                     }
+                    // Bell-icon mirror — same content as push (separate system, see helper docs)
+                    await insertNotification({
+                      event_type: 'review_lead_response',
+                      title: pushTitle,
+                      body: pushBody,
+                      url: '/#tasks',
+                      metadata: { lead_id: lead.id, intent: intent, confidence: verdict.confidence, source: 'sms' },
+                    });
                     const pushRes = await sendPushToAllSubscribed({
                       title: pushTitle,
                       body: pushBody,
@@ -791,9 +842,19 @@ export default async function handler(req, res) {
                 // Push fan-out — same pattern as call-source lead detection
                 try {
                   const { sendPushToAllSubscribed } = await import('./utils/send-push.js');
+                  const pushTitle = 'New SMS lead - ' + senderName;
+                  const pushBody = 'AI read: ' + (verdict.reasoning || 'looks like a lead').slice(0, 100);
+                  // Bell-icon mirror
+                  await insertNotification({
+                    event_type: 'review_call_lead',
+                    title: pushTitle,
+                    body: pushBody,
+                    url: '/#tasks',
+                    metadata: { phone: from, source: 'sms', confidence: verdict.confidence, ai_reasoning: verdict.reasoning || null },
+                  });
                   const pushRes = await sendPushToAllSubscribed({
-                    title: 'New SMS lead - ' + senderName,
-                    body: 'AI read: ' + (verdict.reasoning || 'looks like a lead').slice(0, 100),
+                    title: pushTitle,
+                    body: pushBody,
                     url: '/#tasks',
                     tag: 'sms-lead-' + (data.id || from),
                     requireInteraction: verdict.confidence === 'high',
@@ -908,9 +969,19 @@ export default async function handler(req, res) {
                     // Push fan-out — same pattern as call-source quote tasks.
                     try {
                       const { sendPushToAllSubscribed } = await import('./utils/send-push.js');
+                      const pushTitle = `Confirm $${amount.toFixed(2)} quote - ${lead.name || 'lead'}`;
+                      const pushBody = `AI read SMS: ${(qVerdict.reasoning || 'price was quoted').slice(0, 100)}`;
+                      // Bell-icon mirror
+                      await insertNotification({
+                        event_type: 'review_quote_sent',
+                        title: pushTitle,
+                        body: pushBody,
+                        url: '/#tasks',
+                        metadata: { lead_id: lead.id, amount: amount, confidence: qVerdict.confidence, source: 'sms' },
+                      });
                       const pushRes = await sendPushToAllSubscribed({
-                        title: `Confirm $${amount.toFixed(2)} quote - ${lead.name || 'lead'}`,
-                        body: `AI read SMS: ${(qVerdict.reasoning || 'price was quoted').slice(0, 100)}`,
+                        title: pushTitle,
+                        body: pushBody,
                         url: '/#tasks',
                         tag: 'quote-sms-' + (data.id || lead.id),
                         requireInteraction: qVerdict.confidence === 'high',
@@ -1090,9 +1161,19 @@ export default async function handler(req, res) {
                       // Push fan-out — same pattern as review_call_lead.
                       try {
                         const { sendPushToAllSubscribed } = await import('./utils/send-push.js');
+                        const pushTitle = `Confirm $${amount.toFixed(2)} quote — ${existingLead.name || 'lead'}`;
+                        const pushBody = `AI read: ${(qVerdict.reasoning || 'price was quoted').slice(0, 100)}`;
+                        // Bell-icon mirror
+                        await insertNotification({
+                          event_type: 'review_quote_sent',
+                          title: pushTitle,
+                          body: pushBody,
+                          url: '/#tasks',
+                          metadata: { lead_id: existingLead.id, amount: amount, confidence: qVerdict.confidence, call_id: data.callId, source: 'call' },
+                        });
                         const pushRes = await sendPushToAllSubscribed({
-                          title: `Confirm $${amount.toFixed(2)} quote — ${existingLead.name || 'lead'}`,
-                          body: `AI read: ${(qVerdict.reasoning || 'price was quoted').slice(0, 100)}`,
+                          title: pushTitle,
+                          body: pushBody,
                           url: '/#tasks',
                           tag: 'quote-' + data.callId,
                           requireInteraction: qVerdict.confidence === 'high',
@@ -1173,9 +1254,19 @@ export default async function handler(req, res) {
                 // Push fan-out — same pattern as the SMS lost-intent flow.
                 try {
                   const { sendPushToAllSubscribed } = await import('./utils/send-push.js');
+                  const pushTitle = 'New call lead — ' + callerName;
+                  const pushBody = 'AI read: ' + (verdict.reasoning || 'looks like a lead').slice(0, 100);
+                  // Bell-icon mirror
+                  await insertNotification({
+                    event_type: 'review_call_lead',
+                    title: pushTitle,
+                    body: pushBody,
+                    url: '/#tasks',
+                    metadata: { call_id: data.callId, phone: callerPhone || null, confidence: verdict.confidence, source: 'call' },
+                  });
                   const pushRes = await sendPushToAllSubscribed({
-                    title: 'New call lead — ' + callerName,
-                    body: 'AI read: ' + (verdict.reasoning || 'looks like a lead').slice(0, 100),
+                    title: pushTitle,
+                    body: pushBody,
                     url: '/#tasks',
                     tag: 'call-lead-' + data.callId,
                     requireInteraction: verdict.confidence === 'high',

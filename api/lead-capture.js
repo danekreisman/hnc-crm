@@ -47,6 +47,7 @@ export default async function handler(req, res) {
     email:        d.email.trim(),
     phone:        d.phone.replace(/\D/g, ''),
     address:      d.address.trim(),
+    island:       d.island || null,
     service:      d.serviceType || null,
     sqft:         d.sqft ? parseInt(d.sqft) : null,
     source:       d.referralSource || 'Website form',

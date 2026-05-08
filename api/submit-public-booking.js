@@ -200,7 +200,7 @@ export default async function handler(req, res) {
           'Submitted via public booking form on ' + new Date().toISOString().slice(0, 10),
         ].filter(Boolean).join('\n');
 
-        const upd = { service: b.service, address: b.address, notes: noteParts };
+        const upd = { service: b.service, address: b.address, island: resolvedIsland, notes: noteParts };
         if (quoteResult && !quoteResult.custom_quote && quoteResult.total != null) {
           upd.quote_total = quoteResult.total;
           upd.quote_data = quoteResult;
@@ -235,6 +235,7 @@ export default async function handler(req, res) {
           email:            cleanEmail,
           phone:            cleanPhoneDigits,
           address:          b.address.trim(),
+          island:           resolvedIsland,
           service:          b.service,
           sqft:             b.sqft ? parseInt(b.sqft) : null,
           source:           'Public booking form',

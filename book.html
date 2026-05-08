@@ -531,12 +531,8 @@ function renderNewQuoteForm(){
 
     +'<div class="field"><label>Service address</label>'
     +'<div class="bk-pac-wrap"><input type="text" id="nq-address" autocomplete="off" placeholder="Start typing your address\u2026"></div></div>'
-    +'<div class="field"><label>Island</label>'
-    +'<select id="nq-island">'
-    +'<option value="Oahu" selected>Oahu</option>'
-    +'<option value="Maui">Maui</option>'
-    +'</select></div>'
-    +'<div class="field-help">We service Oahu and Maui only. Out-of-area requests will be declined.</div>'
+    +'<div id="nq-area-status" class="field-help" style="margin-top:-6px;">We service Oahu and Maui only. Out-of-area requests will be declined.</div>'
+    +'<input type="hidden" id="nq-island" value="">'
 
     +'<div id="nq-fields"></div>'
 
@@ -566,12 +562,54 @@ function renderNewQuoteForm(){
   initBkAddressField();
 }
 
-// ─── Places autocomplete (ported from lead-form.html) ────────────────────
-// Self-contained: keeps a single dropdown in the page at a time, mounted
-// into the input's wrapping `.bk-pac-wrap` container.
-var _bkPacDropdown = null;
-var _bkPacTimer = null;
-var _bkPacActive = -1;
+// ─── Island detection from a Hawaii address string ────────────────────────
+// Returns: 'Oahu' | 'Maui' | 'out_of_area' | 'unknown'
+// Pulled from a list of city / locality names per island. Big Island, Kauai,
+// Molokai, and Lanai → 'out_of_area' so the form rejects the booking before
+// the customer wastes time. Anything we can't classify → 'unknown', which
+// the form handles by not enforcing rejection (admin catches at review).
+function detectIsland(text){
+  if (!text) return 'unknown';
+  var s = String(text).toLowerCase();
+  // Maui
+  if (/\b(maui|lahaina|kihei|wailea|kahului|hana|paia|makawao|kula|wailuku|pukalani|kaanapali|napili|kapalua|haiku|spreckelsville|olinda|haliimaile|kanaio)\b/.test(s)) return 'Maui';
+  // Oahu — check after Maui in case "Lahaina" appears in an Oahu street name (rare)
+  if (/\b(oahu|honolulu|pearl city|aiea|kapolei|kaneohe|kailua|mililani|wahiawa|waipahu|ewa|kahuku|hawaii kai|waianae|hauula|laie|haleiwa|nanakuli|waipio|pearl harbor|hickam|schofield|tripler|makakilo|waimanalo|hauula|kahala)\b/.test(s)) return 'Oahu';
+  // Big Island (Hawaii County) — NOT serviced
+  if (/\b(hilo|kailua-kona|kona|waikoloa|pahoa|volcano|honokaa|naalehu|kapaau|hawi|captain cook|holualoa|keaau|mountain view|ocean view|pahala)\b/.test(s)) return 'out_of_area';
+  // Kauai — NOT serviced
+  if (/\b(kauai|lihue|kapaa|princeville|hanalei|poipu|koloa|wailua|kalaheo|waimea kauai)\b/.test(s)) return 'out_of_area';
+  // Molokai / Lanai — NOT serviced
+  if (/\b(molokai|kaunakakai|lanai|lanai city|maunaloa)\b/.test(s)) return 'out_of_area';
+  // Mainland or unknown city; defer to admin review
+  return 'unknown';
+}
+
+function applyAreaStatus(addressText){
+  var island = detectIsland(addressText);
+  var hidden = $('nq-island');
+  var status = $('nq-area-status');
+  var btn = $('nq-btn');
+  if (!hidden || !status || !btn) return;
+
+  if (island === 'Oahu' || island === 'Maui') {
+    hidden.value = island;
+    status.innerHTML = '<span style="color:#059669;">\u2713 ' + island + ' \u2014 in service area</span>';
+    btn.disabled = false;
+  } else if (island === 'out_of_area') {
+    hidden.value = '';
+    status.innerHTML = '<span style="color:#b91c1c;font-weight:600;">\u2717 Sorry, we don\u2019t service this area yet.</span> Hawaii Natural Clean services Oahu and Maui only.';
+    btn.disabled = true;
+  } else {
+    // unknown — keep the calculate button enabled but flag the address as
+    // unverified so admin catches it at review.
+    hidden.value = '';
+    status.innerHTML = 'We service Oahu and Maui only. Out-of-area requests will be declined.';
+    btn.disabled = false;
+  }
+}
+
+
 
 function _bkPacRemove(){
   if (_bkPacDropdown && _bkPacDropdown.parentNode) _bkPacDropdown.parentNode.removeChild(_bkPacDropdown);
@@ -592,6 +630,7 @@ function _bkPacBuild(input, predictions){
       input.value = p.description;
       _bkPacRemove();
       input.dispatchEvent(new Event('change', { bubbles: true }));
+      try { applyAreaStatus(p.description); } catch (_e) {}
     });
     dd.appendChild(item);
   });
@@ -608,6 +647,10 @@ function initBkAddressField(){
   input.addEventListener('input', function(){
     clearTimeout(_bkPacTimer);
     var val = input.value.trim();
+    // Re-evaluate area status from typed text — handles users who paste an
+    // address or close the dropdown without picking. Detection key off city
+    // names which usually appear once the address is mostly typed.
+    try { applyAreaStatus(val); } catch (_e) {}
     if (val.length < 2) { _bkPacRemove(); return; }
     _bkPacTimer = setTimeout(function(){
       fetch('/api/places-autocomplete?input=' + encodeURIComponent(val))
@@ -683,6 +726,17 @@ async function calcNewQuote(){
 
   var address = ($('nq-address').value || '').trim();
   if (!address) { errEl.innerHTML = '<div class="error-banner">Please enter your service address.</div>'; return; }
+
+  // Re-run detection at submit time so users who didn't trigger autocomplete
+  // (paste-and-go) still hit the gate. Final island value comes from the
+  // hidden field, which applyAreaStatus has been keeping in sync.
+  applyAreaStatus(address);
+  var detectedIsland = detectIsland(address);
+  if (detectedIsland === 'out_of_area') {
+    errEl.innerHTML = '<div class="error-banner">Sorry, we don\u2019t service this area yet. Hawaii Natural Clean services Oahu and Maui only.</div>';
+    return;
+  }
+  // 'unknown' is allowed — admin will catch a non-Hawaii address at review.
 
   var beds = null, baths = null, sqft = null, condition = null, frequency = null;
   if (service === 'Regular Cleaning') {

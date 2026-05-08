@@ -58,6 +58,21 @@ function toE164(phone) {
   return '+1' + digits;
 }
 
+// Service-area detection. Mirrors the frontend `detectIsland` in book.html.
+// Returns 'Oahu' | 'Maui' | 'out_of_area' | 'unknown'. The submit endpoint
+// rejects 'out_of_area' so a customer in California, Big Island, Kauai, etc.
+// can't get a booking through even if they bypass the frontend gate.
+function detectIslandServer(text) {
+  if (!text) return 'unknown';
+  const s = String(text).toLowerCase();
+  if (/\b(maui|lahaina|kihei|wailea|kahului|hana|paia|makawao|kula|wailuku|pukalani|kaanapali|napili|kapalua|haiku|spreckelsville|olinda|haliimaile|kanaio)\b/.test(s)) return 'Maui';
+  if (/\b(oahu|honolulu|pearl city|aiea|kapolei|kaneohe|kailua|mililani|wahiawa|waipahu|ewa|kahuku|hawaii kai|waianae|hauula|laie|haleiwa|nanakuli|waipio|pearl harbor|hickam|schofield|tripler|makakilo|waimanalo|kahala)\b/.test(s)) return 'Oahu';
+  if (/\b(hilo|kailua-kona|kona|waikoloa|pahoa|volcano|honokaa|naalehu|kapaau|hawi|captain cook|holualoa|keaau|mountain view|ocean view|pahala)\b/.test(s)) return 'out_of_area';
+  if (/\b(kauai|lihue|kapaa|princeville|hanalei|poipu|koloa|wailua|kalaheo|waimea kauai)\b/.test(s)) return 'out_of_area';
+  if (/\b(molokai|kaunakakai|lanai|lanai city|maunaloa)\b/.test(s)) return 'out_of_area';
+  return 'unknown';
+}
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST,OPTIONS');
@@ -80,6 +95,21 @@ export default async function handler(req, res) {
 
   try {
     const rushFee = (typeof b.rushFee === 'number' || (b.rushFee != null && !isNaN(Number(b.rushFee)))) ? Math.max(0, Number(b.rushFee)) : 0;
+
+    // ── 1.5. Service-area gate ─────────────────────────────────────────────
+    // Reject out-of-area addresses (Big Island, Kauai, Molokai, Lanai,
+    // mainland) before doing any work. Frontend has the same check; this is
+    // defense-in-depth in case someone bypasses the form.
+    const detected = detectIslandServer(b.address);
+    if (detected === 'out_of_area') {
+      return res.status(400).json({
+        error: 'Sorry, we don\u2019t service this area yet. Hawaii Natural Clean services Oahu and Maui only.',
+      });
+    }
+    // If frontend didn't supply island but we detected one, use detection.
+    const resolvedIsland = (b.island === 'Oahu' || b.island === 'Maui')
+      ? b.island
+      : (detected === 'Oahu' || detected === 'Maui' ? detected : 'Oahu');
 
     // ── 2. Resolve quote (price + duration) ───────────────────────────────
     // For 'new_quote' we recompute server-side via /api/calculate-quote.
@@ -161,7 +191,7 @@ export default async function handler(req, res) {
         // a new quote so the freshest numbers should land on the row.
         const noteParts = [
           'Service: '   + b.service,
-          b.island     ? 'Island: '    + b.island    : null,
+          'Island: '    + resolvedIsland,
           b.frequency  ? 'Frequency: ' + b.frequency : null,
           b.beds       ? 'Beds: '      + b.beds      : null,
           b.baths      ? 'Baths: '     + b.baths     : null,
@@ -190,7 +220,7 @@ export default async function handler(req, res) {
         const bookingToken = crypto.randomUUID();
         const noteParts = [
           'Service: '   + b.service,
-          b.island     ? 'Island: '    + b.island    : null,
+          'Island: '    + resolvedIsland,
           b.frequency  ? 'Frequency: ' + b.frequency : null,
           b.beds       ? 'Beds: '      + b.beds      : null,
           b.baths      ? 'Baths: '     + b.baths     : null,
@@ -243,7 +273,7 @@ export default async function handler(req, res) {
       'Customer: ' + cleanName,
       'Phone:    ' + cleanPhoneDigits,
       'Email:    ' + cleanEmail,
-      'Address:  ' + b.address + (b.island ? ' (' + b.island + ')' : ''),
+      'Address:  ' + b.address + ' (' + resolvedIsland + ')',
       '',
       'Service:   ' + b.service + (b.frequency ? ' (' + b.frequency + ')' : ''),
       b.beds       ? 'Beds:      ' + b.beds       : null,
@@ -294,7 +324,7 @@ export default async function handler(req, res) {
           email:          cleanEmail,
           phone:          cleanPhoneDigits,
           address:        b.address,
-          island:         b.island || null,
+          island:         resolvedIsland,
           service:        b.service,
           frequency:      b.frequency || null,
           beds:           b.beds || null,

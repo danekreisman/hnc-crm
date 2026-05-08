@@ -535,6 +535,7 @@ function renderNewQuoteForm(){
 
     +'<div class="field" id="nq-freq-row" style="display:none"><label>How often?</label>'
     +'<select id="nq-freq">'
+    +'<option value="" disabled selected>-- Select frequency --</option>'
     +'<option value="One-time">One-time</option>'
     +'<option value="Weekly">Weekly (20% off)</option>'
     +'<option value="Biweekly">Biweekly (15% off)</option>'
@@ -681,7 +682,8 @@ async function calcNewQuote(){
     beds  = $('nq-beds').value;
     baths = $('nq-baths').value;
     if (!beds || !baths) { errEl.innerHTML = '<div class="error-banner">Please pick bedrooms and bathrooms.</div>'; return; }
-    frequency = $('nq-freq').value || 'One-time';
+    frequency = $('nq-freq').value;
+    if (!frequency) { errEl.innerHTML = '<div class="error-banner">Please pick how often you want cleaning (One-time, Weekly, Biweekly, or Monthly).</div>'; return; }
   } else {
     sqft = $('nq-sqft').value;
     condition = $('nq-condition').value || '5';

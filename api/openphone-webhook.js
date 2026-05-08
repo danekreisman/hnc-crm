@@ -171,16 +171,60 @@ export default async function handler(req, res) {
 
      Returns array of {direction, body, createdAt} or [] on any failure.
      Fail-soft: never throws — Stage 2 falls back to single-message extraction
-     if the thread can't be fetched. */
-  async function fetchSmsThread(phone, ourNumber) {
+     if the thread can't be fetched.
+
+     The OpenPhone messages endpoint requires phoneNumberId — OpenPhone's
+     internal UUID for our line, not the phone number itself. We auto-discover
+     this at first use (no env var setup required) by calling /v1/phone-numbers
+     and matching against process.env.QUO_NUMBER. The result is cached in
+     module-level state for subsequent calls within this Lambda lifetime. */
+  async function getOpenPhonePhoneNumberId() {
+    if (global._cachedQuoPhoneNumberId) return global._cachedQuoPhoneNumberId;
+    if (process.env.QUO_PHONE_NUMBER_ID) {
+      global._cachedQuoPhoneNumberId = process.env.QUO_PHONE_NUMBER_ID;
+      return global._cachedQuoPhoneNumberId;
+    }
+    try {
+      const res = await fetchWithTimeout('https://api.openphone.com/v1/phone-numbers', {
+        headers: { 'Authorization': process.env.QUO_API_KEY }
+      }, TIMEOUTS.OPENPHONE);
+      if (!res.ok) {
+        console.warn('[openphone-webhook] phone-numbers lookup failed status=' + res.status);
+        return null;
+      }
+      const data = await res.json();
+      // Response shape: { data: [{ id, phoneNumber, name, ... }, ...] }
+      const numbers = (data && Array.isArray(data.data)) ? data.data : [];
+      if (numbers.length === 0) return null;
+      const ourNumber = (process.env.QUO_NUMBER || '').replace(/\D/g, '').slice(-10);
+      // Try to match by phone number suffix; fall back to first number if only one exists
+      let match = numbers.find(n => {
+        const num = (n.phoneNumber || '').replace(/\D/g, '').slice(-10);
+        return num === ourNumber;
+      });
+      if (!match && numbers.length === 1) match = numbers[0];
+      if (!match) {
+        console.warn('[openphone-webhook] could not match QUO_NUMBER to any OpenPhone phone-numbers entry');
+        return null;
+      }
+      global._cachedQuoPhoneNumberId = match.id;
+      console.log('[openphone-webhook] auto-discovered phoneNumberId=' + match.id + ' for ' + match.phoneNumber);
+      return match.id;
+    } catch (e) {
+      console.warn('[openphone-webhook] phone-numbers lookup threw:', e.message);
+      return null;
+    }
+  }
+
+  async function fetchSmsThread(phone) {
     if (!phone || !process.env.QUO_API_KEY) return [];
     try {
-      const phoneNumberId = process.env.QUO_PHONE_NUMBER_ID; // OpenPhone's internal ID for our line
-      const ourPhone = ourNumber || process.env.QUO_NUMBER;
-      // OpenPhone messages endpoint requires phoneNumberId AND participants.
-      // participants is the OTHER party (the lead), our line is implicit
-      // via phoneNumberId.
-      const url = `https://api.openphone.com/v1/messages?phoneNumberId=${encodeURIComponent(phoneNumberId || '')}&participants[]=${encodeURIComponent(phone)}&maxResults=30`;
+      const phoneNumberId = await getOpenPhonePhoneNumberId();
+      if (!phoneNumberId) {
+        console.warn('[openphone-webhook] fetchSmsThread skipped — no phoneNumberId available');
+        return [];
+      }
+      const url = `https://api.openphone.com/v1/messages?phoneNumberId=${encodeURIComponent(phoneNumberId)}&participants[]=${encodeURIComponent(phone)}&maxResults=30`;
       const res = await fetchWithTimeout(url, {
         headers: { 'Authorization': process.env.QUO_API_KEY }
       }, TIMEOUTS.OPENPHONE);

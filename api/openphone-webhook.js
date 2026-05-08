@@ -936,15 +936,35 @@ export default async function handler(req, res) {
     }
 
     if (type === 'call.completed' && data) {
-      const direction = data.direction;
+      // ── BUG FIX 2026-05-08: OpenPhone uses 'incoming'/'outgoing' but our ─
+      // ── code expected 'inbound'/'outbound'. The mismatch caused: ────────
+      //   1. phone field stored YOUR number (data.to) instead of caller's
+      //      because `direction === 'inbound'` was always false
+      //   2. The classifier gate at line ~993 rejected every call because
+      //      callRow.direction !== 'inbound' was true for every real call
+      //   3. Lead detection has been silently broken for inbound calls
+      //      since this feature shipped
+      // Normalize to the 'inbound'/'outbound' canonical form before any
+      // logic runs. Accept either spelling defensively in case OpenPhone
+      // changes it again.
+      const rawDirection = String(data.direction || '').toLowerCase();
+      const direction = (rawDirection === 'incoming' || rawDirection === 'inbound') ? 'inbound'
+        : (rawDirection === 'outgoing' || rawDirection === 'outbound') ? 'outbound'
+        : rawDirection;
       const phone = direction === 'inbound' ? data.from : data.to;
+      // OpenPhone's duration field name varies across event payloads. Check
+      // common variants — data.duration, data.duration_seconds, data.callDuration
+      // — so the 30s gate works regardless of which one this event uses.
+      const duration = data.duration || data.duration_seconds || data.callDuration || null;
       const client = await findClientByPhone(phone);
+
+      console.log('[openphone-webhook] call.completed callId=' + data.id + ' rawDirection=' + rawDirection + ' normalized=' + direction + ' phone=' + phone + ' duration=' + duration);
 
       await supabaseUpsert('call_transcripts', {
         call_id: data.id,
         phone: phone,
         direction: direction,
-        duration_seconds: data.duration,
+        duration_seconds: duration,
         called_at: data.createdAt || new Date().toISOString(),
         status: 'completed',
         client_id: client ? client.id : null,
@@ -992,7 +1012,10 @@ export default async function handler(req, res) {
           console.log('[openphone-webhook] call.transcript.completed: no call_transcripts row yet for', data.callId, '— skipping lead-classify');
         } else if (callRow.direction !== 'inbound') {
           console.log('[openphone-webhook] call', data.callId, 'is', callRow.direction, '— skipping lead-classify');
-        } else if ((callRow.duration_seconds || 0) < 30) {
+        } else if (callRow.duration_seconds !== null && callRow.duration_seconds !== undefined && callRow.duration_seconds < 30) {
+          // Only reject when duration is explicitly known AND below 30s.
+          // Null duration means OpenPhone didn't send it — fall through to
+          // transcript-length check which is a more reliable signal anyway.
           console.log('[openphone-webhook] call', data.callId, 'too short (' + callRow.duration_seconds + 's) — skipping lead-classify');
         } else if (!transcript || transcript.length < 40) {
           console.log('[openphone-webhook] call', data.callId, 'transcript too short — skipping lead-classify');

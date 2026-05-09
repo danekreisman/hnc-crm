@@ -388,6 +388,53 @@ export default async function handler(req, res) {
     const { error: updateErr } = await db.from('leads').update(quoteUpdate).eq('id', leadId);
     if (updateErr) console.error('[lead-capture] update quote fields error:', JSON.stringify(updateErr));
     else console.log('[lead-capture] quote stored on lead', leadId);
+  } else {
+    /* Quote calc returned an error (most commonly: 'Square footage required
+       for Deep Clean / Move-out'). Previously this fell through silently —
+       lead got created, no quote was sent, no notification fired, no error
+       was logged. Result: lead sat in the pipeline with no SMS, Dane never
+       knew anything went wrong.
+       
+       Bug fix 2026-05-08: write a notification row (surfaces in bell), log
+       the issue to error_logs (surfaces in Recent Errors panel), and fire
+       a push so Dane gets pinged that a lead needs manual quoting. */
+    const reason = (quoteResult && quoteResult.error) ? quoteResult.error : 'unknown';
+    console.warn('[lead-capture] quote calc failed for lead', leadId, '— reason:', reason);
+    try {
+      await fetch(`${process.env.SUPABASE_URL}/rest/v1/notifications`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': process.env.SUPABASE_SERVICE_ROLE_KEY,
+          'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
+          'Prefer': 'return=minimal',
+        },
+        body: JSON.stringify({
+          event_type: 'lead_quote_manual',
+          title: 'Manual quote needed: ' + (d.name || 'new lead'),
+          body: 'Auto-quote couldn\'t compute (' + reason + '). Open the lead and send a manual quote.',
+          url: '/#leads',
+          metadata: { lead_id: leadId, reason: reason, service: d.serviceType || null },
+        }),
+      });
+    } catch(err) { console.warn('[lead-capture] failed to write notification:', err.message); }
+    try {
+      const { sendPushToAllSubscribed } = await import('./utils/send-push.js');
+      await sendPushToAllSubscribed({
+        title: 'Manual quote needed: ' + (d.name || 'new lead'),
+        body: 'Auto-quote skipped (' + reason + '). Tap to open the lead.',
+        url: '/#leads',
+        tag: 'manual-quote-' + leadId,
+        requireInteraction: false,
+      });
+    } catch(pushErr) { console.warn('[lead-capture] push for manual-quote failed:', pushErr.message); }
+    try {
+      const { logError } = await import('./utils/error-logger.js');
+      await logError('lead-capture', 'Auto-quote could not compute: ' + reason, {
+        lead_id: leadId, lead_name: d.name, service: d.serviceType,
+        beds: d.beds, baths: d.baths, sqft: d.sqft, condition: d.condition,
+      });
+    } catch(_) {}
   }
 
   return res.status(200).json({ success: true, leadId });

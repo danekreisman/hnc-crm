@@ -740,6 +740,18 @@ function validate(s){
       if(cw){cw.style.borderColor='var(--error)';setTimeout(function(){cw.style.borderColor='';},2500);}
       return false;
     }
+    // Sqft is REQUIRED for Move-out / Deep Cleaning. The /api/calculate-quote
+    // endpoint returns 400 without it, which silently kills the auto-quote
+    // SMS path in lead-capture.js. Block the form submission here so the
+    // problem never reaches the server.
+    if (needsCondition) {
+      var sqftVal = document.getElementById('sqft').value;
+      if (!sqftVal || parseInt(sqftVal) < 100) {
+        se('sqft', 'Square footage is required for Move-out / Deep Cleaning');
+        return false;
+      }
+      ce('sqft');
+    }
     // Janitorial doesn't need frequency
     if(!isJanitorial){
       if(!document.querySelector('input[name="freq"]:checked')){se('freq','Please select a frequency');return false;}
@@ -798,6 +810,24 @@ document.querySelectorAll('input[name="svc"]').forEach(function(r){
     // Show/hide res fields (beds/baths/sqft)
     var resFields = document.getElementById('res-fields');
     if(resFields) resFields.style.display = isJanitorial ? 'none' : '';
+
+    // Sqft is REQUIRED for Move-out / Deep Cleaning (the calculate-quote
+    // endpoint returns HTTP 400 without it, which silently skips the
+    // auto-quote SMS and leaves the lead with no price). For Regular
+    // Cleaning sqft is optional. Update the label dynamically.
+    var sqftLabel = document.querySelector('label[for="sqft"]');
+    if (!sqftLabel) {
+      // The label wraps the input via parent — find by text instead
+      var allLabels = document.querySelectorAll('label');
+      for (var i = 0; i < allLabels.length; i++) {
+        if (allLabels[i].textContent.indexOf('Square footage') >= 0) { sqftLabel = allLabels[i]; break; }
+      }
+    }
+    if (sqftLabel && needsCondition) {
+      sqftLabel.innerHTML = 'Square footage <span class="opt" style="color:#d32f2f;">(required)</span>';
+    } else if (sqftLabel) {
+      sqftLabel.innerHTML = 'Square footage <span class="opt">(optional)</span>';
+    }
 
     // Show/hide frequency field — janitorial doesn't need it
     var freqField = document.getElementById('freq-field');

@@ -16878,6 +16878,11 @@ function scheduleLeadAppointment(){
   });
   if(calNav) sv('calendar', calNav);
   setTimeout(function(){
+    // Reset all form fields first so override checkboxes/values, notes, beds,
+    // etc. from a prior booking don't leak in. Per dev guide 2026-05-03: every
+    // overlay-opening path that doesn't go through handleTopCta must call
+    // resetNewApptForm explicitly before pre-fill.
+    resetNewApptForm();
     var overlay=document.getElementById('new-appt-overlay');
     if(overlay) overlay.classList.remove('hidden');
     populateCleanerDropdown('na-cleaner');
@@ -17274,6 +17279,11 @@ function scheduleFromClient(){
   });
   if(calNav) sv('calendar', calNav);
   setTimeout(function(){
+    // Reset all form fields first so override checkboxes/values, notes, beds,
+    // etc. from a prior booking don't leak in. Per dev guide 2026-05-03: every
+    // overlay-opening path that doesn't go through handleTopCta must call
+    // resetNewApptForm explicitly before pre-fill.
+    resetNewApptForm();
     // Open booking form
     openOverlay('new-appt-overlay');
     populateCleanerDropdown('na-cleaner');

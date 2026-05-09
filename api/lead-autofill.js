@@ -104,7 +104,7 @@ export default async function handler(req, res) {
       '  - condition: One of "Pristine", "Decent", "Moderately dirty", "Very dirty", "Extreme", or null',
       '  - frequency: One of "weekly", "biweekly", "monthly", "one-time", or null',
       '  - timeline: When they want service (e.g. "next week", "Friday", "ASAP", "flexible", or null)',
-      '  - notes: Any other useful context that doesn\'t fit above fields - quirks, special requests, who they are, where they heard about us, pets, accessibility, parking, etc.',
+      '  - notes: Operational details a CLEANER needs on-site that don\'t have their own field. Examples: parking, gate codes, how to enter, pets, areas to focus on or skip, property quirks (steep driveway, shoes off, no AC), how to find the unit. Do NOT include beds, baths, sqft, service, frequency, condition, price, discount, name, email, or address — each has its own field. Do NOT write a summary of who they are or what they want. Return null when there are no operational details — empty is correct.',
       '',
       'Return ONLY a JSON object - first character must be { and last must be }. No preamble, no markdown.',
       'Format: {"name": <string|null>, "email": <string|null>, "service": <string|null>, "address": <string|null>, "beds": <int|null>, "baths": <number|null>, "sqft": <int|null>, "condition": <string|null>, "frequency": <string|null>, "timeline": <string|null>, "notes": <string|null>}',

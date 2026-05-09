@@ -5,6 +5,45 @@ Read it at the start of every session before touching any code.
 
 ---
 
+## 📍 Current state snapshot — last updated 2026-05-09 (early AM)
+
+This block is the elevator-pitch summary for any new Claude session. Read this BEFORE the recent-edits table at the bottom — it tells you where things stand without re-deriving from commits.
+
+**The CRM is production-ready except for the items listed under PENDING below.** Tide is live in production, the auto-quote/SMS path works, the booking flow works, the lead pipeline works, payments work via Stripe.
+
+**WORKING & VERIFIED:**
+- Auto-quote SMS + email on website lead form (with sqft validation for Move-out / Deep Clean)
+- Lead pipeline + Tide automations (23 cadences enabled, queue model — every touch is a `create_va_task`)
+- Inbound call lead detection (was broken since launch; fixed 2026-05-08 in commit 1283fa9)
+- Inbound SMS lead detection w/ two-stage classifier (Stage 2 reads thread context for richer extraction)
+- Lead profile autofill button (pulls SMS + call history, runs Haiku extraction, fills empty fields with overwrite-on-confirm option)
+- Push notifications + bell-icon notifications across all webhook task creators
+- Recent Errors panel (Settings → Communication tab) with frontend + backend coverage and Settings nav badge
+- Diagnostic test endpoint (`/api/test-error-logger`) — verified end-to-end working 2026-05-09
+- All 4 core tables (appointments, leads, clients, cleaners) audited — zero schema/code mismatches
+- 5 single-source-of-truth helpers (`_leadRowToDb`, `_clientRowToDb`, `_cleanerRowToDb`, `_apptRowToDbEntry`, `_auditDataShapes`)
+
+**READY-BUT-UNTESTED IN PRODUCTION:**
+- Direct booking on `book.hawaiinaturalclean.com` (Option B, partially shipped)
+- Booking confirmation flag (currently `booking_confirm_enabled=false` — book.html success screen still says "confirmation has been sent" which is misleading)
+
+**PENDING (priority order):**
+1. **Schema-enforcement script** (~4-6 hours) — single source-of-truth schema definition + check that fails build if code writes to non-existent columns. Highest-leverage prevention work. Per-table column lists for appointments/leads/clients are already in tonight's session — start there.
+2. **Cleaner section overhaul** — priority_tier, accepts_new_clients, allowed_services, exclusive_client_ids. Phase A migration + Phase B settings UI + Phase C booking modal filter + Phase D AI smart booking.
+3. **Direct-book finalization** on book.html (or decision to disable confirmation message until ready).
+4. **Cleaner portal email audit** before launch (`SELECT name, email, status FROM cleaners WHERE status='Active'`).
+5. **Supabase auto-backups** — currently no backup strategy.
+
+**KNOWN DATA STATE NOTES:**
+- Two Kelley Diane O'Neill records exist (active: `ba2f0f8f`, inactive: `f2046882`); 52 future appointments remapped to active record.
+- Brooke Lee lead `17dcdbc8-7e6f-4276-8827-60383c607b70` needs a manual quote (no sqft on file) — she submitted Move-out without sqft and the auto-quote couldn't compute. Going forward the form blocks this.
+- Two Ashleys exist in the system: "Ashley" (`+19124332536`, no email) and "Ashley Maeda" (`+16264820138`, has email). Different humans, both valid leads.
+
+**HOW TO READ A BUG REPORT FROM DANE (referenced from bug-fix protocol below):**
+The Recent Errors panel in Settings → Communication is the FIRST place to look. If a bug crashes JS, it's there. If it's a silent incomplete or wrong-data bug, the panel won't help — those need code grep + DB SELECT. Tonight's autofill 4-attempt-fix loop is the canonical anti-pattern; don't repeat it.
+
+---
+
 ## 🚨 Bug-fix protocol — READ THIS FIRST
 
 When Dane reports something broken, the FIRST move is a diagnostic, NEVER a fix. Shipping code without seeing the actual error wastes deploy cycles, churns the codebase, and erodes trust. This rule is non-negotiable and is the most important rule in this guide.

@@ -3217,6 +3217,9 @@ async function dbSaveLead(data){
     sqft:data.sqft||null, estimated_value:data.value||null,
     beds:data.beds||null, baths:data.baths||null,
     condition:data.condition||null,
+    frequency:data.frequency||data.freq||null,
+    timeline:data.timeline||null,
+    island:data.island||null,
     quote_total:data.quote_total||null,
     quote_data:data.quote_data||null,
     source:data.source||null, stage:data.stage||null,
@@ -3285,7 +3288,6 @@ function _clientRowToDb(c){
     permDiscount: c.perm_discount||'',
     stripeCustomerId: c.stripe_customer_id||'',
     policiesAgreedAt: c.policies_agreed_at||null,
-    tags: c.tags||[],
     do_not_contact: !!c.do_not_contact,
   };
 }

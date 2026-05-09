@@ -1644,6 +1644,21 @@ body:not(.hnc-assistant-user) .assistant-only{display:none!important;}
             </div>
           </div>
 
+          <!-- Recent errors panel — diagnostic visibility into anything
+               that crashed in the last 24h without needing DevTools. -->
+          <div class="settings-card" style="margin-bottom:14px;">
+            <div class="settings-card-title">Recent errors</div>
+            <div class="settings-card-desc">Server-side errors logged in the last 24 hours. If something feels broken, check here first.</div>
+            <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;">
+              <button class="btn" onclick="loadRecentErrors()" style="font-size:13px;padding:7px 14px;">Refresh</button>
+              <button class="btn" onclick="loadRecentErrors(true)" id="recent-errors-show-all-btn" style="font-size:13px;padding:7px 14px;background:#fff;border:1.5px solid var(--border);">Show last 7 days</button>
+              <span id="recent-errors-count" style="font-size:12px;color:var(--text-muted);"></span>
+            </div>
+            <div id="recent-errors-list" style="font-size:12px;max-height:400px;overflow-y:auto;border:1px solid var(--border);border-radius:6px;background:#fafbfb;">
+              <div style="padding:14px;color:var(--text-muted);text-align:center;">Click Refresh to load errors</div>
+            </div>
+          </div>
+
           <!-- Email templates -->
           <div class="settings-card" style="margin-bottom:14px;">
             <div class="settings-card-title">Email templates</div>
@@ -3228,6 +3243,108 @@ async function dbLoadLeads(){
 //   ALTER PUBLICATION supabase_realtime ADD TABLE leads;
 var _leadsRealtimeChan = null;
 
+/* ─── _clientRowToDb ──────────────────────────────────────────────────
+   Single source of truth for the clientDB entry shape. ALL writers to
+   clientDB must call this function. See bug-prevention rules in the
+   dev guide. Pattern matches _leadRowToDb / _cleanerRowToDb.
+   ──────────────────────────────────────────────────────────────────── */
+function _clientRowToDb(c){
+  // Color rotation for client avatars — based on current clientDB size,
+  // preserves existing color when this is an UPDATE (realtime path).
+  var colors=[['var(--brand-200)','var(--brand-700)'],['#B5D4F4','#0C447C'],['#CECBF6','#3C3489'],['#FAC775','#633806'],['#F5C4B3','#712B13'],['#F4C0D1','#72243E']];
+  var existing=(typeof clientDB!=='undefined' && clientDB[c.id])||null;
+  var col=existing ? [existing.bg, existing.fg] : colors[Object.keys(typeof clientDB!=='undefined'?clientDB:{}).length%colors.length];
+  var initials=(c.name||'').split(' ').map(function(w){return w[0]||'';}).join('').slice(0,2).toUpperCase();
+  return {
+    id: c.id,
+    name: c.name||'',
+    type: c.type||'Residential',
+    initials: initials,
+    bg: col[0], fg: col[1],
+    phone: c.phone||'\u2014',
+    email: c.email||'\u2014',
+    address: c.address||'\u2014',
+    payment: (c.payment_type||'\u2014')+(c.payment_last4?' \u00b7 ****'+c.payment_last4:''),
+    since: c.since||'\u2014',
+    ltv: '$'+(c.ltv||0),
+    mrr: c.mrr>0?'$'+c.mrr:'\u2014',
+    jobs: existing ? existing.jobs : '0',
+    avg: existing ? existing.avg : '\u2014',
+    service: c.service||'Standard clean',
+    freq: c.frequency||'\u2014',
+    sqft: c.sqft||'\u2014',
+    bedbath: (c.beds||'?')+' bed / '+(c.baths||'?')+' bath',
+    cleaner: c.preferred_cleaner||'No preference',
+    lastjob: existing ? existing.lastjob : 'None yet',
+    nextjob: existing ? existing.nextjob : 'Not scheduled',
+    status: c.status||'New',
+    notes: c.notes||'\u2014',
+    history: existing ? existing.history : [],
+    properties: Array.isArray(c.properties) ? c.properties : (c.properties ? JSON.parse(JSON.stringify(c.properties)) : []),
+    flatRate: c.flat_rate||'',
+    permDiscount: c.perm_discount||'',
+    stripeCustomerId: c.stripe_customer_id||'',
+    policiesAgreedAt: c.policies_agreed_at||null,
+    tags: c.tags||[],
+    do_not_contact: !!c.do_not_contact,
+  };
+}
+
+/* ─── _apptRowToDbEntry ───────────────────────────────────────────────
+   Single source of truth for an apptData[date] entry. Note: NOT to be
+   confused with _apptRowToDb at line ~3050 (that one converts an in-
+   memory entry to a DB row for INSERT/UPDATE — opposite direction).
+   This one converts a DB row to the in-memory shape used by calendar
+   render and edit handlers.
+   
+   clientDB and cleanerDB must be populated before this is called
+   because we look up display names from them.
+   ──────────────────────────────────────────────────────────────────── */
+function _apptRowToDbEntry(a, opts){
+  opts=opts||{};
+  var seriesNameMap=opts.seriesNameMap||{};
+  var seriesCleanerMap=opts.seriesCleanerMap||{};
+  var clientName=(a.client_id&&typeof clientDB!=='undefined'&&clientDB[a.client_id])?clientDB[a.client_id].name:(a.client_name||(a.series_id&&seriesNameMap[a.series_id])||'Unknown');
+  var cleanerName=(a.cleaner_id&&typeof cleanerDB!=='undefined'&&cleanerDB[a.cleaner_id])?cleanerDB[a.cleaner_id].name:(a.cleaner_name||(a.series_id&&seriesCleanerMap[a.series_id])||'Unassigned');
+  var cleaner2Name=(a.cleaner_id_2&&typeof cleanerDB!=='undefined'&&cleanerDB[a.cleaner_id_2])?cleanerDB[a.cleaner_id_2].name:null;
+  var cleaner3Name=(a.cleaner_id_3&&typeof cleanerDB!=='undefined'&&cleanerDB[a.cleaner_id_3])?cleanerDB[a.cleaner_id_3].name:null;
+  return {
+    n: clientName,
+    s: a.status||'unassigned',
+    t: a.time||'8am',
+    cleaner: cleanerName,
+    recurring: a.recurring||false,
+    dbId: a.id,
+    client_id: a.client_id||null,
+    cleaner_id: a.cleaner_id||null,
+    service: a.service||'Regular Cleaning',
+    freq: a.frequency||'One-time',
+    address: a.address||'',
+    beds: a.beds||'',
+    baths: a.baths||'',
+    sqft: a.sqft||'',
+    condition: a.condition||7,
+    basePrice: a.base_price||0,
+    tax: a.tax||0,
+    totalPrice: a.total_price||0,
+    cleanerPay: a.cleaner_pay||0,
+    cleanerPayOverride: a.cleaner_pay_override!=null?a.cleaner_pay_override:null,
+    notes: a.notes||'',
+    duration: a.duration_hours||null,
+    seriesId: a.series_id||null,
+    seriesIndex: a.series_index!=null?a.series_index:null,
+    tipAmount: a.tip_amount!=null?parseFloat(a.tip_amount):0,
+    cleaner_id_2: a.cleaner_id_2||null,
+    cleaner2: cleaner2Name,
+    cleanerPay2: a.cleaner_pay_2!=null?parseFloat(a.cleaner_pay_2):null,
+    cleaner_id_3: a.cleaner_id_3||null,
+    cleaner3: cleaner3Name,
+    cleanerPay3: a.cleaner_pay_3!=null?parseFloat(a.cleaner_pay_3):null,
+    manualDiscountAmount: a.manual_discount_amount!=null?parseFloat(a.manual_discount_amount):null,
+    manualDiscountReason: a.manual_discount_reason||null,
+  };
+}
+
 /* ─── _cleanerRowToDb ─────────────────────────────────────────────────
    Single source of truth for the cleanerDB entry shape. ALL code paths
    that write to cleanerDB must call this — DO NOT build cleanerDB
@@ -3283,6 +3400,84 @@ function _cleanerRowToDb(c){
     notes: c.notes||'\u2014',
     status: c.status||'Active',
   };
+}
+
+/* ─── _auditDataShapes ────────────────────────────────────────────────
+   Runs once after initial data load. Validates that every entry in
+   cleanerDB / clientDB / leadDB has the expected fields with the
+   expected types. Logs warnings (not errors) for any drift so we can
+   spot it before it becomes a user-facing crash.
+   
+   Why not enforce hard? We don't want to break the page if drift exists
+   — we want to NOTICE it. Warnings show up in the browser console AND
+   get logged to the error_logs table where the Recent Errors panel
+   surfaces them in Settings.
+   ──────────────────────────────────────────────────────────────────── */
+function _auditDataShapes(){
+  var issues = [];
+  // cleanerDB: rate must be a string starting with $
+  if (typeof cleanerDB === 'object') {
+    Object.keys(cleanerDB).forEach(function(id){
+      var c = cleanerDB[id];
+      if (!c) return;
+      if (typeof c.rate !== 'string') {
+        issues.push('cleanerDB[' + id + '].rate is ' + typeof c.rate + ' (expected string), value=' + c.rate);
+      } else if (c.rate && !c.rate.startsWith('$')) {
+        issues.push('cleanerDB[' + id + '].rate does not start with $, value=' + c.rate);
+      }
+      if (typeof c.name !== 'string' || !c.name) {
+        issues.push('cleanerDB[' + id + '].name missing or non-string');
+      }
+    });
+  }
+  // clientDB: name + ltv shape checks
+  if (typeof clientDB === 'object') {
+    Object.keys(clientDB).forEach(function(id){
+      var c = clientDB[id];
+      if (!c) return;
+      if (typeof c.name !== 'string' || !c.name) {
+        issues.push('clientDB[' + id + '].name missing or non-string');
+      }
+      if (typeof c.ltv !== 'string' || !c.ltv.startsWith('$')) {
+        issues.push('clientDB[' + id + '].ltv has wrong shape, value=' + c.ltv);
+      }
+    });
+  }
+  // leadDB: stage must exist
+  if (typeof leadDB === 'object') {
+    Object.keys(leadDB).forEach(function(id){
+      var l = leadDB[id];
+      if (!l) return;
+      if (typeof l.name !== 'string' || !l.name) {
+        issues.push('leadDB[' + id + '].name missing or non-string');
+      }
+      if (typeof l.stage !== 'string') {
+        issues.push('leadDB[' + id + '].stage missing');
+      }
+    });
+  }
+  console.log('[audit] checked '
+    + Object.keys(typeof cleanerDB!=='undefined'?cleanerDB:{}).length + ' cleaners, '
+    + Object.keys(typeof clientDB!=='undefined'?clientDB:{}).length + ' clients, '
+    + Object.keys(typeof leadDB!=='undefined'?leadDB:{}).length + ' leads — '
+    + issues.length + ' shape issue' + (issues.length === 1 ? '' : 's'));
+  if (issues.length > 0) {
+    issues.slice(0, 10).forEach(function(i){ console.warn('[audit]', i); });
+    // Also log to error_logs so the Recent Errors panel surfaces it.
+    // Best-effort — never crash the audit on logging failure.
+    try {
+      db.from('error_logs').insert({
+        source: 'frontend-audit',
+        message: 'Data shape audit found ' + issues.length + ' issue' + (issues.length === 1 ? '' : 's'),
+        context: { issues: issues.slice(0, 25), counts: {
+          cleaners: Object.keys(typeof cleanerDB!=='undefined'?cleanerDB:{}).length,
+          clients: Object.keys(typeof clientDB!=='undefined'?clientDB:{}).length,
+          leads: Object.keys(typeof leadDB!=='undefined'?leadDB:{}).length,
+        }},
+        occurred_at: new Date().toISOString(),
+      }).then(function(){}).catch(function(){});
+    } catch(_) {}
+  }
 }
 
 function _leadRowToDb(l){
@@ -3444,36 +3639,9 @@ function _rebuildAppointmentsFromDB(appts){
     var d=new Date(a.date+'T12:00:00');
     var key=d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate();
     if(!apptData[key])apptData[key]=[];
-    var clientName=(a.client_id&&clientDB[a.client_id])?clientDB[a.client_id].name:(a.client_name||(a.series_id&&seriesNameMap[a.series_id])||'Unknown');
-    var cleanerName=(a.cleaner_id&&cleanerDB[a.cleaner_id])?cleanerDB[a.cleaner_id].name:(a.cleaner_name||(a.series_id&&seriesCleanerMap[a.series_id])||'Unassigned');
-    // Paired cleaner names: resolve from cleanerDB (FK), fall back to null
-    var cleaner2Name=(a.cleaner_id_2&&cleanerDB[a.cleaner_id_2])?cleanerDB[a.cleaner_id_2].name:null;
-    var cleaner3Name=(a.cleaner_id_3&&cleanerDB[a.cleaner_id_3])?cleanerDB[a.cleaner_id_3].name:null;
-    apptData[key].push({
-      n:clientName, s:a.status||'unassigned',
-      t:a.time||'8am', cleaner:cleanerName,
-      recurring:a.recurring||false, dbId:a.id,
-      client_id:a.client_id||null, cleaner_id:a.cleaner_id||null,
-      service:a.service||'Regular Cleaning',
-      freq:a.frequency||'One-time',
-      address:a.address||'',
-      beds:a.beds||'', baths:a.baths||'',
-      sqft:a.sqft||'',
-      condition:a.condition||7,
-      basePrice:a.base_price||0, tax:a.tax||0, totalPrice:a.total_price||0,
-      cleanerPay:a.cleaner_pay||0,
-      cleanerPayOverride:a.cleaner_pay_override!=null?a.cleaner_pay_override:null,
-      notes:a.notes||'',
-      duration:a.duration_hours||null,
-      seriesId:a.series_id||null,
-      seriesIndex:a.series_index!=null?a.series_index:null,
-      tipAmount:a.tip_amount!=null?parseFloat(a.tip_amount):0,
-      // Paired cleaners
-      cleaner_id_2:a.cleaner_id_2||null, cleaner2:cleaner2Name,
-      cleanerPay2:a.cleaner_pay_2!=null?parseFloat(a.cleaner_pay_2):null,
-      cleaner_id_3:a.cleaner_id_3||null, cleaner3:cleaner3Name,
-      cleanerPay3:a.cleaner_pay_3!=null?parseFloat(a.cleaner_pay_3):null
-    });
+    // Use _apptRowToDbEntry helper for consistent shape. seriesNameMap
+    // and seriesCleanerMap are passed through for fallback name resolution.
+    apptData[key].push(_apptRowToDbEntry(a, { seriesNameMap: seriesNameMap, seriesCleanerMap: seriesCleanerMap }));
   });
 
   // Rebuild recurringAppts (one entry per unique series)
@@ -3536,30 +3704,16 @@ async function loadAllData(){
       dbLoadLeads(),
     ]);
     console.log('[loadAllData] All 4 fetches completed in ' + (Date.now() - _t0) + 'ms');
+    // Startup data-shape audit — validates the in-memory dicts have the
+    // expected shape. Catches drift before it becomes a user-facing crash.
+    // Runs once after initial load. See _auditDataShapes for the rules.
+    try { _auditDataShapes(); } catch(e) { console.warn('[audit] failed:', e); }
 
     // ── Process clients (independent) ────────────────────────────────────
+    // Use _clientRowToDb helper for consistent shape across all writers.
+    // Bug-prevention rule #1 — see DEVELOPMENT_GUIDE.md.
     clients.forEach(function(c){
-      const id=c.id;
-      clientDB[id]={
-        name:c.name, type:c.type||'Residential',
-        phone:c.phone||'—', email:c.email||'—',
-        address:c.address||'—',
-        payment:(c.payment_type||'—')+(c.payment_last4?' · ****'+c.payment_last4:''),
-        since:c.since||'—', ltv:'$'+(c.ltv||0),
-        mrr:c.mrr>0?'$'+c.mrr:'—', jobs:'0', avg:'—',
-        service:c.service||'Standard clean',
-        freq:c.frequency||'—',
-        sqft:c.sqft||'—',
-        bedbath:(c.beds||'?')+' bed / '+(c.baths||'?')+' bath',
-        cleaner:c.preferred_cleaner||'No preference',
-        lastjob:'None yet', nextjob:'Not scheduled',
-        status:c.status||'New', notes:c.notes||'—', history:[],
-        properties:Array.isArray(c.properties)?c.properties:(c.properties?JSON.parse(JSON.stringify(c.properties)):[]),
-        flatRate:c.flat_rate||'',
-        permDiscount:c.perm_discount||'',
-        stripeCustomerId:c.stripe_customer_id||'',
-        policiesAgreedAt:c.policies_agreed_at||null
-      };
+      clientDB[c.id] = _clientRowToDb(c);
     });
 
     // ── Process cleaners (independent) ───────────────────────────────────
@@ -10499,6 +10653,71 @@ async function sendTestPush() {
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = 'Send test push'; }
   }
+}
+
+/* Recent errors panel — reads error_logs table for the last 24h (or 7d
+   in extended mode) and renders a clickable list. Each entry expands to
+   show full context + stack trace inline. Lets Dane see what's
+   crashing on the backend without touching DevTools or Vercel logs. */
+async function loadRecentErrors(showAll){
+  var listEl = document.getElementById('recent-errors-list');
+  var countEl = document.getElementById('recent-errors-count');
+  var showAllBtn = document.getElementById('recent-errors-show-all-btn');
+  if (!listEl) return;
+  listEl.innerHTML = '<div style="padding:14px;color:var(--text-muted);text-align:center;">Loading\u2026</div>';
+  if (countEl) countEl.textContent = '';
+  try {
+    var hours = showAll ? 168 : 24;
+    var cutoff = new Date(Date.now() - hours*60*60*1000).toISOString();
+    var resp = await db.from('error_logs')
+      .select('id, source, message, stack, context, occurred_at, resolved')
+      .gte('occurred_at', cutoff)
+      .order('occurred_at', { ascending: false })
+      .limit(100);
+    if (resp.error) {
+      listEl.innerHTML = '<div style="padding:14px;color:#9b2c2c;">Couldn\'t load: ' + resp.error.message + '</div>';
+      return;
+    }
+    var rows = resp.data || [];
+    if (countEl) countEl.textContent = rows.length + ' error' + (rows.length === 1 ? '' : 's') + ' in last ' + (showAll ? '7 days' : '24 hours');
+    if (showAllBtn) showAllBtn.textContent = showAll ? 'Show last 24 hours' : 'Show last 7 days';
+    if (rows.length === 0) {
+      listEl.innerHTML = '<div style="padding:14px;color:#065f46;text-align:center;">\u2713 No errors logged in this window.</div>';
+      return;
+    }
+    var html = '';
+    rows.forEach(function(r){
+      var occurred = new Date(r.occurred_at);
+      var when = occurred.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+      var ctxStr = '';
+      if (r.context && Object.keys(r.context).length > 0) {
+        try { ctxStr = JSON.stringify(r.context, null, 2); } catch(_) { ctxStr = '<unreadable>'; }
+      }
+      var idAttr = 'recent-err-' + r.id;
+      html += '<div style="border-bottom:1px solid var(--border);padding:10px 12px;">'
+        + '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">'
+        + '<div style="flex:1;min-width:0;">'
+        + '<div style="font-weight:600;color:#9b2c2c;">' + (r.source || 'unknown source') + '</div>'
+        + '<div style="color:var(--text);margin-top:2px;word-break:break-word;">' + escapeHtml(r.message || '') + '</div>'
+        + '</div>'
+        + '<div style="font-size:11px;color:var(--text-muted);white-space:nowrap;">' + when + '</div>'
+        + '</div>';
+      if (ctxStr || r.stack) {
+        html += '<details style="margin-top:6px;"><summary style="cursor:pointer;color:var(--brand-500);font-size:11px;">Show details</summary>';
+        if (ctxStr) html += '<pre style="background:#fff;padding:8px;border-radius:4px;border:1px solid var(--border);font-size:11px;overflow-x:auto;margin:6px 0 0;">' + escapeHtml(ctxStr) + '</pre>';
+        if (r.stack) html += '<pre style="background:#fff;padding:8px;border-radius:4px;border:1px solid var(--border);font-size:11px;overflow-x:auto;margin:6px 0 0;color:#666;">' + escapeHtml(r.stack) + '</pre>';
+        html += '</details>';
+      }
+      html += '</div>';
+    });
+    listEl.innerHTML = html;
+  } catch (e) {
+    listEl.innerHTML = '<div style="padding:14px;color:#9b2c2c;">Error loading: ' + e.message + '</div>';
+  }
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
 // Render status whenever Settings panel is shown

@@ -5,7 +5,7 @@ Read it at the start of every session before touching any code.
 
 ---
 
-## 📍 Current state snapshot — last updated 2026-05-09 (early AM)
+## 📍 Current state snapshot — last updated 2026-05-09 (mid-day)
 
 This block is the elevator-pitch summary for any new Claude session. Read this BEFORE the recent-edits table at the bottom — it tells you where things stand without re-deriving from commits.
 
@@ -22,13 +22,14 @@ This block is the elevator-pitch summary for any new Claude session. Read this B
 - Diagnostic test endpoint (`/api/test-error-logger`) — verified end-to-end working 2026-05-09
 - All 4 core tables (appointments, leads, clients, cleaners) audited — zero schema/code mismatches
 - 5 single-source-of-truth helpers (`_leadRowToDb`, `_clientRowToDb`, `_cleanerRowToDb`, `_apptRowToDbEntry`, `_auditDataShapes`)
+- Schema-enforcement script (`scripts/check-schema.js`) — static checker that catches "code writes to non-existent column" at commit time; uses `schema-snapshot.json` as the source of truth, validates 154 writer call sites across `index.html` + `api/**/*.js`. Initial run (2026-05-09) surfaced 3 latent bugs masked by defensive try/catch fallbacks. Workflow documented in "Schema enforcement workflow" section below.
 
 **READY-BUT-UNTESTED IN PRODUCTION:**
 - Direct booking on `book.hawaiinaturalclean.com` (Option B, partially shipped)
 - Booking confirmation flag (currently `booking_confirm_enabled=false` — book.html success screen still says "confirmation has been sent" which is misleading)
 
 **PENDING (priority order):**
-1. **Schema-enforcement script** (~4-6 hours) — single source-of-truth schema definition + check that fails build if code writes to non-existent columns. Highest-leverage prevention work. Per-table column lists for appointments/leads/clients are already in tonight's session — start there.
+1. **Run 3 outstanding migrations + refresh schema snapshot + wire `vercel.json` buildCommand** — schema-enforcement script is built and surfaced 3 latent column-mismatch bugs on first run. Pending migrations: `2026-05-01-add-walkthrough-request-sent-at.sql`, `2026-05-01-add-last-followup-sent-at.sql`, `2026-05-09-appointments-invoice-url.sql`. After Dane runs them in Supabase SQL Editor, re-run `scripts/snapshot-schema.sql`, save the output to `schema-snapshot.json` (via `node scripts/extract-snapshot.js`), confirm `npm run check-schema` is clean, then add `"buildCommand": "npm run check-schema"` to `vercel.json` so future deploys are gated.
 2. **Cleaner section overhaul** — priority_tier, accepts_new_clients, allowed_services, exclusive_client_ids. Phase A migration + Phase B settings UI + Phase C booking modal filter + Phase D AI smart booking.
 3. **Direct-book finalization** on book.html (or decision to disable confirmation message until ready).
 4. **Cleaner portal email audit** before launch (`SELECT name, email, status FROM cleaners WHERE status='Active'`).
@@ -855,6 +856,72 @@ If you're adding a feature that writes to leadDB/cleanerDB/etc. AND you can't ea
 
 **RULE 5: Realtime subscription handlers count as writers too.**
 Tonight's bug had a Postgres realtime UPDATE handler at line ~9472 building the cleanerDB entry inline with a DIFFERENT shape than the initial-load writer. They worked individually but produced inconsistent state when one updated after the other ran. Realtime handlers must use the same helper.
+
+### 🔒 Schema enforcement workflow
+
+The CRM repo now ships with a static checker (`scripts/check-schema.js`) that catches "code writes to non-existent column" at commit time, before it can hit production. This is the automated counterpart to RULE 2 above.
+
+**The pieces:**
+- `schema-snapshot.json` (repo root) — JSON dump of the live schema for `appointments`, `leads`, `clients`, `cleaners`. Source of truth for what columns exist.
+- `scripts/snapshot-schema.sql` — the SQL query that produces the snapshot. Paste into Supabase SQL Editor when you need to refresh.
+- `scripts/extract-snapshot.js` — helper that converts the SQL Editor's `[{"snapshot": "..."}]` wrapper into clean `schema-snapshot.json`.
+- `scripts/check-schema.js` — the validator. Walks `index.html` + `api/**/*.js`, finds every `db.from('TABLE').(insert|update|upsert)(...)` writer, parses the columns being written (handles literals, arrays of literals, and variable-passed payloads with backwards scope resolution), and exits non-zero on any column not in the snapshot.
+
+**Run it:**
+```bash
+npm run check-schema           # standard
+npm run check-schema:verbose   # also list every site checked
+```
+
+**When to refresh the snapshot (and the fast-path workflow):**
+
+1. You're about to ship code that writes a NEW column → first write the migration → run it in Supabase → THEN refresh the snapshot → THEN commit the code.
+2. Concretely the chain is:
+   ```
+   # 1. Write migration SQL → migrations/YYYY-MM-DD-foo.sql
+   # 2. Run it in Supabase SQL Editor (CREATE / ALTER / etc.)
+   # 3. Refresh snapshot:
+   #    - Open scripts/snapshot-schema.sql
+   #    - Paste the whole query into Supabase SQL Editor and run
+   #    - Copy the result row's JSON
+   #    - Send it back to Claude in chat
+   #    - Claude saves it to /tmp/snapshot-raw.json then runs:
+   #         node scripts/extract-snapshot.js /tmp/snapshot-raw.json
+   #      → updates schema-snapshot.json
+   # 4. Run npm run check-schema locally → confirm clean
+   # 5. Commit the migration + the new schema-snapshot.json + the code change together
+   # 6. Push → Vercel build runs check-schema → deploy proceeds
+   ```
+
+**Skipping step 2 or 3 is the bug.** Without the migration, the column doesn't exist and runtime UPDATE fails. Without refreshing the snapshot, the build check passes locally but lies — drift between code and the snapshot can mask real errors. Both have to land together with the code that uses the column.
+
+**What the checker handles:**
+- Inline literal: `db.from('leads').update({stage: 'X', notes: 'Y'})` — keys parsed directly
+- Array of literals: `db.from('appointments').insert([{...}, {...}])` — keys parsed from each
+- Variable payload: `var payload = {...}; payload.foo = ...; db.from('X').update(payload)` — walks back from the call site to find the `var/let/const VAR = {}` initializer in the same file, then collects all `VAR.field = ...` and `VAR['field'] = ...` assignments before the call.
+
+**What it skips (warns, doesn't fail):**
+- Spread operators inside literals: `update({...other, foo: 1})` — only the literal half is parsed
+- Computed keys: `update({[expr]: val})` — flagged in the shape note
+- Function-parameter payloads: e.g. `function dbSaveAppointmentsBatch(rows) { ... .insert(rows) }` — `rows` is a parameter, the checker can't see the caller's payload. Audit these manually if you change the writer.
+- `.map(fn => return {...})` patterns where the variable is built via array transformation rather than direct literal — currently unresolved, surfaces as a warning. (Future enhancement: parse `return {...}` literals inside the assigned-via-map RHS.)
+
+**What it skips silently (intentional):**
+- Writes to tables NOT in the snapshot (`settings`, `error_logs`, `tasks`, `notifications`, `pay_periods`, `lead_comms_log`, `invoices`, etc.) — the snapshot defines scope. To extend coverage to a new table, add it to the `IN ('appointments', 'leads', 'clients', 'cleaners')` list in `scripts/snapshot-schema.sql` and re-snapshot.
+
+**What it cannot catch (RULE 3 still applies):**
+- Type mismatches (writer puts a number where reader expects a string) — checker only sees column existence, not types
+- Stale reads (cached object in memory after a migration drops a column) — runtime concern, not static
+- Application-level invariants (e.g. "if X is set, Y must also be set")
+
+**Vercel build hook (TODO — wire after the 3 outstanding migrations land):**
+Once the 3 outstanding violations are cleared, add this to `vercel.json`:
+```json
+"buildCommand": "npm run check-schema"
+```
+That makes the deploy fail if check-schema fails — code that references a non-existent column never reaches production. **Don't add this hook while there are unresolved violations in the codebase, or every deploy will fail.**
+
+---
 
 ### Other gotchas added this session
 

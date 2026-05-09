@@ -1,0 +1,907 @@
+{
+  "tables": {
+    "leads": [
+      {
+        "type": "uuid",
+        "column": "id",
+        "default": "gen_random_uuid()",
+        "nullable": false
+      },
+      {
+        "type": "timestamp with time zone",
+        "column": "created_at",
+        "default": "now()",
+        "nullable": true
+      },
+      {
+        "type": "text",
+        "column": "name",
+        "default": null,
+        "nullable": false
+      },
+      {
+        "type": "text",
+        "column": "contact_name",
+        "default": null,
+        "nullable": true
+      },
+      {
+        "type": "text",
+        "column": "phone",
+        "default": null,
+        "nullable": true
+      },
+      {
+        "type": "text",
+        "column": "email",
+        "default": null,
+        "nullable": true
+      },
+      {
+        "type": "text",
+        "column": "address",
+        "default": null,
+        "nullable": true
+      },
+      {
+        "type": "text",
+        "column": "service",
+        "default": null,
+        "nullable": true
+      },
+      {
+        "type": "text",
+        "column": "sqft",
+        "default": null,
+        "nullable": true
+      },
+      {
+        "type": "text",
+        "column": "estimated_value",
+        "default": null,
+        "nullable": true
+      },
+      {
+        "type": "text",
+        "column": "source",
+        "default": "'Google SEO'::text",
+        "nullable": true
+      },
+      {
+        "type": "text",
+        "column": "stage",
+        "default": "'New inquiry'::text",
+        "nullable": true
+      },
+      {
+        "type": "text",
+        "column": "next_action",
+        "default": null,
+        "nullable": true
+      },
+      {
+        "type": "date",
+        "column": "due_date",
+        "default": null,
+        "nullable": true
+      },
+      {
+        "type": "text",
+        "column": "assigned_to",
+        "default": "'VA'::text",
+        "nullable": true
+      },
+      {
+        "type": "text",
+        "column": "notes",
+        "default": null,
+        "nullable": true
+      },
+      {
+        "type": "integer",
+        "column": "beds",
+        "default": null,
+        "nullable": true
+      },
+      {
+        "type": "numeric",
+        "column": "baths",
+        "default": null,
+        "nullable": true
+      },
+      {
+        "type": "integer",
+        "column": "condition",
+        "default": null,
+        "nullable": true
+      },
+      {
+        "type": "numeric",
+        "column": "quoted_price",
+        "default": null,
+        "nullable": true
+      },
+      {
+        "type": "timestamp with time zone",
+        "column": "quote_sent_at",
+        "default": null,
+        "nullable": true
+      },
+      {
+        "type": "text",
+        "column": "quote_message",
+        "default": null,
+        "nullable": true
+      },
+      {
+        "type": "text",
+        "column": "preferred_dates",
+        "default": null,
+        "nullable": true
+      },
+      {
+        "type": "text",
+        "column": "booking_status",
+        "default": null,
+        "nullable": true
+      },
+      {
+        "type": "uuid",
+        "column": "assigned_to_id",
+        "default": null,
+        "nullable": true
+      },
+      {
+        "type": "uuid",
+        "column": "source_id",
+        "default": null,
+        "nullable": true
+      },
+      {
+        "type": "uuid",
+        "column": "converted_client_id",
+        "default": null,
+        "nullable": true
+      },
+      {
+        "type": "date",
+        "column": "next_followup_date",
+        "default": null,
+        "nullable": true
+      },
+      {
+        "type": "integer",
+        "column": "num_contacts",
+        "default": "0",
+        "nullable": false
+      },
+      {
+        "type": "timestamp with time zone",
+        "column": "last_contacted_at",
+        "default": null,
+        "nullable": true
+      },
+      {
+        "type": "jsonb",
+        "column": "custom_fields",
+        "default": null,
+        "nullable": true
+      },
+      {
+        "type": "jsonb",
+        "column": "notes_history",
+        "default": "'[]'::jsonb",
+        "nullable": true
+      },
+      {
+        "type": "numeric",
+        "column": "quote_total",
+        "default": null,
+        "nullable": true
+      },
+      {
+        "type": "jsonb",
+        "column": "quote_data",
+        "default": null,
+        "nullable": true
+      },
+      {
+        "type": "uuid",
+        "column": "booking_token",
+        "default": null,
+        "nullable": true
+      },
+      {
+        "type": "text",
+        "column": "segment",
+        "default": "'initial_sequence'::text",
+        "nullable": false
+      },
+      {
+        "type": "timestamp with time zone",
+        "column": "segment_moved_at",
+        "default": "now()",
+        "nullable": true
+      },
+      {
+        "type": "integer",
+        "column": "response_count",
+        "default": "0",
+        "nullable": false
+      },
+      {
+        "type": "timestamp with time zone",
+        "column": "last_responded_at",
+        "default": null,
+        "nullable": true
+      },
+      {
+        "type": "integer",
+        "column": "booking_count_6m",
+        "default": "0",
+        "nullable": false
+      },
+      {
+        "type": "date",
+        "column": "first_booking_date",
+        "default": null,
+        "nullable": true
+      },
+      {
+        "type": "date",
+        "column": "last_booking_date",
+        "default": null,
+        "nullable": true
+      },
+      {
+        "type": "timestamp with time zone",
+        "column": "last_automation_run_at",
+        "default": null,
+        "nullable": true
+      },
+      {
+        "type": "text",
+        "column": "blacklist_reason",
+        "default": null,
+        "nullable": true
+      },
+      {
+        "type": "boolean",
+        "column": "do_not_contact",
+        "default": "false",
+        "nullable": false
+      },
+      {
+        "type": "timestamp with time zone",
+        "column": "unsubscribed_at",
+        "default": null,
+        "nullable": true
+      },
+      {
+        "type": "timestamp with time zone",
+        "column": "attention_snoozed_until",
+        "default": null,
+        "nullable": true
+      },
+      {
+        "type": "date",
+        "column": "tide_wake_up_date",
+        "default": null,
+        "nullable": true
+      },
+      {
+        "type": "text",
+        "column": "island",
+        "default": null,
+        "nullable": true
+      },
+      {
+        "type": "text",
+        "column": "frequency",
+        "default": null,
+        "nullable": true
+      },
+      {
+        "type": "text",
+        "column": "timeline",
+        "default": null,
+        "nullable": true
+      }
+    ],
+    "clients": [
+      {
+        "type": "uuid",
+        "column": "id",
+        "default": "gen_random_uuid()",
+        "nullable": false
+      },
+      {
+        "type": "timestamp with time zone",
+        "column": "created_at",
+        "default": "now()",
+        "nullable": true
+      },
+      {
+        "type": "text",
+        "column": "name",
+        "default": null,
+        "nullable": false
+      },
+      {
+        "type": "text",
+        "column": "type",
+        "default": "'Residential'::text",
+        "nullable": true
+      },
+      {
+        "type": "text",
+        "column": "phone",
+        "default": null,
+        "nullable": true
+      },
+      {
+        "type": "text",
+        "column": "email",
+        "default": null,
+        "nullable": true
+      },
+      {
+        "type": "text",
+        "column": "address",
+        "default": null,
+        "nullable": true
+      },
+      {
+        "type": "text",
+        "column": "payment_type",
+        "default": null,
+        "nullable": true
+      },
+      {
+        "type": "text",
+        "column": "payment_last4",
+        "default": null,
+        "nullable": true
+      },
+      {
+        "type": "text",
+        "column": "service",
+        "default": null,
+        "nullable": true
+      },
+      {
+        "type": "text",
+        "column": "frequency",
+        "default": null,
+        "nullable": true
+      },
+      {
+        "type": "text",
+        "column": "sqft",
+        "default": null,
+        "nullable": true
+      },
+      {
+        "type": "integer",
+        "column": "beds",
+        "default": null,
+        "nullable": true
+      },
+      {
+        "type": "numeric",
+        "column": "baths",
+        "default": null,
+        "nullable": true
+      },
+      {
+        "type": "text",
+        "column": "preferred_cleaner",
+        "default": null,
+        "nullable": true
+      },
+      {
+        "type": "text",
+        "column": "status",
+        "default": "'New'::text",
+        "nullable": true
+      },
+      {
+        "type": "text",
+        "column": "notes",
+        "default": null,
+        "nullable": true
+      },
+      {
+        "type": "text",
+        "column": "since",
+        "default": null,
+        "nullable": true
+      },
+      {
+        "type": "numeric",
+        "column": "mrr",
+        "default": "0",
+        "nullable": true
+      },
+      {
+        "type": "numeric",
+        "column": "ltv",
+        "default": "0",
+        "nullable": true
+      },
+      {
+        "type": "jsonb",
+        "column": "properties",
+        "default": "'[]'::jsonb",
+        "nullable": true
+      },
+      {
+        "type": "numeric",
+        "column": "flat_rate",
+        "default": null,
+        "nullable": true
+      },
+      {
+        "type": "numeric",
+        "column": "perm_discount",
+        "default": null,
+        "nullable": true
+      },
+      {
+        "type": "text",
+        "column": "stripe_customer_id",
+        "default": null,
+        "nullable": true
+      },
+      {
+        "type": "uuid",
+        "column": "auth_user_id",
+        "default": null,
+        "nullable": true
+      },
+      {
+        "type": "timestamp with time zone",
+        "column": "policies_agreed_at",
+        "default": null,
+        "nullable": true
+      },
+      {
+        "type": "boolean",
+        "column": "do_not_contact",
+        "default": "false",
+        "nullable": false
+      },
+      {
+        "type": "text",
+        "column": "segment",
+        "default": null,
+        "nullable": true
+      },
+      {
+        "type": "timestamp with time zone",
+        "column": "segment_moved_at",
+        "default": null,
+        "nullable": true
+      },
+      {
+        "type": "timestamp with time zone",
+        "column": "last_automation_run_at",
+        "default": null,
+        "nullable": true
+      },
+      {
+        "type": "timestamp with time zone",
+        "column": "canceled_at",
+        "default": null,
+        "nullable": true
+      },
+      {
+        "type": "text",
+        "column": "canceled_reason",
+        "default": null,
+        "nullable": true
+      },
+      {
+        "type": "timestamp with time zone",
+        "column": "unsubscribed_at",
+        "default": null,
+        "nullable": true
+      },
+      {
+        "type": "timestamp with time zone",
+        "column": "policy_reminder_sent_at",
+        "default": null,
+        "nullable": true
+      },
+      {
+        "type": "jsonb",
+        "column": "notification_prefs",
+        "default": "'{}'::jsonb",
+        "nullable": true
+      },
+      {
+        "type": "boolean",
+        "column": "pre_existing",
+        "default": "true",
+        "nullable": true
+      }
+    ],
+    "cleaners": [
+      {
+        "type": "uuid",
+        "column": "id",
+        "default": "gen_random_uuid()",
+        "nullable": false
+      },
+      {
+        "type": "timestamp with time zone",
+        "column": "created_at",
+        "default": "now()",
+        "nullable": true
+      },
+      {
+        "type": "text",
+        "column": "name",
+        "default": null,
+        "nullable": false
+      },
+      {
+        "type": "text",
+        "column": "role",
+        "default": "'Cleaner'::text",
+        "nullable": true
+      },
+      {
+        "type": "text",
+        "column": "island",
+        "default": "'Oahu'::text",
+        "nullable": true
+      },
+      {
+        "type": "text",
+        "column": "phone",
+        "default": null,
+        "nullable": true
+      },
+      {
+        "type": "text",
+        "column": "email",
+        "default": null,
+        "nullable": true
+      },
+      {
+        "type": "text",
+        "column": "location",
+        "default": null,
+        "nullable": true
+      },
+      {
+        "type": "numeric",
+        "column": "hourly_rate",
+        "default": "16",
+        "nullable": true
+      },
+      {
+        "type": "date",
+        "column": "start_date",
+        "default": null,
+        "nullable": true
+      },
+      {
+        "type": "text",
+        "column": "background_check",
+        "default": "'Not started'::text",
+        "nullable": true
+      },
+      {
+        "type": "text",
+        "column": "status",
+        "default": "'Active'::text",
+        "nullable": true
+      },
+      {
+        "type": "text",
+        "column": "notes",
+        "default": null,
+        "nullable": true
+      },
+      {
+        "type": "uuid",
+        "column": "auth_user_id",
+        "default": null,
+        "nullable": true
+      },
+      {
+        "type": "integer",
+        "column": "rate_regular_cents",
+        "default": null,
+        "nullable": true
+      },
+      {
+        "type": "integer",
+        "column": "rate_deep_cents",
+        "default": null,
+        "nullable": true
+      },
+      {
+        "type": "integer",
+        "column": "rate_moveout_cents",
+        "default": null,
+        "nullable": true
+      }
+    ],
+    "appointments": [
+      {
+        "type": "uuid",
+        "column": "id",
+        "default": "gen_random_uuid()",
+        "nullable": false
+      },
+      {
+        "type": "timestamp with time zone",
+        "column": "created_at",
+        "default": "now()",
+        "nullable": true
+      },
+      {
+        "type": "uuid",
+        "column": "client_id",
+        "default": null,
+        "nullable": true
+      },
+      {
+        "type": "text",
+        "column": "service",
+        "default": "'Standard clean'::text",
+        "nullable": true
+      },
+      {
+        "type": "text",
+        "column": "frequency",
+        "default": "'One-time'::text",
+        "nullable": true
+      },
+      {
+        "type": "date",
+        "column": "date",
+        "default": null,
+        "nullable": false
+      },
+      {
+        "type": "text",
+        "column": "time",
+        "default": null,
+        "nullable": true
+      },
+      {
+        "type": "text",
+        "column": "address",
+        "default": null,
+        "nullable": true
+      },
+      {
+        "type": "integer",
+        "column": "beds",
+        "default": null,
+        "nullable": true
+      },
+      {
+        "type": "numeric",
+        "column": "baths",
+        "default": null,
+        "nullable": true
+      },
+      {
+        "type": "integer",
+        "column": "condition",
+        "default": "7",
+        "nullable": true
+      },
+      {
+        "type": "text",
+        "column": "sqft",
+        "default": null,
+        "nullable": true
+      },
+      {
+        "type": "uuid",
+        "column": "cleaner_id",
+        "default": null,
+        "nullable": true
+      },
+      {
+        "type": "text",
+        "column": "status",
+        "default": "'unassigned'::text",
+        "nullable": true
+      },
+      {
+        "type": "numeric",
+        "column": "base_price",
+        "default": "0",
+        "nullable": true
+      },
+      {
+        "type": "numeric",
+        "column": "discount",
+        "default": "0",
+        "nullable": true
+      },
+      {
+        "type": "numeric",
+        "column": "tax",
+        "default": "0",
+        "nullable": true
+      },
+      {
+        "type": "numeric",
+        "column": "total_price",
+        "default": "0",
+        "nullable": true
+      },
+      {
+        "type": "numeric",
+        "column": "cleaner_pay",
+        "default": "0",
+        "nullable": true
+      },
+      {
+        "type": "text",
+        "column": "notes",
+        "default": null,
+        "nullable": true
+      },
+      {
+        "type": "boolean",
+        "column": "recurring",
+        "default": "false",
+        "nullable": true
+      },
+      {
+        "type": "numeric",
+        "column": "duration_hours",
+        "default": null,
+        "nullable": true
+      },
+      {
+        "type": "numeric",
+        "column": "cleaner_pay_override",
+        "default": null,
+        "nullable": true
+      },
+      {
+        "type": "uuid",
+        "column": "series_id",
+        "default": null,
+        "nullable": true
+      },
+      {
+        "type": "boolean",
+        "column": "invoice_sent",
+        "default": "false",
+        "nullable": true
+      },
+      {
+        "type": "text",
+        "column": "google_event_id",
+        "default": null,
+        "nullable": true
+      },
+      {
+        "type": "text",
+        "column": "google_event_calendar_id",
+        "default": null,
+        "nullable": true
+      },
+      {
+        "type": "double precision",
+        "column": "address_lat",
+        "default": null,
+        "nullable": true
+      },
+      {
+        "type": "double precision",
+        "column": "address_lng",
+        "default": null,
+        "nullable": true
+      },
+      {
+        "type": "text",
+        "column": "address_place_id",
+        "default": null,
+        "nullable": true
+      },
+      {
+        "type": "uuid",
+        "column": "google_event_cleaner_id",
+        "default": null,
+        "nullable": true
+      },
+      {
+        "type": "text",
+        "column": "cleaners_json",
+        "default": null,
+        "nullable": true
+      },
+      {
+        "type": "text",
+        "column": "import_batch_id",
+        "default": null,
+        "nullable": true
+      },
+      {
+        "type": "text",
+        "column": "review_requested_at",
+        "default": null,
+        "nullable": true
+      },
+      {
+        "type": "timestamp with time zone",
+        "column": "updated_at",
+        "default": "now()",
+        "nullable": true
+      },
+      {
+        "type": "text",
+        "column": "client_name",
+        "default": null,
+        "nullable": true
+      },
+      {
+        "type": "text",
+        "column": "cleaner_name",
+        "default": null,
+        "nullable": true
+      },
+      {
+        "type": "integer",
+        "column": "series_index",
+        "default": null,
+        "nullable": true
+      },
+      {
+        "type": "numeric",
+        "column": "tip_amount",
+        "default": "0",
+        "nullable": false
+      },
+      {
+        "type": "uuid",
+        "column": "cleaner_id_2",
+        "default": null,
+        "nullable": true
+      },
+      {
+        "type": "numeric",
+        "column": "cleaner_pay_2",
+        "default": null,
+        "nullable": true
+      },
+      {
+        "type": "uuid",
+        "column": "cleaner_id_3",
+        "default": null,
+        "nullable": true
+      },
+      {
+        "type": "numeric",
+        "column": "cleaner_pay_3",
+        "default": null,
+        "nullable": true
+      },
+      {
+        "type": "numeric",
+        "column": "manual_discount_amount",
+        "default": null,
+        "nullable": true
+      },
+      {
+        "type": "text",
+        "column": "manual_discount_reason",
+        "default": null,
+        "nullable": true
+      }
+    ]
+  },
+  "generated_at": "2026-05-09 07:52:13.10097+00"
+}

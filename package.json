@@ -2,6 +2,10 @@
     "name": "hnc-crm",
     "version": "1.0.0",
     "description": "Hawaii Natural Clean CRM",
+    "scripts": {
+        "check-schema": "node scripts/check-schema.js",
+        "check-schema:verbose": "node scripts/check-schema.js --verbose"
+    },
     "dependencies": {
         "@supabase/supabase-js": "^2.104.0",
         "stripe": "^14.25.0",

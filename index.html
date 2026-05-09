@@ -17209,14 +17209,22 @@ function scheduleFromClient(){
     calcPrice();
     // Pre-fill all client info
     var nameEl = document.getElementById('na-name');
+    var phoneEl = document.getElementById('na-phone');
+    var emailEl = document.getElementById('na-email');
     var addrEl = document.getElementById('na-address');
+    var sqftEl = document.getElementById('na-sqft');
     var bedsEl = document.getElementById('na-beds');
     var bathsEl = document.getElementById('na-baths');
     var cleanerEl = document.getElementById('na-cleaner');
     var freqEl = document.getElementById('na-freq');
     var serviceEl = document.getElementById('na-service');
     if(nameEl) nameEl.value = cdata.name || '';
-    if(addrEl) addrEl.value = cdata.address !== '—' ? cdata.address : '';
+    // Phone & email are stored with em-dash placeholder when missing — strip
+    // those out so we don't put '—' into the form fields.
+    if(phoneEl) phoneEl.value = (cdata.phone && cdata.phone !== '\u2014') ? cdata.phone : '';
+    if(emailEl) emailEl.value = (cdata.email && cdata.email !== '\u2014') ? cdata.email : '';
+    if(addrEl) addrEl.value = (cdata.address && cdata.address !== '\u2014') ? cdata.address : '';
+    if(sqftEl) sqftEl.value = (cdata.sqft && cdata.sqft !== '\u2014') ? cdata.sqft : '';
     // Set beds
     if(bedsEl && cdata.bedbath){
       var beds = cdata.bedbath.match(/(\d+)\s*bed/);

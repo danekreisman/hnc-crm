@@ -22,18 +22,17 @@ This block is the elevator-pitch summary for any new Claude session. Read this B
 - Diagnostic test endpoint (`/api/test-error-logger`) — verified end-to-end working 2026-05-09
 - All 4 core tables (appointments, leads, clients, cleaners) audited — zero schema/code mismatches
 - 5 single-source-of-truth helpers (`_leadRowToDb`, `_clientRowToDb`, `_cleanerRowToDb`, `_apptRowToDbEntry`, `_auditDataShapes`)
-- Schema-enforcement script (`scripts/check-schema.js`) — static checker that catches "code writes to non-existent column" at commit time; uses `schema-snapshot.json` as the source of truth, validates 154 writer call sites across `index.html` + `api/**/*.js`. Initial run (2026-05-09) surfaced 3 latent bugs masked by defensive try/catch fallbacks. Workflow documented in "Schema enforcement workflow" section below.
+- Schema-enforcement script (`scripts/check-schema.js`) — static checker that catches "code writes to non-existent column" at commit time; uses `schema-snapshot.json` as the source of truth, validates 154 writer call sites across `index.html` + `api/**/*.js`. Initial run (2026-05-09) surfaced 3 latent bugs masked by defensive try/catch fallbacks; after migrations + snapshot refresh, the checker is clean and `vercel.json` `buildCommand` is wired so every deploy is gated. Workflow documented in "Schema enforcement workflow" section below.
 
 **READY-BUT-UNTESTED IN PRODUCTION:**
 - Direct booking on `book.hawaiinaturalclean.com` (Option B, partially shipped)
 - Booking confirmation flag (currently `booking_confirm_enabled=false` — book.html success screen still says "confirmation has been sent" which is misleading)
 
 **PENDING (priority order):**
-1. **Run 3 outstanding migrations + refresh schema snapshot + wire `vercel.json` buildCommand** — schema-enforcement script is built and surfaced 3 latent column-mismatch bugs on first run. Pending migrations: `2026-05-01-add-walkthrough-request-sent-at.sql`, `2026-05-01-add-last-followup-sent-at.sql`, `2026-05-09-appointments-invoice-url.sql`. After Dane runs them in Supabase SQL Editor, re-run `scripts/snapshot-schema.sql`, save the output to `schema-snapshot.json` (via `node scripts/extract-snapshot.js`), confirm `npm run check-schema` is clean, then add `"buildCommand": "npm run check-schema"` to `vercel.json` so future deploys are gated.
-2. **Cleaner section overhaul** — priority_tier, accepts_new_clients, allowed_services, exclusive_client_ids. Phase A migration + Phase B settings UI + Phase C booking modal filter + Phase D AI smart booking.
-3. **Direct-book finalization** on book.html (or decision to disable confirmation message until ready).
-4. **Cleaner portal email audit** before launch (`SELECT name, email, status FROM cleaners WHERE status='Active'`).
-5. **Supabase auto-backups** — currently no backup strategy.
+1. **Cleaner section overhaul** — priority_tier, accepts_new_clients, allowed_services, exclusive_client_ids. Phase A migration + Phase B settings UI + Phase C booking modal filter + Phase D AI smart booking.
+2. **Direct-book finalization** on book.html (or decision to disable confirmation message until ready).
+3. **Cleaner portal email audit** before launch (`SELECT name, email, status FROM cleaners WHERE status='Active'`).
+4. **Supabase auto-backups** — currently no backup strategy.
 
 **KNOWN DATA STATE NOTES:**
 - Two Kelley Diane O'Neill records exist (active: `ba2f0f8f`, inactive: `f2046882`); 52 future appointments remapped to active record.
@@ -914,12 +913,8 @@ npm run check-schema:verbose   # also list every site checked
 - Stale reads (cached object in memory after a migration drops a column) — runtime concern, not static
 - Application-level invariants (e.g. "if X is set, Y must also be set")
 
-**Vercel build hook (TODO — wire after the 3 outstanding migrations land):**
-Once the 3 outstanding violations are cleared, add this to `vercel.json`:
-```json
-"buildCommand": "npm run check-schema"
-```
-That makes the deploy fail if check-schema fails — code that references a non-existent column never reaches production. **Don't add this hook while there are unresolved violations in the codebase, or every deploy will fail.**
+**Vercel build hook (active as of 2026-05-09):**
+`vercel.json` has `"buildCommand": "npm run check-schema"` set. Every `git push origin main` triggers Vercel to run the checker; if it exits non-zero, the deploy fails and the previous deploy stays live. Code that references a non-existent column never reaches production. **Don't commit a code change that introduces a new column reference without first shipping the migration AND refreshing `schema-snapshot.json` — the build will block your push.**
 
 ---
 

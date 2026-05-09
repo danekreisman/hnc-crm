@@ -10722,6 +10722,64 @@ function escapeHtml(s) {
   return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
+/* ────────────────────────────────────────────────────────────────────
+   Frontend error logger
+   ────────────────────────────────────────────────────────────────────
+   Writes uncaught JS errors to the same error_logs table that backend
+   endpoints use, so the Recent Errors panel in Settings surfaces BOTH
+   server-side AND client-side crashes. Dane shouldn't have to open
+   DevTools to see what's broken on the frontend.
+
+   Hooks two events:
+     - window.error: synchronous JS crashes (TypeError, ReferenceError, etc.)
+     - unhandledrejection: async promise rejections nobody caught
+
+   Throttled: max one log per 3s per error message — prevents a render
+   loop from spamming error_logs with hundreds of identical rows.
+
+   Best-effort: if the log write itself fails, we just skip — no error
+   handler should ever throw (would loop forever).
+   ──────────────────────────────────────────────────────────────────── */
+var _frontendErrorLastLogged = {};
+function _logFrontendError(source, message, stack, context){
+  try {
+    if (!message) return;
+    var key = source + '|' + String(message).slice(0, 200);
+    var now = Date.now();
+    if (_frontendErrorLastLogged[key] && (now - _frontendErrorLastLogged[key]) < 3000) return;
+    _frontendErrorLastLogged[key] = now;
+    if (typeof db !== 'undefined') {
+      db.from('error_logs').insert({
+        source: 'frontend:' + source,
+        message: String(message).slice(0, 500),
+        stack: stack ? String(stack).slice(0, 2000) : null,
+        context: context || {},
+        occurred_at: new Date().toISOString(),
+      }).then(function(){}).catch(function(){});
+    }
+  } catch(_) {}
+}
+window.addEventListener('error', function(ev){
+  // Filter out cross-origin script errors (no useful info) and
+  // resource-load errors (image/script failed to load — different signal).
+  if (!ev.message || ev.message === 'Script error.') return;
+  if (ev.target && ev.target !== window && ev.target.tagName && ['IMG','SCRIPT','LINK'].indexOf(ev.target.tagName) >= 0) return;
+  _logFrontendError('global-error', ev.message, ev.error && ev.error.stack, {
+    filename: ev.filename || '',
+    lineno: ev.lineno,
+    colno: ev.colno,
+    user_url: window.location.href.slice(0, 200),
+  });
+});
+window.addEventListener('unhandledrejection', function(ev){
+  var reason = ev.reason;
+  var msg = (reason && reason.message) || String(reason || 'unknown rejection');
+  var stk = (reason && reason.stack) || null;
+  _logFrontendError('unhandled-promise', msg, stk, {
+    user_url: window.location.href.slice(0, 200),
+  });
+});
+
 // Render status whenever Settings panel is shown
 window.addEventListener('DOMContentLoaded', function(){
   // Initial render — fires once on page load

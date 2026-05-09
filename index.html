@@ -643,7 +643,7 @@ body:not(.hnc-assistant-user) .assistant-only{display:none!important;}
     <div class="nav-item non-assistant-only" onclick="sv('broadcasts',this)"><svg class="nav-icon" viewBox="0 0 16 16" fill="none"><path d="M2 5h12v7a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5z" stroke="currentColor" stroke-width="1.3"/><path d="M2 5l6-4 6 4" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M6 16V9h4v7" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>Broadcasts</div>
     <div class="nav-item non-assistant-only" onclick="sv('payments',this)"><svg class="nav-icon" viewBox="0 0 16 16" fill="none"><rect x="1" y="3" width="14" height="10" rx="2" stroke="currentColor" stroke-width="1.3"/><path d="M1 7h14" stroke="currentColor" stroke-width="1.3"/><rect x="3" y="10" width="3" height="1.5" rx=".5" fill="currentColor" opacity=".6"/></svg>Payments</div>
     <div class="nav-section">Config</div>
-    <div class="nav-item non-assistant-only" onclick="sv('settings',this)"><svg class="nav-icon" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="2.5" stroke="currentColor" stroke-width="1.3"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2M3.05 3.05l1.41 1.41M11.54 11.54l1.41 1.41M3.05 12.95l1.41-1.41M11.54 4.46l1.41-1.41" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>Settings</div>
+    <div class="nav-item non-assistant-only" onclick="sv('settings',this)"><svg class="nav-icon" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="2.5" stroke="currentColor" stroke-width="1.3"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2M3.05 3.05l1.41 1.41M11.54 11.54l1.41 1.41M3.05 12.95l1.41-1.41M11.54 4.46l1.41-1.41" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>Settings<span id="settings-error-badge" style="display:none;background:#e53e3e;color:white;font-size:10px;font-weight:700;padding:1px 6px;border-radius:10px;margin-left:6px;line-height:1.4;"></span></div>
     
       <div class="nav-section">Monitor</div>
       <div class="nav-item non-assistant-only" id="nav-logs" onclick="sv('logs',this);loadLogs(_logsCurrentTab||'activity');setTimeout(()=>loadLogs(_logsCurrentTab||'activity'),800)"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg><span>Logs</span></div>
@@ -1649,9 +1649,10 @@ body:not(.hnc-assistant-user) .assistant-only{display:none!important;}
           <div class="settings-card" style="margin-bottom:14px;">
             <div class="settings-card-title">Recent errors</div>
             <div class="settings-card-desc">Server-side errors logged in the last 24 hours. If something feels broken, check here first.</div>
-            <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;">
+            <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap;">
               <button class="btn" onclick="loadRecentErrors()" style="font-size:13px;padding:7px 14px;">Refresh</button>
               <button class="btn" onclick="loadRecentErrors(true)" id="recent-errors-show-all-btn" style="font-size:13px;padding:7px 14px;background:#fff;border:1.5px solid var(--border);">Show last 7 days</button>
+              <button class="btn" onclick="testErrorLogger()" style="font-size:13px;padding:7px 14px;background:#fff;border:1.5px solid var(--border);">Run diagnostic test</button>
               <span id="recent-errors-count" style="font-size:12px;color:var(--text-muted);"></span>
             </div>
             <div id="recent-errors-list" style="font-size:12px;max-height:400px;overflow-y:auto;border:1px solid var(--border);border-radius:6px;background:#fafbfb;">
@@ -10683,6 +10684,12 @@ async function loadRecentErrors(showAll){
     var rows = resp.data || [];
     if (countEl) countEl.textContent = rows.length + ' error' + (rows.length === 1 ? '' : 's') + ' in last ' + (showAll ? '7 days' : '24 hours');
     if (showAllBtn) showAllBtn.textContent = showAll ? 'Show last 24 hours' : 'Show last 7 days';
+    // Mark errors as viewed — clears the nav badge until new errors arrive.
+    // Done after the query so we know the latest occurred_at we've seen.
+    try {
+      localStorage.setItem('hnc_errors_last_viewed', new Date().toISOString());
+      if (typeof _updateErrorBadge === 'function') _updateErrorBadge();
+    } catch(_) {}
     if (rows.length === 0) {
       listEl.innerHTML = '<div style="padding:14px;color:#065f46;text-align:center;">\u2713 No errors logged in this window.</div>';
       return;
@@ -10720,6 +10727,40 @@ async function loadRecentErrors(showAll){
 
 function escapeHtml(s) {
   return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+/* End-to-end smoke test for the diagnostic system. Calls
+   /api/test-error-logger which writes a row to error_logs. We then
+   trigger BOTH a frontend logged error (via the global handler) and
+   refresh the panel so Dane can see both backend + frontend paths in
+   one click. */
+async function testErrorLogger(){
+  try {
+    showToast('Running diagnostic test\u2026', 'info');
+    // Trigger the backend-side test write
+    var resp = await fetch('/api/test-error-logger', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ variant: 'backend' })
+    });
+    var data = await resp.json();
+    if (!data.ok) {
+      showToast('Backend test failed: ' + (data.error || 'unknown'), 'error');
+      return;
+    }
+    // Also fire a frontend-side test by intentionally throwing in a
+    // setTimeout. The window.onerror handler picks it up and logs it.
+    setTimeout(function(){
+      throw new Error('Diagnostic system test \u2014 frontend variant @ ' + new Date().toISOString());
+    }, 0);
+    // Wait briefly for both writes to land, then refresh the panel
+    setTimeout(function(){
+      loadRecentErrors();
+      showToast('Test complete \u2014 you should see TWO new entries (frontend + backend) at the top.', 'success');
+    }, 1500);
+  } catch(e) {
+    showToast('Test threw: ' + e.message, 'error');
+  }
 }
 
 /* ────────────────────────────────────────────────────────────────────
@@ -10779,6 +10820,36 @@ window.addEventListener('unhandledrejection', function(ev){
     user_url: window.location.href.slice(0, 200),
   });
 });
+
+/* Error badge poller — checks error_logs for recent errors and updates
+   the Settings nav badge so Dane sees breakage WITHOUT having to remember
+   to check Settings. Polls every 60s.
+   
+   Uses localStorage to track when Dane last viewed the panel — anything
+   newer than that timestamp counts as "unread" and shows in the badge.
+   When Dane opens Settings → Recent errors and clicks Refresh, the
+   timestamp updates and the badge clears. */
+async function _updateErrorBadge(){
+  try {
+    var badge = document.getElementById('settings-error-badge');
+    if (!badge || typeof db === 'undefined') return;
+    var lastViewed = localStorage.getItem('hnc_errors_last_viewed') || '1970-01-01T00:00:00Z';
+    var resp = await db.from('error_logs')
+      .select('id', { count: 'exact', head: true })
+      .gt('occurred_at', lastViewed);
+    if (resp.error) return;
+    var count = resp.count || 0;
+    if (count > 0) {
+      badge.textContent = count > 99 ? '99+' : String(count);
+      badge.style.display = 'inline-block';
+    } else {
+      badge.style.display = 'none';
+    }
+  } catch(_) {}
+}
+// Initial check 5s after page load (lets data settle first), then every 60s
+setTimeout(_updateErrorBadge, 5000);
+setInterval(_updateErrorBadge, 60000);
 
 // Render status whenever Settings panel is shown
 window.addEventListener('DOMContentLoaded', function(){

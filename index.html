@@ -7137,7 +7137,7 @@ function openLead(id){
    current values; user picks Accept All or Cancel.
    ──────────────────────────────────────────────────────────────────── */
 async function autofillLeadFromHistory() {
-  if (!currentLead) {
+  if (!currentLeadId) {
     showToast('No lead selected.', 'error');
     return;
   }
@@ -7153,7 +7153,7 @@ async function autofillLeadFromHistory() {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer ' + token
       },
-      body: JSON.stringify({ leadId: currentLead })
+      body: JSON.stringify({ leadId: currentLeadId })
     });
     var data = await resp.json();
     if (!resp.ok || !data.ok) {
@@ -7238,13 +7238,13 @@ async function autofillLeadFromHistory() {
       if (!confirm(directOverwriteMsg)) return;
       var doPatch = {};
       skipped.forEach(function(s) { doPatch[s.key] = s.value; });
-      var doRes = await db.from('leads').update(doPatch).eq('id', currentLead);
+      var doRes = await db.from('leads').update(doPatch).eq('id', currentLeadId);
       if (doRes.error) {
         showToast('Overwrite failed: ' + doRes.error.message, 'error');
         return;
       }
       showToast('Overwrote ' + skipped.length + ' field' + (skipped.length === 1 ? '' : 's') + ' with AI\'s extraction.', 'success');
-      setTimeout(function() { openLead(currentLead); }, 200);
+      setTimeout(function() { openLead(currentLeadId); }, 200);
       return;
     }
     msg += '\nApply ' + fillable.length + ' new field' + (fillable.length === 1 ? '' : 's') + ' to the lead profile?';
@@ -7255,7 +7255,7 @@ async function autofillLeadFromHistory() {
     // canonical lead-row column names.
     var patch = {};
     fillable.forEach(function(f) { patch[f.key] = f.value; });
-    var updateRes = await db.from('leads').update(patch).eq('id', currentLead);
+    var updateRes = await db.from('leads').update(patch).eq('id', currentLeadId);
     if (updateRes.error) {
       showToast('Update failed: ' + updateRes.error.message, 'error');
       return;
@@ -7277,7 +7277,7 @@ async function autofillLeadFromHistory() {
       if (confirm(overwriteMsg)) {
         var overwritePatch = {};
         skipped.forEach(function(s) { overwritePatch[s.key] = s.value; });
-        var overwriteRes = await db.from('leads').update(overwritePatch).eq('id', currentLead);
+        var overwriteRes = await db.from('leads').update(overwritePatch).eq('id', currentLeadId);
         if (overwriteRes.error) {
           showToast('Overwrite failed: ' + overwriteRes.error.message, 'error');
         } else {
@@ -7291,7 +7291,7 @@ async function autofillLeadFromHistory() {
     msg2 += '.';
     showToast(msg2, 'success');
     // Refresh the lead view so the new values appear
-    setTimeout(function() { openLead(currentLead); }, 200);
+    setTimeout(function() { openLead(currentLeadId); }, 200);
   } catch (e) {
     console.error('[lead-autofill] error:', e);
     showToast('Error: ' + e.message, 'error');

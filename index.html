@@ -7798,10 +7798,25 @@ function populateCleanerDropdown(selectId, currentValue){
   entries.forEach(function(entry){
     var c=entry[1];
     if(!c.name)return;
-    var rate=parseFloat((c.rate||'').replace(/[^0-9.]/g,''))||16;
+    /* Defensive rate parsing — bug fix 2026-05-08. There are 3 writers to
+       cleanerDB across the codebase (lines 3513, 9414, 22489) and they're
+       inconsistent about whether c.rate is a formatted string ("$25/hr"),
+       a raw number (25), or undefined. The original code did
+       (c.rate||'').replace(...) which crashed with TypeError when c.rate
+       was a number. Handle all shapes without throwing. */
+    var rateNum;
+    if (typeof c.rate === 'number') {
+      rateNum = c.rate;
+    } else if (typeof c.rate === 'string') {
+      rateNum = parseFloat(c.rate.replace(/[^0-9.]/g,''));
+    }
+    if (!rateNum || isNaN(rateNum)) {
+      // Fallback to hourly_rate if it's directly on the entry, else default
+      rateNum = parseFloat(c.hourly_rate) || 16;
+    }
     var opt=document.createElement('option');
     opt.value=c.name;
-    opt.textContent=c.name+' — '+(c.islands||c.loc||'Oahu')+' ($'+rate+'/hr)';
+    opt.textContent=c.name+' — '+(c.islands||c.loc||'Oahu')+' ($'+rateNum+'/hr)';
     sel.appendChild(opt);
   });
   // Restore current selection

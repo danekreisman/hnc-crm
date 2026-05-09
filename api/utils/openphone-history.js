@@ -18,6 +18,10 @@ const OPENPHONE_BASE = 'https://api.openphone.com/v1';
 
 /**
  * Get your HNC phone number ID from OpenPhone (cached per cold start).
+ * Bug fix 2026-05-08: previously this grabbed numbers[0].id unconditionally,
+ * which only worked if the HNC line happened to be first in the API response.
+ * Now matches by QUO_NUMBER suffix (last 10 digits) and falls back to the
+ * single-number case if there's only one number on the account.
  */
 let _cachedPhoneNumberId = null;
 async function getPhoneNumberId(apiKey) {
@@ -29,6 +33,20 @@ async function getPhoneNumberId(apiKey) {
   const data = await resp.json();
   const numbers = data.data || [];
   if (!numbers.length) throw new Error('No OpenPhone phone numbers found');
+
+  // Try to match QUO_NUMBER if it's set
+  const ourNumber = (process.env.QUO_NUMBER || '').replace(/\D/g, '').slice(-10);
+  if (ourNumber) {
+    const match = numbers.find(n => {
+      const num = (n.phoneNumber || '').replace(/\D/g, '').slice(-10);
+      return num === ourNumber;
+    });
+    if (match) {
+      _cachedPhoneNumberId = match.id;
+      return _cachedPhoneNumberId;
+    }
+  }
+  // Fallback: single-number account
   _cachedPhoneNumberId = numbers[0].id;
   return _cachedPhoneNumberId;
 }
@@ -143,10 +161,41 @@ export async function getOpenPhoneHistory(clientPhone, { apiKey, maxSms = 200, m
 
   try {
     const phoneNumberId = await getPhoneNumberId(apiKey);
-    const [smsHistory, callSummaries] = await Promise.all([
-      fetchSmsHistory(apiKey, phoneNumberId, e164, maxSms),
-      fetchCallSummaries(apiKey, phoneNumberId, e164, maxCalls),
-    ]);
+
+    // Try multiple phone formats. OpenPhone is inconsistent about how
+    // numbers are stored vs queried — a number might be saved as
+    // '9124332536' but the API only accepts '+19124332536' (or vice versa).
+    // Try the most-likely format first; if it returns 0 results, fall back.
+    const last10 = digits.slice(-10);
+    const phoneFormats = [
+      e164,                                  // '+19124332536'
+      `+1${last10}`,                         // ensure +1 prefix
+      last10,                                // bare 10 digits
+      digits,                                // raw digits as given
+    ].filter((v, i, a) => v && a.indexOf(v) === i); // dedupe + remove empties
+
+    let smsHistory = [];
+    let callSummaries = [];
+    let successFormat = null;
+
+    for (const tryPhone of phoneFormats) {
+      const [sms, calls] = await Promise.all([
+        fetchSmsHistory(apiKey, phoneNumberId, tryPhone, maxSms),
+        fetchCallSummaries(apiKey, phoneNumberId, tryPhone, maxCalls),
+      ]);
+      if (sms.length > 0 || calls.length > 0) {
+        smsHistory = sms;
+        callSummaries = calls;
+        successFormat = tryPhone;
+        break;
+      }
+    }
+
+    if (!successFormat) {
+      console.warn('[openphone-history] No history found for phone in any format. Tried:', phoneFormats.join(', '));
+    } else {
+      console.log('[openphone-history] phone format that worked:', successFormat, 'sms=' + smsHistory.length, 'calls=' + callSummaries.length);
+    }
 
     const lines = [];
 

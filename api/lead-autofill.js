@@ -217,6 +217,13 @@ export default async function handler(req, res) {
       current_values,
       lead_id: leadId,
       history_chars: history.length,
+      // Diagnostic — first 800 chars of what we sent to the AI so we can
+      // see whether the email/name was actually IN the history we fetched.
+      // If history shows the email but suggested.email is null, it's an AI
+      // extraction problem. If history doesn't have the email, it's a
+      // fetch problem (wrong phone format, wrong phoneNumberId, etc).
+      _debug_history_preview: history.slice(0, 800),
+      _debug_phone_used: lead.phone,
     });
   } catch (e) {
     console.error('[lead-autofill] error:', e);

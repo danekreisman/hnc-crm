@@ -730,6 +730,45 @@ Only relevant if Claude is operating in an environment without bash/git access (
 
 ## Updates to Known Gotchas (additions for the section above)
 
+### 🛡️ Bug-prevention rules — REQUIRED reading before any data-shape change
+
+The CRM has hit the same class of bug 4+ times in May 2026: code references DB columns that don't exist OR multiple code paths build the same in-memory object with slightly different shapes. The pattern is so consistent it deserves explicit rules. Following these would have prevented the cleaner-dropdown crash, the frequency/timeline insert error, the manual_discount_amount error, and the cleaner.rate type mismatch — all in a single night.
+
+**RULE 1: Single-helper rule for in-memory shapes.**
+Every JS object that's stored in a top-level dict (cleanerDB, leadDB, clientDB, apptDB) must be built ONLY through a `_xxxRowToDb()` helper function. No inline object literals.
+
+Helpers currently in place:
+- `_leadRowToDb(l)` at line ~3231 — leadDB shape
+- `_cleanerRowToDb(c)` at line ~3251 — cleanerDB shape (added 2026-05-08)
+- (clientDB and apptDB still need helpers — TODO)
+
+If you find yourself writing `someDB[c.id] = { ... }` with a literal: STOP. Check if a helper exists. If yes, call it. If no, write one and migrate every inline writer to use it.
+
+**RULE 2: When adding a column to a DB table, ship the migration BEFORE the code that writes it.**
+Tonight three different errors came from code shipping before its migration: `frequency` on leads, `timeline` on leads, `manual_discount_amount` and `manual_discount_reason` on appointments. In all cases, the code was committed but the schema change wasn't.
+
+The discipline:
+1. Write the migration SQL first
+2. Run it in Supabase SQL Editor
+3. Verify with `SELECT column_name FROM information_schema.columns WHERE table_name='X' AND column_name='Y'`
+4. THEN commit the code that uses the new column
+
+**RULE 3: When changing a data shape (renaming a field, changing types), grep all read sites BEFORE shipping.**
+Tonight's cleaner.rate bug: one writer started storing `rate` as a number, three readers expected a string. The breaking writer landed at some point and the readers crashed when that path ran.
+
+The discipline:
+1. Before changing any field on a top-level DB object, grep for every read of that field across the codebase
+2. Verify each read handles the new shape, OR update each read to do so in the same commit
+3. If grep returns more than 5 read sites, that's a sign the field is core enough to warrant defensive parsing at the read sites (like the cleaner-dropdown fix, commit 9ace4a4)
+
+**RULE 4: When a feature touches multiple writer paths, the helper rule overrides everything.**
+If you're adding a feature that writes to leadDB/cleanerDB/etc. AND you can't easily route through the existing helper, that's a sign the helper needs extending — not a sign to bypass it. Inline writers ALWAYS drift. Always.
+
+**RULE 5: Realtime subscription handlers count as writers too.**
+Tonight's bug had a Postgres realtime UPDATE handler at line ~9472 building the cleanerDB entry inline with a DIFFERENT shape than the initial-load writer. They worked individually but produced inconsistent state when one updated after the other ran. Realtime handlers must use the same helper.
+
+### Other gotchas added this session
+
 - **Concurrent AI agents on the same repo collide.** Tonight had a near-miss where the user ran a separate AI session in parallel that pushed 7+ commits to `main` while I was working. We narrowly avoided overwriting each other's work because I happened to stay in `api/openphone-webhook.js` and the other agent stayed in `book.html` / public-booking files. Pattern to formalize: each parallel session must have explicit hard file-level scope written into its system prompt (e.g. "Agent A: ONLY touches book.html, api/submit-public-booking.js... Read-only access to everything else"). `index.html` is shared infrastructure — only one agent at a time. Every push should `git pull --rebase` first. Migrations need single-channel ownership. Dev guide updates need date-stamped sections to avoid merge loss.
 - **OpenPhone uses `incoming`/`outgoing` not `inbound`/`outbound`.** The webhook handler had been silently broken since launch because of this single mismatch — every inbound call's direction was wrong, which cascaded into wrong phone storage (HNC's number instead of caller's) and 100% rejection by the classifier gate. **Always normalize OpenPhone direction values defensively at intake**. Same for duration — OpenPhone uses different field names (`duration`, `duration_seconds`, `callDuration`) across event payloads. Try multiple. **And gates that compare numbers should never use `(value || 0)` as a fallback — null treated as 0 silently passes the check `0 < 30 = true`.** Use `value !== null && value !== undefined && value < 30` to only reject when explicitly known.
 - **Push notifications and the bell icon are independent systems.** Push goes via web-push to FCM/Apple. Bell reads from the `notifications` Postgres table. They share copy but require separate writes — a webhook task creator has to fire both `sendPushToAllSubscribed()` AND `INSERT INTO notifications` for the user to see it both as a banner AND in the bell list. Failing to do both causes confusing bug reports like "I got a notification but it's not in my bell." When adding a new task type that needs notifications, mirror BOTH systems.

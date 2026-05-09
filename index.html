@@ -3228,6 +3228,63 @@ async function dbLoadLeads(){
 //   ALTER PUBLICATION supabase_realtime ADD TABLE leads;
 var _leadsRealtimeChan = null;
 
+/* ─── _cleanerRowToDb ─────────────────────────────────────────────────
+   Single source of truth for the cleanerDB entry shape. ALL code paths
+   that write to cleanerDB must call this — DO NOT build cleanerDB
+   entries inline.
+   
+   Background (2026-05-08): The codebase had THREE different inline
+   cleanerDB writers (initial loadAllData, realtime UPDATE handler, and
+   a settings-tab repopulate). Each one was written at a different time
+   and stored rate slightly differently — some as a string ("$25/hr"),
+   some as a raw number (25), some omitted fields the others included.
+   
+   This caused populateCleanerDropdown to crash with TypeError because
+   c.rate.replace() works on strings but not numbers. The bug only
+   surfaced after the realtime path overwrote the initial-load path,
+   which is why it was intermittent and hard to pin down.
+   
+   Pattern lifted from the existing _leadRowToDb helper. Future writers
+   to cleanerDB should follow the same rule: call this function, never
+   build entries inline.
+   ──────────────────────────────────────────────────────────────────── */
+function _cleanerRowToDb(c){
+  // Color rotation for cleaner avatars — based on current cleanerDB size
+  // so first-loaded cleaners get consistent colors. Realtime updates
+  // (which call this with a single cleaner) preserve existing colors
+  // when possible by checking cleanerDB[c.id] first.
+  var colors=[['var(--brand-200)','var(--brand-700)'],['#B5D4F4','#0C447C'],['#CECBF6','#3C3489'],['#FAC775','#633806'],['#F5C4B3','#712B13'],['#F4C0D1','#72243E']];
+  var existing=(typeof cleanerDB!=='undefined' && cleanerDB[c.id])||null;
+  var col=existing ? [existing.bg, existing.fg] : colors[Object.keys(typeof cleanerDB!=='undefined'?cleanerDB:{}).length%colors.length];
+  var initials=(c.name||'').split(' ').map(function(w){return w[0]||'';}).join('').slice(0,2).toUpperCase();
+  return {
+    id: c.id,
+    name: c.name||'',
+    role: (c.role||'Cleaner')+' \u00b7 '+(c.island||'Oahu'),
+    initials: initials,
+    bg: col[0], fg: col[1],
+    phone: c.phone||'\u2014',
+    email: c.email||'\u2014',
+    loc: c.location||c.island||'\u2014',
+    start: c.start_date?new Date(c.start_date+'T12:00:00').toLocaleDateString('en-US',{month:'short',year:'numeric'}):'\u2014',
+    // RATE NORMALIZATION — always a string in '$N/hr' format. This was
+    // the source of the cleaner-dropdown crash. NEVER store as raw number.
+    rate: '$'+(c.hourly_rate||c.rate_legacy||16)+'/hr',
+    rate_regular: c.rate_regular_cents ? '$'+(c.rate_regular_cents/100)+'/hr' : undefined,
+    rate_deep: c.rate_deep_cents ? '$'+(c.rate_deep_cents/100)+'/hr' : undefined,
+    rate_moveout: c.rate_moveout_cents ? '$'+(c.rate_moveout_cents/100)+'/hr' : undefined,
+    week: existing ? existing.week : '0 hrs',
+    month: existing ? existing.month : '0 hrs',
+    paid: existing ? existing.paid : '$0',
+    jobs: existing ? existing.jobs : '0',
+    alltime: existing ? existing.alltime : '0',
+    islands: c.island||c.islands||'Oahu',
+    bgcheck: c.background_check||'Not started',
+    notes: c.notes||'\u2014',
+    status: c.status||'Active',
+  };
+}
+
 function _leadRowToDb(l){
   return {
     name:l.name, contact:l.contact_name||l.name,
@@ -3506,26 +3563,12 @@ async function loadAllData(){
     });
 
     // ── Process cleaners (independent) ───────────────────────────────────
+    // Use _cleanerRowToDb helper to ensure consistent shape across all
+    // cleanerDB writers. Bug fix 2026-05-08: previously each writer built
+    // entries inline with slightly different shapes, causing dropdown
+    // crashes. Helper is defined above near _leadRowToDb.
     cleaners.forEach(function(c){
-      const initials=c.name.split(' ').map(function(w){return w[0]||'';}).join('').slice(0,2).toUpperCase();
-      const colors=[['var(--brand-200)','var(--brand-700)'],['#B5D4F4','#0C447C'],['#CECBF6','#3C3489'],['#FAC775','#633806'],['#F5C4B3','#712B13'],['#F4C0D1','#72243E']];
-      const col=colors[Object.keys(cleanerDB).length%colors.length];
-      cleanerDB[c.id]={
-        name:c.name, role:(c.role||'Cleaner')+' · '+(c.island||'Oahu'),
-        initials:initials, bg:col[0], fg:col[1],
-        phone:c.phone||'—', email:c.email||'—',
-        loc:c.location||'—',
-        start:c.start_date?new Date(c.start_date+'T12:00:00').toLocaleDateString('en-US',{month:'short',year:'numeric'}):'—',
-        rate:'$'+(c.hourly_rate||16)+'/hr',
-        rate_regular: c.rate_regular_cents ? '$'+(c.rate_regular_cents/100)+'/hr' : undefined,
-        rate_deep: c.rate_deep_cents ? '$'+(c.rate_deep_cents/100)+'/hr' : undefined,
-        rate_moveout: c.rate_moveout_cents ? '$'+(c.rate_moveout_cents/100)+'/hr' : undefined,
-        week:'0 hrs', month:'0 hrs', paid:'$0',
-        jobs:'0', alltime:'0', islands:c.island||'Oahu',
-        bgcheck:c.background_check||'Not started',
-        notes:c.notes||'—',
-        status:c.status||'Active'
-      };
+      cleanerDB[c.id] = _cleanerRowToDb(c);
     });
 
     // ── Process leads first so the pipeline view can render before
@@ -9426,7 +9469,7 @@ function setPeriod(btn){
           if(typeof dbLoadCleaners === 'function'){
             try { var cs = await dbLoadCleaners(); (cs||[]).forEach(function(c){
               if(typeof cleanerDB==='undefined') window.cleanerDB = {};
-              cleanerDB[c.id] = { id:c.id, name:c.name, role:c.role||'Cleaner · '+(c.island||''), rate:'$'+(c.hourly_rate||0)+'/hr', rate_regular: c.rate_regular_cents ? '$'+(c.rate_regular_cents/100)+'/hr' : undefined, rate_deep: c.rate_deep_cents ? '$'+(c.rate_deep_cents/100)+'/hr' : undefined, rate_moveout: c.rate_moveout_cents ? '$'+(c.rate_moveout_cents/100)+'/hr' : undefined, islands:c.island||'', email:c.email, phone:c.phone };
+              cleanerDB[c.id] = _cleanerRowToDb(c);
             }); } catch(e){ console.warn('bootstrap cleaners', e); }
           }
         }
@@ -22501,12 +22544,11 @@ async function _hncFullSyncFromRealtime(reason) {
     if (typeof cleanerDB === 'object' && Array.isArray(cleaners)) {
       Object.keys(cleanerDB).forEach(function(k){ delete cleanerDB[k]; });
       cleaners.forEach(function(c){
-        cleanerDB[c.id] = {
-          name: c.name, phone: c.phone || '', email: c.email || '',
-          islands: c.islands || c.island || '',
-          rate: c.hourly_rate || c.rate || 0,
-          active: c.active !== false
-        };
+        // Use _cleanerRowToDb for consistency. This was previously the
+        // BUGGY writer that stored rate as a raw number, causing the
+        // dropdown TypeError crash. The helper guarantees rate is a
+        // string in '$N/hr' format.
+        cleanerDB[c.id] = _cleanerRowToDb(c);
       });
     }
     // Now rebuild appointments view (uses fresh clientDB + cleanerDB)

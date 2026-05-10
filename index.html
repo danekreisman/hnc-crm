@@ -20484,7 +20484,20 @@ async function loadTasks() {
     _tasks.done = (doneRes.data || []).map(enrich);
     renderTasks();
   } catch(e) {
+    // Was console.error only — silent in production. Promoted to
+    // _logFrontendError 2026-05-09 because if loadTasks fails, the
+    // public-booking banner (which reads from _tasks.open) silently
+    // goes empty and Dane has no visibility into pending booking
+    // requests. Any future failure here appears in the Recent Errors
+    // panel and the Settings nav badge.
     console.error('loadTasks error', e);
+    try {
+      if (typeof _logFrontendError === 'function') {
+        _logFrontendError('loadTasks', (e && e.message) || String(e), e && e.stack, {
+          user_url: location.href.slice(0, 200),
+        });
+      }
+    } catch(_){}
   }
 }
 
@@ -20530,9 +20543,28 @@ function renderTasks() {
 function renderPublicBookingBanner() {
   var el = document.getElementById('public-booking-banner');
   if (!el) return;
-  var tasks = ((_tasks && _tasks.open) || []).filter(function(t){
-    return t.type === 'review_public_booking' && t.extracted_data;
+  var allReviewTasks = ((_tasks && _tasks.open) || []).filter(function(t){
+    return t.type === 'review_public_booking';
   });
+  var tasks = allReviewTasks.filter(function(t){ return !!t.extracted_data; });
+
+  // Defensive: if a review_public_booking task is in _tasks.open but is
+  // missing extracted_data, the banner silently filters it out and the
+  // user has no idea a booking is pending. Log it so we can fix the
+  // upstream cause. Added 2026-05-09.
+  if (allReviewTasks.length > tasks.length) {
+    try {
+      if (typeof _logFrontendError === 'function') {
+        var dropped = allReviewTasks.filter(function(t){ return !t.extracted_data; }).map(function(t){ return t.id; });
+        _logFrontendError('renderPublicBookingBanner', 'review_public_booking task missing extracted_data', null, {
+          dropped_task_ids: dropped,
+          total_review_tasks: allReviewTasks.length,
+          rendered: tasks.length,
+        });
+      }
+    } catch(_){}
+  }
+
   if (!tasks.length) { el.style.display = 'none'; el.innerHTML = ''; return; }
 
   // Sort: rush requests first (highest fee → lowest), then by requested

@@ -384,7 +384,7 @@ export default async function handler(req, res) {
       });
     }
 
-    // ── 6/7/8. Notifications: in-app bell + push + owner email ─────────────
+    // ── 6/7/8/9. Notifications: in-app bell + push + owner email + owner SMS ─
     // CRITICAL: these were fire-and-forget. On Vercel serverless, the runtime
     // can freeze the function as soon as `res.status(200).json(...)` returns,
     // which kills any in-flight fetches. Kai Hammond's booking (2026-05-09)
@@ -394,6 +394,14 @@ export default async function handler(req, res) {
     // failing path doesn't block the others. Each task already has its own
     // try/catch + logError so the customer-facing booking submit never fails
     // because of a downstream notification glitch.
+    //
+    // SMS-to-owner is ADDED as the absolute floor (added 2026-05-09 after
+    // Kai's booking missed every other channel). This path goes through
+    // OpenPhone via /api/send-sms which is independent of the bell/push/email
+    // stack — even if every other layer breaks silently in the future, the
+    // SMS still buzzes Dane's phone. Treat it as the contract: "every public
+    // booking will at minimum send an SMS to the owner before this function
+    // returns 200." If the SMS fails, that's logged loudly (logError).
     const inAppNotifyPromise = (async () => {
       try {
         await fetchWithTimeout(`${process.env.SUPABASE_URL}/rest/v1/notifications`, {
@@ -446,7 +454,37 @@ export default async function handler(req, res) {
       logError('submit-public-booking:owner-email', err, { leadId });
     });
 
-    await Promise.allSettled([inAppNotifyPromise, pushNotifyPromise, ownerEmailPromise]);
+    // Owner SMS — independent fallback. Mirrors lead-capture.js pattern.
+    const OWNER_PHONE = '+18084685356';
+    const smsLines = [
+      'Booking request' + (rushTag ? rushTag : '') + ': ' + cleanName,
+      cleanPhoneDigits ? '\u00B7 ' + cleanPhoneDigits : null,
+      '\u00B7 ' + b.service + (b.frequency ? ' (' + b.frequency + ')' : ''),
+      '\u00B7 ' + prettyReq,
+      displayTotal != null ? '\u00B7 $' + displayTotal.toFixed(2) : null,
+      b.path === 'existing_property' ? '\u00B7 returning client' : '\u00B7 new lead',
+      '',
+      'Review: hnc-crm.vercel.app/#tasks',
+    ].filter(Boolean).join(' ').replace(/\s+\u00B7/g, '\n\u00B7'); // newline before each bullet for readability
+
+    const ownerSmsPromise = fetchWithTimeout(`${BASE_URL}/api/send-sms`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ to: OWNER_PHONE, message: smsLines }),
+    }, TIMEOUTS.OPENPHONE).then(async (r) => {
+      // send-sms returns 200 on OpenPhone success; surface non-2xx as an error
+      // so the panel shows it. The body is small so reading it is cheap.
+      if (!r.ok) {
+        const body = await r.text().catch(() => '<unreadable>');
+        await logError('submit-public-booking:owner-sms', new Error('send-sms ' + r.status), {
+          leadId, taskRowId, body: body.slice(0, 500),
+        });
+      }
+    }).catch(async (err) => {
+      await logError('submit-public-booking:owner-sms', err, { leadId, taskRowId });
+    });
+
+    await Promise.allSettled([inAppNotifyPromise, pushNotifyPromise, ownerEmailPromise, ownerSmsPromise]);
 
     // ── 9. Done ────────────────────────────────────────────────────────────
     return res.status(200).json({

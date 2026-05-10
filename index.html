@@ -16059,7 +16059,6 @@ function openApptInvoice(){
   var termsSel=document.getElementById('appt-inv-terms');
   termsSel.value=isCommercial?'net30':'now';
   openOverlay('appt-invoice-overlay');
-  try { _refreshFollowupSection('invoice'); } catch(e){ console.warn('followup section render failed:', e); }
 }
 
 async function sendApptInvoice(method){
@@ -16163,22 +16162,36 @@ async function sendApptInvoice(method){
 
     // Send SMS to client phone (always — gives them the payment link)
     if(clientPhone&&clientPhone!=='—'){
+      // amount is passed WITHOUT a leading $ because the default
+      // smsInvoice template has '${amount}' (literal $ before the
+      // placeholder). Passing '$X.XX' produced '$$X.XX' in the
+      // delivered text. The defensive replace below collapses any
+      // remaining $$ in case a custom template doesn't have the
+      // literal $ — covers both shapes.
+      var smsAmount = amountNum.toFixed(2);
+      var smsMessage = (typeof messageTemplates!=='undefined'&&messageTemplates.smsInvoice)
+        ? applyTemplate(messageTemplates.smsInvoice,{clientName:clientName,amount:smsAmount,invoiceLink:invoiceUrl})
+        : ('Your cleaning invoice for $'+smsAmount+' is ready: '+invoiceUrl);
+      smsMessage = smsMessage.replace(/\$\$+/g, '$');
       fetch('/api/send-sms',{
         method:'POST',
         headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({to:clientPhone,message:(typeof messageTemplates!=='undefined'&&messageTemplates.smsInvoice)?applyTemplate(messageTemplates.smsInvoice,{clientName:clientName,amount:'$'+amountNum.toFixed(2),invoiceLink:invoiceUrl}):('Your cleaning invoice is ready: '+invoiceUrl)})
+        body:JSON.stringify({to:clientPhone,message:smsMessage})
       }).then(function(r){return r.json();}).then(function(d){
         console.log('[sendApptInvoice] SMS result:', JSON.stringify(d));
-      }).catch(function(e){console.error('[sendApptInvoice] SMS error:',e);});
+        if (d && d.success) {
+          if (typeof showToast === 'function') showToast('Invoice link sent via SMS to ' + clientPhone);
+        } else {
+          if (typeof showToast === 'function') showToast('Invoice SMS failed: ' + (d && d.error ? d.error : 'unknown'), true);
+        }
+      }).catch(function(e){
+        console.error('[sendApptInvoice] SMS error:',e);
+        if (typeof showToast === 'function') showToast('Invoice SMS error: ' + (e.message || e), true);
+      });
     }
 
     // Update invoice table UI
     addToInvoiceTable(clientName, cd.service||'Cleaning service', '$'+amountNum.toFixed(2), terms);
-
-    // Optional post-clean follow-up SMS — fired before the close-
-    // timeout so the toast appears in the same beat as the invoice
-    // success bar. Skipped silently if the checkbox isn't checked.
-    try { await _maybeSendChargeFollowup('invoice'); } catch(e){ console.warn('invoice followup error:', e); }
 
     // Show success and close
     var s=document.getElementById('appt-inv-success');
@@ -20009,21 +20022,6 @@ Your total will update automatically when you select a payment method.</textarea
       <div style="background:var(--brand-50);border:1px solid #9ae6b4;border-radius:10px;padding:11px 13px;margin-bottom:14px;">
         <div style="font-size:11px;font-weight:600;color:#276749;margin-bottom:6px;">ACH payment incentive included</div>
         <div style="font-size:11px;color:#276749;line-height:1.6;">The invoice will show clients both payment options:<br>&#x2022; ACH bank transfer — FREE<br>&#x2022; Card, Apple Pay, Cash App, Klarna, or Link — no extra fee</div>
-      </div>
-
-      <!-- Post-clean follow-up SMS — same UX as the charge modal. The
-           message wording differs ("Sent the invoice for $X" vs
-           "Charged the card on file for $X") but the section, the
-           checkbox, and the editable preview all behave the same. -->
-      <div id="invoice-followup-section" style="display:none;background:var(--brand-50);border:1px solid #9ae6b4;border-radius:10px;padding:12px 13px;margin-bottom:14px;">
-        <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;">
-          <input type="checkbox" id="invoice-followup-chk" style="margin-top:3px;flex-shrink:0;">
-          <span style="flex:1;">
-            <span style="font-size:13px;font-weight:600;color:#276749;display:block;">Send post-clean follow-up SMS</span>
-            <span id="invoice-followup-recipient" style="font-size:11px;color:#276749;display:block;margin-top:2px;"></span>
-          </span>
-        </label>
-        <textarea id="invoice-followup-msg" style="width:100%;margin-top:10px;min-height:120px;padding:10px;border:1px solid #9ae6b4;border-radius:8px;font-size:12px;line-height:1.5;font-family:inherit;color:var(--text);background:#fff;display:none;" placeholder="Follow-up message preview"></textarea>
       </div>
 
       <div class="save-bar">

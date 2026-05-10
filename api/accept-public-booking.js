@@ -223,12 +223,19 @@ export default async function handler(req, res) {
     // ── 4. Optional: send confirmation email to customer ────────────────
     // Default OFF — keeps testing safe. Frontend opts in explicitly via
     // sendEmail: true in the request body.
+    //
+    // 2026-05-10: also writes appointments.confirmation_sent_at on
+    // successful send, so the appointment-modal's "Last sent" indicator
+    // reflects ALL confirmation sends (any trigger), not just manual ones.
+    // Per Dane's design call: customer's perspective is "did I get the
+    // email?" — they don't care which button triggered it.
     if (sendEmail === true && x.email) {
       let prettyDate = date;
       try { prettyDate = new Date(date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }); } catch (_e) {}
       const totalLine = totalPost != null ? `$${Number(totalPost).toFixed(2)}` : null;
+      let emailSent = false;
       try {
-        await fetchWithTimeout(`${BASE_URL}/api/send-email`, {
+        const r = await fetchWithTimeout(`${BASE_URL}/api/send-email`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -245,9 +252,23 @@ export default async function handler(req, res) {
             rushNote:   rushFee > 0 ? `A ${rushFee === 200 ? 'same-day' : rushFee === 100 ? 'next-day' : '2-day'} booking fee of $${rushFee} is included in your total.` : null,
           }),
         }, TIMEOUTS.RESEND);
+        emailSent = !!(r && r.ok);
       } catch (err) {
         await logError('accept-public-booking:confirm-email', err, { taskId, email: x.email });
         // Don't fail — the appointment is already saved.
+      }
+      if (emailSent && appointmentId) {
+        // Audit row reflects all confirmation sends, not just manual ones.
+        // Best-effort — failure here doesn't unwind the email or the booking.
+        try {
+          const sentAt = new Date().toISOString();
+          await db
+            .from('appointments')
+            .update({ confirmation_sent_at: sentAt })
+            .eq('id', appointmentId);
+        } catch (auditErr) {
+          await logError('accept-public-booking:confirm-audit', auditErr, { taskId, appointmentId });
+        }
       }
     }
 

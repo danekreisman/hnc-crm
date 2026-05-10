@@ -111,6 +111,21 @@ export default async function handler(req, res) {
         if (resp.ok) {
           // Mark so we never send this reminder again
           await db.from('clients').update({ policy_reminder_sent_at: new Date().toISOString() }).eq('id', client.id);
+          // 2026-05-10: also stamp waiver_sent_at on the upcoming
+          // appointment we referenced, so the appointment-modal's
+          // "Last sent" indicator reflects ALL waiver sends regardless
+          // of trigger. Best-effort — failure here doesn't unwind the
+          // SMS or the per-client send marker.
+          if (upcoming && upcoming.id) {
+            try {
+              await db
+                .from('appointments')
+                .update({ waiver_sent_at: new Date().toISOString() })
+                .eq('id', upcoming.id);
+            } catch (auditErr) {
+              await logError('run-policy-reminders:waiver-audit', auditErr, { clientId: client.id, apptId: upcoming.id });
+            }
+          }
           sent++;
           console.log(`[run-policy-reminders] Sent policy link to ${client.name}`);
         } else {

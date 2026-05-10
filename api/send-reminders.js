@@ -85,6 +85,12 @@ export default async function handler(req, res) {
     console.log(`[send-reminders] Found ${appointments.length} appointment(s) for ${tomorrowStr}`);
 
     let customersSent = 0, cleanersSent = 0, errors = [];
+    // Track appointment ids whose customer SMS landed successfully —
+    // we'll batch the audit write at the end so a slow update doesn't
+    // hold up the rest of the cron loop. 2026-05-10: per Dane's design
+    // call, reminder_sent_at on appointments tracks ALL sends (cron OR
+    // manual), not just manual.
+    const reminderSentApptIds = [];
 
     for (const appt of appointments) {
       const client   = appt.clients;
@@ -111,6 +117,7 @@ export default async function handler(req, res) {
 
           if (r.ok) {
             customersSent++;
+            reminderSentApptIds.push(appt.id);
             console.log(`[send-reminders] Customer SMS sent to ${firstName} (${e164})`);
           } else {
             throw new Error(`SMS API returned ${r.status}`);
@@ -148,6 +155,25 @@ export default async function handler(req, res) {
         }
       }
     }
+
+  // Batch-update reminder_sent_at on every appointment that successfully
+  // received a customer SMS in this run. One UPDATE with an `in` filter
+  // keeps it cheap regardless of run size. Failure here doesn't fail
+  // the cron — the SMS already went out.
+  if (reminderSentApptIds.length > 0) {
+    try {
+      const sentAt = new Date().toISOString();
+      const { error: upErr } = await db
+        .from('appointments')
+        .update({ reminder_sent_at: sentAt })
+        .in('id', reminderSentApptIds);
+      if (upErr) {
+        await logError('send-reminders:audit-update', upErr, { count: reminderSentApptIds.length });
+      }
+    } catch (auditErr) {
+      await logError('send-reminders:audit-update', auditErr, { count: reminderSentApptIds.length });
+    }
+  }
 
   await logActivity('reminders_sent','Day-before appointment reminders sent',{count:results?.length||0});
     return res.status(200).json({

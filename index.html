@@ -11538,6 +11538,7 @@ async function loadRecentErrors(showAll){
     var resp = await db.from('error_logs')
       .select('id, source, message, stack, context, occurred_at, resolved')
       .gte('occurred_at', cutoff)
+      .not('source', 'like', 'stripe-charge-success%')
       .order('occurred_at', { ascending: false })
       .limit(100);
     if (resp.error) {
@@ -11699,7 +11700,8 @@ async function _updateErrorBadge(){
     var lastViewed = localStorage.getItem('hnc_errors_last_viewed') || '1970-01-01T00:00:00Z';
     var resp = await db.from('error_logs')
       .select('id', { count: 'exact', head: true })
-      .gt('occurred_at', lastViewed);
+      .gt('occurred_at', lastViewed)
+      .not('source', 'like', 'stripe-charge-success%');
     if (resp.error) return;
     var count = resp.count || 0;
     if (count > 0) {
@@ -16639,9 +16641,21 @@ async function executeCharge(){
       service: (currentApptData && currentApptData.service) || 'Cleaning',
     };
     if (action === 'charge_specific_card') body.paymentMethodId = selectedPmId;
+    // Capture the signed-in user email for the audit row. The
+    // backend's charge-success log reads req.body._authedEmail to
+    // populate requesting_user_email in error_logs. The Authorization
+    // header is what requireAdmin actually gates on; _authedEmail is
+    // just so the audit row reflects who clicked the button.
+    var session = await db.auth.getSession();
+    var token = session && session.data && session.data.session ? session.data.session.access_token : null;
+    var authedEmail = session && session.data && session.data.session && session.data.session.user ? session.data.session.user.email : null;
+    if (authedEmail) body._authedEmail = authedEmail;
     var resp = await fetch('/api/stripe-invoice', {
       method: 'POST',
-      headers: {'Content-Type':'application/json'},
+      headers: Object.assign(
+        {'Content-Type':'application/json'},
+        token ? {'Authorization':'Bearer ' + token} : {}
+      ),
       body: JSON.stringify(body),
     });
     var data = await resp.json();
@@ -16664,6 +16678,12 @@ async function executeCharge(){
     } catch(e){ console.warn('insert invoice err', e); }
     closeOverlay('appt-charge-overlay');
     if (sb) { sb.textContent = '$' + amount.toFixed(2) + ' collected from ' + clientName + '!'; sb.classList.add('show'); setTimeout(function(){ sb.classList.remove('show'); }, 3000); }
+    // Big-deal celebration — Dane specifically asked for an obvious
+    // confirmation since the modal-close-only feedback felt
+    // ambiguous. Fires alongside the success bar (belt + suspenders).
+    if (typeof showCelebrationToast === 'function') {
+      showCelebrationToast('Card Charged!', '$' + amount.toFixed(2) + ' from ' + clientName);
+    }
     // Fire the optional post-clean follow-up SMS. Best-effort — the
     // charge has already succeeded and been audited. Errors get
     // toasted but don't roll back anything.
@@ -21299,6 +21319,38 @@ function showToast(msg, isError) {
   t.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:'+(isError?'#ef4444':'#22c55e')+';color:#fff;padding:10px 20px;border-radius:999px;font-size:13px;font-weight:600;z-index:99999;box-shadow:0 4px 16px rgba(0,0,0,.2);';
   document.body.appendChild(t);
   setTimeout(function(){ t.remove(); }, 3500);
+}
+
+/* ── Celebration toast — used for big-deal successes (charges, etc) ───
+   Bigger, centered-on-screen briefly, sparkle decoration, scale-in
+   animation, longer dwell. Reserved for moments where a regular
+   toast feels too quiet — money landing in your account is the
+   canonical example.
+   Usage: showCelebrationToast('Card Charged!', '$250 from Sarah');
+*/
+function showCelebrationToast(title, subtitle) {
+  var t = document.createElement('div');
+  t.innerHTML = ''
+    + '<div style="font-size:42px;line-height:1;margin-bottom:8px;">\u2728</div>'
+    + '<div style="font-size:18px;font-weight:700;color:#fff;margin-bottom:4px;">' + (title || 'Success!') + '</div>'
+    + (subtitle ? '<div style="font-size:13px;color:#dcfce7;">' + subtitle + '</div>' : '');
+  t.style.cssText = ''
+    + 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) scale(0.6);'
+    + 'background:linear-gradient(135deg,#16a34a 0%,#22c55e 100%);'
+    + 'color:#fff;padding:24px 36px;border-radius:18px;text-align:center;'
+    + 'z-index:99999;box-shadow:0 12px 36px rgba(34,197,94,.5),0 0 0 6px rgba(34,197,94,.18);'
+    + 'opacity:0;transition:opacity 220ms ease, transform 280ms cubic-bezier(0.34,1.56,0.64,1);'
+    + 'pointer-events:none;';
+  document.body.appendChild(t);
+  // Force reflow so the transition fires.
+  void t.offsetWidth;
+  t.style.opacity = '1';
+  t.style.transform = 'translate(-50%,-50%) scale(1)';
+  setTimeout(function(){
+    t.style.opacity = '0';
+    t.style.transform = 'translate(-50%,-50%) scale(0.95)';
+    setTimeout(function(){ t.remove(); }, 240);
+  }, 2200);
 }
 </script>
   <script src="/gcal-sync.js?v=1"></script>

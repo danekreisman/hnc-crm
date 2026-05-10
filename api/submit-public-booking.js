@@ -428,13 +428,20 @@ export default async function handler(req, res) {
     const pushNotifyPromise = (async () => {
       try {
         const { sendPushToAllSubscribed } = await import('./utils/send-push.js');
-        await sendPushToAllSubscribed({
+        const result = await sendPushToAllSubscribed({
           title: 'Booking request \u2014 ' + cleanName + rushTag,
           body: prettyReq + ' \u00b7 ' + b.service + (displayTotal != null ? ' \u00b7 $' + displayTotal.toFixed(2) : ''),
           url: '/#tasks',
           tag: 'public-booking-' + (leadId || b.clientId || phone10),
           urgency: 'high',
         });
+        // Log when sent: 0 — that's the silent-failure case (no active
+        // subscriptions, all dead, VAPID misconfig, etc).
+        if (!result || result.sent === 0) {
+          await logError('submit-public-booking:push-notify-zero-sent', new Error('Push sent to 0 devices'), {
+            leadId, taskRowId, result: result || null,
+          });
+        }
       } catch (err) {
         await logError('submit-public-booking:push-notify', err, { leadId, taskRowId });
       }
@@ -454,13 +461,8 @@ export default async function handler(req, res) {
       logError('submit-public-booking:owner-email', err, { leadId });
     });
 
-    // Owner SMS — independent fallback. Mirrors lead-capture.js pattern.
-    // 2026-05-09: changed from '+18084685356' (HNC OpenPhone business line)
-    // to '+18082697636' (Dane's personal). OpenPhone refuses to deliver
-    // self-to-self messages — QUO_NUMBER (sender) is the same business line,
-    // so messages to the business line fail silently. Dane's personal number
-    // is a distinct device on a distinct line; OpenPhone delivers fine.
-    const OWNER_PHONE = '+18082697636';
+    // Owner SMS — HNC business line (same as lead-capture pattern).
+    const OWNER_PHONE = '+18084685356';
     const smsLines = [
       'Booking request' + (rushTag ? rushTag : '') + ': ' + cleanName,
       cleanPhoneDigits ? '\u00B7 ' + cleanPhoneDigits : null,

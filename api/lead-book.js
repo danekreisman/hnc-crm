@@ -325,7 +325,7 @@ export default async function handler(req, res) {
     const pushNotifyPromise = (async () => {
       try {
         const { sendPushToAllSubscribed } = await import('./utils/send-push.js');
-        await sendPushToAllSubscribed({
+        const result = await sendPushToAllSubscribed({
           title: 'Booking request \u2014 ' + cleanName + rushTag,
           body: prettyReq + ' \u00b7 ' + (lead.service || service || 'Cleaning')
                 + (displayTotal != null ? ' \u00b7 $' + displayTotal.toFixed(2) : ''),
@@ -333,6 +333,14 @@ export default async function handler(req, res) {
           tag: 'public-booking-' + lead.id,
           urgency: 'high',
         });
+        // sendPushToAllSubscribed returns { sent, removed, errors }. Log the
+        // result if sent === 0 — that's the silent-failure case (no active
+        // subscriptions, all subscriptions dead, VAPID misconfig, etc).
+        if (!result || result.sent === 0) {
+          await logError('lead-book:push-notify-zero-sent', new Error('Push sent to 0 devices'), {
+            leadId: lead.id, taskRowId, result: result || null,
+          });
+        }
       } catch (err) {
         await logError('lead-book:push-notify', err, { leadId: lead.id, taskRowId });
       }
@@ -353,9 +361,8 @@ export default async function handler(req, res) {
       logError('lead-book:owner-email', err, { leadId: lead.id });
     });
 
-    // Personal phone — OpenPhone refuses self-to-self, so this CAN'T be the
-    // HNC business line.
-    const OWNER_PHONE = '+18082697636';
+    // Owner SMS — HNC business line (same as lead-capture pattern).
+    const OWNER_PHONE = '+18084685356';
     const smsLines = [
       'Booking request' + (rushTag ? rushTag : '') + ': ' + cleanName,
       lead.phone ? '\u00B7 ' + lead.phone : null,

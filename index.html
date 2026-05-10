@@ -1939,7 +1939,7 @@ Mahalo 🌺</textarea>
           </div>
           <div class="form-two">
             <div class="form-row"><label>Phone</label><input type="tel" id="na-phone" placeholder="(808) 555-0000" oninput="fmtPhone(this)"></div>
-            <div class="form-row"><label>Email</label><input type="email" id="na-email" placeholder="client@email.com"></div>
+            <div class="form-row"><label>Email</label><input type="email" id="na-email" placeholder="client@email.com" oninput="_refreshNaNotifyRows()"></div>
           </div>
           <div class="form-row" id="na-existing-client-row">
             <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:normal;font-size:13px;color:var(--text-muted);">
@@ -1983,7 +1983,7 @@ Mahalo 🌺</textarea>
             <div class="form-row"><label>Time</label><input type="time" id="na-time" value="08:00" onchange="this.blur()"></div>
           </div>
           <div class="form-row"><label>Assign cleaner</label>
-            <select id="na-cleaner" onchange="calcPrice()">
+            <select id="na-cleaner" onchange="calcPrice();_refreshNaNotifyRows();">
               <option value="unassigned">Leave unassigned</option>
             </select>
           </div>
@@ -2125,6 +2125,23 @@ Mahalo 🌺</textarea>
           </div>
         </div>
       </details>
+      <!-- Send notifications on book — fires after the appointment saves
+           successfully. The client confirmation row hides when no email
+           is on file; the cleaner notify row hides when "unassigned" is
+           selected. Both default to checked since booking-time is the
+           expected moment to send these. Wired to saveNewAppt's success
+           branch (one-time AND recurring paths). -->
+      <div id="na-notify-panel" style="border:1px solid var(--border);border-radius:10px;padding:12px 13px;margin-top:14px;background:var(--bg-soft);">
+        <div style="font-size:12px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;">Send on book</div>
+        <label id="na-notify-client-row" style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;padding:4px 0;">
+          <input type="checkbox" id="na-notify-client" checked style="margin-top:3px;flex-shrink:0;">
+          <span style="flex:1;font-size:13px;color:var(--text);">Send booking confirmation email to client</span>
+        </label>
+        <label id="na-notify-cleaner-row" style="display:none;align-items:flex-start;gap:8px;cursor:pointer;padding:4px 0;border-top:1px dashed var(--border);margin-top:4px;padding-top:8px;">
+          <input type="checkbox" id="na-notify-cleaner" checked style="margin-top:3px;flex-shrink:0;">
+          <span style="flex:1;font-size:13px;color:var(--text);">Notify cleaner of new assignment via SMS</span>
+        </label>
+      </div>
       <div class="save-bar">
         <button class="btn btn-primary" onclick="saveNewAppt()">Book appointment</button>
         <button class="btn" onclick="closeOverlay('new-appt-overlay')">Cancel</button>
@@ -9778,6 +9795,89 @@ function fmtPrice(v){
   return isNaN(n)?'—':'$'+n.toFixed(2);
 }
 
+/* ── New-appt notify rows visibility ───────────────────────────────
+   The "Send on book" panel has two checkboxes:
+     - Send confirmation to client (needs an email)
+     - Notify cleaner via SMS (needs a non-unassigned cleaner)
+   Each row hides when the prerequisite field isn't set. Wired to
+   the cleaner select + email input. Called once on overlay open
+   so initial state is correct.
+*/
+function _refreshNaNotifyRows(){
+  var clientRow  = document.getElementById('na-notify-client-row');
+  var cleanerRow = document.getElementById('na-notify-cleaner-row');
+  if (clientRow) {
+    var emailEl = document.getElementById('na-email');
+    var hasEmail = !!(emailEl && emailEl.value && emailEl.value.trim());
+    clientRow.style.display = hasEmail ? 'flex' : 'none';
+  }
+  if (cleanerRow) {
+    var clEl = document.getElementById('na-cleaner');
+    var clVal = clEl && clEl.value;
+    var assigned = !!(clVal && clVal !== 'unassigned');
+    cleanerRow.style.display = assigned ? 'flex' : 'none';
+  }
+}
+
+/* ── Send-on-book firing helper ───────────────────────────────────
+   Called by saveNewAppt after the appointment row is in DB and we
+   have a dbId. Reads the two checkboxes, fires the matching
+   manual-send-* endpoints. Best-effort: errors get toasted but
+   don't unwind the booking. Idempotent guards (hidden rows return
+   false at the checkbox.checked read since they default unchecked
+   only via DOM removal — here they default checked but hidden).
+*/
+async function _maybeSendOnBook(apptDbId){
+  if (!apptDbId) return;
+  var clientChk  = document.getElementById('na-notify-client');
+  var cleanerChk = document.getElementById('na-notify-cleaner');
+  var clientRow  = document.getElementById('na-notify-client-row');
+  var cleanerRow = document.getElementById('na-notify-cleaner-row');
+  // Visible AND checked — visible because the field they depend on
+  // is populated (email / assigned cleaner).
+  var wantClient  = !!(clientRow  && clientRow.style.display  !== 'none' && clientChk  && clientChk.checked);
+  var wantCleaner = !!(cleanerRow && cleanerRow.style.display !== 'none' && cleanerChk && cleanerChk.checked);
+  if (!wantClient && !wantCleaner) return;
+
+  var session;
+  try { session = await db.auth.getSession(); } catch(_){ session = null; }
+  var token = session && session.data && session.data.session ? session.data.session.access_token : null;
+  if (!token) {
+    if (typeof showToast === 'function') showToast('Booking saved, but notifications skipped — not signed in.', true);
+    return;
+  }
+
+  // Fire both in parallel — independent endpoints, no ordering needed.
+  var tasks = [];
+  if (wantClient) {
+    tasks.push(fetch('/api/manual-send-confirmation', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({ appointmentId: apptDbId }),
+    }).then(function(r){ return r.json().then(function(d){ return { kind:'client', ok: r.ok && d.success, data: d }; }); })
+      .catch(function(err){ return { kind:'client', ok:false, data:{ error: err.message } }; }));
+  }
+  if (wantCleaner) {
+    tasks.push(fetch('/api/manual-send-cleaner-job', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({ appointmentId: apptDbId, mode: 'assigned' }),
+    }).then(function(r){ return r.json().then(function(d){ return { kind:'cleaner', ok: r.ok && d.success, data: d }; }); })
+      .catch(function(err){ return { kind:'cleaner', ok:false, data:{ error: err.message } }; }));
+  }
+
+  var results = await Promise.all(tasks);
+  results.forEach(function(r){
+    var label = r.kind === 'client' ? 'Client confirmation' : 'Cleaner notification';
+    if (r.ok) {
+      if (typeof showToast === 'function') showToast(label + ' sent');
+    } else {
+      var msg = (r.data && r.data.error) || 'failed';
+      if (typeof showToast === 'function') showToast(label + ' failed: ' + msg, true);
+    }
+  });
+}
+
 async function saveNewAppt(){
   var name=document.getElementById('na-name').value;
   var dateVal=document.getElementById('na-date').value;
@@ -10060,6 +10160,10 @@ async function saveNewAppt(){
       if(!sbRes.error&&sbRes.data&&sbRes.data[0]){
         apptObj.dbId=sbRes.data[0].id;
         console.log('[saveNewAppt] Supabase one-time saved, dbId='+apptObj.dbId);
+        // Send-on-book notifications — fire after dbId resolves so the
+        // manual-send-* endpoints can look up the appointment. Best-
+        // effort; failures get toasted but don't roll back the booking.
+        try { _maybeSendOnBook(apptObj.dbId); } catch(_){}
         // Fire notification (phase 1, 2026-05-03). Broadcast to all admins.
         // Best-effort — if this insert fails, the booking still succeeded.
         if(typeof _fireNotification === 'function'){
@@ -10136,6 +10240,12 @@ async function saveNewAppt(){
       if(batchRes.data && batchRes.data[0]){
         apptObj.dbId=batchRes.data[0].id;
         console.log('[saveNewAppt] Supabase batch saved '+batchRows.length+' rows, first dbId='+apptObj.dbId);
+        // Send-on-book notifications for recurring: fire once, anchored
+        // to the FIRST occurrence (the upcoming clean). The confirmation
+        // email and cleaner SMS both reference that specific appt;
+        // sending one per occurrence would be 26+ pings for a weekly
+        // series.
+        try { _maybeSendOnBook(apptObj.dbId); } catch(_){}
       } else {
         console.log('[saveNewAppt] Supabase batch saved '+batchRows.length+' rows (no data returned, likely Prefer: return=minimal)');
       }
@@ -10362,6 +10472,7 @@ function handleTopCta(){
     openOverlay('new-appt-overlay');
     populateCleanerDropdown('na-cleaner');
     calcPrice();
+    try { _refreshNaNotifyRows(); } catch(_){}
   }
   else if(currentView==='pipeline'||currentView==='dashboard'){openOverlay('new-lead-overlay');}
   else if(currentView==='clients'){openOverlay('new-client-overlay');}
@@ -18160,6 +18271,7 @@ function scheduleLeadAppointment(){
     if(_ncChk) _ncChk.checked = false;
     populatePropertySelector(lead.name);
     calcPrice();
+    try { _refreshNaNotifyRows(); } catch(_){}
   }, 300);
 }
 

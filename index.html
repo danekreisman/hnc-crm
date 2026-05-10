@@ -15863,9 +15863,18 @@ async function confirmApptDuplicate(){
 /* ── Unified billing entry point ───────────────────────────────────────
    Replaces the previous two-button "Invoice client" / "Charge card on
    file" pattern. Single Charge button on the appointment view fires
-   this dispatcher, which checks for a Stripe customer + card, then
-   routes to the appropriate modal. No card → invoice modal opens
-   directly so Dane doesn't have to click "Send invoice instead."
+   this dispatcher, which resolves card-on-file state, then routes to
+   the appropriate modal. No card → invoice modal opens directly so
+   Dane doesn't have to click "Send invoice instead."
+
+   IMPORTANT: a Stripe customer ID is NECESSARY but NOT SUFFICIENT for
+   "card on file." Customers can exist without a saved payment method
+   (created e.g. when a past invoice was emailed but never paid by
+   card). Routing on customerId alone produced a flaky path where
+   clicking Charge would silently fail or close the modal. Use the
+   explicit _cardCache.hasCard flag when it's been populated; treat
+   absence as "unknown" and fall through to the modal — the modal
+   itself disables the [Charge card now] button on no-card.
 */
 async function openApptChargeOrInvoice(){
   if(!currentAppt) return;
@@ -15873,18 +15882,27 @@ async function openApptChargeOrInvoice(){
   var clientKey = Object.keys(clientDB).find(function(k){ return k.length>=30 && clientDB[k].name === clientName; });
   var client = clientKey ? clientDB[clientKey] : null;
 
-  // Fast path: client record already shows a Stripe customer id —
-  // assume card is on file (executeCharge does the actual lookup).
-  // Mirrors the existing updateApptChargeButtonState pattern, so the
-  // routing decision matches what the legacy two-button UI was doing.
-  var hasCard = !!(client && (client.stripeCustomerId || client.stripe_customer_id))
-             || !!(clientKey && window._cardCache && window._cardCache[clientKey] && window._cardCache[clientKey].hasCard);
-
-  if (hasCard) {
-    openApptCharge();
-  } else {
-    openApptInvoice();
+  // Prefer the explicit cache value when known: hasCard===true → charge,
+  // hasCard===false → invoice. The cache is the source of truth because
+  // it actually checked Stripe; the client.stripeCustomerId fallback is
+  // a hint, not a guarantee.
+  var cached = (clientKey && window._cardCache && window._cardCache[clientKey]) ? window._cardCache[clientKey] : null;
+  if (cached && typeof cached.hasCard === 'boolean') {
+    if (cached.hasCard) openApptCharge();
+    else                openApptInvoice();
+    return;
   }
+
+  // Unknown card state — kick off a probe (async) and route based on
+  // whatever signal we have. If a customer ID exists we open charge
+  // optimistically; the modal will disable the button if the probe
+  // lands no-card. If there's no customer ID at all, route to invoice.
+  if (client && client.email && typeof probeClientCardOnFile === 'function' && clientKey) {
+    try { probeClientCardOnFile(clientKey, client.email); } catch(_){}
+  }
+  var maybeHasCustomer = !!(client && (client.stripeCustomerId || client.stripe_customer_id));
+  if (maybeHasCustomer) openApptCharge();
+  else                  openApptInvoice();
 }
 
 /* ── Post-clean follow-up SMS helpers ──────────────────────────────────
@@ -16214,10 +16232,53 @@ async function sendApptInvoice(method){
   }
 }
 
+/* ── Charge button enable/disable state ───────────────────────────────
+   The [Charge card now] button must be enabled ONLY when there is
+   actually a card on file. Per Dane (2026-05-10): "We should fix it
+   so that I can't press that button unless there is a card on file."
+   Three possible states:
+     'enabled'   — card confirmed (cache says hasCard:true)
+     'disabled'  — card confirmed missing (cache says hasCard:false)
+     'checking'  — probe in flight; treat as disabled until resolved
+   Calling this is idempotent and safe to fire from anywhere.
+*/
+function _setChargeBtnState(state){
+  var btns = document.querySelectorAll('#appt-charge-overlay button');
+  var primary = null;
+  btns.forEach(function(b){
+    if (b && b.getAttribute('onclick') === 'executeCharge()') primary = b;
+  });
+  if (!primary) return;
+  var hint = document.getElementById('charge-no-card-hint');
+  if (state === 'enabled') {
+    primary.disabled = false;
+    primary.style.opacity = '';
+    primary.style.cursor = '';
+    primary.title = 'Charge the card on file';
+    primary.textContent = 'Charge card now';
+    if (hint) hint.style.display = 'none';
+  } else if (state === 'checking') {
+    primary.disabled = true;
+    primary.style.opacity = '0.5';
+    primary.style.cursor = 'wait';
+    primary.title = 'Checking for card on file…';
+    primary.textContent = 'Checking…';
+    if (hint) hint.style.display = 'none';
+  } else { // 'disabled'
+    primary.disabled = true;
+    primary.style.opacity = '0.4';
+    primary.style.cursor = 'not-allowed';
+    primary.title = 'No card on file — use Send invoice instead';
+    primary.textContent = 'Charge card now';
+    if (hint) hint.style.display = '';
+  }
+}
+
 function openApptCharge(){
   if(!currentAppt)return;
   var cd=currentApptData||{};
-  var client=clientDB[Object.keys(clientDB).find(function(k){return clientDB[k].name===currentAppt.n;})];
+  var clientKey = Object.keys(clientDB).find(function(k){return clientDB[k].name===currentAppt.n;});
+  var client = clientKey ? clientDB[clientKey] : null;
   var base=parseFloat(((cd.totalPrice||cd.total||cd.basePrice||'0')+'').replace('$',''))||0;
   var fee=0;
   var total=Math.round((base+fee)*100)/100;
@@ -16231,6 +16292,31 @@ function openApptCharge(){
   document.getElementById('charge-card-info').textContent=client?client.payment:'No card on file';
   openOverlay('appt-charge-overlay');
   try { _refreshFollowupSection('charge'); } catch(e){ console.warn('followup section render failed:', e); }
+
+  // Resolve card-on-file state and gate the [Charge card now] button.
+  // The cache is the source of truth (it actually checked Stripe).
+  // Three branches:
+  //   1. cache says yes → enable
+  //   2. cache says no  → disable + hint
+  //   3. unknown        → 'checking' state, fire probe, update on result
+  var cached = (clientKey && window._cardCache && window._cardCache[clientKey]) ? window._cardCache[clientKey] : null;
+  if (cached && typeof cached.hasCard === 'boolean') {
+    _setChargeBtnState(cached.hasCard ? 'enabled' : 'disabled');
+  } else if (client && client.email && typeof probeClientCardOnFile === 'function' && clientKey) {
+    _setChargeBtnState('checking');
+    probeClientCardOnFile(clientKey, client.email).then(function(found){
+      // Modal might have closed by the time the probe lands; check
+      // the overlay before mutating state.
+      var overlay = document.getElementById('appt-charge-overlay');
+      if (!overlay || overlay.classList.contains('hidden')) return;
+      _setChargeBtnState(found ? 'enabled' : 'disabled');
+    }).catch(function(){
+      _setChargeBtnState('disabled');
+    });
+  } else {
+    // No email to probe with → assume no card (probe can't run).
+    _setChargeBtnState('disabled');
+  }
 }
 
 async function executeCharge(){
@@ -20072,6 +20158,13 @@ Your total will update automatically when you select a payment method.</textarea
            Charge button is always visible. -->
       <div style="border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:14px;background:var(--bg-soft);">
         <button class="btn btn-primary" style="width:100%;" onclick="executeCharge()">Charge card now</button>
+        <!-- Surfaced when openApptCharge can't confirm a card on file
+             (cache miss + no probe success). Tells the user explicitly
+             why the button is disabled instead of leaving them
+             clicking a dead button. -->
+        <div id="charge-no-card-hint" style="display:none;margin-top:10px;padding:8px 10px;background:#fef3c7;border:1px solid #fde68a;border-radius:8px;font-size:12px;color:#92400e;line-height:1.5;">
+          No card on file for this client. Use <strong>Send invoice instead</strong> below.
+        </div>
         <div id="charge-followup-section" style="display:none;margin-top:12px;padding-top:12px;border-top:1px dashed var(--border);">
           <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;">
             <input type="checkbox" id="charge-followup-chk" style="margin-top:3px;flex-shrink:0;">

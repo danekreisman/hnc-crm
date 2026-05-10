@@ -136,169 +136,266 @@ export default async function handler(req, res) {
       notes || null,
     ].filter(Boolean).join('\n');
 
-    // -- 2-4. ATOMIC: find/create client + appointment + close lead --------
-    // Uses a PostgreSQL stored procedure so all 3 steps succeed or all roll back.
-    // No more "client created but no appointment" state.
-    const { data: bookingResult, error: bookingErr } = await supabase.rpc('book_lead_atomic', {
-      p_lead_id: lead.id,
-      p_client_data: {
-        name:      lead.name.trim(),
-        email:     lead.email.trim(),
-        phone:     phone || null,
-        address:   lead.address || null,
-        type:      'Residential',
-        service:   lead.service || null,
-        frequency: frequency    || null,
-        beds:      beds         || null,
-        baths:     baths        || null,
-        sqft:      lead.sqft    ? String(lead.sqft) : null,
-        status:    'New',
-        notes:     'Created automatically from booking portal',
-      },
-      p_appointment_data: {
-        service:        lead.service || service || 'Regular Cleaning',
-        frequency:      frequency    || null,
-        date:           date,
-        time:           time,
-        address:        lead.address || null,
-        beds:           beds         || null,
-        baths:          baths        || null,
-        sqft:           lead.sqft    ? String(lead.sqft) : null,
-        status:         'scheduled',
-        base_price:     quoteData.subtotal  != null ? String(quoteData.subtotal)  : null,
-        discount:       quoteData.discount  != null ? String(quoteData.discount)  : '0',
-        tax:            tax                 != null ? String(tax)                 : null,
-        total_price:    totalWithTax        != null ? String(totalWithTax)        : null,
-        duration_hours: durationHrs         != null ? String(durationHrs)         : null,
-        notes:          apptNotes,
-      }
-    });
-
-    if (bookingErr) {
-      await logError('lead-book', bookingErr, { leadId: lead.id, token, date, time });
-      return res.status(500).json({
-        success: false,
-        error: 'Booking failed — no changes were saved. Please try again.',
-        detail: bookingErr.message
-      });
-    }
-
-    const { client_id: clientId, appointment_id: appointmentId } = bookingResult;
-    console.log('[lead-book] Booking committed atomically — client:', clientId, 'appointment:', appointmentId);
-
-    // -- 5. Format date -----------------------------------------------------
+    // -- 2. Pretty-format the requested date for notifications -------------
     const prettyDate = new Date(date + 'T12:00:00').toLocaleDateString('en-US', {
       weekday: 'long', month: 'long', day: 'numeric', year: 'numeric'
     });
-    const rushNote = rushFee > 0
-      ? ` A ${rushFee === 200 ? 'same-day' : rushFee === 100 ? 'next-day' : '2-day'} booking fee of $${rushFee} applies.`
+    const prettyShort = new Date(date + 'T12:00:00').toLocaleDateString('en-US', {
+      weekday: 'short', month: 'short', day: 'numeric'
+    });
+    const rushTag = rushFee > 0
+      ? ' \u26A1 ' + (rushFee === 200 ? 'SAME-DAY' : rushFee === 100 ? 'NEXT-DAY' : '2-DAY')
       : '';
+    const cleanName = (lead.name || '').trim();
 
-    // -- 6. Confirmation email — check global automation toggle + per-client prefs (non-critical) --
-    const bookingConfirmEnabled = await isAutomationEnabled(db, 'booking_confirm_enabled');
-    const bookingNotifOn = await isNotifEnabled(db, result.client_id, 'booking_confirmation');
-    if (!bookingConfirmEnabled) console.log('[lead-book] booking_confirm_enabled is FALSE — skipping confirmation email');
-    if (!bookingNotifOn) console.log('[lead-book] booking_confirmation disabled for client', result.client_id);
-    if (bookingConfirmEnabled && bookingNotifOn) try {
-      await fetchWithTimeout(`${BASE_URL}/api/send-email`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          to:         lead.email.trim(),
-          subject:    `Booking confirmed — ${prettyDate}`,
-          type:       'booking_confirmation',
-          clientName: lead.name,
-          date:       prettyDate,
-          time:       time,
-          service:    lead.service || 'Cleaning',
-          frequency:  frequency || null,
-          address:    lead.address || null,
-          total:      totalWithTax ? `$${totalWithTax}` : null,
-          rushNote:   rushFee > 0 ? `A ${rushFee === 200 ? 'same-day' : rushFee === 100 ? 'next-day' : '2-day'} booking fee of $${rushFee} is included in your total.` : null,
-        })
-      }, TIMEOUTS.RESEND);
-      console.log('[lead-book] Confirmation email sent to', lead.email);
-    } catch (err) {
-      // Email failure does NOT fail the booking — it's already saved
-      await logError('lead-book:confirmation-email', err, { leadId: lead.id, email: lead.email });
-    }
-
-    // -- 7. Admin SMS notification (non-critical) ---------------------------
-    if (await isAutomationEnabled(supabase, 'auto_book_admin_sms_enabled')) {
-    try {
-      const adminSms = `✅ Auto-booked!\n${lead.name} · ${lead.service || 'Cleaning'}\n${prettyDate} at ${time}${totalWithTax ? '\nTotal: $' + totalWithTax : ''}${rushFee > 0 ? ' (incl. $' + rushFee + ' rush fee)' : ''}`;
-      await fetchWithTimeout(`${BASE_URL}/api/send-sms`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ to: '+18084685356', message: adminSms })
-      }, TIMEOUTS.OPENPHONE);
-    } catch (err) {
-      await logError('lead-book:admin-sms', err, { leadId: lead.id });
-    }
-    // Push fan-out alongside the admin SMS — same flag gate. Fire-and-forget.
-    import('./utils/send-push.js').then(({ sendPushToAllSubscribed }) => {
-      return sendPushToAllSubscribed({
-        title: '\u2705 Auto-booked: ' + lead.name,
-        body: (lead.service || 'Cleaning') + ' \u00B7 ' + prettyDate + ' at ' + time
-              + (totalWithTax ? ' \u00B7 $' + totalWithTax : '')
-              + (rushFee > 0 ? ' (incl. $' + rushFee + ' rush)' : ''),
-        url: '/?lead=' + lead.id,
-        tag: 'auto-book-' + lead.id,
-      });
-    }).then(r => r && console.log('[lead-book] admin push:', JSON.stringify(r)))
-      .catch(err => console.warn('[lead-book] admin push failed:', err.message));
-    } else {
-      console.log('[lead-book] auto_book_admin_sms disabled — skipping');
-    }
-
-    // -- 8. Policy agreement SMS — only if client hasn't already agreed -----
-    // New clients have policies_agreed_at = null. Existing clients who already
-    // agreed are skipped automatically so they don't get a repeat message.
-    if (await isAutomationEnabled(supabase, 'policy_first_booking_sms_enabled')) {
-    try {
-      const { data: clientRecord } = await supabase
-        .from('clients')
-        .select('policies_agreed_at')
-        .eq('id', clientId)
-        .maybeSingle();
-
-      if (clientRecord && !clientRecord.policies_agreed_at) {
-        // Map booked service to checklist id so agree.html shows the right scope
-        const svcRaw = String(body.service || '').toLowerCase();
-        let svcId = null;
-        if (svcRaw.indexOf('move') !== -1) svcId = 'moveout';
-        else if (svcRaw.indexOf('deep') !== -1) svcId = 'deep';
-        else if (svcRaw.indexOf('airbnb') !== -1 || svcRaw.indexOf('turnover') !== -1) svcId = 'airbnb';
-        else if (svcRaw.indexOf('regular') !== -1) svcId = 'regular';
-
-        const policyLink = svcId
-          ? `${BASE_URL}/agree.html?c=${clientId}&svc=${svcId}`
-          : `${BASE_URL}/agree.html?c=${clientId}`;
-        const policyMsg  = `Hi ${firstName}! Before your first cleaning with Hawaii Natural Clean, please take a moment to review and agree to our service policies: ${policyLink} 🌺`;
-        await fetchWithTimeout(`${BASE_URL}/api/send-sms`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ to: e164, message: policyMsg })
-        }, TIMEOUTS.OPENPHONE);
-        console.log('[lead-book] Policy agreement SMS sent to', e164);
-      } else {
-        console.log('[lead-book] Client already agreed to policies — skipping SMS');
+    // -- 3. Guard: don't create a duplicate review task for the same lead --
+    // If Dane hasn't yet accepted the previous booking request from this
+    // lead, don't pile on another. The customer's UI guards on lead.stage
+    // 'Closed won' but with the review-flow shift the lead stays in
+    // earlier stages until acceptance, so we need a task-level guard too.
+    {
+      const dupCheck = await fetchWithTimeout(
+        `${process.env.SUPABASE_URL}/rest/v1/tasks?select=id&type=eq.review_public_booking&status=eq.open&extracted_data->>lead_id=eq.${lead.id}&limit=1`,
+        {
+          headers: {
+            apikey: process.env.SUPABASE_SERVICE_ROLE_KEY,
+            Authorization: 'Bearer ' + process.env.SUPABASE_SERVICE_ROLE_KEY,
+          }
+        },
+        TIMEOUTS.SUPABASE
+      ).catch(() => null);
+      if (dupCheck && dupCheck.ok) {
+        const rows = await dupCheck.json().catch(() => []);
+        if (Array.isArray(rows) && rows.length > 0) {
+          return res.status(409).json({
+            error: "You've already submitted a request — our team is reviewing it. We'll be in touch shortly. If you need to make changes, call or text us at (808) 468-5356."
+          });
+        }
       }
-    } catch (err) {
-      // Policy SMS failure does NOT fail the booking
-      await logError('lead-book:policy-sms', err, { leadId: lead.id, clientId });
-    }
-    } else {
-      console.log('[lead-book] policy_first_booking_sms disabled — skipping');
     }
 
-  await logActivity('lead_booked', 'Lead booked as client: ' + (body.name || body.clientName || 'Unknown'), { name: body.name, service: body.service, date: body.date });
+    // -- 4. Build task title + description ---------------------------------
+    const taskTitle = 'Booking request \u2014 ' + cleanName
+      + (rushTag ? rushTag : '')
+      + ' \u00B7 ' + prettyShort
+      + ' at ' + time;
+
+    const description = [
+      'BOOKING REQUEST (token-link flow)',
+      '',
+      'Customer:  ' + cleanName,
+      'Phone:     ' + (lead.phone || '\u2014'),
+      'Email:     ' + (lead.email || '\u2014'),
+      'Address:   ' + (lead.address || '\u2014'),
+      'Island:    ' + island,
+      '',
+      'Service:   ' + (lead.service || service || '\u2014'),
+      frequency  ? 'Frequency: ' + frequency : null,
+      beds       ? 'Beds:      ' + beds      : null,
+      baths      ? 'Baths:     ' + baths     : null,
+      lead.sqft  ? 'Sqft:      ' + lead.sqft : null,
+      '',
+      'Requested: ' + date + ' at ' + time,
+      rushFee > 0 ? 'Rush fee:  $' + rushFee + ' (' + (rushFee === 200 ? 'same-day' : rushFee === 100 ? 'next-day' : '2-day') + ')' : null,
+      totalWithTax != null ? 'Quote:     $' + totalWithTax + ' (incl. tax' + (rushFee > 0 ? ' + rush' : '') + ')' : 'Quote:     custom',
+      '',
+      notes ? 'Customer notes: ' + notes : null,
+      '',
+      'Path: token-link from auto-quote SMS \u2014 leadId ' + lead.id,
+    ].filter(Boolean).join('\n');
+
+    const today = new Date().toISOString().split('T')[0];
+
+    // -- 5. Insert the review_public_booking task --------------------------
+    // Shape mirrors submit-public-booking.js so accept-public-booking can
+    // process this task identically. path='new_quote' + lead_id makes
+    // book_lead_atomic reuse the existing lead instead of creating a dup.
+    const taskRes = await fetchWithTimeout(`${process.env.SUPABASE_URL}/rest/v1/tasks`, {
+      method: 'POST',
+      headers: {
+        apikey: process.env.SUPABASE_SERVICE_ROLE_KEY,
+        Authorization: 'Bearer ' + process.env.SUPABASE_SERVICE_ROLE_KEY,
+        'Content-Type': 'application/json',
+        Prefer: 'return=representation',
+      },
+      body: JSON.stringify({
+        title:       taskTitle,
+        type:        'review_public_booking',
+        priority:    'high',
+        due_date:    today,
+        description: description,
+        status:      'open',
+        extracted_data: {
+          path:           'new_quote',
+          name:           cleanName,
+          email:          (lead.email || '').trim(),
+          phone:          phone,
+          address:        lead.address || null,
+          island:         island,
+          service:        lead.service || service || 'Regular Cleaning',
+          frequency:      frequency || null,
+          beds:           beds || null,
+          baths:          baths || null,
+          sqft:           lead.sqft ? String(lead.sqft) : null,
+          condition:      parse(/Condition:\s*(\d+)/),
+          requested_date: date,
+          requested_time: time,
+          customer_notes: notes || null,
+          quote_total_pretax:   preTotal,
+          quote_tax:            tax,
+          rush_fee:             rushFee || 0,
+          quote_total_with_tax: totalWithTax,
+          quote_data:           quoteData || null,
+          lead_id:              lead.id,
+          client_id:            null,
+          property_address:     null,
+          source:               'Public booking form (token link)',
+          submitted_at:         new Date().toISOString(),
+          // policiesAgreed is required by SCHEMAS.booking; if we got here it
+          // was true (validateOrFail above would have rejected otherwise).
+          policies_agreed_at:   new Date().toISOString(),
+        },
+      }),
+    }, TIMEOUTS.SUPABASE);
+
+    if (!taskRes.ok) {
+      const errBody = await taskRes.text().catch(() => '<unreadable>');
+      await logError('lead-book:task-insert', new Error('Task insert ' + taskRes.status), {
+        leadId: lead.id, body: errBody.slice(0, 500),
+      });
+      return res.status(500).json({
+        success: false,
+        error: 'Could not save your request. Please call (808) 468-5356.',
+      });
+    }
+
+    let taskRowId = null;
+    try {
+      const taskRows = await taskRes.json();
+      if (Array.isArray(taskRows) && taskRows[0] && taskRows[0].id) taskRowId = taskRows[0].id;
+    } catch (_e) { /* non-fatal */ }
+
+    // -- 6. Notifications: bell + push + owner email + owner SMS ----------
+    // All four awaited via Promise.allSettled before responding so Vercel
+    // doesn't kill them mid-flight (the bug that bit Kai's submission on
+    // 2026-05-09). SMS goes to Dane's PERSONAL number, not the OpenPhone
+    // business line — OpenPhone refuses to deliver self-to-self messages,
+    // which is why the previous admin-SMS path was silently broken.
+    const prettyReq = prettyShort + ' at ' + time;
+    const displayTotal = totalWithTax;
+
+    const inAppNotifyPromise = (async () => {
+      try {
+        await fetchWithTimeout(`${process.env.SUPABASE_URL}/rest/v1/notifications`, {
+          method: 'POST',
+          headers: {
+            apikey: process.env.SUPABASE_SERVICE_ROLE_KEY,
+            Authorization: 'Bearer ' + process.env.SUPABASE_SERVICE_ROLE_KEY,
+            'Content-Type': 'application/json',
+            Prefer: 'return=minimal',
+          },
+          body: JSON.stringify({
+            event_type: 'lead_inquiry',
+            title: 'New booking request: ' + cleanName + rushTag,
+            body: prettyReq + ' \u00b7 ' + (lead.service || service || 'Cleaning')
+                  + (frequency ? ' (' + frequency + ')' : '')
+                  + (displayTotal != null ? ' \u00b7 $' + displayTotal.toFixed(2) : ''),
+            url: '/#tasks',
+            metadata: {
+              source: 'public_booking',
+              taskId: taskRowId,
+              leadId: lead.id,
+              clientId: null,
+              name: cleanName,
+              phone: phone,
+              service: lead.service || service,
+              path: 'new_quote',
+              requestedDate: date,
+              requestedTime: time,
+              rushFee: rushFee || 0,
+              flow: 'token-link',
+            },
+          }),
+        }, TIMEOUTS.SUPABASE);
+      } catch (err) {
+        await logError('lead-book:in-app-notify', err, { leadId: lead.id, taskRowId });
+      }
+    })();
+
+    const pushNotifyPromise = (async () => {
+      try {
+        const { sendPushToAllSubscribed } = await import('./utils/send-push.js');
+        await sendPushToAllSubscribed({
+          title: 'Booking request \u2014 ' + cleanName + rushTag,
+          body: prettyReq + ' \u00b7 ' + (lead.service || service || 'Cleaning')
+                + (displayTotal != null ? ' \u00b7 $' + displayTotal.toFixed(2) : ''),
+          url: '/#tasks',
+          tag: 'public-booking-' + lead.id,
+          urgency: 'high',
+        });
+      } catch (err) {
+        await logError('lead-book:push-notify', err, { leadId: lead.id, taskRowId });
+      }
+    })();
+
+    const OWNER_EMAIL = 'dane@hawaiinaturalclean.net';
+    const ownerEmailPromise = fetchWithTimeout(`${BASE_URL}/api/send-email`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        to: OWNER_EMAIL,
+        subject: 'New booking request: ' + cleanName + ' \u2014 ' + (lead.service || service || 'Cleaning'),
+        type: 'generic',
+        clientName: 'Dane',
+        notes: description + '\n\nReview in CRM: https://hnc-crm.vercel.app/#tasks',
+      }),
+    }, TIMEOUTS.RESEND).catch((err) => {
+      logError('lead-book:owner-email', err, { leadId: lead.id });
+    });
+
+    // Personal phone — OpenPhone refuses self-to-self, so this CAN'T be the
+    // HNC business line.
+    const OWNER_PHONE = '+18082697636';
+    const smsLines = [
+      'Booking request' + (rushTag ? rushTag : '') + ': ' + cleanName,
+      lead.phone ? '\u00B7 ' + lead.phone : null,
+      '\u00B7 ' + (lead.service || service || 'Cleaning') + (frequency ? ' (' + frequency + ')' : ''),
+      '\u00B7 ' + prettyReq,
+      displayTotal != null ? '\u00B7 $' + displayTotal.toFixed(2) : null,
+      '\u00B7 token-link flow',
+      '',
+      'Review: hnc-crm.vercel.app/#tasks',
+    ].filter(Boolean).join(' ').replace(/\s+\u00B7/g, '\n\u00B7');
+
+    const ownerSmsPromise = fetchWithTimeout(`${BASE_URL}/api/send-sms`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ to: OWNER_PHONE, message: smsLines }),
+    }, TIMEOUTS.OPENPHONE).then(async (r) => {
+      if (!r.ok) {
+        const body = await r.text().catch(() => '<unreadable>');
+        await logError('lead-book:owner-sms', new Error('send-sms ' + r.status), {
+          leadId: lead.id, taskRowId, body: body.slice(0, 500),
+        });
+      }
+    }).catch(async (err) => {
+      await logError('lead-book:owner-sms', err, { leadId: lead.id, taskRowId });
+    });
+
+    await Promise.allSettled([inAppNotifyPromise, pushNotifyPromise, ownerEmailPromise, ownerSmsPromise]);
+
+    // -- 7. Done. Lead stays open until Dane accepts via the review modal -
+
+  await logActivity('lead_booking_requested', 'Booking request received from lead: ' + (lead.name || 'Unknown'), {
+    leadId: lead.id, name: lead.name, service: lead.service, date, time,
+  });
     return res.status(200).json({
       success: true,
-      appointmentId,
-      clientId,
-      date: prettyDate,
-      time,
+      requestReceived: true,
+      leadId: lead.id,
+      taskId: taskRowId,
+      requestedDate: date,
+      requestedTime: time,
     });
   }
 

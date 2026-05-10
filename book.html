@@ -1163,14 +1163,18 @@ async function submitBooking(){
 // SUCCESS
 // ─────────────────────────────────────────────────────────────────────────
 function renderSuccess(result){
+  // 2026-05-09: lead-book.js no longer auto-books — it creates a
+  // review_public_booking task that Dane has to accept. Customer should
+  // see "request received", not "you're booked". Mirrors renderPublicSuccess.
   $('steps-bar').style.display='none';
-  var rush = RUSH_FEE > 0 ? getRushInfo(SEL_DATE) : null;
+  var dateStr = SEL_DATE;
+  try { dateStr = new Date(SEL_DATE+'T12:00:00').toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'}); } catch(e){}
   $('app').innerHTML = '<div class="card"><div class="success-screen">'
-    +'<div class="success-icon">&#127946;</div>'
-    +'<h2>You\'re booked!</h2>'
-    +'<p>Your cleaning is confirmed for <strong>'+esc(result.date || SEL_DATE)+'</strong> at <strong>'+esc(result.time || SEL_TIME)+'</strong>.'
-    +(rush ? ' A '+rush.label.toLowerCase()+' fee of '+fmt(rush.fee)+' applies.' : '')
-    +'<br><br>A confirmation has been sent to your email. Our team will be in touch with your cleaner assignment shortly. Questions? Call or text <strong>(808) 468-5356</strong>. We look forward to seeing you! &#127946;</p>'
+    +'<div class="success-icon">\uD83D\uDCE9</div>'
+    +'<h2>Booking request received!</h2>'
+    +'<p>Thanks '+esc((LEAD && LEAD.firstName)||'')+'! We got your request for <strong>'+esc(dateStr)+'</strong> at <strong>'+esc(SEL_TIME)+'</strong>.'
+    +'<br><br>Our team will review the details and confirm your booking within 24 hours. You\u2019ll get a confirmation email once a cleaner is assigned.'
+    +'<br><br>Questions? Call or text <strong>(808) 468-5356</strong>. Mahalo! &#127946;</p>'
     +'</div></div>';
 }
 

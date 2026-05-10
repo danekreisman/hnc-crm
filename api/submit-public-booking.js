@@ -455,7 +455,12 @@ export default async function handler(req, res) {
     });
 
     // Owner SMS — independent fallback. Mirrors lead-capture.js pattern.
-    const OWNER_PHONE = '+18084685356';
+    // 2026-05-09: changed from '+18084685356' (HNC OpenPhone business line)
+    // to '+18082697636' (Dane's personal). OpenPhone refuses to deliver
+    // self-to-self messages — QUO_NUMBER (sender) is the same business line,
+    // so messages to the business line fail silently. Dane's personal number
+    // is a distinct device on a distinct line; OpenPhone delivers fine.
+    const OWNER_PHONE = '+18082697636';
     const smsLines = [
       'Booking request' + (rushTag ? rushTag : '') + ': ' + cleanName,
       cleanPhoneDigits ? '\u00B7 ' + cleanPhoneDigits : null,

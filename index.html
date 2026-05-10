@@ -2198,6 +2198,18 @@ Mahalo 🌺</textarea>
           <button class="action-btn full" id="cancel-recurring-btn" style="display:none;background:#EEF2F4;color:#5B7683;border-color:#CFE3EA;" onclick="cancelAllRecurring()">Cancel entire series (grey out)</button>
           <button class="action-btn red full" id="delete-recurring-btn" style="display:none;" onclick="deleteEntireSeries()">Halt series (delete all future)</button>
         </div>
+
+        <!-- Manual notification panel — populated by renderApptNotifications() on
+             modal open. Each row is a name + recipient + last-sent label + Send
+             button. Click → window.confirm() with recipient → POST → toast +
+             inline timestamp update. Distinct from automation toggles: this is
+             always-available manual trigger, no flag gating. -->
+        <div id="appt-notifications-panel" style="margin-top:14px;padding:12px;border:1px solid var(--border);border-radius:10px;background:#fafdfe;">
+          <div style="font-size:12px;font-weight:700;color:#16758F;text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px;">Manual notifications</div>
+          <div id="appt-notif-rows">
+            <!-- Populated by renderApptNotifications -->
+          </div>
+        </div>
         <div class="success-bar" id="appt-action-success" style="margin-top:10px;"></div>
       </div>
       <div id="appt-edit" style="display:none;">
@@ -5790,6 +5802,198 @@ function _openApptInner(a,dateKey){
   if(_assignBtn){
     var _isUnassigned = !a.cleaner_id && (!a.cleaner || a.cleaner === 'Unassigned');
     _assignBtn.style.display = _isUnassigned ? '' : 'none';
+  }
+  // Render the manual-notifications panel (Send confirmation / reminder /
+  // waiver buttons + last-sent labels). Decoupled from the apptData shape:
+  // fetches the audit timestamps directly from the row each time so we
+  // don't need to keep calendar query columns in sync with this feature.
+  try { renderApptNotifications(); } catch(e){ console.warn('renderApptNotifications failed:', e); }
+}
+
+/* ── Manual notifications panel ────────────────────────────────────────
+   Three rows in the appointment modal: Send confirmation email, Send
+   day-before reminder SMS, Send waiver SMS. Each row shows the
+   recipient, the last-sent timestamp (or "never"), and a Send button
+   that fires the matching /api/manual-send-* endpoint after a
+   window.confirm() with the recipient. Endpoint writes the audit
+   timestamp to appointments.{action}_sent_at; this helper reads it
+   back to render.
+
+   Decoupled from the apptData calendar query shape: fetches the audit
+   columns + the recipient (client.email/phone) ad-hoc each time the
+   modal opens. Cheap; one row, one round-trip.
+*/
+function _formatLastSent(iso){
+  if (!iso) return 'never sent manually';
+  try {
+    var then = new Date(iso);
+    var diffMs = Date.now() - then.getTime();
+    var diffMin = Math.round(diffMs / 60000);
+    if (diffMin < 1) return 'just now';
+    if (diffMin < 60) return diffMin + ' min ago';
+    var diffHr = Math.round(diffMin / 60);
+    if (diffHr < 24) return diffHr + ' hr ago';
+    var diffDay = Math.round(diffHr / 24);
+    if (diffDay < 30) return diffDay + ' day' + (diffDay === 1 ? '' : 's') + ' ago';
+    return then.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  } catch(_){ return iso; }
+}
+
+async function renderApptNotifications(){
+  var rowsEl = document.getElementById('appt-notif-rows');
+  if (!rowsEl) return;
+  if (!currentAppt || !currentAppt.dbId) {
+    rowsEl.innerHTML = '<div style="font-size:12px;color:var(--text-muted);">Save the appointment first to enable manual notifications.</div>';
+    return;
+  }
+  rowsEl.innerHTML = '<div style="font-size:12px;color:var(--text-muted);">Loading…</div>';
+
+  // Fetch the audit columns + the recipient(s) for the labels. One
+  // PostgREST query joining clients keeps it to a single round trip.
+  var apptId = currentAppt.dbId;
+  try {
+    var { data, error } = await db
+      .from('appointments')
+      .select('id, service, confirmation_sent_at, reminder_sent_at, waiver_sent_at, client_id, clients ( name, email, phone, policies_agreed_at )')
+      .eq('id', apptId)
+      .maybeSingle();
+    if (error) throw error;
+    if (!data) { rowsEl.innerHTML = '<div style="font-size:12px;color:var(--text-muted);">Appointment not found.</div>'; return; }
+    var c = data.clients || {};
+    var rows = [
+      {
+        key: 'confirmation',
+        label: 'Confirmation email',
+        recipient: c.email || null,
+        recipientLabel: c.email ? c.email : 'no email on file',
+        sentAt: data.confirmation_sent_at,
+        disabledReason: c.email ? null : 'Add an email to the client record',
+      },
+      {
+        key: 'reminder',
+        label: 'Day-before reminder SMS',
+        recipient: c.phone || null,
+        recipientLabel: c.phone ? c.phone : 'no phone on file',
+        sentAt: data.reminder_sent_at,
+        disabledReason: c.phone ? null : 'Add a phone to the client record',
+      },
+      {
+        key: 'waiver',
+        label: 'Waiver / policy agreement SMS',
+        recipient: c.phone || null,
+        recipientLabel: c.phone ? c.phone : 'no phone on file',
+        sentAt: data.waiver_sent_at,
+        // Already-agreed clients don't need it. The endpoint will refuse
+        // anyway; reflect that in the UI so Dane isn't surprised.
+        disabledReason: !c.phone ? 'Add a phone to the client record'
+                       : c.policies_agreed_at ? 'Already agreed ' + _formatLastSent(c.policies_agreed_at)
+                       : null,
+      },
+    ];
+
+    rowsEl.innerHTML = rows.map(function(r){
+      var disabled = !!r.disabledReason;
+      var sentLabel = _formatLastSent(r.sentAt);
+      var sentColor = r.sentAt ? '#5B7683' : '#94a3b8';
+      return ''
+        + '<div data-notif-row="' + r.key + '" style="display:flex;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--border);">'
+        +   '<div style="flex:1;min-width:0;">'
+        +     '<div style="font-size:13px;font-weight:600;color:var(--text);">' + esc(r.label) + '</div>'
+        +     '<div style="font-size:11px;color:var(--text-muted);margin-top:2px;">'
+        +       '\u2192 ' + esc(r.recipientLabel)
+        +     '</div>'
+        +     '<div style="font-size:11px;color:' + sentColor + ';margin-top:2px;" data-sent-label="' + r.key + '">'
+        +       'Last sent: ' + esc(sentLabel)
+        +       (r.disabledReason ? ' \u00B7 <span style="color:#b45309;">' + esc(r.disabledReason) + '</span>' : '')
+        +     '</div>'
+        +   '</div>'
+        +   '<button type="button" '
+        +     'data-notif-send="' + r.key + '" '
+        +     'onclick="sendManualNotification(\'' + r.key + '\')" '
+        +     (disabled ? 'disabled ' : '')
+        +     'style="padding:6px 12px;border-radius:7px;border:1px solid ' + (disabled ? '#cbd5e1' : '#3BB8E3') + ';'
+        +     'background:' + (disabled ? '#f1f5f9' : '#3BB8E3') + ';color:' + (disabled ? '#94a3b8' : '#fff') + ';'
+        +     'font-size:12px;font-weight:600;cursor:' + (disabled ? 'not-allowed' : 'pointer') + ';flex-shrink:0;">'
+        +     'Send'
+        +   '</button>'
+        + '</div>';
+    }).join('');
+    // Strip the leading border on the first row.
+    var first = rowsEl.querySelector('[data-notif-row]');
+    if (first) first.style.borderTop = 'none';
+  } catch (err) {
+    console.error('[renderApptNotifications]', err);
+    rowsEl.innerHTML = '<div style="font-size:12px;color:#b91c1c;">Could not load notification status: ' + esc(err.message || String(err)) + '</div>';
+  }
+}
+
+async function sendManualNotification(kind){
+  if (!currentAppt || !currentAppt.dbId) {
+    if (typeof showToast === 'function') showToast('No appointment selected', 'error');
+    return;
+  }
+  // Recipient confirmation. The recipient is rendered in the row, so
+  // pull it from the DOM rather than re-querying — keeps the confirm
+  // dialog in sync with what Dane is seeing.
+  var row = document.querySelector('[data-notif-row="' + kind + '"]');
+  var recipientLabel = '';
+  if (row) {
+    var recEl = row.querySelector('div[style*="margin-top:2px"]');
+    if (recEl) recipientLabel = recEl.textContent.replace(/^→\s*/, '').trim();
+  }
+  var prettyKind = kind === 'confirmation' ? 'confirmation email'
+                : kind === 'reminder'      ? 'day-before reminder SMS'
+                : kind === 'waiver'        ? 'waiver SMS'
+                : kind;
+  var confirmMsg = 'Send ' + prettyKind + '\nTo: ' + (recipientLabel || '(see row)') + '\n\nProceed?';
+  if (!confirm(confirmMsg)) return;
+
+  var btn = document.querySelector('[data-notif-send="' + kind + '"]');
+  if (btn) { btn.disabled = true; btn.textContent = 'Sending\u2026'; }
+
+  var endpoint = kind === 'confirmation' ? '/api/manual-send-confirmation'
+              : kind === 'reminder'     ? '/api/manual-send-reminder'
+              : kind === 'waiver'       ? '/api/manual-send-waiver'
+              : null;
+  if (!endpoint) {
+    if (typeof showToast === 'function') showToast('Unknown notification kind: ' + kind, 'error');
+    if (btn) { btn.disabled = false; btn.textContent = 'Send'; }
+    return;
+  }
+
+  try {
+    var session = await db.auth.getSession();
+    var token = session.data.session ? session.data.session.access_token : null;
+    if (!token) throw new Error('Not signed in');
+    var resp = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + token,
+      },
+      body: JSON.stringify({ appointmentId: currentAppt.dbId }),
+    });
+    var data = await resp.json().catch(function(){ return {}; });
+    if (!resp.ok || !data.success) {
+      var msg = data.error || ('Send failed (' + resp.status + ')');
+      if (typeof showToast === 'function') showToast(msg, 'error');
+      if (btn) { btn.disabled = false; btn.textContent = 'Send'; }
+      return;
+    }
+    // Update the inline timestamp without re-rendering the whole panel.
+    var sentLabel = document.querySelector('[data-sent-label="' + kind + '"]');
+    if (sentLabel) {
+      sentLabel.textContent = 'Last sent: just now';
+      sentLabel.style.color = '#15803d';
+    }
+    if (btn) { btn.disabled = false; btn.textContent = 'Sent \u2713'; setTimeout(function(){ if (btn) btn.textContent = 'Send'; }, 2500); }
+    var sentToastMsg = (kind === 'confirmation' ? 'Confirmation email sent' : kind === 'reminder' ? 'Reminder sent' : 'Waiver SMS sent')
+      + (data.recipient ? ' to ' + data.recipient : '');
+    if (typeof showToast === 'function') showToast(sentToastMsg);
+  } catch (err) {
+    console.error('[sendManualNotification]', err);
+    if (typeof showToast === 'function') showToast('Send failed: ' + (err.message || err), 'error');
+    if (btn) { btn.disabled = false; btn.textContent = 'Send'; }
   }
 }
 

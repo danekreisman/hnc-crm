@@ -918,7 +918,13 @@
         "column": "invoice_url",
         "default": null,
         "nullable": true
-      }
+      },
+      "confirmation_sent_at",
+      "confirmation_sent_by",
+      "reminder_sent_at",
+      "reminder_sent_by",
+      "waiver_sent_at",
+      "waiver_sent_by"
     ]
   },
   "generated_at": "2026-05-09 08:05:52.759042+00"

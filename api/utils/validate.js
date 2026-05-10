@@ -221,6 +221,18 @@ export const SCHEMAS = {
     totalPrice: { required: false, rules: [(v) => v == null || (is.number(Number(v)) && Number(v) >= 0 && Number(v) < 100000)],     message: 'totalPrice must be a non-negative number under 100000 if provided' },
   },
 
+  // Manual-send buttons in the appointment modal. Each takes only the
+  // appointment id; the endpoint hydrates the rest from the row.
+  manualSendConfirmation: {
+    appointmentId: { required: true, rules: [is.uuid], message: 'appointmentId must be a valid UUID' },
+  },
+  manualSendReminder: {
+    appointmentId: { required: true, rules: [is.uuid], message: 'appointmentId must be a valid UUID' },
+  },
+  manualSendWaiver: {
+    appointmentId: { required: true, rules: [is.uuid], message: 'appointmentId must be a valid UUID' },
+  },
+
 };
 
 /**

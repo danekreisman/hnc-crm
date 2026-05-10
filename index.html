@@ -2186,8 +2186,11 @@ Mahalo 🌺</textarea>
                the full Edit form — common for the user who has many unassigned
                recurring rows that need a cleaner picked. -->
           <button class="action-btn blue full" id="appt-assign-btn" style="display:none;background:#3BB8E3;color:#fff;border-color:#2DA1CC;" onclick="openApptAssign()">Assign cleaner</button>
-          <button class="action-btn green" id="appt-invoice-btn" onclick="openApptInvoice()">Invoice client</button>
-          <button class="action-btn green" id="appt-charge-btn" onclick="openApptCharge()">Charge card on file</button>
+          <!-- Unified billing entry point. Dispatcher checks the client's
+               card-on-file state and routes to the charge or invoice
+               modal — same flow Dane used to do manually with two
+               separate buttons. (2026-05-10) -->
+          <button class="action-btn green full" id="appt-charge-entry-btn" onclick="openApptChargeOrInvoice()">Charge</button>
           <button class="action-btn blue full" onclick="openApptDuplicate()">Duplicate to another date</button>
           <button class="action-btn blue full" onclick="openInviteCleaner()">Invite cleaner</button>
           <button class="action-btn amber full" onclick="showApptEdit()">Edit job</button>
@@ -15857,6 +15860,190 @@ async function confirmApptDuplicate(){
   }
 }
 
+/* ── Unified billing entry point ───────────────────────────────────────
+   Replaces the previous two-button "Invoice client" / "Charge card on
+   file" pattern. Single Charge button on the appointment view fires
+   this dispatcher, which checks for a Stripe customer + card, then
+   routes to the appropriate modal. No card → invoice modal opens
+   directly so Dane doesn't have to click "Send invoice instead."
+*/
+async function openApptChargeOrInvoice(){
+  if(!currentAppt) return;
+  var clientName = currentAppt.n;
+  var clientKey = Object.keys(clientDB).find(function(k){ return k.length>=30 && clientDB[k].name === clientName; });
+  var client = clientKey ? clientDB[clientKey] : null;
+
+  // Fast path: client record already shows a Stripe customer id —
+  // assume card is on file (executeCharge does the actual lookup).
+  // Mirrors the existing updateApptChargeButtonState pattern, so the
+  // routing decision matches what the legacy two-button UI was doing.
+  var hasCard = !!(client && (client.stripeCustomerId || client.stripe_customer_id))
+             || !!(clientKey && window._cardCache && window._cardCache[clientKey] && window._cardCache[clientKey].hasCard);
+
+  if (hasCard) {
+    openApptCharge();
+  } else {
+    openApptInvoice();
+  }
+}
+
+/* ── Post-clean follow-up SMS helpers ──────────────────────────────────
+   The Charge and Invoice modals both have a "Send post-clean follow-up
+   SMS" checkbox + editable preview. Visibility rules:
+     - Client must have a phone on file
+     - There must be a future-dated appointment for this client
+       (excluding the current one, which is the clean we just finished)
+   Wording differs by mode:
+     - 'charge'  → "We charged the card on file for $X"
+     - 'invoice' → "Sent the invoice for $X"
+   But the structure is the same: greeting + amount line + next-appt
+   line + closer. Editable so Dane can tweak before sending.
+*/
+function _findNextAppointmentForClient(clientName, excludeApptDbId){
+  if (!clientName) return null;
+  var todayKey = (function(){
+    var d = new Date();
+    return d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate();
+  })();
+  var todayDate = new Date(todayKey + 'T00:00:00');
+  var best = null;
+  Object.keys(apptData || {}).forEach(function(k){
+    var parts = k.split('-');
+    if (parts.length !== 3) return;
+    var d = new Date(parts[0]+'-'+String(parts[1]).padStart(2,'0')+'-'+String(parts[2]).padStart(2,'0')+'T00:00:00');
+    if (isNaN(d.getTime()) || d < todayDate) return;
+    (apptData[k] || []).forEach(function(a){
+      if (!a || a.n !== clientName) return;
+      if (excludeApptDbId && a.dbId === excludeApptDbId) return;
+      if (a.s === 'cancelled' || a.s === 'deleted') return;
+      if (!best || d < best._dt) {
+        best = { dt: k, time: a.t || '', _dt: d, dbId: a.dbId };
+      }
+    });
+  });
+  return best;
+}
+
+function _formatNextApptDate(dateKey){
+  if (!dateKey) return '';
+  var parts = dateKey.split('-');
+  if (parts.length !== 3) return dateKey;
+  var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  var weekdays = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  try {
+    var d = new Date(parseInt(parts[0],10), parseInt(parts[1],10)-1, parseInt(parts[2],10));
+    return weekdays[d.getDay()] + ', ' + months[d.getMonth()] + ' ' + d.getDate();
+  } catch(_){ return dateKey; }
+}
+
+function _buildFollowupMessage(mode, firstName, amount, nextAppt){
+  // Default templates per Dane's spec. User-editable in the preview
+  // textarea before sending. Length is validated (10–1600 chars) on
+  // the server.
+  var amt = '$' + (Number(amount) || 0).toFixed(2);
+  var actionLine = mode === 'charge'
+    ? 'We charged the card on file for ' + amt + '.'
+    : 'Just sent the invoice for ' + amt + '.';
+  var nextLine = nextAppt
+    ? 'Your next appointment is on ' + _formatNextApptDate(nextAppt.dt) + (nextAppt.time ? ' at ' + nextAppt.time : '') + '. See you then,'
+    : '';
+  var closer = nextAppt ? 'mahalo!' : 'Mahalo for choosing Hawaii Natural Clean!';
+  return 'Aloha ' + firstName + ', hope everything went well today. ' + actionLine
+       + (nextLine ? ' ' + nextLine + ' ' : ' ')
+       + closer;
+}
+
+function _refreshFollowupSection(mode){
+  // mode: 'charge' or 'invoice'. Renders the follow-up checkbox +
+  // preview into the matching modal. Hides the section entirely if
+  // the client has no phone OR no next appointment exists.
+  var prefix = mode === 'charge' ? 'charge' : 'invoice';
+  var section   = document.getElementById(prefix + '-followup-section');
+  var chk       = document.getElementById(prefix + '-followup-chk');
+  var msgEl     = document.getElementById(prefix + '-followup-msg');
+  var recipEl   = document.getElementById(prefix + '-followup-recipient');
+  if (!section || !chk || !msgEl || !recipEl) return;
+  if (!currentAppt) { section.style.display = 'none'; return; }
+
+  var clientName = currentAppt.n;
+  var clientKey = Object.keys(clientDB).find(function(k){ return k.length>=30 && clientDB[k].name === clientName; });
+  var client = clientKey ? clientDB[clientKey] : null;
+  var phone = client && client.phone ? client.phone : '';
+  var nextAppt = _findNextAppointmentForClient(clientName, currentAppt && currentAppt.dbId);
+
+  if (!phone || !nextAppt) {
+    // The whole point is "you've got a next clean coming up" — without
+    // either a phone or a next-appt, there's nothing useful to send.
+    section.style.display = 'none';
+    chk.checked = false;
+    msgEl.style.display = 'none';
+    return;
+  }
+
+  section.style.display = '';
+  chk.checked = false;
+  msgEl.style.display = 'none';
+  recipEl.textContent = '\u2192 ' + phone + ' \u00B7 next appt: ' + _formatNextApptDate(nextAppt.dt) + (nextAppt.time ? ' ' + nextAppt.time : '');
+
+  // Build the default message. The amount comes from the visible UI:
+  // for charge, the charge-total field; for invoice, the appointment's
+  // totalPrice. Recompute on each open so editing the price doesn't
+  // leave a stale preview.
+  var amount = 0;
+  if (mode === 'charge') {
+    var totalText = (document.getElementById('charge-total') || {}).textContent || '';
+    amount = parseFloat(totalText.replace(/[^0-9.]/g,'')) || 0;
+  } else {
+    var cd = currentApptData || {};
+    amount = parseFloat(((cd.totalPrice||cd.total||cd.basePrice||'0')+'').toString().replace(/[^0-9.]/g,'')) || 0;
+  }
+  var firstName = (clientName || 'there').split(' ')[0];
+  msgEl.value = _buildFollowupMessage(mode, firstName, amount, nextAppt);
+
+  // Toggle preview visibility when the user checks the box.
+  chk.onchange = function(){
+    msgEl.style.display = chk.checked ? '' : 'none';
+  };
+}
+
+async function _maybeSendChargeFollowup(mode){
+  // Called by executeCharge / sendApptInvoice on success. Reads the
+  // checkbox + the (possibly edited) message, fires the manual-send-
+  // charge-followup endpoint. Best-effort: if the follow-up fails the
+  // toast says so but the charge/invoice itself is already done.
+  var prefix = mode === 'charge' ? 'charge' : 'invoice';
+  var chk    = document.getElementById(prefix + '-followup-chk');
+  var msgEl  = document.getElementById(prefix + '-followup-msg');
+  if (!chk || !chk.checked) return;
+  if (!currentAppt || !currentAppt.dbId) return;
+  var message = ((msgEl && msgEl.value) || '').trim();
+  if (message.length < 10) {
+    if (typeof showToast === 'function') showToast('Follow-up message is too short — skipped.', 'error');
+    return;
+  }
+  try {
+    var session = await db.auth.getSession();
+    var token = session.data.session ? session.data.session.access_token : null;
+    if (!token) {
+      if (typeof showToast === 'function') showToast('Follow-up SMS skipped — not signed in.', 'error');
+      return;
+    }
+    var resp = await fetch('/api/manual-send-charge-followup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({ appointmentId: currentAppt.dbId, message: message }),
+    });
+    var data = await resp.json().catch(function(){ return {}; });
+    if (!resp.ok || !data.success) {
+      if (typeof showToast === 'function') showToast('Follow-up SMS failed: ' + (data.error || resp.status), 'error');
+      return;
+    }
+    if (typeof showToast === 'function') showToast('Follow-up SMS sent to ' + (data.recipient || 'client'));
+  } catch (err) {
+    if (typeof showToast === 'function') showToast('Follow-up SMS error: ' + (err.message || err), 'error');
+  }
+}
+
 function openApptInvoice(){
   if(!currentAppt)return;
   var cd=currentApptData||{};
@@ -15872,6 +16059,7 @@ function openApptInvoice(){
   var termsSel=document.getElementById('appt-inv-terms');
   termsSel.value=isCommercial?'net30':'now';
   openOverlay('appt-invoice-overlay');
+  try { _refreshFollowupSection('invoice'); } catch(e){ console.warn('followup section render failed:', e); }
 }
 
 async function sendApptInvoice(method){
@@ -15987,6 +16175,11 @@ async function sendApptInvoice(method){
     // Update invoice table UI
     addToInvoiceTable(clientName, cd.service||'Cleaning service', '$'+amountNum.toFixed(2), terms);
 
+    // Optional post-clean follow-up SMS — fired before the close-
+    // timeout so the toast appears in the same beat as the invoice
+    // success bar. Skipped silently if the checkbox isn't checked.
+    try { await _maybeSendChargeFollowup('invoice'); } catch(e){ console.warn('invoice followup error:', e); }
+
     // Show success and close
     var s=document.getElementById('appt-inv-success');
     s.textContent='Invoice for $'+amountNum.toFixed(2)+' sent to '+clientName+' via '+(method==='email'?'email':'SMS')+' ('+terms+'). ACH & card options included.';
@@ -16024,6 +16217,7 @@ function openApptCharge(){
   document.getElementById('charge-total').textContent='$'+total.toFixed(2);
   document.getElementById('charge-card-info').textContent=client?client.payment:'No card on file';
   openOverlay('appt-charge-overlay');
+  try { _refreshFollowupSection('charge'); } catch(e){ console.warn('followup section render failed:', e); }
 }
 
 async function executeCharge(){
@@ -16062,6 +16256,10 @@ async function executeCharge(){
     } catch(e){ console.warn('insert invoice err', e); }
     closeOverlay('appt-charge-overlay');
     if (sb) { sb.textContent = '$' + amount.toFixed(2) + ' collected from ' + clientName + '!'; sb.classList.add('show'); setTimeout(function(){ sb.classList.remove('show'); }, 3000); }
+    // Fire the optional post-clean follow-up SMS. Best-effort — the
+    // charge has already succeeded and been audited. Errors get
+    // toasted but don't roll back anything.
+    try { await _maybeSendChargeFollowup('charge'); } catch(e){ console.warn('charge followup error:', e); }
     if (typeof loadAllData === 'function') await loadAllData();
   } catch (err) {
     if (sb) { sb.textContent = 'Charge error: ' + err.message; }
@@ -19812,6 +20010,22 @@ Your total will update automatically when you select a payment method.</textarea
         <div style="font-size:11px;font-weight:600;color:#276749;margin-bottom:6px;">ACH payment incentive included</div>
         <div style="font-size:11px;color:#276749;line-height:1.6;">The invoice will show clients both payment options:<br>&#x2022; ACH bank transfer — FREE<br>&#x2022; Card, Apple Pay, Cash App, Klarna, or Link — no extra fee</div>
       </div>
+
+      <!-- Post-clean follow-up SMS — same UX as the charge modal. The
+           message wording differs ("Sent the invoice for $X" vs
+           "Charged the card on file for $X") but the section, the
+           checkbox, and the editable preview all behave the same. -->
+      <div id="invoice-followup-section" style="display:none;background:var(--brand-50);border:1px solid #9ae6b4;border-radius:10px;padding:12px 13px;margin-bottom:14px;">
+        <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;">
+          <input type="checkbox" id="invoice-followup-chk" style="margin-top:3px;flex-shrink:0;">
+          <span style="flex:1;">
+            <span style="font-size:13px;font-weight:600;color:#276749;display:block;">Send post-clean follow-up SMS</span>
+            <span id="invoice-followup-recipient" style="font-size:11px;color:#276749;display:block;margin-top:2px;"></span>
+          </span>
+        </label>
+        <textarea id="invoice-followup-msg" style="width:100%;margin-top:10px;min-height:120px;padding:10px;border:1px solid #9ae6b4;border-radius:8px;font-size:12px;line-height:1.5;font-family:inherit;color:var(--text);background:#fff;display:none;" placeholder="Follow-up message preview"></textarea>
+      </div>
+
       <div class="save-bar">
         <button class="btn btn-primary" onclick="sendApptInvoice('email')">Send via email</button>
         <button class="btn" style="background:#ebf5ff;color:#2b6cb0;border-color:#bee3f8;" onclick="sendApptInvoice('sms')">Send link via SMS</button>
@@ -19849,6 +20063,22 @@ Your total will update automatically when you select a payment method.</textarea
       <div class="form-row"><label>Card on file</label>
         <div id="charge-card-info" style="font-size:13px;color:var(--text);padding:8px 10px;background:var(--bg-soft);border:1px solid var(--border);border-radius:8px;">Stripe card ****4521</div>
       </div>
+
+      <!-- Post-clean follow-up SMS — shown only when the client has both
+           a phone on file AND a future appointment scheduled. Built by
+           _refreshChargeFollowupSection on modal open. Message preview
+           is editable (Dane wanted a preview, not a fixed template). -->
+      <div id="charge-followup-section" style="display:none;background:var(--brand-50);border:1px solid #9ae6b4;border-radius:10px;padding:12px 13px;margin-bottom:14px;">
+        <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;">
+          <input type="checkbox" id="charge-followup-chk" style="margin-top:3px;flex-shrink:0;">
+          <span style="flex:1;">
+            <span style="font-size:13px;font-weight:600;color:#276749;display:block;">Send post-clean follow-up SMS</span>
+            <span id="charge-followup-recipient" style="font-size:11px;color:#276749;display:block;margin-top:2px;"></span>
+          </span>
+        </label>
+        <textarea id="charge-followup-msg" style="width:100%;margin-top:10px;min-height:120px;padding:10px;border:1px solid #9ae6b4;border-radius:8px;font-size:12px;line-height:1.5;font-family:inherit;color:var(--text);background:#fff;display:none;" placeholder="Follow-up message preview"></textarea>
+      </div>
+
       <div class="save-bar">
         <button class="btn btn-primary" onclick="executeCharge()">Charge card now</button>
         <button class="btn" onclick="closeApptChargeToInvoice()">Send invoice instead</button>

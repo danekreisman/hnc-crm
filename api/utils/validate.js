@@ -263,6 +263,10 @@ export const SCHEMAS = {
   manualSendInvoiceSms: {
     clientId: { required: true, rules: [is.uuid], message: 'clientId must be a valid UUID' },
   },
+  manualSendChargeFollowup: {
+    appointmentId: { required: true, rules: [is.uuid], message: 'appointmentId must be a valid UUID' },
+    message:       { required: true, rules: [is.minLength(10), is.maxLength(1600)], message: 'message must be 10–1600 characters' },
+  },
 
 };
 

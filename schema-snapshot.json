@@ -998,6 +998,16 @@
         "column": "cleaner_notified_by",
         "default": null,
         "nullable": true
+      },
+      {
+        "column": "charge_followup_sent_at",
+        "default": null,
+        "nullable": true
+      },
+      {
+        "column": "charge_followup_sent_by",
+        "default": null,
+        "nullable": true
       }
     ]
   },

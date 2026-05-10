@@ -6513,6 +6513,14 @@ async function saveApptEdit(mode){
   var _editPid2 = _cleanerNameToId(_editPair.name2);
   var _editPid3 = _editPid2 ? _cleanerNameToId(_editPair.name3) : null;
   var _editPairN = 1 + (_editPair.name2 ? 1 : 0) + (_editPair.name3 ? 1 : 0);
+  // Capture a.recurring BEFORE the tail-regen path mutates it. Needed
+  // by the single-mode "break series" guard at the persist block — that
+  // guard fires when the appointment was *originally* part of a series
+  // and the user wants to detach this single occurrence. The conversion
+  // case (one-time → weekly) flips a.recurring to true mid-save via the
+  // regen path; without this snapshot the break-series guard would
+  // misfire and immediately undo the conversion.
+  var _origARecurring = !!(a && a.recurring);
   // Read the LABOR hours from the override field (or fall back to calc).
   // If the user has the hours override on, that field represents what
   // they typed — total labor for the job before splitting. If override
@@ -6777,7 +6785,18 @@ async function saveApptEdit(mode){
   try{
     var _isRecurFreq = (freq && freq!=='One-time');
     var _isExistingSeries = !!(a && a.seriesId);
-    var _shouldRegen = _isRecurFreq && mode==='all' && !_isExistingSeries;
+    // Tail-regen fires in two cases:
+    //   (1) mode='all' on a recurring appointment with NO existing series
+    //       — orphan upgrade. Existing behavior.
+    //   (2) Conversion: appointment was NOT recurring (a.recurring falsy)
+    //       and the user just changed freq to a recurring value. Mode is
+    //       always 'single' here because the recurring mode picker only
+    //       shows when currentAppt.recurring is true at modal-open time.
+    //       Without this branch, "edit one-time → Weekly" silently saves
+    //       the freq change but creates zero future occurrences.
+    // Both cases require !_isExistingSeries — if a series already exists
+    // the all-series UPDATE at line ~7011 handles propagation.
+    var _shouldRegen = _isRecurFreq && !_isExistingSeries && (mode==='all' || !a.recurring);
     if(_shouldRegen){
       var _kp = (currentApptKey||'').split('-');
       if(_kp.length===3){
@@ -6839,6 +6858,20 @@ async function saveApptEdit(mode){
             }catch(_dberr){ console.warn('[saveApptEdit] dbSaveAppointment failed for '+_oKey, _dberr); }
           });
           if(a && !a.seriesId){ a.seriesId = _ensureSid; a.recurring = true; }
+          // Persist the recurring/series_id flag on the original
+          // appointment row. dbUpdateAppointment (called later in the
+          // single-mode branch) doesn't include these columns in its
+          // payload, so without this fire-and-forget call the in-memory
+          // a.seriesId set above would be lost on next page load and
+          // the converted appointment would re-appear as one-time.
+          if(a && a.dbId){
+            db.from('appointments').update({ recurring: true, series_id: _ensureSid })
+              .eq('id', a.dbId)
+              .then(function(_r){
+                if(_r.error) console.warn('[saveApptEdit] series-link persist on original row failed:', _r.error);
+                else        console.log('[saveApptEdit] series-link persisted on original row dbId='+a.dbId+' series_id='+_ensureSid);
+              });
+          }
           console.log('[saveApptEdit] tail-regen (NEW series): inserted '+_inserted+' future occurrences, skipped '+_skipped+' (freq='+freq+', mode='+mode+', from '+currentApptKey+')');
         }
       }
@@ -7089,11 +7122,15 @@ async function saveApptEdit(mode){
         }
       });
     } else {
-      // Single: also clear series_id to break series link
+      // Single: also clear series_id to break series link (only when the
+      // appointment was *originally* part of a series — see _origARecurring
+      // capture at top of saveApptEdit. Without that snapshot a conversion
+      // (one-time → recurring) would immediately undo itself here, since
+      // the regen path flips a.recurring=true mid-save.)
       var singlePayload=Object.assign({},sbBasePayload,{
         date:dateVal,
-        series_id: mode==='single'&&a.recurring ? null : undefined,
-        recurring: mode==='single'&&a.recurring ? false : undefined
+        series_id: mode==='single'&&_origARecurring ? null : undefined,
+        recurring: mode==='single'&&_origARecurring ? false : undefined
       });
       // Remove undefined keys
       Object.keys(singlePayload).forEach(function(k){ if(singlePayload[k]===undefined) delete singlePayload[k]; });
@@ -7107,7 +7144,7 @@ async function saveApptEdit(mode){
         notes:editNotes, duration:editDuration,
         tipAmount:editTip
       }).then(function(sbUpdate){
-        if(!sbUpdate.error && mode==='single'&&a.recurring&&a.dbId){
+        if(!sbUpdate.error && mode==='single'&&_origARecurring&&a.dbId){
           // Break the series link for this specific occurrence in DB
           db.from('appointments').update({series_id:null,recurring:false}).eq('id',a.dbId).then(function(r){
             console.log('[saveApptEdit] series link broken for dbId='+a.dbId+', error:',r.error||'none');

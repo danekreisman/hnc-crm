@@ -345,6 +345,12 @@ export default async function handler(req, res) {
           property_address:      b.propertyAddress || null,
           source:                'Public booking form',
           submitted_at:          new Date().toISOString(),
+          // Customer checked the policies box on book.html. validate.js
+          // gates this endpoint on policiesAgreed===true, so by the time
+          // we reach this point the agreement is guaranteed. Storing the
+          // timestamp explicitly so the review modal can surface it and
+          // accept-public-booking can stamp it on the client record.
+          policies_agreed_at:    new Date().toISOString(),
         },
       }),
     });

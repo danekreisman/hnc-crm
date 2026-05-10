@@ -20062,23 +20062,39 @@ Your total will update automatically when you select a payment method.</textarea
         <div id="charge-card-info" style="font-size:13px;color:var(--text);padding:8px 10px;background:var(--bg-soft);border:1px solid var(--border);border-radius:8px;">Stripe card ****4521</div>
       </div>
 
-      <!-- Post-clean follow-up SMS — shown only when the client has both
-           a phone on file AND a future appointment scheduled. Built by
-           _refreshChargeFollowupSection on modal open. Message preview
-           is editable (Dane wanted a preview, not a fixed template). -->
-      <div id="charge-followup-section" style="display:none;background:var(--brand-50);border:1px solid #9ae6b4;border-radius:10px;padding:12px 13px;margin-bottom:14px;">
-        <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;">
-          <input type="checkbox" id="charge-followup-chk" style="margin-top:3px;flex-shrink:0;">
-          <span style="flex:1;">
-            <span style="font-size:13px;font-weight:600;color:#276749;display:block;">Send post-clean follow-up SMS</span>
-            <span id="charge-followup-recipient" style="font-size:11px;color:#276749;display:block;margin-top:2px;"></span>
-          </span>
-        </label>
-        <textarea id="charge-followup-msg" style="width:100%;margin-top:10px;min-height:120px;padding:10px;border:1px solid #9ae6b4;border-radius:8px;font-size:12px;line-height:1.5;font-family:inherit;color:var(--text);background:#fff;display:none;" placeholder="Follow-up message preview"></textarea>
+      <!-- Primary action: charge the card. The post-clean follow-up
+           checkbox is grouped *inside* this block (border + tinted bg)
+           so it visually reads as a sub-option of the charge action,
+           not a standalone preference. Reworded to "Also send…" to
+           reinforce that it's an addition to the charge, not a
+           separate decision. _refreshFollowupSection toggles the
+           checkbox row's visibility based on phone + next-appt; the
+           Charge button is always visible. -->
+      <div style="border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:14px;background:var(--bg-soft);">
+        <button class="btn btn-primary" style="width:100%;" onclick="executeCharge()">Charge card now</button>
+        <div id="charge-followup-section" style="display:none;margin-top:12px;padding-top:12px;border-top:1px dashed var(--border);">
+          <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;">
+            <input type="checkbox" id="charge-followup-chk" style="margin-top:3px;flex-shrink:0;">
+            <span style="flex:1;">
+              <span style="font-size:13px;font-weight:600;color:var(--text);display:block;">Also send post-clean follow-up SMS</span>
+              <span id="charge-followup-recipient" style="font-size:11px;color:var(--text-muted);display:block;margin-top:2px;"></span>
+            </span>
+          </label>
+          <textarea id="charge-followup-msg" style="width:100%;margin-top:10px;min-height:120px;padding:10px;border:1px solid var(--border);border-radius:8px;font-size:12px;line-height:1.5;font-family:inherit;color:var(--text);background:#fff;display:none;" placeholder="Follow-up message preview"></textarea>
+        </div>
+      </div>
+
+      <!-- Secondary actions: alternative path (send invoice) and cancel.
+           Visually separated from the primary block by spacing + a
+           subtle "or" divider — makes it obvious these are different
+           branches, not extensions of the charge action. -->
+      <div style="display:flex;align-items:center;gap:10px;margin:6px 0 12px;color:var(--text-muted);font-size:11px;text-transform:uppercase;letter-spacing:.05em;">
+        <div style="flex:1;height:1px;background:var(--border);"></div>
+        <span>or</span>
+        <div style="flex:1;height:1px;background:var(--border);"></div>
       </div>
 
       <div class="save-bar">
-        <button class="btn btn-primary" onclick="executeCharge()">Charge card now</button>
         <button class="btn" onclick="closeApptChargeToInvoice()">Send invoice instead</button>
         <button class="btn" onclick="closeOverlay('appt-charge-overlay')">Cancel</button>
       </div>

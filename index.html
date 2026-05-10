@@ -6371,6 +6371,66 @@ async function refreshClientCards(){
   }
 }
 
+/* ── Refresh card data from inside the charge modal ─────────────────
+   Same endpoint as the client-profile button (/api/sync-client-cards),
+   but resolves the client via currentAppt, updates the modal's
+   selector inline, and re-runs _setChargeBtnState so the [Charge
+   card now] button flips state if cards become available (or
+   disappear). Mirrors refreshClientCards but doesn't require the
+   client modal to be open.
+*/
+async function refreshChargeCardData(){
+  if (!currentAppt) return;
+  var clientKey = Object.keys(clientDB).find(function(k){ return k.length>=30 && clientDB[k].name === currentAppt.n; });
+  if (!clientKey) {
+    if (typeof showToast === 'function') showToast('Could not resolve client for this appointment', true);
+    return;
+  }
+  var btn = document.getElementById('charge-modal-refresh-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Syncing\u2026'; }
+  try {
+    var session = await db.auth.getSession();
+    var token = session.data.session ? session.data.session.access_token : null;
+    if (!token) throw new Error('Not signed in');
+    var resp = await fetch('/api/sync-client-cards', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({ clientId: clientKey }),
+    });
+    var data = await resp.json().catch(function(){ return {}; });
+    if (!resp.ok || !data.success) {
+      if (typeof showToast === 'function') showToast('Card sync failed: ' + (data.error || resp.status), true);
+      return;
+    }
+    // Hydrate clientDB + cache so other code paths (dispatcher,
+    // future opens, client profile if it's also showing) all see
+    // the fresh state.
+    window._cardCache = window._cardCache || {};
+    window._cardCache[clientKey] = {
+      customerId: data.customerId,
+      hasCard: (data.cards && data.cards.length > 0),
+      cards: data.cards || [],
+    };
+    if (clientDB[clientKey]) {
+      clientDB[clientKey].stripeCustomerId = data.customerId || clientDB[clientKey].stripeCustomerId;
+      clientDB[clientKey].cards = data.cards || [];
+      clientDB[clientKey].cardsSyncedAt = data.syncedAt || new Date().toISOString();
+    }
+    // Re-render the selector and update the [Charge card now] state.
+    try { renderChargeCardSelector(); } catch(_){}
+    _setChargeBtnState((data.cards && data.cards.length > 0) ? 'enabled' : 'disabled');
+    var msg = (data.cards && data.cards.length)
+      ? 'Found ' + data.cards.length + ' card' + (data.cards.length === 1 ? '' : 's') + ' on Stripe'
+      : 'No cards on Stripe for this client';
+    if (typeof showToast === 'function') showToast(msg);
+  } catch (err) {
+    console.error('[refreshChargeCardData]', err);
+    if (typeof showToast === 'function') showToast('Card sync error: ' + (err.message || err), true);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '\u21BB Refresh from Stripe'; }
+  }
+}
+
 /* ── Charge modal card selector ─────────────────────────────────────
    Renders into #charge-card-selector based on whatever cards are
    known for the current appt's client. Drives executeCharge: if 2+
@@ -20393,12 +20453,19 @@ Your total will update automatically when you select a payment method.</textarea
       <div style="background:#fffbeb;border:1px solid #f6e05e;border-radius:8px;padding:10px 12px;margin-bottom:14px;font-size:12px;color:#b7791f;line-height:1.6;">
         <strong>Tip:</strong> Encourage clients to pay by ACH (free) to keep costs down. You can send an invoice instead and let them choose.
       </div>
-      <div class="form-row"><label>Card on file</label>
+      <div class="form-row">
+        <label style="display:flex;align-items:center;justify-content:space-between;">
+          <span>Card on file</span>
+          <button type="button" id="charge-modal-refresh-btn" onclick="refreshChargeCardData()" style="font-size:11px;padding:3px 8px;border-radius:6px;border:1px solid #3BB8E3;background:#fff;color:#16758F;cursor:pointer;font-weight:600;">↻ Refresh from Stripe</button>
+        </label>
         <!-- Populated by renderChargeCardSelector(): one of
              "no card" / "single card display" / "multi-card radio
              selector". When multi-card, the chosen value drives
              executeCharge to use charge_specific_card with that
-             paymentMethod ID. -->
+             paymentMethod ID. The refresh button up in the label
+             re-pulls from Stripe inline — useful when the CRM's
+             card data is stale (just paid an invoice, added a new
+             card in Stripe, etc). -->
         <div id="charge-card-selector" style="font-size:13px;color:var(--text);padding:8px 10px;background:var(--bg-soft);border:1px solid var(--border);border-radius:8px;">No card on file</div>
       </div>
 

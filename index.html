@@ -2335,8 +2335,11 @@ Mahalo 🌺</textarea>
         <div id="edit-reschedule-notify" style="display:none;background:var(--brand-50);border:1px solid #9ae6b4;border-radius:8px;padding:10px 12px;margin:10px 0;">
           <div id="edit-notify-client-section" style="display:none;">
             <div style="font-size:11px;font-weight:600;color:#276749;text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px;">Date or time changed</div>
-            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:var(--text);font-weight:normal;">
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:var(--text);font-weight:normal;margin-bottom:6px;">
               <input type="checkbox" id="edit-notify-client-reschedule"> Notify client of reschedule (email + SMS)
+            </label>
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:var(--text);font-weight:normal;">
+              <input type="checkbox" id="edit-notify-cleaner-reschedule"> Notify cleaner of reschedule (SMS)
             </label>
           </div>
           <div id="edit-notify-cleaner-section" style="display:none;margin-top:8px;padding-top:8px;border-top:1px dashed #9ae6b4;">
@@ -6134,8 +6137,9 @@ function showApptEdit(){
   if(cleanerSection) cleanerSection.style.display = 'none';
   // Default checkboxes UNCHECKED — opt-in. Avoids surprise sends when
   // Dane saves a routine edit. He has to actively decide to notify.
-  var ce = document.getElementById('edit-notify-client-reschedule'); if(ce) ce.checked = false;
-  var cs = document.getElementById('edit-notify-cleaner-job');       if(cs) cs.checked = false;
+  var ce = document.getElementById('edit-notify-client-reschedule');  if(ce) ce.checked = false;
+  var cr = document.getElementById('edit-notify-cleaner-reschedule'); if(cr) cr.checked = false;
+  var cs = document.getElementById('edit-notify-cleaner-job');        if(cs) cs.checked = false;
 
   // Wire change detection. Each section toggles based on its own field
   // change; the wrapper panel becomes visible if either is.
@@ -6669,8 +6673,9 @@ async function saveApptEdit(mode){
     var _newTime  = timeVal;
     var _dateChanged = (_origDate && _newDate && _origDate !== _newDate);
     var _timeChanged = (_origTime && _newTime && _origTime !== _newTime);
-    var _clientChk   = document.getElementById('edit-notify-client-reschedule');
-    var _cleanerChk  = document.getElementById('edit-notify-cleaner-job');
+    var _clientChk        = document.getElementById('edit-notify-client-reschedule');
+    var _cleanerReschedChk= document.getElementById('edit-notify-cleaner-reschedule');
+    var _cleanerJobChk    = document.getElementById('edit-notify-cleaner-job');
     var _origCl  = window._editOrigCleanerId  || null;
     var _origCl2 = window._editOrigCleanerId2 || null;
     var _origCl3 = window._editOrigCleanerId3 || null;
@@ -6712,7 +6717,33 @@ async function saveApptEdit(mode){
         }
       }, 800);
     }
-    if(a.dbId && _cleanerChanged && _cleanerChk && _cleanerChk.checked){
+    // Cleaner notification on RESCHEDULE — fires only if date/time
+    // changed AND its own checkbox is ticked. Distinct from the
+    // assignment-change notification below (different mode → different
+    // SMS wording on the server side).
+    if(a.dbId && (_dateChanged || _timeChanged) && _cleanerReschedChk && _cleanerReschedChk.checked){
+      setTimeout(async function(){
+        var tok = await _getNotifyToken();
+        if(!tok){ console.warn('[notify-cleaner-reschedule] no auth token'); return; }
+        try{
+          var r = await fetch('/api/manual-send-cleaner-job', {
+            method:'POST',
+            headers:{'Content-Type':'application/json','Authorization':'Bearer '+tok},
+            body: JSON.stringify({ appointmentId: a.dbId, mode: 'rescheduled' })
+          });
+          var j = await r.json().catch(function(){ return {}; });
+          if(!r.ok || !j.success){
+            if(typeof showToast==='function') showToast('Cleaner reschedule SMS failed: '+(j.error||r.status), 'error');
+          } else {
+            if(typeof showToast==='function') showToast('Cleaner notified of reschedule');
+          }
+        }catch(err){
+          console.warn('[notify-cleaner-reschedule] error:', err);
+          if(typeof showToast==='function') showToast('Cleaner reschedule SMS failed: '+(err.message||err), 'error');
+        }
+      }, 800);
+    }
+    if(a.dbId && _cleanerChanged && _cleanerJobChk && _cleanerJobChk.checked){
       setTimeout(async function(){
         var tok = await _getNotifyToken();
         if(!tok){ console.warn('[notify-cleaner-job] no auth token'); return; }
@@ -6720,7 +6751,7 @@ async function saveApptEdit(mode){
           var r = await fetch('/api/manual-send-cleaner-job', {
             method:'POST',
             headers:{'Content-Type':'application/json','Authorization':'Bearer '+tok},
-            body: JSON.stringify({ appointmentId: a.dbId })
+            body: JSON.stringify({ appointmentId: a.dbId, mode: 'assigned' })
           });
           var j = await r.json().catch(function(){ return {}; });
           if(!r.ok || !j.success){

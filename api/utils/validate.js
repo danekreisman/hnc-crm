@@ -237,6 +237,7 @@ export const SCHEMAS = {
   },
   manualSendCleanerJob: {
     appointmentId: { required: true, rules: [is.uuid], message: 'appointmentId must be a valid UUID' },
+    mode:          { required: false, rules: [is.oneOf(['assigned', 'rescheduled'])], message: "mode must be 'assigned' or 'rescheduled' if provided" },
   },
   manualResendBookingLink: {
     leadId: { required: true, rules: [is.uuid], message: 'leadId must be a valid UUID' },

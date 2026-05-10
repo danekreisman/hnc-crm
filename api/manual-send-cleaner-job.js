@@ -65,6 +65,11 @@ export default async function handler(req, res) {
   const invalid = validateOrFail(req.body, SCHEMAS.manualSendCleanerJob);
   if (invalid) return res.status(400).json(invalid);
   const { appointmentId } = req.body;
+  // Mode controls the message wording. 'assigned' (default) frames it
+  // as "You have been assigned: ..."; 'rescheduled' frames it as
+  // "Schedule update: ... has been moved to ...". Same data, same
+  // recipients, same audit column — just different text.
+  const mode = req.body.mode === 'rescheduled' ? 'rescheduled' : 'assigned';
 
   const db = createClient(
     process.env.SUPABASE_URL,
@@ -76,12 +81,15 @@ export default async function handler(req, res) {
     // Pull all 3 possible cleaner ids and the appointment details.
     // No PostgREST embed for paired cleaners (the join only works for
     // the primary cleaner_id), so resolve names + phones in a second
-    // round trip.
+    // round trip. cleaner_pay / _2 / _3 are pulled here so each
+    // cleaner's SMS shows their own pay (paired cleaners may have
+    // different rates).
     const { data: appt, error: apptErr } = await db
       .from('appointments')
       .select(`
         id, date, time, service, address, duration_hours, total_price, notes,
         client_id, cleaner_id, cleaner_id_2, cleaner_id_3,
+        cleaner_pay, cleaner_pay_2, cleaner_pay_3,
         clients ( name )
       `)
       .eq('id', appointmentId)
@@ -108,6 +116,14 @@ export default async function handler(req, res) {
       });
     }
 
+    // Map each cleaner id to their slot's pay so per-cleaner messages
+    // include the correct dollar figure. Slot 1 = primary, 2 = paired,
+    // 3 = third paired.
+    const payByCleanerId = {};
+    if (appt.cleaner_id)   payByCleanerId[appt.cleaner_id]   = appt.cleaner_pay;
+    if (appt.cleaner_id_2) payByCleanerId[appt.cleaner_id_2] = appt.cleaner_pay_2;
+    if (appt.cleaner_id_3) payByCleanerId[appt.cleaner_id_3] = appt.cleaner_pay_3;
+
     const prettyDate = (() => {
       try {
         return new Date(appt.date + 'T12:00:00').toLocaleDateString('en-US', {
@@ -119,15 +135,24 @@ export default async function handler(req, res) {
     const duration = appt.duration_hours ? `~${Math.round(appt.duration_hours)} hrs` : null;
 
     const buildMsg = (cleaner) => {
-      const lines = [
-        `New job: ${appt.service || 'Cleaning'} on ${prettyDate} at ${appt.time || ''}`,
+      const pay = payByCleanerId[cleaner.id];
+      const payLine = (pay != null && !isNaN(Number(pay))) ? `Pay: $${Number(pay).toFixed(2)}` : null;
+      const partners = eligibleCleaners
+        .filter((c) => c.id !== cleaner.id)
+        .map((c) => c.name)
+        .join(', ');
+      const baseLines = [
         `Client: ${clientName}`,
         appt.address ? `Address: ${appt.address}` : null,
         duration ? `Duration: ${duration}` : null,
-        eligibleCleaners.length > 1 ? `Paired with: ${eligibleCleaners.filter((c) => c.id !== cleaner.id).map((c) => c.name).join(', ')}` : null,
+        payLine,
+        partners ? `Paired with: ${partners}` : null,
         `Questions? Text Dane at ${ADMIN_PHONE}`,
       ].filter(Boolean);
-      return lines.join('\n');
+      const headline = mode === 'rescheduled'
+        ? `Schedule update: ${clientName}'s ${appt.service || 'cleaning'} has been rescheduled to ${prettyDate} at ${appt.time || ''}`
+        : `You have been assigned: ${appt.service || 'Cleaning'} on ${prettyDate} at ${appt.time || ''}`;
+      return [headline, ...baseLines].join('\n');
     };
 
     const results = [];
@@ -171,8 +196,8 @@ export default async function handler(req, res) {
 
     await logActivity(
       'manual_cleaner_job_sent',
-      `${userEmail} manually sent job assignment to ${results.filter((r) => r.ok).map((r) => r.name).join(', ')}`,
-      { appointmentId, results, sentBy: userId },
+      `${userEmail} manually sent ${mode === 'rescheduled' ? 'reschedule notice' : 'job assignment'} to ${results.filter((r) => r.ok).map((r) => r.name).join(', ')}`,
+      { appointmentId, mode, results, sentBy: userId },
     );
 
     return res.status(200).json({ success: true, sentAt, results });

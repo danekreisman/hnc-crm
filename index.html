@@ -7173,7 +7173,12 @@ function openClient(id){
     }
   }
   var hist=document.getElementById('cl-history');hist.innerHTML='';
-  d.history.forEach(function(h){
+  // d.history is undefined for fresh clients with no appointments yet.
+  // Guard so a brand-new client (e.g. just accepted from a public booking
+  // review task) doesn't crash openClient when the user clicks them in
+  // search results. Bug pattern: TypeError: Cannot read properties of
+  // undefined (reading 'forEach') at openClient.
+  (d.history || []).forEach(function(h){
     var row=document.createElement('div');row.className='job-history-item';
     row.innerHTML='<div><div style="font-size:12px;font-weight:500;">'+h.date+' — '+h.svc+'</div></div><div style="text-align:right;"><div style="font-size:12px;font-weight:600;color:var(--brand-500);">'+h.amt+'</div><div style="font-size:10px;color:'+(h.paid?'#276749':'#b7791f')+';">'+(h.paid?'Paid':'Pending')+'</div></div>';
     hist.appendChild(row);

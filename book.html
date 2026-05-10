@@ -1169,17 +1169,12 @@ function renderSuccess(result){
   $('steps-bar').style.display='none';
   var dateStr = SEL_DATE;
   try { dateStr = new Date(SEL_DATE+'T12:00:00').toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'}); } catch(e){}
-  // Visible build marker — diagnostic. Helps Dane confirm at a glance
-  // which version of the booking flow rendered. Remove after deploy
-  // pipeline is verified working.
-  var ver = (result && result.code_version) ? result.code_version : 'no-version-in-response';
   $('app').innerHTML = '<div class="card"><div class="success-screen">'
     +'<div class="success-icon">\uD83D\uDCE9</div>'
     +'<h2>Booking request received!</h2>'
     +'<p>Thanks '+esc((LEAD && LEAD.firstName)||'')+'! We got your request for <strong>'+esc(dateStr)+'</strong> at <strong>'+esc(SEL_TIME)+'</strong>.'
     +'<br><br>Our team will review the details and confirm your booking within 24 hours. You\u2019ll get a confirmation email once a cleaner is assigned.'
     +'<br><br>Questions? Call or text <strong>(808) 468-5356</strong>. Mahalo! &#127946;</p>'
-    +'<div style="margin-top:20px;padding:8px;background:#f0f9ff;border:1px dashed #3BB8E3;border-radius:6px;font-size:11px;color:#1e40af;">build: '+esc(ver)+'</div>'
     +'</div></div>';
 }
 

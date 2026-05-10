@@ -87,13 +87,6 @@ export default async function handler(req, res) {
 
   // -- POST: book ---------------------------------------------------------
   if (req.method === 'POST') {
-    // VERSION MARKER — proves which build is serving this request. Bumped
-    // on each diagnostic round so Dane can see in the response whether
-    // a deploy actually took effect. If you're reading this, the version
-    // is also logged to Vercel function logs at request entry.
-    const CODE_VERSION = 'v2-review-task-flow-rc3-2026-05-10';
-    console.log('[lead-book] entered POST handler, code_version=' + CODE_VERSION);
-
     const { token, date, time, notes, service, rushFee } = req.body;
     const invalid = validateOrFail(req.body, SCHEMAS.booking);
     if (invalid) return res.status(400).json(invalid);
@@ -402,7 +395,6 @@ export default async function handler(req, res) {
     return res.status(200).json({
       success: true,
       requestReceived: true,
-      code_version: CODE_VERSION,
       leadId: lead.id,
       taskId: taskRowId,
       requestedDate: date,

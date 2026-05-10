@@ -2549,6 +2549,22 @@ Mahalo 🌺</textarea>
         </div>
         <div class="success-bar" id="lead-action-success" style="margin-top:10px;"></div>
 
+        <!-- Resend booking link panel — manual SMS that mirrors the
+             auto-quote SMS sent at lead capture. Used when the lead lost
+             the original. Renders the last-sent label inline so Dane can
+             tell at a glance whether they were already nudged. -->
+        <div id="lead-booking-link-panel" style="margin-top:12px;padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:#fafdfe;display:flex;align-items:center;gap:10px;">
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:13px;font-weight:600;color:var(--text);">Booking link SMS</div>
+            <div id="lead-booking-link-recipient" style="font-size:11px;color:var(--text-muted);margin-top:2px;">\u2192 \u2014</div>
+            <div id="lead-booking-link-sent" style="font-size:11px;color:#94a3b8;margin-top:2px;">Last resent: never</div>
+          </div>
+          <button id="lead-resend-booking-link-btn" type="button" onclick="resendLeadBookingLink()"
+            style="padding:6px 12px;border-radius:7px;border:1px solid #3BB8E3;background:#3BB8E3;color:#fff;font-size:12px;font-weight:600;cursor:pointer;flex-shrink:0;">
+            Resend
+          </button>
+        </div>
+
         <!-- Comms log panel: per-lead timeline of every outbound message
              (AI follow-ups, automation runs, future manual sends). Lazy-loaded
              on profile open via /api/lead-comms-log. -->
@@ -5854,12 +5870,13 @@ async function renderApptNotifications(){
   try {
     var { data, error } = await db
       .from('appointments')
-      .select('id, service, confirmation_sent_at, reminder_sent_at, waiver_sent_at, client_id, clients ( name, email, phone, policies_agreed_at )')
+      .select('id, service, cleaner_id, cleaner_id_2, cleaner_id_3, confirmation_sent_at, reminder_sent_at, waiver_sent_at, reschedule_sent_at, cleaner_notified_at, client_id, clients ( name, email, phone, policies_agreed_at )')
       .eq('id', apptId)
       .maybeSingle();
     if (error) throw error;
     if (!data) { rowsEl.innerHTML = '<div style="font-size:12px;color:var(--text-muted);">Appointment not found.</div>'; return; }
     var c = data.clients || {};
+    var hasCleaner = !!(data.cleaner_id || data.cleaner_id_2 || data.cleaner_id_3);
     var rows = [
       {
         key: 'confirmation',
@@ -5888,6 +5905,25 @@ async function renderApptNotifications(){
         disabledReason: !c.phone ? 'Add a phone to the client record'
                        : c.policies_agreed_at ? 'Already agreed ' + _formatLastSent(c.policies_agreed_at)
                        : null,
+      },
+      {
+        key: 'reschedule',
+        label: 'Reschedule notice (email + SMS)',
+        recipient: (c.email && c.phone) ? (c.email + ' + ' + c.phone) : (c.email || c.phone || null),
+        recipientLabel: c.email && c.phone ? (c.email + ' + ' + c.phone)
+                       : c.email ? (c.email + ' (email only — no phone)')
+                       : c.phone ? (c.phone + ' (SMS only — no email)')
+                       : 'no email or phone on file',
+        sentAt: data.reschedule_sent_at,
+        disabledReason: (!c.email && !c.phone) ? 'Add an email or phone to the client record' : null,
+      },
+      {
+        key: 'cleaner-job',
+        label: 'Send job to cleaner (SMS)',
+        recipient: hasCleaner ? 'assigned cleaner(s)' : null,
+        recipientLabel: hasCleaner ? 'assigned cleaner(s) on this appointment' : 'no cleaner assigned',
+        sentAt: data.cleaner_notified_at,
+        disabledReason: hasCleaner ? null : 'Assign a cleaner first',
       },
     ];
 
@@ -5944,6 +5980,8 @@ async function sendManualNotification(kind){
   var prettyKind = kind === 'confirmation' ? 'confirmation email'
                 : kind === 'reminder'      ? 'day-before reminder SMS'
                 : kind === 'waiver'        ? 'waiver SMS'
+                : kind === 'reschedule'    ? 'reschedule notice (email + SMS)'
+                : kind === 'cleaner-job'   ? 'job-assignment SMS to cleaner(s)'
                 : kind;
   var confirmMsg = 'Send ' + prettyKind + '\nTo: ' + (recipientLabel || '(see row)') + '\n\nProceed?';
   if (!confirm(confirmMsg)) return;
@@ -5954,6 +5992,8 @@ async function sendManualNotification(kind){
   var endpoint = kind === 'confirmation' ? '/api/manual-send-confirmation'
               : kind === 'reminder'     ? '/api/manual-send-reminder'
               : kind === 'waiver'       ? '/api/manual-send-waiver'
+              : kind === 'reschedule'   ? '/api/manual-send-reschedule'
+              : kind === 'cleaner-job'  ? '/api/manual-send-cleaner-job'
               : null;
   if (!endpoint) {
     if (typeof showToast === 'function') showToast('Unknown notification kind: ' + kind, 'error');
@@ -5987,7 +6027,12 @@ async function sendManualNotification(kind){
       sentLabel.style.color = '#15803d';
     }
     if (btn) { btn.disabled = false; btn.textContent = 'Sent \u2713'; setTimeout(function(){ if (btn) btn.textContent = 'Send'; }, 2500); }
-    var sentToastMsg = (kind === 'confirmation' ? 'Confirmation email sent' : kind === 'reminder' ? 'Reminder sent' : 'Waiver SMS sent')
+    var sentToastMsg = (kind === 'confirmation' ? 'Confirmation email sent'
+                       : kind === 'reminder'     ? 'Reminder sent'
+                       : kind === 'waiver'       ? 'Waiver SMS sent'
+                       : kind === 'reschedule'   ? 'Reschedule notice sent'
+                       : kind === 'cleaner-job'  ? 'Job notification sent to cleaner(s)'
+                       : 'Sent')
       + (data.recipient ? ' to ' + data.recipient : '');
     if (typeof showToast === 'function') showToast(sentToastMsg);
   } catch (err) {
@@ -7531,6 +7576,98 @@ function openLead(id){
   setTimeout(loadLeadSummary, 400);
   setTimeout(loadSuggestedQuote, 400);
   setTimeout(loadLeadCommsLog, 500);
+  try { renderLeadBookingLinkPanel(); } catch(e){ console.warn('renderLeadBookingLinkPanel failed:', e); }
+}
+
+/* Render the booking-link resend panel for the currently open lead.
+   Reads the lead row to populate the recipient phone + last-resent
+   timestamp. Disables the Resend button if the lead has no phone or
+   if the row hasn't loaded yet. Same pattern as renderApptNotifications
+   but lead-scoped. */
+async function renderLeadBookingLinkPanel(){
+  var recipEl = document.getElementById('lead-booking-link-recipient');
+  var sentEl  = document.getElementById('lead-booking-link-sent');
+  var btn     = document.getElementById('lead-resend-booking-link-btn');
+  if (!recipEl || !sentEl || !btn) return;
+  if (!currentLeadId) {
+    recipEl.textContent = '\u2192 \u2014';
+    sentEl.textContent = 'Last resent: never';
+    btn.disabled = true; btn.style.opacity = '0.5'; btn.style.cursor = 'not-allowed';
+    return;
+  }
+  recipEl.textContent = '\u2192 loading\u2026';
+  sentEl.textContent = 'Last resent: \u2026';
+  try {
+    var { data, error } = await db
+      .from('leads')
+      .select('id, phone, booking_link_resent_at')
+      .eq('id', currentLeadId)
+      .maybeSingle();
+    if (error) throw error;
+    if (!data) {
+      recipEl.textContent = '\u2192 lead not found';
+      sentEl.textContent = 'Last resent: \u2014';
+      btn.disabled = true; btn.style.opacity = '0.5';
+      return;
+    }
+    var phone = data.phone || null;
+    if (!phone) {
+      recipEl.textContent = '\u2192 no phone on file';
+      sentEl.innerHTML = 'Last resent: never \u00B7 <span style="color:#b45309;">add a phone first</span>';
+      btn.disabled = true; btn.style.opacity = '0.5'; btn.style.cursor = 'not-allowed';
+      btn.style.background = '#f1f5f9'; btn.style.color = '#94a3b8'; btn.style.borderColor = '#cbd5e1';
+    } else {
+      recipEl.textContent = '\u2192 ' + phone;
+      var sentLabel = _formatLastSent(data.booking_link_resent_at);
+      sentEl.textContent = 'Last resent: ' + sentLabel;
+      sentEl.style.color = data.booking_link_resent_at ? '#5B7683' : '#94a3b8';
+      btn.disabled = false; btn.style.opacity = '1'; btn.style.cursor = 'pointer';
+      btn.style.background = '#3BB8E3'; btn.style.color = '#fff'; btn.style.borderColor = '#3BB8E3';
+    }
+  } catch (err) {
+    recipEl.textContent = '\u2192 (error loading)';
+    sentEl.textContent = err.message || String(err);
+  }
+}
+
+async function resendLeadBookingLink(){
+  if (!currentLeadId) {
+    if (typeof showToast === 'function') showToast('No lead selected', 'error');
+    return;
+  }
+  var recipEl = document.getElementById('lead-booking-link-recipient');
+  var phoneText = recipEl ? recipEl.textContent.replace(/^\u2192\s*/, '').trim() : '';
+  if (!confirm('Resend booking link SMS to ' + phoneText + '?\n\nProceed?')) return;
+  var btn = document.getElementById('lead-resend-booking-link-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Sending\u2026'; }
+  try {
+    var session = await db.auth.getSession();
+    var token = session.data.session ? session.data.session.access_token : null;
+    if (!token) throw new Error('Not signed in');
+    var resp = await fetch('/api/manual-resend-booking-link', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({ leadId: currentLeadId }),
+    });
+    var data = await resp.json().catch(function(){ return {}; });
+    if (!resp.ok || !data.success) {
+      var msg = data.error || ('Send failed (' + resp.status + ')');
+      if (typeof showToast === 'function') showToast(msg, 'error');
+      if (btn) { btn.disabled = false; btn.textContent = 'Resend'; }
+      return;
+    }
+    var sentEl = document.getElementById('lead-booking-link-sent');
+    if (sentEl) {
+      sentEl.textContent = 'Last resent: just now';
+      sentEl.style.color = '#15803d';
+    }
+    if (btn) { btn.textContent = 'Sent \u2713'; setTimeout(function(){ if (btn) { btn.disabled = false; btn.textContent = 'Resend'; } }, 2500); }
+    if (typeof showToast === 'function') showToast('Booking link resent' + (data.recipient ? ' to ' + data.recipient : ''));
+  } catch (err) {
+    console.error('[resendLeadBookingLink]', err);
+    if (typeof showToast === 'function') showToast('Send failed: ' + (err.message || err), 'error');
+    if (btn) { btn.disabled = false; btn.textContent = 'Resend'; }
+  }
 }
 
 /* ────────────────────────────────────────────────────────────────────────

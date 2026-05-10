@@ -232,6 +232,15 @@ export const SCHEMAS = {
   manualSendWaiver: {
     appointmentId: { required: true, rules: [is.uuid], message: 'appointmentId must be a valid UUID' },
   },
+  manualSendReschedule: {
+    appointmentId: { required: true, rules: [is.uuid], message: 'appointmentId must be a valid UUID' },
+  },
+  manualSendCleanerJob: {
+    appointmentId: { required: true, rules: [is.uuid], message: 'appointmentId must be a valid UUID' },
+  },
+  manualResendBookingLink: {
+    leadId: { required: true, rules: [is.uuid], message: 'leadId must be a valid UUID' },
+  },
 
 };
 

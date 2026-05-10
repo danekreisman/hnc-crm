@@ -318,6 +318,16 @@
         "column": "last_followup_sent_at",
         "default": null,
         "nullable": true
+      },
+      {
+        "column": "booking_link_resent_at",
+        "default": null,
+        "nullable": true
+      },
+      {
+        "column": "booking_link_resent_by",
+        "default": null,
+        "nullable": true
       }
     ],
     "clients": [
@@ -946,6 +956,26 @@
       },
       {
         "column": "waiver_sent_by",
+        "default": null,
+        "nullable": true
+      },
+      {
+        "column": "reschedule_sent_at",
+        "default": null,
+        "nullable": true
+      },
+      {
+        "column": "reschedule_sent_by",
+        "default": null,
+        "nullable": true
+      },
+      {
+        "column": "cleaner_notified_at",
+        "default": null,
+        "nullable": true
+      },
+      {
+        "column": "cleaner_notified_by",
         "default": null,
         "nullable": true
       }

@@ -112,7 +112,10 @@ export default async function handler(req, res) {
     const firstName = lead.name.trim().split(' ')[0];
     const rawPhone  = (lead.phone || '').trim();
     const phone     = rawPhone.replace(/\D/g, '');
-    const e164      = rawPhone.startsWith('+') ? rawPhone.replace(/[^0-9+]/g, '') : '+1' + phone;
+    // e164 not currently needed — kept in scope in case a future audit
+    // wants the canonicalised form. (Unused since lead-book stopped
+    // calling book_lead_atomic 2026-05-09.)
+    // const e164      = rawPhone.startsWith('+') ? rawPhone.replace(/[^0-9+]/g, '') : '+1' + phone;
     const quoteData = lead.quote_data || {};
     const TAX_RATE  = 0.04712;
 
@@ -128,13 +131,6 @@ export default async function handler(req, res) {
     const preTotal     = quoteData.total != null ? Number(quoteData.total) : (lead.quote_total ? Number(lead.quote_total) : null);
     const tax          = preTotal != null ? +(preTotal * TAX_RATE).toFixed(2) : null;
     const totalWithTax = preTotal != null ? +(preTotal + tax + (rushFee || 0)).toFixed(2) : null;
-    const durationHrs  = quoteData.duration_minutes ? quoteData.duration_minutes / 60 : null;
-
-    const apptNotes = [
-      'Booked via portal',
-      rushFee > 0 ? `Rush fee: $${rushFee} (${rushFee === 200 ? 'same-day' : rushFee === 100 ? 'next-day' : '2-day'})` : null,
-      notes || null,
-    ].filter(Boolean).join('\n');
 
     // -- 2. Pretty-format the requested date for notifications -------------
     const prettyDate = new Date(date + 'T12:00:00').toLocaleDateString('en-US', {

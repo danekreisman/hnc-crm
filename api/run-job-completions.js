@@ -15,7 +15,16 @@ import { fetchWithTimeout, TIMEOUTS } from './utils/with-timeout.js';
 import { isAutomationEnabled } from './utils/automation-gate.js';
 
 // ── VA TASK TEST MODE: limit task creation to Dane only during rollout ─────
-const TASK_AUTOMATIONS_TEST_MODE = true;
+/**
+ * TEST MODE GUARD (flipped to false 2026-05-10): the post-first-clean
+ * VA task previously fired only for records matching Dane's phone or
+ * email. That's how new automations get verified before going live —
+ * but flipping back to false had been forgotten, so Dane was getting
+ * the tasks for his own appointments and no real one-time clients
+ * were getting them. Sibling file run-task-automations.js had already
+ * been flipped to false; this one had not.
+ */
+const TASK_AUTOMATIONS_TEST_MODE = false;
 const DANE_PHONE_DIGITS = '8082697636';
 const DANE_EMAIL = 'dane.kreisman@gmail.com';
 

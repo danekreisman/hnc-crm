@@ -5,7 +5,7 @@ Read it at the start of every session before touching any code.
 
 ---
 
-## 📍 Current state snapshot — last updated 2026-05-09 (mid-day)
+## 📍 Current state snapshot — last updated 2026-05-09 (late afternoon)
 
 This block is the elevator-pitch summary for any new Claude session. Read this BEFORE the recent-edits table at the bottom — it tells you where things stand without re-deriving from commits.
 
@@ -23,6 +23,7 @@ This block is the elevator-pitch summary for any new Claude session. Read this B
 - All 4 core tables (appointments, leads, clients, cleaners) audited — zero schema/code mismatches
 - 5 single-source-of-truth helpers (`_leadRowToDb`, `_clientRowToDb`, `_cleanerRowToDb`, `_apptRowToDbEntry`, `_auditDataShapes`)
 - Schema-enforcement script (`scripts/check-schema.js`) — static checker that catches "code writes to non-existent column" at commit time; uses `schema-snapshot.json` as the source of truth, validates 154 writer call sites across `index.html` + `api/**/*.js`. Initial run (2026-05-09) surfaced 3 latent bugs masked by defensive try/catch fallbacks; after migrations + snapshot refresh, the checker is clean and `vercel.json` `buildCommand` is wired so every deploy is gated. Workflow documented in "Schema enforcement workflow" section below.
+- **Public-booking review modal now shows policies-agreed indicator** (commit 35a982b, 2026-05-09). The customer block in the `review_public_booking` overlay renders "✓ Agreed to service policies [date]" using `extracted_data.policies_agreed_at` (newly stamped by `submit-public-booking.js`), with a fallback to `submitted_at` for tasks created before this change. Every public booking implies agreement because `validate.js` SCHEMAS.publicBookingSubmit gates `policiesAgreed===true` server-side — but Dane couldn't see that at a glance and asked for visibility (Kai Hammond booking, 2026-05-09).
 
 **READY-BUT-UNTESTED IN PRODUCTION:**
 - Direct booking on `book.hawaiinaturalclean.com` (Option B, partially shipped)
@@ -33,6 +34,7 @@ This block is the elevator-pitch summary for any new Claude session. Read this B
 2. **Direct-book finalization** on book.html (or decision to disable confirmation message until ready).
 3. **Cleaner portal email audit** before launch (`SELECT name, email, status FROM cleaners WHERE status='Active'`).
 4. **Supabase auto-backups** — currently no backup strategy.
+5. **Public-booking policy persistence (follow-up to commit 35a982b):** `accept-public-booking.js` does NOT propagate `extracted_data.policies_agreed_at` to the resulting `clients.policies_agreed_at` column. For `new_quote` path → `book_lead_atomic` RPC sets `policies_agreed_at = NOW()` for new clients (works, but uses acceptance time instead of submission time); for `existing_property` path → no update at all (existing client with `policies_agreed_at = null` stays null even after re-agreeing). Fix is small: pass `policies_agreed_at` into `p_client_data`, change RPC to `COALESCE((p_client_data->>'policies_agreed_at')::TIMESTAMPTZ, NOW())`, and add an UPDATE on the existing-client branch when null.
 
 **KNOWN DATA STATE NOTES:**
 - Two Kelley Diane O'Neill records exist (active: `ba2f0f8f`, inactive: `f2046882`); 52 future appointments remapped to active record.

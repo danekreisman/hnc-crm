@@ -384,42 +384,60 @@ export default async function handler(req, res) {
       });
     }
 
-    // ── 6. Best-effort: in-app notification (the bell) ─────────────────────
-    fetch(`${process.env.SUPABASE_URL}/rest/v1/notifications`, {
-      method: 'POST',
-      headers: {
-        apikey: process.env.SUPABASE_SERVICE_ROLE_KEY,
-        Authorization: 'Bearer ' + process.env.SUPABASE_SERVICE_ROLE_KEY,
-        'Content-Type': 'application/json',
-        Prefer: 'return=minimal',
-      },
-      body: JSON.stringify({
-        event_type: 'lead_inquiry',
-        title: 'New booking request: ' + cleanName + rushTag,
-        body: prettyReq + ' \u00b7 ' + b.service + (b.frequency ? ' (' + b.frequency + ')' : '') + (displayTotal != null ? ' \u00b7 $' + displayTotal.toFixed(2) : ''),
-        url: '/#tasks',
-        metadata: { source: 'public_booking', taskId: taskRowId, leadId, clientId: b.clientId || null, name: cleanName, phone: cleanPhoneDigits, service: b.service, path: b.path, requestedDate: b.date, requestedTime: b.time, rushFee: rushFee },
-      }),
-    }).catch((err) => console.warn('[submit-public-booking] in-app notify failed:', err && err.message));
+    // ── 6/7/8. Notifications: in-app bell + push + owner email ─────────────
+    // CRITICAL: these were fire-and-forget. On Vercel serverless, the runtime
+    // can freeze the function as soon as `res.status(200).json(...)` returns,
+    // which kills any in-flight fetches. Kai Hammond's booking (2026-05-09)
+    // came through fine but Dane received zero notifications because all
+    // three were torn down mid-flight. Fix: kick them off in parallel and
+    // await Promise.allSettled before returning. allSettled means a slow or
+    // failing path doesn't block the others. Each task already has its own
+    // try/catch + logError so the customer-facing booking submit never fails
+    // because of a downstream notification glitch.
+    const inAppNotifyPromise = (async () => {
+      try {
+        await fetchWithTimeout(`${process.env.SUPABASE_URL}/rest/v1/notifications`, {
+          method: 'POST',
+          headers: {
+            apikey: process.env.SUPABASE_SERVICE_ROLE_KEY,
+            Authorization: 'Bearer ' + process.env.SUPABASE_SERVICE_ROLE_KEY,
+            'Content-Type': 'application/json',
+            Prefer: 'return=minimal',
+          },
+          body: JSON.stringify({
+            event_type: 'lead_inquiry',
+            title: 'New booking request: ' + cleanName + rushTag,
+            body: prettyReq + ' \u00b7 ' + b.service + (b.frequency ? ' (' + b.frequency + ')' : '') + (displayTotal != null ? ' \u00b7 $' + displayTotal.toFixed(2) : ''),
+            url: '/#tasks',
+            metadata: { source: 'public_booking', taskId: taskRowId, leadId, clientId: b.clientId || null, name: cleanName, phone: cleanPhoneDigits, service: b.service, path: b.path, requestedDate: b.date, requestedTime: b.time, rushFee: rushFee },
+          }),
+        }, TIMEOUTS.SUPABASE);
+      } catch (err) {
+        await logError('submit-public-booking:in-app-notify', err, { leadId, taskRowId });
+      }
+    })();
 
-    // ── 7. Best-effort: push fan-out ───────────────────────────────────────
-    import('./utils/send-push.js').then(({ sendPushToAllSubscribed }) => {
-      return sendPushToAllSubscribed({
-        title: 'Booking request \u2014 ' + cleanName + rushTag,
-        body: prettyReq + ' \u00b7 ' + b.service + (displayTotal != null ? ' \u00b7 $' + displayTotal.toFixed(2) : ''),
-        url: '/#tasks',
-        tag: 'public-booking-' + (leadId || b.clientId || phone10),
-        urgency: 'high',
-      });
-    }).catch((err) => console.warn('[submit-public-booking] push notify failed:', err && err.message));
+    const pushNotifyPromise = (async () => {
+      try {
+        const { sendPushToAllSubscribed } = await import('./utils/send-push.js');
+        await sendPushToAllSubscribed({
+          title: 'Booking request \u2014 ' + cleanName + rushTag,
+          body: prettyReq + ' \u00b7 ' + b.service + (displayTotal != null ? ' \u00b7 $' + displayTotal.toFixed(2) : ''),
+          url: '/#tasks',
+          tag: 'public-booking-' + (leadId || b.clientId || phone10),
+          urgency: 'high',
+        });
+      } catch (err) {
+        await logError('submit-public-booking:push-notify', err, { leadId, taskRowId });
+      }
+    })();
 
-    // ── 8. Best-effort: owner email ────────────────────────────────────────
-    fetchWithTimeout(`${BASE_URL}/api/send-email`, {
+    const ownerEmailPromise = fetchWithTimeout(`${BASE_URL}/api/send-email`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         to: OWNER_EMAIL,
-        subject: 'New booking request: ' + cleanName + ' — ' + b.service,
+        subject: 'New booking request: ' + cleanName + ' \u2014 ' + b.service,
         type: 'generic',
         clientName: 'Dane',
         notes: description + '\n\nReview in CRM: https://hnc-crm.vercel.app/#tasks',
@@ -427,6 +445,8 @@ export default async function handler(req, res) {
     }, TIMEOUTS.RESEND).catch((err) => {
       logError('submit-public-booking:owner-email', err, { leadId });
     });
+
+    await Promise.allSettled([inAppNotifyPromise, pushNotifyPromise, ownerEmailPromise]);
 
     // ── 9. Done ────────────────────────────────────────────────────────────
     return res.status(200).json({

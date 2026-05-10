@@ -16065,14 +16065,20 @@ async function openApptChargeOrInvoice(){
   var client = clientKey ? clientDB[clientKey] : null;
 
   // Source-of-truth ladder for card-on-file state:
-  //   1. clientDB[id].cards — DB-backed, populated by /api/sync-client-cards.
-  //      The "Refresh from Stripe" button writes here; loadAllData rehydrates
-  //      from the clients.cards JSONB column on every app load.
+  //   1. clients.cards — DB-backed, populated by /api/sync-client-cards.
+  //      ONLY trusted when cards_synced_at is set; otherwise the array
+  //      is the migration default '[]' and means "never checked yet,"
+  //      not "definitively no cards." Misreading [] + never-synced as
+  //      "no cards" was the source of Dane's 2026-05-10 charge-routing
+  //      bug — he'd just paid an invoice, Stripe had his card, but the
+  //      dispatcher sent him straight to the invoice modal because the
+  //      migration default looked like "synced and empty."
   //   2. window._cardCache — in-memory probe results (find_customer_cards).
   //      Survives only this session; useful when probe ran but sync didn't.
   //   3. customerId presence — last-resort hint that they MAY have a card.
   var dbCards = (client && Array.isArray(client.cards)) ? client.cards : null;
-  if (dbCards) {
+  var hasBeenSynced = !!(client && client.cardsSyncedAt);
+  if (dbCards && hasBeenSynced) {
     if (dbCards.length > 0) openApptCharge();
     else                    openApptInvoice();
     return;
@@ -16486,11 +16492,12 @@ function openApptCharge(){
 
   // Resolve card-on-file state and gate the [Charge card now] button.
   // Source-of-truth ladder matches the dispatcher's:
-  //   1. clientDB[id].cards (DB-backed)
+  //   1. clientDB[id].cards (DB-backed) — ONLY when cardsSyncedAt set
   //   2. _cardCache (probe results)
   //   3. async probe (when we have an email but no cached state)
   var dbCards = (client && Array.isArray(client.cards)) ? client.cards : null;
-  if (dbCards) {
+  var hasBeenSynced = !!(client && client.cardsSyncedAt);
+  if (dbCards && hasBeenSynced) {
     _setChargeBtnState(dbCards.length > 0 ? 'enabled' : 'disabled');
   } else {
     var cached = (clientKey && window._cardCache && window._cardCache[clientKey]) ? window._cardCache[clientKey] : null;
@@ -16502,7 +16509,34 @@ function openApptCharge(){
         var overlay = document.getElementById('appt-charge-overlay');
         if (!overlay || overlay.classList.contains('hidden')) return;
         _setChargeBtnState(found ? 'enabled' : 'disabled');
-        // Re-render the selector now that probe results landed.
+        // Self-healing: if the probe found cards, persist them to
+        // clients.cards so future page loads don't need another
+        // probe. Fire-and-forget; failures don't block the charge.
+        // Skipped if already-synced (cardsSyncedAt set) — we already
+        // know.
+        if (found && !client.cardsSyncedAt) {
+          (async function(){
+            try {
+              var session = await db.auth.getSession();
+              var token = session.data.session ? session.data.session.access_token : null;
+              if (!token) return;
+              var resp = await fetch('/api/sync-client-cards', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+                body: JSON.stringify({ clientId: clientKey }),
+              });
+              var data = await resp.json().catch(function(){ return {}; });
+              if (resp.ok && data.success) {
+                if (clientDB[clientKey]) {
+                  clientDB[clientKey].cards = data.cards || [];
+                  clientDB[clientKey].cardsSyncedAt = data.syncedAt || new Date().toISOString();
+                }
+                // Re-render the selector now that we have real card data.
+                try { renderChargeCardSelector(); } catch(_){}
+              }
+            } catch(_){}
+          })();
+        }
         try { renderChargeCardSelector(); } catch(_){}
       }).catch(function(){
         _setChargeBtnState('disabled');

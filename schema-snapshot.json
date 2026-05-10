@@ -566,6 +566,16 @@
         "column": "invoice_resent_by",
         "default": null,
         "nullable": true
+      },
+      {
+        "column": "cards",
+        "default": "'[]'::jsonb",
+        "nullable": true
+      },
+      {
+        "column": "cards_synced_at",
+        "default": null,
+        "nullable": true
       }
     ],
     "cleaners": [

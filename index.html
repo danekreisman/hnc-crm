@@ -2378,6 +2378,19 @@ Mahalo 🌺</textarea>
           <div class="info-row"><span class="info-label">Client since</span><span class="info-val" id="cl-since">—</span></div>
           <div class="info-row"><span class="info-label">Policies</span><span class="info-val" id="cl-policies">—</span></div>
         </div>
+
+        <!-- Cards on file — populated by renderClientCards() from
+             clients.cards (synced on demand via /api/sync-client-cards).
+             Click "Refresh from Stripe" to re-pull. The cards displayed
+             here drive the charge-modal selector when 2+ cards exist. -->
+        <div class="panel-section" style="display:flex;justify-content:space-between;align-items:center;">
+          <span>Cards on file</span>
+          <button type="button" id="cl-cards-refresh-btn" onclick="refreshClientCards()" style="font-size:11px;padding:4px 10px;border-radius:6px;border:1px solid #3BB8E3;background:#fff;color:#16758F;cursor:pointer;font-weight:600;">↻ Refresh from Stripe</button>
+        </div>
+        <div id="cl-cards-block" class="info-block" style="margin-bottom:14px;">
+          <div style="font-size:12px;color:var(--text-muted);">No card data yet — click Refresh to pull from Stripe.</div>
+        </div>
+
         <div class="panel-section">Stats</div>
         <div class="stat-grid">
           <div class="stat-box"><div class="stat-box-label">Lifetime value</div><div class="stat-box-val" id="cl-ltv">—</div></div>
@@ -3345,6 +3358,8 @@ function _clientRowToDb(c){
     flatRate: c.flat_rate||'',
     permDiscount: c.perm_discount||'',
     stripeCustomerId: c.stripe_customer_id||'',
+    cards: Array.isArray(c.cards) ? c.cards : [],
+    cardsSyncedAt: c.cards_synced_at || null,
     policiesAgreedAt: c.policies_agreed_at||null,
     do_not_contact: !!c.do_not_contact,
   };
@@ -6237,6 +6252,166 @@ async function sendClientNotification(kind){
   }
 }
 
+/* ── Cards on file (Stripe-synced) ─────────────────────────────────────
+   Reads clients.cards (JSONB array) and renders into #cl-cards-block.
+   Refresh button hits /api/sync-client-cards which re-pulls from
+   Stripe. The same data drives the charge-modal selector when 2+
+   cards exist (see renderChargeCardSelector below).
+*/
+function _formatCardLine(card, opts){
+  // opts: { isDefault: bool }
+  var brandPretty = ({ visa: 'Visa', mastercard: 'Mastercard', amex: 'Amex', discover: 'Discover', jcb: 'JCB', diners: 'Diners', unionpay: 'UnionPay' })[(card.brand||'').toLowerCase()] || (card.brand || 'Card');
+  var expStr = (card.exp_month && card.exp_year)
+    ? String(card.exp_month).padStart(2,'0') + '/' + String(card.exp_year).slice(-2)
+    : '';
+  return brandPretty + ' \u2022' + (card.last4 || '????') + (expStr ? ' \u00B7 exp ' + expStr : '') + (opts && opts.isDefault ? ' \u00B7 default' : '');
+}
+
+function _formatCardsSyncedAt(iso){
+  if (!iso) return 'never';
+  try {
+    var t = new Date(iso);
+    var diffMin = Math.round((Date.now() - t.getTime())/60000);
+    if (diffMin < 1) return 'just now';
+    if (diffMin < 60) return diffMin + ' min ago';
+    var diffHr = Math.round(diffMin/60);
+    if (diffHr < 24) return diffHr + ' hr ago';
+    var diffDay = Math.round(diffHr/24);
+    if (diffDay < 30) return diffDay + ' day' + (diffDay===1?'':'s') + ' ago';
+    return t.toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' });
+  } catch(_){ return iso; }
+}
+
+async function renderClientCards(){
+  var block = document.getElementById('cl-cards-block');
+  if (!block) return;
+  if (!currentClientId) {
+    block.innerHTML = '<div style="font-size:12px;color:var(--text-muted);">Save the client first.</div>';
+    return;
+  }
+  block.innerHTML = '<div style="font-size:12px;color:var(--text-muted);">Loading\u2026</div>';
+  try {
+    var { data, error } = await db
+      .from('clients')
+      .select('cards, cards_synced_at, stripe_customer_id')
+      .eq('id', currentClientId)
+      .maybeSingle();
+    if (error) throw error;
+    var cards = (data && Array.isArray(data.cards)) ? data.cards : [];
+    var synced = data && data.cards_synced_at;
+
+    if (cards.length === 0) {
+      var emptyMsg = synced
+        ? 'No cards on Stripe for this client (synced ' + _formatCardsSyncedAt(synced) + ')'
+        : 'No card data yet — click Refresh to pull from Stripe.';
+      block.innerHTML = '<div style="font-size:12px;color:var(--text-muted);">' + esc(emptyMsg) + '</div>';
+      return;
+    }
+
+    var html = '';
+    cards.forEach(function(c, idx){
+      html += '<div class="info-row">'
+        +     '<span class="info-label">' + (idx === 0 ? 'Primary' : 'Card ' + (idx+1)) + '</span>'
+        +     '<span class="info-val">' + esc(_formatCardLine(c, { isDefault: idx === 0 })) + '</span>'
+        +   '</div>';
+    });
+    html += '<div class="info-row"><span class="info-label">Last synced</span><span class="info-val" style="color:var(--text-muted);font-size:11px;">' + esc(_formatCardsSyncedAt(synced)) + '</span></div>';
+    block.innerHTML = html;
+  } catch (err) {
+    console.error('[renderClientCards]', err);
+    block.innerHTML = '<div style="font-size:12px;color:#b91c1c;">Could not load card data: ' + esc(err.message || String(err)) + '</div>';
+  }
+}
+
+async function refreshClientCards(){
+  if (!currentClientId) {
+    if (typeof showToast === 'function') showToast('No client selected', true);
+    return;
+  }
+  var btn = document.getElementById('cl-cards-refresh-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Syncing\u2026'; }
+  try {
+    var session = await db.auth.getSession();
+    var token = session.data.session ? session.data.session.access_token : null;
+    if (!token) throw new Error('Not signed in');
+    var resp = await fetch('/api/sync-client-cards', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({ clientId: currentClientId }),
+    });
+    var data = await resp.json().catch(function(){ return {}; });
+    if (!resp.ok || !data.success) {
+      if (typeof showToast === 'function') showToast('Card sync failed: ' + (data.error || resp.status), true);
+      return;
+    }
+    // Update _cardCache so the dispatcher + charge modal pick up the
+    // fresh state immediately without another round trip.
+    window._cardCache = window._cardCache || {};
+    window._cardCache[currentClientId] = {
+      customerId: data.customerId,
+      hasCard: (data.cards && data.cards.length > 0),
+      cards: data.cards || [],
+    };
+    // Also propagate to in-memory clientDB so other views see it.
+    if (clientDB[currentClientId]) {
+      clientDB[currentClientId].stripeCustomerId = data.customerId || clientDB[currentClientId].stripeCustomerId;
+      clientDB[currentClientId].cards = data.cards || [];
+    }
+    var msg = (data.cards && data.cards.length)
+      ? 'Synced ' + data.cards.length + ' card' + (data.cards.length === 1 ? '' : 's') + ' from Stripe'
+      : 'No cards on Stripe for this client';
+    if (typeof showToast === 'function') showToast(msg);
+    await renderClientCards();
+  } catch (err) {
+    console.error('[refreshClientCards]', err);
+    if (typeof showToast === 'function') showToast('Card sync error: ' + (err.message || err), true);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '\u21BB Refresh from Stripe'; }
+  }
+}
+
+/* ── Charge modal card selector ─────────────────────────────────────
+   Renders into #charge-card-selector based on whatever cards are
+   known for the current appt's client. Drives executeCharge: if 2+
+   cards, the user picks via radio; the choice is read at charge
+   time. If 1 card, just shows it. If 0, message + button stays
+   disabled (existing _setChargeBtnState handles that).
+*/
+function renderChargeCardSelector(){
+  var box = document.getElementById('charge-card-selector');
+  if (!box) return;
+  if (!currentAppt) { box.textContent = 'No appointment'; return; }
+  var clientKey = Object.keys(clientDB).find(function(k){ return k.length>=30 && clientDB[k].name === currentAppt.n; });
+  // Source of truth: in-memory clientDB.cards (just synced) → cache → empty.
+  var cards = (clientKey && clientDB[clientKey] && Array.isArray(clientDB[clientKey].cards)) ? clientDB[clientKey].cards : null;
+  if (!cards) {
+    var cached = (clientKey && window._cardCache && window._cardCache[clientKey]) ? window._cardCache[clientKey] : null;
+    cards = (cached && Array.isArray(cached.cards)) ? cached.cards : [];
+  }
+
+  if (cards.length === 0) {
+    box.innerHTML = '<span style="color:var(--text-muted);">No card on file</span>';
+    return;
+  }
+  if (cards.length === 1) {
+    box.innerHTML = esc(_formatCardLine(cards[0], { isDefault: true }));
+    box.dataset.selectedPmId = cards[0].id || '';
+    return;
+  }
+  // Multi-card: radio picker. First card is selected by default.
+  var html = '<div style="display:flex;flex-direction:column;gap:6px;">';
+  cards.forEach(function(c, idx){
+    var checked = idx === 0 ? 'checked' : '';
+    html += '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:6px 8px;border-radius:6px;background:#fff;border:1px solid var(--border);">'
+      +   '<input type="radio" name="charge-pm" value="' + esc(c.id || '') + '" ' + checked + ' onchange="document.getElementById(\'charge-card-selector\').dataset.selectedPmId=this.value">'
+      +   '<span style="flex:1;font-size:13px;">' + esc(_formatCardLine(c, { isDefault: idx === 0 })) + '</span>'
+      + '</label>';
+  });
+  html += '</div>';
+  box.innerHTML = html;
+  box.dataset.selectedPmId = cards[0].id || '';
+}
+
 function updateApptChargeButtonState(){
   var btn = document.getElementById('appt-charge-btn');
   if (!btn || !currentAppt) return;
@@ -7540,6 +7715,7 @@ function openClient(id){
   setTimeout(updateChargeBtn, 50);
   setTimeout(loadClientSummary, 400);
   try { renderClientNotifications(); } catch(e){ console.warn('renderClientNotifications failed:', e); }
+  try { renderClientCards(); } catch(e){ console.warn('renderClientCards failed:', e); }
 }
 
 function sendPolicyAgreement(){
@@ -15882,10 +16058,19 @@ async function openApptChargeOrInvoice(){
   var clientKey = Object.keys(clientDB).find(function(k){ return k.length>=30 && clientDB[k].name === clientName; });
   var client = clientKey ? clientDB[clientKey] : null;
 
-  // Prefer the explicit cache value when known: hasCard===true → charge,
-  // hasCard===false → invoice. The cache is the source of truth because
-  // it actually checked Stripe; the client.stripeCustomerId fallback is
-  // a hint, not a guarantee.
+  // Source-of-truth ladder for card-on-file state:
+  //   1. clientDB[id].cards — DB-backed, populated by /api/sync-client-cards.
+  //      The "Refresh from Stripe" button writes here; loadAllData rehydrates
+  //      from the clients.cards JSONB column on every app load.
+  //   2. window._cardCache — in-memory probe results (find_customer_cards).
+  //      Survives only this session; useful when probe ran but sync didn't.
+  //   3. customerId presence — last-resort hint that they MAY have a card.
+  var dbCards = (client && Array.isArray(client.cards)) ? client.cards : null;
+  if (dbCards) {
+    if (dbCards.length > 0) openApptCharge();
+    else                    openApptInvoice();
+    return;
+  }
   var cached = (clientKey && window._cardCache && window._cardCache[clientKey]) ? window._cardCache[clientKey] : null;
   if (cached && typeof cached.hasCard === 'boolean') {
     if (cached.hasCard) openApptCharge();
@@ -15893,10 +16078,9 @@ async function openApptChargeOrInvoice(){
     return;
   }
 
-  // Unknown card state — kick off a probe (async) and route based on
-  // whatever signal we have. If a customer ID exists we open charge
-  // optimistically; the modal will disable the button if the probe
-  // lands no-card. If there's no customer ID at all, route to invoice.
+  // Unknown — kick off a probe (async) and route on the customer-id
+  // hint. The modal's _setChargeBtnState will lock the button if the
+  // probe lands no-card.
   if (client && client.email && typeof probeClientCardOnFile === 'function' && clientKey) {
     try { probeClientCardOnFile(clientKey, client.email); } catch(_){}
   }
@@ -16289,33 +16473,37 @@ function openApptCharge(){
   document.getElementById('charge-base').textContent=cd.total||'—';
   document.getElementById('charge-fee').textContent='$'+fee.toFixed(2);
   document.getElementById('charge-total').textContent='$'+total.toFixed(2);
-  document.getElementById('charge-card-info').textContent=client?client.payment:'No card on file';
+  document.getElementById('charge-card-info') && (document.getElementById('charge-card-info').textContent = client?client.payment:'No card on file');
   openOverlay('appt-charge-overlay');
   try { _refreshFollowupSection('charge'); } catch(e){ console.warn('followup section render failed:', e); }
+  try { renderChargeCardSelector(); } catch(e){ console.warn('charge card selector render failed:', e); }
 
   // Resolve card-on-file state and gate the [Charge card now] button.
-  // The cache is the source of truth (it actually checked Stripe).
-  // Three branches:
-  //   1. cache says yes → enable
-  //   2. cache says no  → disable + hint
-  //   3. unknown        → 'checking' state, fire probe, update on result
-  var cached = (clientKey && window._cardCache && window._cardCache[clientKey]) ? window._cardCache[clientKey] : null;
-  if (cached && typeof cached.hasCard === 'boolean') {
-    _setChargeBtnState(cached.hasCard ? 'enabled' : 'disabled');
-  } else if (client && client.email && typeof probeClientCardOnFile === 'function' && clientKey) {
-    _setChargeBtnState('checking');
-    probeClientCardOnFile(clientKey, client.email).then(function(found){
-      // Modal might have closed by the time the probe lands; check
-      // the overlay before mutating state.
-      var overlay = document.getElementById('appt-charge-overlay');
-      if (!overlay || overlay.classList.contains('hidden')) return;
-      _setChargeBtnState(found ? 'enabled' : 'disabled');
-    }).catch(function(){
-      _setChargeBtnState('disabled');
-    });
+  // Source-of-truth ladder matches the dispatcher's:
+  //   1. clientDB[id].cards (DB-backed)
+  //   2. _cardCache (probe results)
+  //   3. async probe (when we have an email but no cached state)
+  var dbCards = (client && Array.isArray(client.cards)) ? client.cards : null;
+  if (dbCards) {
+    _setChargeBtnState(dbCards.length > 0 ? 'enabled' : 'disabled');
   } else {
-    // No email to probe with → assume no card (probe can't run).
-    _setChargeBtnState('disabled');
+    var cached = (clientKey && window._cardCache && window._cardCache[clientKey]) ? window._cardCache[clientKey] : null;
+    if (cached && typeof cached.hasCard === 'boolean') {
+      _setChargeBtnState(cached.hasCard ? 'enabled' : 'disabled');
+    } else if (client && client.email && typeof probeClientCardOnFile === 'function' && clientKey) {
+      _setChargeBtnState('checking');
+      probeClientCardOnFile(clientKey, client.email).then(function(found){
+        var overlay = document.getElementById('appt-charge-overlay');
+        if (!overlay || overlay.classList.contains('hidden')) return;
+        _setChargeBtnState(found ? 'enabled' : 'disabled');
+        // Re-render the selector now that probe results landed.
+        try { renderChargeCardSelector(); } catch(_){}
+      }).catch(function(){
+        _setChargeBtnState('disabled');
+      });
+    } else {
+      _setChargeBtnState('disabled');
+    }
   }
 }
 
@@ -16331,10 +16519,31 @@ async function executeCharge(){
   var amount = parseFloat(totalText) || 0;
   if (amount <= 0) { showPaymentToast('Charge amount must be > $0', null, 'error'); return; }
   var apptId = currentAppt.dbId || null;
+
+  // Pick the specific paymentMethod the user selected. Single-card
+  // case still sets dataset.selectedPmId to that single card's id.
+  // Multi-card case reads whichever radio is checked. If somehow
+  // unset, fall back to charge_card (lets the backend pick) — we
+  // never want to silently fail the charge over a UI race.
+  var selectorEl = document.getElementById('charge-card-selector');
+  var selectedPmId = (selectorEl && selectorEl.dataset && selectorEl.dataset.selectedPmId) || '';
+  var action = selectedPmId ? 'charge_specific_card' : 'charge_card';
+
   var sb = document.getElementById('appt-action-success');
-  if (sb) { sb.textContent = 'Charging $' + amount.toFixed(2) + '…'; sb.classList.add('show'); }
+  if (sb) { sb.textContent = 'Charging $' + amount.toFixed(2) + '\u2026'; sb.classList.add('show'); }
   try {
-    var resp = await fetch('/api/stripe-invoice', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ action: 'charge_card', customerId: customerId, amount: amount.toFixed(2), service: (currentApptData && currentApptData.service) || 'Cleaning' }) });
+    var body = {
+      action: action,
+      customerId: customerId,
+      amount: amount.toFixed(2),
+      service: (currentApptData && currentApptData.service) || 'Cleaning',
+    };
+    if (action === 'charge_specific_card') body.paymentMethodId = selectedPmId;
+    var resp = await fetch('/api/stripe-invoice', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(body),
+    });
     var data = await resp.json();
     if (!resp.ok || data.success === false) {
       if (sb) { sb.textContent = 'Charge failed: ' + (data.error || 'Unknown error'); }
@@ -20145,7 +20354,12 @@ Your total will update automatically when you select a payment method.</textarea
         <strong>Tip:</strong> Encourage clients to pay by ACH (free) to keep costs down. You can send an invoice instead and let them choose.
       </div>
       <div class="form-row"><label>Card on file</label>
-        <div id="charge-card-info" style="font-size:13px;color:var(--text);padding:8px 10px;background:var(--bg-soft);border:1px solid var(--border);border-radius:8px;">Stripe card ****4521</div>
+        <!-- Populated by renderChargeCardSelector(): one of
+             "no card" / "single card display" / "multi-card radio
+             selector". When multi-card, the chosen value drives
+             executeCharge to use charge_specific_card with that
+             paymentMethod ID. -->
+        <div id="charge-card-selector" style="font-size:13px;color:var(--text);padding:8px 10px;background:var(--bg-soft);border:1px solid var(--border);border-radius:8px;">No card on file</div>
       </div>
 
       <!-- Primary action: charge the card. The post-clean follow-up

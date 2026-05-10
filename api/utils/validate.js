@@ -230,7 +230,15 @@ export const SCHEMAS = {
     appointmentId: { required: true, rules: [is.uuid], message: 'appointmentId must be a valid UUID' },
   },
   manualSendWaiver: {
-    appointmentId: { required: true, rules: [is.uuid], message: 'appointmentId must be a valid UUID' },
+    // Either appointmentId OR clientId must be provided. Caller-side
+    // semantics: appointmentId path writes appointments.waiver_sent_at +
+    // clients.policy_reminder_sent_at; clientId path writes only
+    // clients.policy_reminder_sent_at (and waiver_sent_at on the
+    // soonest upcoming appointment if any). Validation of "exactly
+    // one" is enforced in the handler since this validator doesn't
+    // support cross-field rules.
+    appointmentId: { required: false, rules: [is.uuid], message: 'appointmentId must be a valid UUID if provided' },
+    clientId:      { required: false, rules: [is.uuid], message: 'clientId must be a valid UUID if provided' },
   },
   manualSendReschedule: {
     appointmentId: { required: true, rules: [is.uuid], message: 'appointmentId must be a valid UUID' },
@@ -241,6 +249,19 @@ export const SCHEMAS = {
   },
   manualResendBookingLink: {
     leadId: { required: true, rules: [is.uuid], message: 'leadId must be a valid UUID' },
+  },
+  // Client-profile sends — one endpoint per action+channel pair.
+  manualSendReviewEmail: {
+    clientId: { required: true, rules: [is.uuid], message: 'clientId must be a valid UUID' },
+  },
+  manualSendReviewSms: {
+    clientId: { required: true, rules: [is.uuid], message: 'clientId must be a valid UUID' },
+  },
+  manualSendInvoiceEmail: {
+    clientId: { required: true, rules: [is.uuid], message: 'clientId must be a valid UUID' },
+  },
+  manualSendInvoiceSms: {
+    clientId: { required: true, rules: [is.uuid], message: 'clientId must be a valid UUID' },
   },
 
 };

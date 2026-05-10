@@ -271,6 +271,32 @@ export default async function handler(req, res) {
       });
     }
 
+    // ─── REVIEW REQUEST ─────────────────────────────────────────────────────
+    // Sent manually from the client-profile panel. Asks the customer to
+    // leave a Google review and links to the URL stored in
+    // settings.google_review_url. SMS-side wording is in
+    // /api/run-review-requests.js (kept consistent across channels).
+    else if (type === 'review_request') {
+      const { reviewUrl } = req.body;
+      const rUrl = reviewUrl || 'https://www.google.com/search?q=Hawaii+Natural+Clean';
+
+      html = renderBrandedEmail({
+        preheader: `If you have a moment, ${firstName} — we'd love your review.`,
+        heading: `Mahalo, ${firstName}! 🌺`,
+        intro: `Thank you so much for choosing Hawaii Natural Clean. We hope your home is feeling fresh and clean!`,
+        bodyHtml:
+          `<p style="margin:0 0 24px;color:${BRAND.text};font-size:15px;line-height:1.65;">If you have a moment, we'd love it if you left us a Google review — it means the world to our small team.</p>` +
+          `<table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:0 auto 28px;">
+            <tr>
+              <td>
+                <a href="${rUrl}" style="display:inline-block;background:${BRAND.primary};color:#fff;text-decoration:none;font-weight:600;font-size:15px;padding:14px 26px;border-radius:999px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;">⭐ Leave a Google review</a>
+              </td>
+            </tr>
+          </table>`,
+        footnote: `Any questions or concerns, reply here. Mahalo!`,
+      });
+    }
+
     // ─── PAYMENT RECEIPT ────────────────────────────────────────────────────
     else if (type === 'receipt') {
       const detailTable = `<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">

@@ -76,7 +76,14 @@ export default async function handler(req, res) {
   const invalid = validateOrFail(req.body, SCHEMAS.manualSendWaiver);
   if (invalid) return res.status(400).json(invalid);
 
-  const { appointmentId } = req.body;
+  const { appointmentId, clientId: bodyClientId } = req.body;
+  // Cross-field rule: must provide exactly one of appointmentId / clientId.
+  if (!appointmentId && !bodyClientId) {
+    return res.status(400).json({ error: 'Provide either appointmentId or clientId.' });
+  }
+  if (appointmentId && bodyClientId) {
+    return res.status(400).json({ error: 'Provide only one of appointmentId or clientId — not both.' });
+  }
 
   const db = createClient(
     process.env.SUPABASE_URL,
@@ -85,19 +92,50 @@ export default async function handler(req, res) {
   );
 
   try {
-    const { data: appt, error: apptErr } = await db
-      .from('appointments')
-      .select(`
-        id, service, client_id,
-        clients ( id, name, phone, policies_agreed_at )
-      `)
-      .eq('id', appointmentId)
-      .maybeSingle();
-    if (apptErr) throw apptErr;
-    if (!appt) return res.status(404).json({ error: 'Appointment not found' });
+    // Resolve to (client, optional appointment, service-for-svc-mapping).
+    // Two paths converge on the same send + audit logic below.
+    let client = null;
+    let apptForAudit = null; // appointment whose waiver_sent_at we'll stamp (if any)
+    let svcSource = null;    // service string used to map the agree.html?svc= param
 
-    const client = appt.clients;
-    if (!client) return res.status(400).json({ error: 'Appointment has no linked client.' });
+    if (appointmentId) {
+      const { data: appt, error: apptErr } = await db
+        .from('appointments')
+        .select(`id, service, client_id, clients ( id, name, phone, policies_agreed_at )`)
+        .eq('id', appointmentId)
+        .maybeSingle();
+      if (apptErr) throw apptErr;
+      if (!appt) return res.status(404).json({ error: 'Appointment not found' });
+      if (!appt.clients) return res.status(400).json({ error: 'Appointment has no linked client.' });
+      client = appt.clients;
+      apptForAudit = { id: appt.id };
+      svcSource = appt.service;
+    } else {
+      // Client path — pull the client + their soonest upcoming
+      // appointment (if any) so we can pick a sensible svc id and
+      // mirror the cron's behaviour of stamping waiver_sent_at on
+      // that appointment.
+      const today = new Date().toISOString().split('T')[0];
+      const { data: cl, error: clErr } = await db
+        .from('clients')
+        .select(`
+          id, name, phone, policies_agreed_at,
+          appointments ( id, date, status, service )
+        `)
+        .eq('id', bodyClientId)
+        .maybeSingle();
+      if (clErr) throw clErr;
+      if (!cl) return res.status(404).json({ error: 'Client not found' });
+      client = cl;
+      const upcoming = (cl.appointments || [])
+        .filter((a) => a.date >= today && ['scheduled', 'assigned'].includes(a.status))
+        .sort((a, b) => a.date.localeCompare(b.date))[0] || null;
+      if (upcoming) {
+        apptForAudit = { id: upcoming.id };
+        svcSource = upcoming.service;
+      }
+    }
+
     if (!client.phone) {
       return res.status(400).json({
         error: 'Client has no phone on file. Add a phone to the client record before sending a waiver.',
@@ -114,7 +152,7 @@ export default async function handler(req, res) {
     }
 
     const firstName = (client.name || 'there').split(' ')[0];
-    const svcId = serviceToSvcId(appt.service);
+    const svcId = serviceToSvcId(svcSource);
     const policyLink = svcId
       ? `${BASE_URL}/agree.html?c=${client.id}&svc=${svcId}`
       : `${BASE_URL}/agree.html?c=${client.id}`;
@@ -136,18 +174,26 @@ export default async function handler(req, res) {
     }
 
     const sentAt = new Date().toISOString();
-    const { error: updErr } = await db
-      .from('appointments')
-      .update({ waiver_sent_at: sentAt, waiver_sent_by: userId })
-      .eq('id', appointmentId);
-    if (updErr) {
-      await logError('manual-send-waiver:audit-update', updErr, { appointmentId });
+    // Write client-level audit (used by run-policy-reminders cron to dedupe + by client-profile UI).
+    const { error: clUpdErr } = await db
+      .from('clients')
+      .update({ policy_reminder_sent_at: sentAt })
+      .eq('id', client.id);
+    if (clUpdErr) await logError('manual-send-waiver:client-audit-update', clUpdErr, { clientId: client.id });
+
+    // Write appointment-level audit if we have one.
+    if (apptForAudit && apptForAudit.id) {
+      const { error: apptUpdErr } = await db
+        .from('appointments')
+        .update({ waiver_sent_at: sentAt, waiver_sent_by: userId })
+        .eq('id', apptForAudit.id);
+      if (apptUpdErr) await logError('manual-send-waiver:audit-update', apptUpdErr, { appointmentId: apptForAudit.id });
     }
 
     await logActivity(
       'manual_waiver_sent',
       `${userEmail} manually sent waiver SMS to ${client.name || 'client'}`,
-      { appointmentId, clientId: client.id, recipient: phoneE164, svcId, sentBy: userId },
+      { appointmentId: apptForAudit ? apptForAudit.id : null, clientId: client.id, recipient: phoneE164, svcId, sentBy: userId, source: appointmentId ? 'appointment' : 'client_profile' },
     );
 
     return res.status(200).json({
@@ -157,7 +203,7 @@ export default async function handler(req, res) {
       policyLink,
     });
   } catch (err) {
-    await logError('manual-send-waiver', err, { appointmentId });
+    await logError('manual-send-waiver', err, { appointmentId, clientId: bodyClientId });
     return res.status(500).json({ error: 'Could not send waiver. See Recent Errors.' });
   }
 }

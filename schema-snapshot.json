@@ -546,6 +546,26 @@
         "column": "pre_existing",
         "default": "true",
         "nullable": true
+      },
+      {
+        "column": "review_request_sent_at",
+        "default": null,
+        "nullable": true
+      },
+      {
+        "column": "review_request_sent_by",
+        "default": null,
+        "nullable": true
+      },
+      {
+        "column": "invoice_resent_at",
+        "default": null,
+        "nullable": true
+      },
+      {
+        "column": "invoice_resent_by",
+        "default": null,
+        "nullable": true
       }
     ],
     "cleaners": [

@@ -2431,6 +2431,19 @@ Mahalo 🌺</textarea>
           <button class="action-btn red full" onclick="deleteRecord('client')">Delete client</button>
         </div>
         <div class="success-bar" id="client-action-success" style="margin-top:10px;"></div>
+
+        <!-- Manual notifications panel — populated by renderClientNotifications
+             when the client modal opens. Five rows: waiver SMS, review-request
+             email/SMS, resend-invoice email/SMS. Each row has a recipient
+             label, last-sent timestamp, and a Send button that confirms
+             before firing. Same UX pattern as the appointment-modal panel
+             (commit e2c9f49) but anchored to the client, not an appt. -->
+        <div id="client-notifications-panel" style="margin-top:14px;padding:12px;border:1px solid var(--border);border-radius:10px;background:#fafdfe;">
+          <div style="font-size:12px;font-weight:700;color:#16758F;text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px;">Manual notifications</div>
+          <div id="client-notif-rows">
+            <!-- Populated by renderClientNotifications -->
+          </div>
+        </div>
       </div>
       <div id="client-edit" style="display:none;">
         <div class="panel-section">Edit client</div>
@@ -6032,6 +6045,197 @@ async function sendManualNotification(kind){
   }
 }
 
+/* ── Client-profile manual notifications ────────────────────────────────
+   Five rows in the client profile: Waiver SMS, Review email, Review SMS,
+   Resend invoice email, Resend invoice SMS. Mirrors the appointment-
+   modal panel's UI but client-scoped. Each row has its own Send button
+   that confirms, then POSTs to the matching /api/manual-send-* endpoint
+   with { clientId }. Endpoints write per-action audit columns
+   (clients.policy_reminder_sent_at, .review_request_sent_at,
+   .invoice_resent_at) — same column for either channel of a given
+   action; activity_logs preserves the channel detail.
+*/
+async function renderClientNotifications(){
+  var rowsEl = document.getElementById('client-notif-rows');
+  if (!rowsEl) return;
+  if (!currentClientId) {
+    rowsEl.innerHTML = '<div style="font-size:12px;color:var(--text-muted);">Save the client first to enable manual notifications.</div>';
+    return;
+  }
+  rowsEl.innerHTML = '<div style="font-size:12px;color:var(--text-muted);">Loading\u2026</div>';
+  try {
+    var { data, error } = await db
+      .from('clients')
+      .select('id, name, email, phone, policies_agreed_at, policy_reminder_sent_at, review_request_sent_at, invoice_resent_at')
+      .eq('id', currentClientId)
+      .maybeSingle();
+    if (error) throw error;
+    if (!data) { rowsEl.innerHTML = '<div style="font-size:12px;color:var(--text-muted);">Client not found.</div>'; return; }
+    var rows = [
+      {
+        key: 'waiver',
+        label: 'Waiver / policy agreement SMS',
+        recipientLabel: data.phone ? data.phone : 'no phone on file',
+        sentAt: data.policy_reminder_sent_at,
+        disabledReason: !data.phone ? 'Add a phone to the client record'
+                       : data.policies_agreed_at ? 'Already agreed ' + _formatLastSent(data.policies_agreed_at)
+                       : null,
+      },
+      {
+        key: 'review-email',
+        label: 'Review request (email)',
+        recipientLabel: data.email ? data.email : 'no email on file',
+        sentAt: data.review_request_sent_at,
+        disabledReason: !data.email ? 'Add an email to the client record' : null,
+      },
+      {
+        key: 'review-sms',
+        label: 'Review request (SMS)',
+        recipientLabel: data.phone ? data.phone : 'no phone on file',
+        sentAt: data.review_request_sent_at,
+        disabledReason: !data.phone ? 'Add a phone to the client record' : null,
+      },
+      {
+        key: 'invoice-email',
+        label: 'Resend last invoice (email)',
+        recipientLabel: data.email ? data.email : 'no email on file',
+        sentAt: data.invoice_resent_at,
+        disabledReason: !data.email ? 'Add an email to the client record' : null,
+      },
+      {
+        key: 'invoice-sms',
+        label: 'Resend last invoice (SMS)',
+        recipientLabel: data.phone ? data.phone : 'no phone on file',
+        sentAt: data.invoice_resent_at,
+        disabledReason: !data.phone ? 'Add a phone to the client record' : null,
+      },
+    ];
+
+    rowsEl.innerHTML = rows.map(function(r){
+      var disabled = !!r.disabledReason;
+      var sentLabel = _formatLastSent(r.sentAt);
+      var sentColor = r.sentAt ? '#5B7683' : '#94a3b8';
+      return ''
+        + '<div data-cnotif-row="' + r.key + '" style="display:flex;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--border);">'
+        +   '<div style="flex:1;min-width:0;">'
+        +     '<div style="font-size:13px;font-weight:600;color:var(--text);">' + esc(r.label) + '</div>'
+        +     '<div style="font-size:11px;color:var(--text-muted);margin-top:2px;">'
+        +       '\u2192 ' + esc(r.recipientLabel)
+        +     '</div>'
+        +     '<div style="font-size:11px;color:' + sentColor + ';margin-top:2px;" data-csent-label="' + r.key + '">'
+        +       'Last sent: ' + esc(sentLabel)
+        +       (r.disabledReason ? ' \u00B7 <span style="color:#b45309;">' + esc(r.disabledReason) + '</span>' : '')
+        +     '</div>'
+        +   '</div>'
+        +   '<button type="button" '
+        +     'data-cnotif-send="' + r.key + '" '
+        +     'onclick="sendClientNotification(\'' + r.key + '\')" '
+        +     (disabled ? 'disabled ' : '')
+        +     'style="padding:6px 12px;border-radius:7px;border:1px solid ' + (disabled ? '#cbd5e1' : '#3BB8E3') + ';'
+        +     'background:' + (disabled ? '#f1f5f9' : '#3BB8E3') + ';color:' + (disabled ? '#94a3b8' : '#fff') + ';'
+        +     'font-size:12px;font-weight:600;cursor:' + (disabled ? 'not-allowed' : 'pointer') + ';flex-shrink:0;">'
+        +     'Send'
+        +   '</button>'
+        + '</div>';
+    }).join('');
+    var first = rowsEl.querySelector('[data-cnotif-row]');
+    if (first) first.style.borderTop = 'none';
+  } catch (err) {
+    console.error('[renderClientNotifications]', err);
+    rowsEl.innerHTML = '<div style="font-size:12px;color:#b91c1c;">Could not load notification status: ' + esc(err.message || String(err)) + '</div>';
+  }
+}
+
+async function sendClientNotification(kind){
+  if (!currentClientId) {
+    if (typeof showToast === 'function') showToast('No client selected', 'error');
+    return;
+  }
+  var row = document.querySelector('[data-cnotif-row="' + kind + '"]');
+  var recipientLabel = '';
+  if (row) {
+    var recEl = row.querySelector('div[style*="margin-top:2px"]');
+    if (recEl) recipientLabel = recEl.textContent.replace(/^→\s*/, '').trim();
+  }
+  var prettyKind = kind === 'waiver'         ? 'waiver SMS'
+                : kind === 'review-email'    ? 'review-request email'
+                : kind === 'review-sms'      ? 'review-request SMS'
+                : kind === 'invoice-email'   ? 'invoice email (resend last)'
+                : kind === 'invoice-sms'     ? 'invoice link via SMS (resend last)'
+                : kind;
+  var confirmMsg = 'Send ' + prettyKind + '\nTo: ' + (recipientLabel || '(see row)') + '\n\nProceed?';
+  if (!confirm(confirmMsg)) return;
+
+  var btn = document.querySelector('[data-cnotif-send="' + kind + '"]');
+  if (btn) { btn.disabled = true; btn.textContent = 'Sending\u2026'; }
+
+  // Each kind has its own endpoint + body shape. Waiver reuses the
+  // existing /api/manual-send-waiver but with clientId rather than
+  // appointmentId (the endpoint accepts either).
+  var endpoint, body;
+  if (kind === 'waiver')              { endpoint = '/api/manual-send-waiver';        body = { clientId: currentClientId }; }
+  else if (kind === 'review-email')   { endpoint = '/api/manual-send-review-email';  body = { clientId: currentClientId }; }
+  else if (kind === 'review-sms')     { endpoint = '/api/manual-send-review-sms';    body = { clientId: currentClientId }; }
+  else if (kind === 'invoice-email')  { endpoint = '/api/manual-send-invoice-email'; body = { clientId: currentClientId }; }
+  else if (kind === 'invoice-sms')    { endpoint = '/api/manual-send-invoice-sms';   body = { clientId: currentClientId }; }
+  else {
+    if (typeof showToast === 'function') showToast('Unknown notification kind: ' + kind, 'error');
+    if (btn) { btn.disabled = false; btn.textContent = 'Send'; }
+    return;
+  }
+
+  try {
+    var session = await db.auth.getSession();
+    var token = session.data.session ? session.data.session.access_token : null;
+    if (!token) throw new Error('Not signed in');
+    var resp = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify(body),
+    });
+    var data = await resp.json().catch(function(){ return {}; });
+    if (!resp.ok || !data.success) {
+      var msg = data.error || ('Send failed (' + resp.status + ')');
+      if (typeof showToast === 'function') showToast(msg, 'error');
+      if (btn) { btn.disabled = false; btn.textContent = 'Send'; }
+      return;
+    }
+    var sentLabel = document.querySelector('[data-csent-label="' + kind + '"]');
+    if (sentLabel) {
+      sentLabel.textContent = 'Last sent: just now';
+      sentLabel.style.color = '#15803d';
+    }
+    // For shared-audit pairs (review-email / review-sms; invoice-email
+    // / invoice-sms), the partner row shows the same column. Update
+    // it too so both reflect the just-sent.
+    var partner = kind === 'review-email'  ? 'review-sms'
+                : kind === 'review-sms'    ? 'review-email'
+                : kind === 'invoice-email' ? 'invoice-sms'
+                : kind === 'invoice-sms'   ? 'invoice-email'
+                : null;
+    if (partner) {
+      var partnerLabel = document.querySelector('[data-csent-label="' + partner + '"]');
+      if (partnerLabel) {
+        partnerLabel.textContent = 'Last sent: just now';
+        partnerLabel.style.color = '#15803d';
+      }
+    }
+    if (btn) { btn.textContent = 'Sent \u2713'; setTimeout(function(){ if (btn) { btn.disabled = false; btn.textContent = 'Send'; } }, 2500); }
+    var toastMsg = (kind === 'waiver'        ? 'Waiver SMS sent'
+                  : kind === 'review-email'  ? 'Review-request email sent'
+                  : kind === 'review-sms'    ? 'Review-request SMS sent'
+                  : kind === 'invoice-email' ? 'Invoice email resent'
+                  : kind === 'invoice-sms'   ? 'Invoice link sent via SMS'
+                  : 'Sent')
+      + (data.recipient ? ' to ' + data.recipient : '');
+    if (typeof showToast === 'function') showToast(toastMsg);
+  } catch (err) {
+    console.error('[sendClientNotification]', err);
+    if (typeof showToast === 'function') showToast('Send failed: ' + (err.message || err), 'error');
+    if (btn) { btn.disabled = false; btn.textContent = 'Send'; }
+  }
+}
+
 function updateApptChargeButtonState(){
   var btn = document.getElementById('appt-charge-btn');
   if (!btn || !currentAppt) return;
@@ -7297,6 +7501,7 @@ function openClient(id){
   openOverlay('client-overlay');
   setTimeout(updateChargeBtn, 50);
   setTimeout(loadClientSummary, 400);
+  try { renderClientNotifications(); } catch(e){ console.warn('renderClientNotifications failed:', e); }
 }
 
 function sendPolicyAgreement(){

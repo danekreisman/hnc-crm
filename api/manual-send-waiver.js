@@ -151,12 +151,33 @@ export default async function handler(req, res) {
       });
     }
 
+    // Mode: 'first' for the initial send, 'reminder' for follow-ups.
+    // Auto-detect from policy_reminder_sent_at when client doesn't
+    // pass it explicitly — saves the frontend from having to track
+    // state. Reminder wording is softer ('just a friendly nudge')
+    // since the customer's already seen the formal version.
+    const requestedMode = req.body && req.body.mode;
+    let mode = requestedMode === 'first' || requestedMode === 'reminder' ? requestedMode : null;
+    if (!mode) {
+      // Reload the client row to get the most current reminder timestamp
+      // — the policy_reminder_sent_at column may have changed between
+      // when we did the initial fetch and now.
+      const { data: clRefresh } = await db
+        .from('clients')
+        .select('policy_reminder_sent_at')
+        .eq('id', client.id)
+        .maybeSingle();
+      mode = (clRefresh && clRefresh.policy_reminder_sent_at) ? 'reminder' : 'first';
+    }
+
     const firstName = (client.name || 'there').split(' ')[0];
     const svcId = serviceToSvcId(svcSource);
     const policyLink = svcId
       ? `${BASE_URL}/agree.html?c=${client.id}&svc=${svcId}`
       : `${BASE_URL}/agree.html?c=${client.id}`;
-    const message = `Hi ${firstName}! Before your first cleaning with Hawaii Natural Clean, please take a moment to review and agree to our service policies: ${policyLink} 🌺`;
+    const message = mode === 'reminder'
+      ? `Hi ${firstName}, just a friendly nudge — we still need you to review and agree to our service policies before your appointment: ${policyLink} Mahalo! 🌺`
+      : `Hi ${firstName}! Before your first cleaning with Hawaii Natural Clean, please take a moment to review and agree to our service policies: ${policyLink} 🌺`;
 
     const phoneE164 = toE164(client.phone);
     const sendRes = await fetchWithTimeout(`${BASE_URL}/api/send-sms`, {
@@ -192,8 +213,8 @@ export default async function handler(req, res) {
 
     await logActivity(
       'manual_waiver_sent',
-      `${userEmail} manually sent waiver SMS to ${client.name || 'client'}`,
-      { appointmentId: apptForAudit ? apptForAudit.id : null, clientId: client.id, recipient: phoneE164, svcId, sentBy: userId, source: appointmentId ? 'appointment' : 'client_profile' },
+      `${userEmail} manually sent waiver ${mode === 'reminder' ? 'reminder ' : ''}SMS to ${client.name || 'client'}`,
+      { appointmentId: apptForAudit ? apptForAudit.id : null, clientId: client.id, recipient: phoneE164, svcId, sentBy: userId, source: appointmentId ? 'appointment' : 'client_profile', mode },
     );
 
     return res.status(200).json({
@@ -201,6 +222,7 @@ export default async function handler(req, res) {
       recipient: phoneE164,
       sentAt,
       policyLink,
+      mode,
     });
   } catch (err) {
     await logError('manual-send-waiver', err, { appointmentId, clientId: bodyClientId });

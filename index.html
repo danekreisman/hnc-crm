@@ -2196,6 +2196,12 @@ Mahalo 🌺</textarea>
         <div class="info-block">
           <div class="info-row"><span class="info-val" id="ai-notes" style="white-space:pre-wrap;color:#444;">—</span></div>
         </div>
+        <!-- Waiver status banner — surfaces when the linked client
+             hasn't signed the policies yet. State-aware: text & button
+             label adapt based on whether/when the last waiver SMS
+             was sent (never, recent, overdue). Populated by
+             renderWaiverBanner('appt') on appointment open. -->
+        <div id="appt-waiver-banner" style="display:none;margin-top:14px;margin-bottom:6px;"></div>
         <div class="panel-section">Actions</div>
         <div class="action-grid">
           <!-- Assign cleaner: hidden by default, revealed by _openApptInner when
@@ -2386,6 +2392,9 @@ Mahalo 🌺</textarea>
           <div class="profile-avatar" id="cl-av" style="background:var(--brand-50);color:#276749;">TM</div>
           <div><div class="profile-name" id="cl-name">—</div><div class="profile-role" id="cl-type">—</div><span class="badge" id="cl-status" style="margin-top:6px;display:inline-block;">Active</span></div>
         </div>
+        <!-- Waiver status banner (client-scoped). Same renderer as the
+             appointment-view banner, scope='client'. -->
+        <div id="cl-waiver-banner" style="display:none;margin-top:12px;"></div>
         <div class="panel-section">Contact</div>
         <div class="info-block">
           <div class="info-row"><span class="info-label">Phone</span><span class="info-val" id="cl-phone">—</span></div>
@@ -5885,6 +5894,7 @@ function _openApptInner(a,dateKey){
   // fetches the audit timestamps directly from the row each time so we
   // don't need to keep calendar query columns in sync with this feature.
   try { renderApptNotifications(); } catch(e){ console.warn('renderApptNotifications failed:', e); }
+  try { renderWaiverBanner('appt'); } catch(e){ console.warn('renderWaiverBanner appt failed:', e); }
 }
 
 /* ── Manual notifications panel ────────────────────────────────────────
@@ -5914,6 +5924,167 @@ function _formatLastSent(iso){
     if (diffDay < 30) return diffDay + ' day' + (diffDay === 1 ? '' : 's') + ' ago';
     return then.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   } catch(_){ return iso; }
+}
+
+/* ── Waiver status banner ─────────────────────────────────────────────
+   Surfaced at the top of both the appointment view and the client
+   profile when the client hasn't signed the policies yet. State-
+   aware: text and button label adapt based on whether/when the last
+   waiver SMS was sent.
+
+   States:
+     - Never sent           → 'never sent'          [Send waiver]
+     - Sent <24h ago        → 'sent N hours ago'    [Send another reminder]
+     - Sent >=1 day ago     → 'last sent N days ago' [Send reminder]
+     - Signed               → banner hidden entirely
+
+   scope: 'appt'   → reads currentAppt, writes to #appt-waiver-banner
+          'client' → reads currentClientId, writes to #cl-waiver-banner
+*/
+async function renderWaiverBanner(scope){
+  var containerId = scope === 'client' ? 'cl-waiver-banner' : 'appt-waiver-banner';
+  var container = document.getElementById(containerId);
+  if (!container) return;
+
+  // Resolve client_id depending on scope.
+  var clientId = null;
+  if (scope === 'client') {
+    clientId = currentClientId;
+  } else {
+    if (!currentAppt) { container.style.display = 'none'; return; }
+    var clientKey = Object.keys(clientDB).find(function(k){ return k.length>=30 && clientDB[k].name === currentAppt.n; });
+    clientId = clientKey || null;
+  }
+  if (!clientId) { container.style.display = 'none'; return; }
+
+  try {
+    var { data, error } = await db
+      .from('clients')
+      .select('id, name, phone, policies_agreed_at, policy_reminder_sent_at')
+      .eq('id', clientId)
+      .maybeSingle();
+    if (error) throw error;
+    if (!data) { container.style.display = 'none'; return; }
+
+    // Signed → hide entirely. The celebration here is just absence.
+    if (data.policies_agreed_at) { container.style.display = 'none'; return; }
+    // No phone → can't send a waiver. Show a softer "blocked" state
+    // rather than hiding silently — Dane should see WHY the action
+    // isn't available.
+    if (!data.phone) {
+      container.style.display = '';
+      container.innerHTML = ''
+        + '<div style="background:#fef3c7;border:1px solid #fde68a;border-radius:10px;padding:12px 14px;display:flex;align-items:center;gap:12px;">'
+        +   '<div style="font-size:20px;line-height:1;">\u26A0</div>'
+        +   '<div style="flex:1;min-width:0;">'
+        +     '<div style="font-size:13px;font-weight:700;color:#92400e;">Waiver not signed yet</div>'
+        +     '<div style="font-size:11px;color:#92400e;margin-top:2px;">No phone on file — can\'t send SMS reminder.</div>'
+        +   '</div>'
+        + '</div>';
+      return;
+    }
+
+    var sentAt = data.policy_reminder_sent_at ? new Date(data.policy_reminder_sent_at) : null;
+    var now = new Date();
+    var ageMin = sentAt ? Math.floor((now - sentAt) / 60000) : null;
+    var ageHr  = ageMin !== null ? Math.floor(ageMin / 60) : null;
+    var ageDay = ageHr !== null ? Math.floor(ageHr / 24) : null;
+
+    // State decision tree.
+    var statusText, buttonText, bgColor, borderColor, textColor;
+    if (!sentAt) {
+      statusText = 'never sent';
+      buttonText = 'Send waiver';
+      bgColor = '#fef3c7'; borderColor = '#fde68a'; textColor = '#92400e';
+    } else if (ageHr < 24) {
+      // Recent — softer urgency, the customer might still be reading the first one
+      statusText = 'sent ' + (ageHr < 1 ? (ageMin <= 1 ? 'just now' : ageMin + ' minutes ago') : (ageHr === 1 ? '1 hour ago' : ageHr + ' hours ago')) + ' — awaiting signature';
+      buttonText = 'Send another reminder';
+      bgColor = '#fef9c3'; borderColor = '#fde047'; textColor = '#854d0e';
+    } else {
+      // Overdue — louder urgency
+      statusText = 'last sent ' + (ageDay === 1 ? '1 day ago' : ageDay + ' days ago');
+      buttonText = 'Send reminder';
+      bgColor = '#fef3c7'; borderColor = '#fbbf24'; textColor = '#92400e';
+    }
+
+    container.style.display = '';
+    container.innerHTML = ''
+      + '<div style="background:' + bgColor + ';border:1px solid ' + borderColor + ';border-radius:10px;padding:12px 14px;display:flex;align-items:center;gap:12px;">'
+      +   '<div style="font-size:20px;line-height:1;">\u26A0</div>'
+      +   '<div style="flex:1;min-width:0;">'
+      +     '<div style="font-size:13px;font-weight:700;color:' + textColor + ';">' + (sentAt && ageHr < 24 ? 'Waiver sent — awaiting signature' : 'Waiver not signed yet') + '</div>'
+      +     '<div style="font-size:11px;color:' + textColor + ';margin-top:2px;">' + esc(statusText) + ' \u00B7 \u2192 ' + esc(data.phone) + '</div>'
+      +   '</div>'
+      +   '<button type="button" data-waiver-btn="' + scope + '" onclick="sendWaiverFromBanner(\'' + scope + '\')" style="flex-shrink:0;padding:8px 14px;border-radius:7px;border:1px solid ' + textColor + ';background:' + textColor + ';color:#fff;font-size:12px;font-weight:600;cursor:pointer;">' + buttonText + '</button>'
+      + '</div>';
+  } catch (err) {
+    console.error('[renderWaiverBanner]', err);
+    container.style.display = 'none';
+  }
+}
+
+async function sendWaiverFromBanner(scope){
+  var btn = document.querySelector('[data-waiver-btn="' + scope + '"]');
+  if (btn) { btn.disabled = true; btn.textContent = 'Sending\u2026'; }
+
+  // Resolve target. Appointment scope uses appointmentId so the
+  // endpoint writes both client-level and appointment-level audit
+  // (matches the existing manual-notifications panel behavior).
+  // Client scope uses clientId — the endpoint writes appt-level audit
+  // on the soonest upcoming appointment if one exists.
+  var body = {};
+  if (scope === 'client') {
+    if (!currentClientId) {
+      if (typeof showToast === 'function') showToast('No client selected', true);
+      if (btn) { btn.disabled = false; }
+      return;
+    }
+    body.clientId = currentClientId;
+  } else {
+    if (!currentAppt || !currentAppt.dbId) {
+      if (typeof showToast === 'function') showToast('No appointment available', true);
+      if (btn) { btn.disabled = false; }
+      return;
+    }
+    body.appointmentId = currentAppt.dbId;
+  }
+  // mode omitted — endpoint auto-detects first vs reminder from
+  // policy_reminder_sent_at.
+
+  try {
+    var session = await db.auth.getSession();
+    var token = session.data.session ? session.data.session.access_token : null;
+    if (!token) throw new Error('Not signed in');
+    var resp = await fetch('/api/manual-send-waiver', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify(body),
+    });
+    var data = await resp.json().catch(function(){ return {}; });
+    if (!resp.ok || !data.success) {
+      if (typeof showToast === 'function') showToast('Waiver send failed: ' + (data.error || resp.status), true);
+      if (btn) { btn.disabled = false; }
+      return;
+    }
+    var label = data.mode === 'reminder' ? 'Waiver reminder sent' : 'Waiver sent';
+    if (typeof showToast === 'function') showToast(label + ' to ' + (data.recipient || 'client'));
+    // Re-render the banner — the new policy_reminder_sent_at flips
+    // it from "never sent" to "sent X minutes ago" or rolls the
+    // overdue clock back.
+    try { await renderWaiverBanner(scope); } catch(_){}
+    // Also re-render the in-panel notifications so the existing
+    // waiver row's last-sent timestamp updates in lockstep.
+    if (scope === 'appt' && typeof renderApptNotifications === 'function') {
+      try { renderApptNotifications(); } catch(_){}
+    } else if (scope === 'client' && typeof renderClientNotifications === 'function') {
+      try { renderClientNotifications(); } catch(_){}
+    }
+  } catch (err) {
+    console.error('[sendWaiverFromBanner]', err);
+    if (typeof showToast === 'function') showToast('Waiver send error: ' + (err.message || err), true);
+    if (btn) { btn.disabled = false; }
+  }
 }
 
 async function renderApptNotifications(){
@@ -7798,6 +7969,7 @@ function openClient(id){
   setTimeout(updateChargeBtn, 50);
   setTimeout(loadClientSummary, 400);
   try { renderClientNotifications(); } catch(e){ console.warn('renderClientNotifications failed:', e); }
+  try { renderWaiverBanner('client'); } catch(e){ console.warn('renderWaiverBanner client failed:', e); }
   try { renderClientCards(); } catch(e){ console.warn('renderClientCards failed:', e); }
 }
 

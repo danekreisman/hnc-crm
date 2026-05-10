@@ -239,6 +239,9 @@ export const SCHEMAS = {
     // support cross-field rules.
     appointmentId: { required: false, rules: [is.uuid], message: 'appointmentId must be a valid UUID if provided' },
     clientId:      { required: false, rules: [is.uuid], message: 'clientId must be a valid UUID if provided' },
+    // Optional — when omitted, the handler auto-detects from
+    // policy_reminder_sent_at: null → 'first', non-null → 'reminder'.
+    mode:          { required: false, rules: [is.oneOf(['first', 'reminder'])], message: "mode must be 'first' or 'reminder' if provided" },
   },
   manualSendReschedule: {
     appointmentId: { required: true, rules: [is.uuid], message: 'appointmentId must be a valid UUID' },

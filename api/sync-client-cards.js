@@ -115,13 +115,37 @@ export default async function handler(req, res) {
       });
     }
 
-    const cards = (paymentMethods.data || []).map((pm) => ({
+    // Read the customer's default_payment_method so we can tag the
+    // matching card and reorder. This is the customer's *stated*
+    // preference — set automatically when they save a card during
+    // an invoice payment, or via API. It's a stronger signal than
+    // attached-date order.
+    let defaultPmId = null;
+    try {
+      const cust = await stripe.customers.retrieve(customerId);
+      defaultPmId = (cust && cust.invoice_settings && cust.invoice_settings.default_payment_method) || null;
+      // Legacy fallback for accounts that still use sources.
+      if (!defaultPmId && cust && cust.default_source) defaultPmId = cust.default_source;
+    } catch (custErr) {
+      // Non-fatal — list still works, just without the default tag.
+      await logError('sync-client-cards:customer-retrieve', custErr, { clientId, customerId });
+    }
+
+    let cards = (paymentMethods.data || []).map((pm) => ({
       id: pm.id,
       brand: pm.card?.brand || 'card',
       last4: pm.card?.last4 || '????',
       exp_month: pm.card?.exp_month || null,
       exp_year:  pm.card?.exp_year  || null,
+      is_default: defaultPmId ? pm.id === defaultPmId : false,
     }));
+
+    // Reorder so the default lands at index 0. The frontend's
+    // renderChargeCardSelector defaults to cards[0]; renderClientCards
+    // labels [0] as "Primary." Both become correct once we sort here.
+    if (defaultPmId) {
+      cards.sort((a, b) => (b.is_default ? 1 : 0) - (a.is_default ? 1 : 0));
+    }
 
     const syncedAt = new Date().toISOString();
     const updatePayload = { cards, cards_synced_at: syncedAt };

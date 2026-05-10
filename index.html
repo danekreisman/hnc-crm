@@ -6310,9 +6310,10 @@ async function renderClientCards(){
 
     var html = '';
     cards.forEach(function(c, idx){
+      var isDef = !!c.is_default;
       html += '<div class="info-row">'
-        +     '<span class="info-label">' + (idx === 0 ? 'Primary' : 'Card ' + (idx+1)) + '</span>'
-        +     '<span class="info-val">' + esc(_formatCardLine(c, { isDefault: idx === 0 })) + '</span>'
+        +     '<span class="info-label">' + (isDef ? 'Default' : 'Card ' + (idx+1)) + '</span>'
+        +     '<span class="info-val">' + esc(_formatCardLine(c, { isDefault: isDef })) + '</span>'
         +   '</div>';
     });
     html += '<div class="info-row"><span class="info-label">Last synced</span><span class="info-val" style="color:var(--text-muted);font-size:11px;">' + esc(_formatCardsSyncedAt(synced)) + '</span></div>';
@@ -6394,22 +6395,27 @@ function renderChargeCardSelector(){
     return;
   }
   if (cards.length === 1) {
-    box.innerHTML = esc(_formatCardLine(cards[0], { isDefault: true }));
+    box.innerHTML = esc(_formatCardLine(cards[0], { isDefault: !!cards[0].is_default }));
     box.dataset.selectedPmId = cards[0].id || '';
     return;
   }
-  // Multi-card: radio picker. First card is selected by default.
+  // Multi-card: radio picker. Pre-check the card flagged as default
+  // by Stripe (synced via /api/sync-client-cards). Falls back to
+  // first if no default is flagged — the sync sorts default-first so
+  // these end up at the same answer either way.
+  var defaultIdx = cards.findIndex(function(c){ return !!c.is_default; });
+  if (defaultIdx < 0) defaultIdx = 0;
   var html = '<div style="display:flex;flex-direction:column;gap:6px;">';
   cards.forEach(function(c, idx){
-    var checked = idx === 0 ? 'checked' : '';
+    var checked = idx === defaultIdx ? 'checked' : '';
     html += '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:6px 8px;border-radius:6px;background:#fff;border:1px solid var(--border);">'
       +   '<input type="radio" name="charge-pm" value="' + esc(c.id || '') + '" ' + checked + ' onchange="document.getElementById(\'charge-card-selector\').dataset.selectedPmId=this.value">'
-      +   '<span style="flex:1;font-size:13px;">' + esc(_formatCardLine(c, { isDefault: idx === 0 })) + '</span>'
+      +   '<span style="flex:1;font-size:13px;">' + esc(_formatCardLine(c, { isDefault: !!c.is_default })) + '</span>'
       + '</label>';
   });
   html += '</div>';
   box.innerHTML = html;
-  box.dataset.selectedPmId = cards[0].id || '';
+  box.dataset.selectedPmId = (cards[defaultIdx] && cards[defaultIdx].id) || '';
 }
 
 function updateApptChargeButtonState(){

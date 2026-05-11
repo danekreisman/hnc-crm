@@ -160,6 +160,260 @@ export default async function handler(req, res) {
     return cleaners.find(c => c.phone && c.phone.replace(/\D/g, '').slice(-10) === digits) || null;
   }
 
+  /* ── handleCleanerInviteReply — added 2026-05-11 ───────────────────
+     Auto-assign-on-YES feature. When a cleaner texts in:
+
+       1. Detect if their message is a YES, NO, or other.
+       2. Look up their pending cleaner_invites rows.
+       3. YES → pick the most recent pending invite (multi-invite
+          option A); attempt atomic assign. If they win, send
+          confirmation; mark their invite 'accepted'. If they lose
+          (slot already filled), mark 'missed', send "sorry taken".
+       4. NO → mark their newest pending invite 'declined'.
+       5. Anything else → ignore here, let the rest of the webhook
+          process it normally (it'll just end up as an inbox message).
+
+     Side effects on a winning YES:
+       - appointments.cleaner_id = winner.id, status = 'assigned'
+       - cleaner_invites row updated (winner: 'accepted', others
+         currently pending for SAME appointment: 'missed')
+       - SMS to winner ("You got it!")
+       - SMS to each other cleaner with a pending invite for that
+         appointment ("Sorry, [winner] grabbed it first")
+       - activity_logs row for audit
+  */
+  async function handleCleanerInviteReply(cleaner, body, fromPhone) {
+    if (!cleaner || !cleaner.id) return;
+    const text = String(body || '').trim();
+    if (!text) return;
+
+    // Classify the reply — rule-based; deliberate over AI to keep
+    // this hot path fast and predictable. Anything ambiguous falls
+    // through to "neither" and the message just ends up in the inbox
+    // for Dane to handle manually.
+    //
+    // YES: case-insensitive, must START with a YES variant. Avoids
+    //      false-positives on "yes, but what time?" style replies
+    //      (which ARE legit interest but ambiguous — Dane should
+    //      see those in the inbox, not auto-assign).
+    //      Acceptable: yes / y / yeah / yup / yep / sure / ok / okay / im in / i'm in / i can
+    // NO:  same shape. Acceptable: no / nope / nah / can't / cant / pass / not me
+    const yesRegex = /^\s*(yes|y|yeah|yup|yep|sure|ok|okay|i'?m\s+in|i\s+can)\b/i;
+    const noRegex  = /^\s*(no|nope|nah|can'?t|cannot|pass|not\s+me|sorry)\b/i;
+    const isYes = yesRegex.test(text);
+    const isNo  = !isYes && noRegex.test(text); // YES wins ties (e.g. "yes/no" weirdness)
+    if (!isYes && !isNo) return;
+
+    // Pull this cleaner's pending invites, newest first.
+    const pendingRes = await fetch(
+      `${SUPABASE_URL}/rest/v1/cleaner_invites?select=id,appointment_id,sent_at&cleaner_id=eq.${cleaner.id}&status=eq.pending&order=sent_at.desc&limit=10`,
+      { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }
+    );
+    const pending = await pendingRes.json();
+    if (!Array.isArray(pending) || pending.length === 0) {
+      // No pending invites → "Ignore all yes texts unless we sent
+      // a cleaner an invite" per Dane's 2026-05-11 design. Just log
+      // and bail.
+      console.log('[cleaner-invite] '+cleaner.name+' replied '+(isYes?'YES':'NO')+' but has no pending invites — ignored');
+      return;
+    }
+
+    // Option A: pick the newest pending. Wrong-job edge cases get
+    // handled manually by Dane.
+    const target = pending[0];
+
+    if (isNo) {
+      // Decline path — just mark the newest invite declined and
+      // move on. No SMS back (cleaner already knows they said no).
+      // Other pending invites for this cleaner (for OTHER jobs)
+      // stay pending; "no to this job" doesn't mean "no to all."
+      await fetch(`${SUPABASE_URL}/rest/v1/cleaner_invites?id=eq.${target.id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': SUPABASE_KEY,
+          'Authorization': `Bearer ${SUPABASE_KEY}`,
+          'Prefer': 'return=minimal'
+        },
+        body: JSON.stringify({ status: 'declined', responded_at: new Date().toISOString() })
+      });
+      console.log('[cleaner-invite] '+cleaner.name+' declined invite '+target.id+' (appt '+target.appointment_id+')');
+      return;
+    }
+
+    // YES path — try the atomic assign.
+    const assignBody = JSON.stringify({
+      cleaner_id: cleaner.id,
+      status: 'assigned',
+    });
+    const assignRes = await fetch(
+      `${SUPABASE_URL}/rest/v1/appointments?id=eq.${target.appointment_id}&cleaner_id=is.null`,
+      {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': SUPABASE_KEY,
+          'Authorization': `Bearer ${SUPABASE_KEY}`,
+          'Prefer': 'return=representation'
+        },
+        body: assignBody
+      }
+    );
+    const updatedRows = await assignRes.json();
+    const won = Array.isArray(updatedRows) && updatedRows.length > 0;
+
+    if (!won) {
+      // Lost the race (someone else already has the slot — could be
+      // another cleaner's YES, or Dane manually assigned).
+      // Mark this cleaner's invite as 'missed' and SMS them.
+      await fetch(`${SUPABASE_URL}/rest/v1/cleaner_invites?id=eq.${target.id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': SUPABASE_KEY,
+          'Authorization': `Bearer ${SUPABASE_KEY}`,
+          'Prefer': 'return=minimal'
+        },
+        body: JSON.stringify({ status: 'missed', responded_at: new Date().toISOString() })
+      });
+      // Inform the cleaner. Concise — they already know what job.
+      try {
+        await sendSmsViaQuo(fromPhone, "Sorry, that job has already been assigned. We'll send you the next one. Mahalo! \uD83C\uDF3A");
+      } catch (e) { console.warn('[cleaner-invite] missed-SMS send failed:', e.message); }
+      console.log('[cleaner-invite] '+cleaner.name+' lost race for appt '+target.appointment_id);
+      return;
+    }
+
+    // WON. Mark this invite accepted, mark all OTHER pending
+    // invites for the same appointment as missed (their cleaners
+    // also need to be notified), and send winner-confirmation SMS.
+    await fetch(`${SUPABASE_URL}/rest/v1/cleaner_invites?id=eq.${target.id}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': SUPABASE_KEY,
+        'Authorization': `Bearer ${SUPABASE_KEY}`,
+        'Prefer': 'return=minimal'
+      },
+      body: JSON.stringify({ status: 'accepted', responded_at: new Date().toISOString() })
+    });
+
+    // Look up the other pending invites for this same appointment
+    // so we can both update their status and SMS the losers.
+    const otherRes = await fetch(
+      `${SUPABASE_URL}/rest/v1/cleaner_invites?select=id,cleaner_id&appointment_id=eq.${target.appointment_id}&status=eq.pending`,
+      { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }
+    );
+    const others = await otherRes.json();
+    if (Array.isArray(others) && others.length > 0) {
+      const otherIds = others.map(o => o.id);
+      const otherCleanerIds = others.map(o => o.cleaner_id);
+      // Mark them all missed.
+      await fetch(`${SUPABASE_URL}/rest/v1/cleaner_invites?id=in.(${otherIds.join(',')})`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': SUPABASE_KEY,
+          'Authorization': `Bearer ${SUPABASE_KEY}`,
+          'Prefer': 'return=minimal'
+        },
+        body: JSON.stringify({ status: 'missed', responded_at: new Date().toISOString() })
+      });
+      // SMS each loser. Look up their phone numbers in one go.
+      try {
+        const phRes = await fetch(
+          `${SUPABASE_URL}/rest/v1/cleaners?select=id,name,phone&id=in.(${otherCleanerIds.join(',')})`,
+          { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }
+        );
+        const phs = await phRes.json();
+        if (Array.isArray(phs)) {
+          for (const p of phs) {
+            if (!p.phone) continue;
+            let cleanPh = p.phone.replace(/[^0-9+]/g, '');
+            if (!cleanPh.startsWith('+')) cleanPh = '+1' + cleanPh;
+            try {
+              await sendSmsViaQuo(cleanPh, "Hey "+(p.name||'').split(' ')[0]+"! "+cleaner.name+" grabbed that one first \u2014 we'll send you the next available job. Mahalo! \uD83C\uDF3A");
+            } catch (e) { console.warn('[cleaner-invite] loser-SMS send failed for '+p.name+':', e.message); }
+          }
+        }
+      } catch (e) {
+        console.warn('[cleaner-invite] loser-SMS lookup failed:', e.message);
+      }
+    }
+
+    // Confirmation SMS to the winner. Concise — they have the full
+    // invite SMS in their thread already.
+    try {
+      // Fetch appointment details for a useful confirmation line.
+      const apptRes = await fetch(
+        `${SUPABASE_URL}/rest/v1/appointments?select=date,time,service,address,clients(name)&id=eq.${target.appointment_id}`,
+        { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }
+      );
+      const apptArr = await apptRes.json();
+      const appt = (Array.isArray(apptArr) && apptArr[0]) || null;
+      let dateStr = appt && appt.date ? appt.date : '';
+      try {
+        if (appt && appt.date) {
+          dateStr = new Date(appt.date+'T12:00:00').toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric' });
+        }
+      } catch(_){}
+      const clientName = appt && appt.clients ? appt.clients.name : 'the client';
+      const winnerMsg = "You got it! \u2705 "+(appt?.service||'Job')+" for "+clientName+" on "+dateStr+(appt?.time?(' at '+appt.time):'')+". See you then! \u2014 HNC";
+      await sendSmsViaQuo(fromPhone, winnerMsg);
+    } catch (e) { console.warn('[cleaner-invite] winner-SMS send failed:', e.message); }
+
+    // Activity log — audit trail Dane can review.
+    try {
+      await fetch(`${SUPABASE_URL}/rest/v1/activity_logs`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': SUPABASE_KEY,
+          'Authorization': `Bearer ${SUPABASE_KEY}`,
+          'Prefer': 'return=minimal'
+        },
+        body: JSON.stringify({
+          action: 'cleaner_invite_auto_assigned',
+          description: cleaner.name+' auto-assigned via YES reply',
+          user_email: 'system',
+          entity_type: 'appointment',
+          metadata: {
+            appointment_id: target.appointment_id,
+            cleaner_id: cleaner.id,
+            cleaner_name: cleaner.name,
+            invite_id: target.id,
+          }
+        })
+      });
+    } catch(e) { console.warn('[cleaner-invite] activity log failed:', e.message); }
+
+    console.log('[cleaner-invite] '+cleaner.name+' AUTO-ASSIGNED to appt '+target.appointment_id);
+  }
+
+  // sendSmsViaQuo — tiny wrapper used by handleCleanerInviteReply so we
+  // don't repeat the OpenPhone REST shape. Uses the same env-driven path
+  // as outbound sends elsewhere in this codebase.
+  async function sendSmsViaQuo(toPhone, msg) {
+    const OPENPHONE_API = process.env.OPENPHONE_API_KEY;
+    const OPENPHONE_FROM = process.env.OPENPHONE_FROM_NUMBER;
+    if (!OPENPHONE_API || !OPENPHONE_FROM) {
+      throw new Error('OpenPhone env not configured');
+    }
+    const r = await fetch('https://api.openphone.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': OPENPHONE_API,
+      },
+      body: JSON.stringify({ from: OPENPHONE_FROM, to: [toPhone], content: msg }),
+    });
+    if (!r.ok) {
+      const t = await r.text().catch(() => '<unreadable>');
+      throw new Error('OpenPhone send '+r.status+': '+t.slice(0,200));
+    }
+    return r.json();
+  }
+
   /* Fetch SMS thread history for a phone number from OpenPhone API.
      Added 2026-05-08 as the data source for the two-stage SMS lead
      classifier (Stage 2 — see extractLeadFromSmsThread below).
@@ -859,6 +1113,30 @@ export default async function handler(req, res) {
         read: false,
         quo_message_id: data.id || null
       });
+
+      // ── Cleaner invite auto-assign (2026-05-11) ─────────────────────
+      // If the inbound is from a known cleaner AND matches a YES/NO
+      // pattern AND that cleaner has a pending cleaner_invites row,
+      // run the assign / decline flow.
+      //
+      // Multi-invite handling (option A from design call): if multiple
+      // pending invites exist for this cleaner, pick the most recent
+      // by sent_at. Wrong-job cases handled by Dane manually.
+      //
+      // Atomic protection: the assign UPDATE has WHERE cleaner_id IS
+      // NULL — Postgres serializes; if two cleaners race, only one
+      // UPDATE affects a row. The loser gets the "sorry already
+      // assigned" SMS.
+      if (cleaner) {
+        try {
+          await handleCleanerInviteReply(cleaner, body, from);
+        } catch (inviteErr) {
+          console.error('[openphone-webhook] cleaner invite handler error:', inviteErr);
+          // Don't bubble — keep processing the message normally so
+          // we never silently drop a cleaner reply on a code bug.
+        }
+      }
+      // ────────────────────────────────────────────────────────────────
 
       // If this is a lead response, track it
       if (lead) {

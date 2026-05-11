@@ -17435,6 +17435,24 @@ function sendCleanerInvites(){
             read:true,
             quo_message_id:result.id||null
           }]);
+          // Record the invite for auto-assign-on-YES. The webhook
+          // (openphone-webhook.js) looks up pending rows when a
+          // cleaner replies. One row per (appointment, cleaner) —
+          // if Dane re-invites the same cleaner to the same job
+          // later, the unique constraint isn't enforced (deliberate:
+          // we want to know the resend happened), and the webhook
+          // picks the newest by sent_at on YES.
+          if (currentAppt && currentAppt.dbId) {
+            db.from('cleaner_invites').insert([{
+              appointment_id: currentAppt.dbId,
+              cleaner_id: id,
+              status: 'pending',
+            }]).then(function(invRes){
+              if (invRes.error) {
+                console.warn('[sendCleanerInvites] cleaner_invites insert failed for '+c.name+':', invRes.error.message);
+              }
+            });
+          }
         }
       });
     }

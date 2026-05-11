@@ -24644,12 +24644,12 @@ function startNotifPolling() {
   _hncSubscribeRealtime('lead_recommendations', function(payload){
     try { if (typeof loadDailyList === 'function') loadDailyList(); } catch (_e) {}
   });
-  // Realtime on client_tags. Tags are stored client-side in clientDB; the
-  // simplest correct refresh is a full client sync. Tag inserts/deletes are
-  // low-frequency so the cost of refetching is negligible.
-  _hncSubscribeRealtime('client_tags', function(payload){
-    try { if (typeof _hncFullSyncFromRealtime === 'function') _hncFullSyncFromRealtime('client_tags ' + (payload.eventType || 'change')); } catch (_e) {}
-  });
+  // (client_tags realtime subscription removed 2026-05-10 — the table doesn't
+  // exist in this database; the May 7 batch migration silently skipped it.
+  // The only writer at line ~14407 is in automation `tag` action handler,
+  // wrapped in its own try/catch. UI reads tags from clients.tags JSONB
+  // column, not from a separate client_tags table. Subscription was
+  // generating CHANNEL_ERROR on every page load.)
   // Realtime on app_users so deactivating a user evicts them within seconds.
   _hncSubscribeRealtime('app_users', function(payload){
     if (payload.eventType !== 'UPDATE' && payload.eventType !== 'DELETE') return;
@@ -24672,18 +24672,25 @@ function startNotifPolling() {
 
   // One-time check that realtime publication is configured for the tables we
   // need. Surfaces a banner to the user if any are missing — instead of
-  // silently degrading to polling-only behavior.
-  setTimeout(_hncCheckRealtimeConfig, 8000);
+  // silently degrading to polling-only behavior. Delay tuned to 15s so the
+  // 5s auto-reconnect loop has time to recover from transient socket failures
+  // (the original 8s window was firing false positives after long idles).
+  setTimeout(_hncCheckRealtimeConfig, 15000);
 }
 
 // Verifies realtime is actually wired up on the Supabase side. If a table
 // hasn't been added to supabase_realtime publication, the subscribe() call
 // returns CHANNEL_ERROR. We collect those after a grace period and surface
 // a single user-visible banner with a one-click fix.
+//
+// Filter is intentionally narrow: only CHANNEL_ERROR triggers the banner.
+// TIMED_OUT and CLOSED are transient network conditions that the 5s
+// auto-reconnect loop handles on its own — including them caused false
+// positives after long idles where the websocket was torn down by the OS.
 function _hncCheckRealtimeConfig() {
   var bad = [];
   ['appointments','notifications','app_users','clients','cleaners'].forEach(function(t){
-    if (_hncRealtimeStatus[t] && _hncRealtimeStatus[t] !== 'SUBSCRIBED') bad.push(t);
+    if (_hncRealtimeStatus[t] === 'CHANNEL_ERROR') bad.push(t);
   });
   if (bad.length === 0) return;
   // Don't nag if banner already shown this session

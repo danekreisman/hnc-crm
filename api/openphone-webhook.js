@@ -279,7 +279,11 @@ export default async function handler(req, res) {
       // Inform the cleaner. Concise — they already know what job.
       try {
         await sendSmsViaQuo(fromPhone, "Sorry, that job has already been assigned. We'll send you the next one. Mahalo! \uD83C\uDF3A");
-      } catch (e) { console.warn('[cleaner-invite] missed-SMS send failed:', e.message); }
+      } catch (e) {
+        await logError('openphone-webhook:cleaner-invite-missed-sms', e, {
+          cleaner_id: cleaner.id, cleaner_name: cleaner.name, invite_id: target.id, appointment_id: target.appointment_id,
+        });
+      }
       console.log('[cleaner-invite] '+cleaner.name+' lost race for appt '+target.appointment_id);
       return;
     }
@@ -333,7 +337,11 @@ export default async function handler(req, res) {
             if (!cleanPh.startsWith('+')) cleanPh = '+1' + cleanPh;
             try {
               await sendSmsViaQuo(cleanPh, "Hey "+(p.name||'').split(' ')[0]+"! "+cleaner.name+" grabbed that one first \u2014 we'll send you the next available job. Mahalo! \uD83C\uDF3A");
-            } catch (e) { console.warn('[cleaner-invite] loser-SMS send failed for '+p.name+':', e.message); }
+            } catch (e) {
+              await logError('openphone-webhook:cleaner-invite-loser-sms', e, {
+                loser_cleaner_id: p.id, loser_name: p.name, winner_name: cleaner.name, appointment_id: target.appointment_id,
+              });
+            }
           }
         }
       } catch (e) {
@@ -360,7 +368,11 @@ export default async function handler(req, res) {
       const clientName = appt && appt.clients ? appt.clients.name : 'the client';
       const winnerMsg = "You got it! \u2705 "+(appt?.service||'Job')+" for "+clientName+" on "+dateStr+(appt?.time?(' at '+appt.time):'')+". See you then! \u2014 HNC";
       await sendSmsViaQuo(fromPhone, winnerMsg);
-    } catch (e) { console.warn('[cleaner-invite] winner-SMS send failed:', e.message); }
+    } catch (e) {
+      await logError('openphone-webhook:cleaner-invite-winner-sms', e, {
+        cleaner_id: cleaner.id, cleaner_name: cleaner.name, appointment_id: target.appointment_id,
+      });
+    }
 
     // Activity log — audit trail Dane can review.
     try {
@@ -392,20 +404,22 @@ export default async function handler(req, res) {
 
   // sendSmsViaQuo — tiny wrapper used by handleCleanerInviteReply so we
   // don't repeat the OpenPhone REST shape. Uses the same env-driven path
-  // as outbound sends elsewhere in this codebase.
+  // as api/send-sms.js — QUO_API_KEY + QUO_NUMBER (NOT 'OPENPHONE_*'
+  // names, those aren't set in Vercel — caused silent SMS send failures
+  // on the initial auto-assign rollout, 2026-05-11).
   async function sendSmsViaQuo(toPhone, msg) {
-    const OPENPHONE_API = process.env.OPENPHONE_API_KEY;
-    const OPENPHONE_FROM = process.env.OPENPHONE_FROM_NUMBER;
-    if (!OPENPHONE_API || !OPENPHONE_FROM) {
-      throw new Error('OpenPhone env not configured');
+    const QUO_API_KEY = process.env.QUO_API_KEY;
+    const QUO_NUMBER  = process.env.QUO_NUMBER;
+    if (!QUO_API_KEY || !QUO_NUMBER) {
+      throw new Error('QUO env not configured (QUO_API_KEY / QUO_NUMBER)');
     }
     const r = await fetch('https://api.openphone.com/v1/messages', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': OPENPHONE_API,
+        'Authorization': QUO_API_KEY,
       },
-      body: JSON.stringify({ from: OPENPHONE_FROM, to: [toPhone], content: msg }),
+      body: JSON.stringify({ from: QUO_NUMBER, to: [toPhone], content: msg }),
     });
     if (!r.ok) {
       const t = await r.text().catch(() => '<unreadable>');

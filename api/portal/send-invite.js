@@ -14,7 +14,11 @@ const SB_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const QUO_API_KEY = process.env.QUO_API_KEY || process.env.OPENPHONE_API_KEY;
 const QUO_NUMBER = process.env.QUO_NUMBER || process.env.OPENPHONE_FROM_NUMBER;
 
-const PORTAL_URL = 'https://hnc-crm.vercel.app/portal';
+// The invite SMS is specifically for the cleaner portal — link
+// straight there rather than routing through the /portal chooser.
+// Uses the public custom subdomain (book.hawaiinaturalclean.com)
+// instead of the .vercel.app domain so cleaners see a branded URL.
+const PORTAL_URL = 'https://book.hawaiinaturalclean.com/cleaner-portal';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {

@@ -6222,12 +6222,33 @@ async function renderApptNotifications(){
   try {
     var { data, error } = await db
       .from('appointments')
-      .select('id, service, confirmation_sent_at, reminder_sent_at, waiver_sent_at, client_id, clients ( name, email, phone, policies_agreed_at )')
+      .select(`
+        id, service, confirmation_sent_at, reminder_sent_at, waiver_sent_at, cleaner_notified_at,
+        client_id, cleaner_id, cleaner_id_2, cleaner_id_3,
+        clients ( name, email, phone, policies_agreed_at )
+      `)
       .eq('id', apptId)
       .maybeSingle();
     if (error) throw error;
     if (!data) { rowsEl.innerHTML = '<div style="font-size:12px;color:var(--text-muted);">Appointment not found.</div>'; return; }
     var c = data.clients || {};
+
+    // Resolve the primary cleaner's name + phone for the cleaner-job
+    // row label. The endpoint walks all paired cleaners on its own;
+    // we just need a representative name for the UI.
+    var primaryCleanerId = data.cleaner_id || null;
+    var hasCleaner = !!primaryCleanerId;
+    var primaryCleanerName = null;
+    var primaryCleanerPhone = null;
+    if (hasCleaner && typeof cleanerDB !== 'undefined' && cleanerDB[primaryCleanerId]) {
+      primaryCleanerName = cleanerDB[primaryCleanerId].name;
+      primaryCleanerPhone = cleanerDB[primaryCleanerId].phone;
+    }
+    var pairedCount = [data.cleaner_id_2, data.cleaner_id_3].filter(Boolean).length;
+    var cleanerLabel = !hasCleaner ? 'no cleaner assigned'
+                     : !primaryCleanerPhone ? (primaryCleanerName || 'cleaner') + ' (no phone)'
+                     : (primaryCleanerName || 'cleaner') + (pairedCount > 0 ? ' (+' + pairedCount + ' paired)' : '') + ' \u00B7 ' + primaryCleanerPhone;
+
     var rows = [
       {
         key: 'confirmation',
@@ -6255,6 +6276,22 @@ async function renderApptNotifications(){
         // anyway; reflect that in the UI so Dane isn't surprised.
         disabledReason: !c.phone ? 'Add a phone to the client record'
                        : c.policies_agreed_at ? 'Already agreed ' + _formatLastSent(c.policies_agreed_at)
+                       : null,
+      },
+      {
+        // Cleaner-job send — standalone manual button. Distinct from
+        // the contextual checkboxes inside the edit form (which fire
+        // automatically when date/time/cleaner change). This row is
+        // for "the cleaner forgot, just re-send the details" or any
+        // manual fire without making an edit. mode='assigned' matches
+        // the post-book firing path.
+        key: 'cleaner_job',
+        label: 'Cleaner job SMS',
+        recipient: primaryCleanerPhone || null,
+        recipientLabel: cleanerLabel,
+        sentAt: data.cleaner_notified_at,
+        disabledReason: !hasCleaner ? 'Assign a cleaner first'
+                       : !primaryCleanerPhone ? 'Cleaner has no phone on file'
                        : null,
       },
     ];
@@ -6326,12 +6363,19 @@ async function sendManualNotification(kind){
   var endpoint = kind === 'confirmation' ? '/api/manual-send-confirmation'
               : kind === 'reminder'     ? '/api/manual-send-reminder'
               : kind === 'waiver'       ? '/api/manual-send-waiver'
+              : kind === 'cleaner_job'  ? '/api/manual-send-cleaner-job'
               : null;
   if (!endpoint) {
     if (typeof showToast === 'function') showToast('Unknown notification kind: ' + kind, 'error');
     if (btn) { btn.disabled = false; btn.textContent = 'Send'; }
     return;
   }
+  // Cleaner-job endpoint accepts a mode ('assigned' | 'rescheduled');
+  // standalone manual sends from this panel use 'assigned' since the
+  // intent is "here's your job" not "schedule changed." (Reschedule
+  // fires from the edit form's date/time-change contextual checkbox.)
+  var requestBody = { appointmentId: currentAppt.dbId };
+  if (kind === 'cleaner_job') requestBody.mode = 'assigned';
 
   try {
     var session = await db.auth.getSession();
@@ -6343,7 +6387,7 @@ async function sendManualNotification(kind){
         'Content-Type': 'application/json',
         'Authorization': 'Bearer ' + token,
       },
-      body: JSON.stringify({ appointmentId: currentAppt.dbId }),
+      body: JSON.stringify(requestBody),
     });
     var data = await resp.json().catch(function(){ return {}; });
     if (!resp.ok || !data.success) {
@@ -6359,7 +6403,11 @@ async function sendManualNotification(kind){
       sentLabel.style.color = '#15803d';
     }
     if (btn) { btn.disabled = false; btn.textContent = 'Sent \u2713'; setTimeout(function(){ if (btn) btn.textContent = 'Send'; }, 2500); }
-    var sentToastMsg = (kind === 'confirmation' ? 'Confirmation email sent' : kind === 'reminder' ? 'Reminder sent' : 'Waiver SMS sent')
+    var sentToastMsg = (kind === 'confirmation' ? 'Confirmation email sent'
+                      : kind === 'reminder'     ? 'Reminder sent'
+                      : kind === 'waiver'       ? 'Waiver SMS sent'
+                      : kind === 'cleaner_job'  ? 'Cleaner job SMS sent'
+                      : 'Sent')
       + (data.recipient ? ' to ' + data.recipient : '');
     if (typeof showToast === 'function') showToast(sentToastMsg);
   } catch (err) {

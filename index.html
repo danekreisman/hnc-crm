@@ -5420,14 +5420,6 @@ var currentView=(function(){try{var v=sessionStorage.getItem('hnc_currentView');
 var activeChatId=null;
 var currentClientName='';
 var currentLeadName='';
-// Logs view state, hoisted here so the page-refresh view-restore at
-// line ~11540 can reference it without hitting the temporal dead zone.
-// (Was originally declared with `let` next to its only consumer down
-// at the Logs view code, which caused the loadLogs auto-load on
-// refresh to silently fail with a ReferenceError swallowed by
-// try/catch — reported by Dane 2026-05-11 as 'logs still don't load
-// on refresh' after the supposed fix in 771f3ae.)
-var _logsCurrentTab = 'activity';
 
 var apptData={};
 
@@ -25406,8 +25398,7 @@ async function triggerRecsCronManually(){
 async function logActivity(action, description, entityType='', entityId='', metadata={}) {
   try { const { data: { session } } = await db.auth.getSession(); const userEmail = session?.user?.email || 'system'; await db.from('activity_logs').insert({ action, description, user_email: userEmail, entity_type: entityType, entity_id: String(entityId), metadata }); } catch(e) { console.warn('logActivity failed:', e.message); }
 }
-// _logsCurrentTab is declared at the top of this script (hoisted from
-// here to avoid temporal-dead-zone errors on page-refresh view-restore).
+let _logsCurrentTab = 'activity';
 
 // Action-type filter buckets — kept here as a single source of truth
 // so the dropdown and the filter logic stay in sync. Each value is a
@@ -25526,7 +25517,6 @@ function applyLogsFilters(){
   if (search) {
     searchPredicate = function(r){
       var m = r.metadata || {};
-      var actor = _resolveActivityActor(m);
       var haystack = [
         r.description || '',
         r.action || '',
@@ -25539,8 +25529,6 @@ function applyLogsFilters(){
         m.body || '',
         m.message || '',
         r.user_email || '',
-        actor.name || '',
-        actor.identifier || '',
       ].join(' ').toLowerCase();
       return haystack.indexOf(search) >= 0;
     };
@@ -25600,12 +25588,8 @@ function _renderLogsPage(container, addCount){
 
     // Two-part context line: recipient + actor.
     var contextParts = [];
-    var actor = _resolveActivityActor(meta);
-    if (actor.name) {
-      contextParts.push('to <strong>' + esc(actor.name) + '</strong>' + (actor.identifier ? ' <span style="opacity:.6;">(' + esc(actor.identifier) + ')</span>' : ''));
-    } else if (actor.identifier) {
-      contextParts.push('to ' + esc(actor.identifier));
-    }
+    if (meta.recipient) contextParts.push('to ' + esc(meta.recipient));
+    else if (meta.to) contextParts.push('to ' + esc(meta.to));
     if (r.user_email && r.user_email !== 'system') contextParts.push('by ' + esc(r.user_email.split('@')[0]));
     else if (r.user_email === 'system') contextParts.push('automated');
     var contextLine = contextParts.length
@@ -26083,94 +26067,6 @@ function _activityTimeLabel(iso){
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + (d.getFullYear() !== now.getFullYear() ? ', ' + d.getFullYear() : '') + ' \u00B7 ' + time;
 }
 
-/* _resolveActivityActor — resolve the recipient of an activity_log row
-   to a human name. Returns { name, identifier } where:
-     - name       is the resolved display name (e.g., "Dane Kreisman"),
-                  or null if no name could be found
-     - identifier is the email/phone fallback (for showing when no name
-                  is known, or appending in parentheses for clarity)
-
-   Resolution order:
-     1. Direct ID lookup in the in-memory DBs (clientDB, leadDB, cleanerDB)
-        for metadata.client_id / lead_id / cleaner_id.
-     2. Reverse email lookup against clientDB and leadDB.
-     3. Reverse phone lookup (last 10 digits) against all three DBs.
-     4. Fallback: identifier-only (raw email/phone).
-
-   The reverse lookups are O(n) over the in-memory DBs — fine for the
-   typical few-hundred clients HNC has. If this becomes a perf issue
-   we can build an email/phone index at load time. */
-function _resolveActivityActor(meta){
-  if (!meta) return { name: null, identifier: null };
-
-  // Step 1: direct ID lookups.
-  if (meta.client_id && typeof clientDB !== 'undefined' && clientDB[meta.client_id]) {
-    return { name: clientDB[meta.client_id].name, identifier: meta.recipient || meta.to || null };
-  }
-  if (meta.lead_id && typeof leadDB !== 'undefined' && leadDB[meta.lead_id]) {
-    return { name: leadDB[meta.lead_id].name, identifier: meta.recipient || meta.to || null };
-  }
-  if (meta.cleaner_id && typeof cleanerDB !== 'undefined' && cleanerDB[meta.cleaner_id]) {
-    return { name: cleanerDB[meta.cleaner_id].name, identifier: meta.recipient || meta.to || null };
-  }
-
-  // Step 2 + 3: reverse lookup from the recipient string.
-  var raw = meta.recipient || meta.to || meta.email || meta.phone || null;
-  if (raw) {
-    var rawStr = String(raw).trim();
-    var rawLower = rawStr.toLowerCase();
-    var isEmail = rawStr.indexOf('@') >= 0;
-    var phoneDigits = isEmail ? null : rawStr.replace(/[^0-9]/g, '').slice(-10);
-
-    // Reverse against clientDB first (most common case).
-    if (typeof clientDB !== 'undefined') {
-      var clientMatch = Object.values(clientDB).find(function(c){
-        if (!c) return false;
-        if (isEmail && c.email && c.email.toLowerCase() === rawLower) return true;
-        if (phoneDigits && c.phone) {
-          var d = String(c.phone).replace(/[^0-9]/g, '').slice(-10);
-          if (d === phoneDigits) return true;
-        }
-        return false;
-      });
-      if (clientMatch) return { name: clientMatch.name, identifier: rawStr };
-    }
-
-    // Then leadDB.
-    if (typeof leadDB !== 'undefined') {
-      var leadMatch = Object.values(leadDB).find(function(l){
-        if (!l) return false;
-        if (isEmail && l.email && l.email.toLowerCase() === rawLower) return true;
-        if (phoneDigits && l.phone) {
-          var d = String(l.phone).replace(/[^0-9]/g, '').slice(-10);
-          if (d === phoneDigits) return true;
-        }
-        return false;
-      });
-      if (leadMatch) return { name: leadMatch.name, identifier: rawStr };
-    }
-
-    // Then cleanerDB.
-    if (typeof cleanerDB !== 'undefined') {
-      var cleanerMatch = Object.values(cleanerDB).find(function(c){
-        if (!c) return false;
-        if (isEmail && c.email && c.email.toLowerCase() === rawLower) return true;
-        if (phoneDigits && c.phone) {
-          var d = String(c.phone).replace(/[^0-9]/g, '').slice(-10);
-          if (d === phoneDigits) return true;
-        }
-        return false;
-      });
-      if (cleanerMatch) return { name: cleanerMatch.name, identifier: rawStr };
-    }
-
-    // No name found — return identifier only.
-    return { name: null, identifier: rawStr };
-  }
-
-  return { name: null, identifier: null };
-}
-
 // Cache rows by id so the detail modal can pick up the full payload
 // without re-querying.
 window._activityRowCache = window._activityRowCache || {};
@@ -26261,11 +26157,10 @@ function _renderClientActivityPage(el, addCount){
       ? 'background:#fef2f2;border-left:3px solid #dc2626;'
       : 'background:transparent;border-left:3px solid transparent;';
     var contextLine = '';
-    var actor = _resolveActivityActor(meta);
-    if (actor.name) {
-      contextLine = '<div style="color:var(--text-muted);font-size:11px;margin-top:2px;">to <strong>' + esc(actor.name) + '</strong>' + (actor.identifier ? ' <span style="opacity:.6;">(' + esc(actor.identifier) + ')</span>' : '') + '</div>';
-    } else if (actor.identifier) {
-      contextLine = '<div style="color:var(--text-muted);font-size:11px;margin-top:2px;">to ' + esc(actor.identifier) + '</div>';
+    if (meta.recipient) {
+      contextLine = '<div style="color:var(--text-muted);font-size:11px;margin-top:2px;">to ' + esc(meta.recipient) + '</div>';
+    } else if (meta.to) {
+      contextLine = '<div style="color:var(--text-muted);font-size:11px;margin-top:2px;">to ' + esc(meta.to) + '</div>';
     }
     return '<div onclick="openActivityDetailModal(\'' + r.id + '\')" style="' + rowStyle + 'display:flex;gap:10px;padding:10px 10px;border-bottom:1px solid var(--border);align-items:flex-start;cursor:pointer;transition:background .12s;" onmouseover="this.style.background=\'' + (isFailed ? '#fee2e2' : 'var(--bg-soft)') + '\'" onmouseout="this.style.background=\'' + (isFailed ? '#fef2f2' : 'transparent') + '\'">'
       + '<span style="font-size:15px;flex-shrink:0;line-height:1.5;">' + icon + '</span>'
@@ -26323,15 +26218,8 @@ function openActivityDetailModal(rowId){
   var icon = _activityIcon(row.action, meta.status);
   var fullTime = new Date(row.created_at).toLocaleString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
 
-  // Resolve recipient label - use the same helper as the feed rows so
-  // the name and identifier render consistently.
-  var actor = _resolveActivityActor(meta);
-  var recipientLine = '';
-  if (actor.name) {
-    recipientLine = '<strong>' + esc(actor.name) + '</strong>' + (actor.identifier ? ' <span style="color:var(--text-muted);">(' + esc(actor.identifier) + ')</span>' : '');
-  } else if (actor.identifier) {
-    recipientLine = '<strong>' + esc(actor.identifier) + '</strong>';
-  }
+  // Resolve recipient label - actions store recipients in different keys.
+  var recipient = meta.recipient || meta.to || meta.email || meta.phone || null;
 
   // Body — if metadata includes message text, show it. Various action
   // types store body under different keys.
@@ -26363,7 +26251,7 @@ function openActivityDetailModal(rowId){
     + '</div>'
     + failureBlock
     + '<div style="background:var(--bg-soft);border:1px solid var(--border);border-radius:8px;padding:14px;font-size:13px;line-height:1.7;">'
-      + (recipientLine ? '<div><span style="color:var(--text-muted);">To:</span> ' + recipientLine + '</div>' : '')
+      + (recipient ? '<div><span style="color:var(--text-muted);">To:</span> <strong>' + esc(recipient) + '</strong></div>' : '')
       + (row.user_email ? '<div><span style="color:var(--text-muted);">By:</span> <strong>' + esc(row.user_email === 'system' ? 'System (automated)' : row.user_email) + '</strong></div>' : '')
       + (row.description ? '<div style="margin-top:8px;color:var(--text);">' + esc(row.description) + '</div>' : '')
     + '</div>'

@@ -25838,7 +25838,7 @@ async function loadClientActivityLog(clientId){
       .select('id, action, description, created_at, metadata, user_email')
       .eq('metadata->>client_id', clientId)
       .order('created_at', { ascending: false })
-      .limit(100);
+      .limit(200);
     var rows = (primaryRes.data || []).slice();
 
     // Legacy fallback: email + phone match. For rows written before
@@ -25855,7 +25855,7 @@ async function loadClientActivityLog(clientId){
           .select('id, action, description, created_at, metadata, user_email')
           .eq('metadata->>to', email)
           .order('created_at', { ascending: false })
-          .limit(50);
+          .limit(100);
         (r1.data || []).forEach(function(r){ if (!seen.has(r.id)) { seen.add(r.id); rows.push(r); } });
       }
       if (phoneE164) {
@@ -25863,64 +25863,91 @@ async function loadClientActivityLog(clientId){
           .select('id, action, description, created_at, metadata, user_email')
           .eq('metadata->>to', phoneE164)
           .order('created_at', { ascending: false })
-          .limit(50);
+          .limit(100);
         (r2.data || []).forEach(function(r){ if (!seen.has(r.id)) { seen.add(r.id); rows.push(r); } });
       }
     }
 
-    // Filter out user_login noise + sort all sources together by time.
+    // Filter + sort.
     rows = rows.filter(function(r){ return r.action !== 'user_login'; });
     rows.sort(function(a, b){ return new Date(b.created_at) - new Date(a.created_at); });
 
-    if (rows.length === 0) {
-      el.innerHTML = '<div style="color:var(--text-muted);padding:12px 0;text-align:center;font-size:13px;">No activity yet.</div>';
-      return;
-    }
-
-    // Cache rows for the detail modal.
+    // Cache full set for the detail modal AND for "Load more" expansion.
     rows.forEach(function(r){ window._activityRowCache[r.id] = r; });
-
-    var html = rows.slice(0, 50).map(function(r){
-      var meta = r.metadata || {};
-      var isFailed = meta.status === 'failed';
-      var label = _humanizeActivityAction(r.action);
-      var icon = _activityIcon(r.action, meta.status);
-      var time = _activityTimeLabel(r.created_at);
-      var failureLine = isFailed && meta.failure_reason
-        ? '<div style="color:#b91c1c;font-size:11px;margin-top:3px;font-weight:500;">' + esc(meta.failure_reason) + '</div>'
-        : '';
-      var rowStyle = isFailed
-        ? 'background:#fef2f2;border-left:3px solid #dc2626;'
-        : 'background:transparent;border-left:3px solid transparent;';
-
-      // Concise context: a body snippet or a short recipient line if
-      // we have one. Falls back to nothing — the row itself is the
-      // headline.
-      var contextLine = '';
-      if (meta.recipient) {
-        contextLine = '<div style="color:var(--text-muted);font-size:11px;margin-top:2px;">to ' + esc(meta.recipient) + '</div>';
-      } else if (meta.to) {
-        contextLine = '<div style="color:var(--text-muted);font-size:11px;margin-top:2px;">to ' + esc(meta.to) + '</div>';
-      }
-
-      return '<div onclick="openActivityDetailModal(\'' + r.id + '\')" style="' + rowStyle + 'display:flex;gap:10px;padding:10px 10px;border-bottom:1px solid var(--border);align-items:flex-start;cursor:pointer;transition:background .12s;" onmouseover="this.style.background=\'' + (isFailed ? '#fee2e2' : 'var(--bg-soft)') + '\'" onmouseout="this.style.background=\'' + (isFailed ? '#fef2f2' : 'transparent') + '\'">'
-        + '<span style="font-size:15px;flex-shrink:0;line-height:1.5;">' + icon + '</span>'
-        + '<div style="flex:1;min-width:0;">'
-          + '<div style="color:' + (isFailed ? '#7f1d1d' : 'var(--text)') + ';font-size:13px;font-weight:500;">' + esc(label) + '</div>'
-          + '<div style="color:var(--text-muted);font-size:11px;margin-top:1px;">' + esc(time) + '</div>'
-          + contextLine
-          + failureLine
-        + '</div>'
-      + '</div>';
-    }).join('');
-
-    if (rows.length > 50) {
-      html += '<div style="color:var(--text-muted);font-size:11px;padding:10px 0;text-align:center;">Showing 50 of ' + rows.length + '</div>';
-    }
-    el.innerHTML = html;
+    window._clientActivityRows = rows;
+    // Reset visible count to the initial page (5) every time we
+    // (re)load — covers profile-switch and re-opens.
+    window._clientActivityShown = 0;
+    _renderClientActivityPage(el, 5);
   } catch (e) {
     el.innerHTML = '<div style="color:#dc2626;font-size:12px;padding:8px 0;">Failed to load: ' + esc(e.message || 'unknown error') + '</div>';
   }
+}
+
+/* Render N additional rows of activity into the container, appending
+   to whatever's already visible. Called once on initial load (n=5) and
+   from the "Load 5 more" button. Tracks state via the window-scoped
+   shown count so the button knows where to start. */
+function _renderClientActivityPage(el, addCount){
+  var rows = window._clientActivityRows || [];
+  if (rows.length === 0) {
+    el.innerHTML = '<div style="color:var(--text-muted);padding:12px 0;text-align:center;font-size:13px;">No activity yet.</div>';
+    return;
+  }
+  var shown = window._clientActivityShown || 0;
+  var nextShown = Math.min(shown + addCount, rows.length);
+  // Slice ALL rows up to nextShown (re-render rather than append) so
+  // the markup stays simple — no per-row append logic, no risk of
+  // duplication, no need to manage a separate insertion point.
+  var slice = rows.slice(0, nextShown);
+  var rowsHtml = slice.map(function(r){
+    var meta = r.metadata || {};
+    var isFailed = meta.status === 'failed';
+    var label = _humanizeActivityAction(r.action);
+    var icon = _activityIcon(r.action, meta.status);
+    var time = _activityTimeLabel(r.created_at);
+    var failureLine = isFailed && meta.failure_reason
+      ? '<div style="color:#b91c1c;font-size:11px;margin-top:3px;font-weight:500;">' + esc(meta.failure_reason) + '</div>'
+      : '';
+    var rowStyle = isFailed
+      ? 'background:#fef2f2;border-left:3px solid #dc2626;'
+      : 'background:transparent;border-left:3px solid transparent;';
+    var contextLine = '';
+    if (meta.recipient) {
+      contextLine = '<div style="color:var(--text-muted);font-size:11px;margin-top:2px;">to ' + esc(meta.recipient) + '</div>';
+    } else if (meta.to) {
+      contextLine = '<div style="color:var(--text-muted);font-size:11px;margin-top:2px;">to ' + esc(meta.to) + '</div>';
+    }
+    return '<div onclick="openActivityDetailModal(\'' + r.id + '\')" style="' + rowStyle + 'display:flex;gap:10px;padding:10px 10px;border-bottom:1px solid var(--border);align-items:flex-start;cursor:pointer;transition:background .12s;" onmouseover="this.style.background=\'' + (isFailed ? '#fee2e2' : 'var(--bg-soft)') + '\'" onmouseout="this.style.background=\'' + (isFailed ? '#fef2f2' : 'transparent') + '\'">'
+      + '<span style="font-size:15px;flex-shrink:0;line-height:1.5;">' + icon + '</span>'
+      + '<div style="flex:1;min-width:0;">'
+        + '<div style="color:' + (isFailed ? '#7f1d1d' : 'var(--text)') + ';font-size:13px;font-weight:500;">' + esc(label) + '</div>'
+        + '<div style="color:var(--text-muted);font-size:11px;margin-top:1px;">' + esc(time) + '</div>'
+        + contextLine
+        + failureLine
+      + '</div>'
+    + '</div>';
+  }).join('');
+
+  // Load-more button OR end-of-list label.
+  var remaining = rows.length - nextShown;
+  var footerHtml = '';
+  if (remaining > 0) {
+    footerHtml = '<button type="button" onclick="_loadMoreClientActivity()" style="display:block;width:100%;margin-top:8px;padding:9px 14px;background:#fff;border:1px solid var(--border);border-radius:8px;color:var(--brand-500);font-size:12px;font-weight:600;cursor:pointer;transition:background .12s;" onmouseover="this.style.background=\'var(--bg-soft)\'" onmouseout="this.style.background=\'#fff\'">Load ' + Math.min(5, remaining) + ' more (' + remaining + ' remaining)</button>';
+  } else if (rows.length > 5) {
+    // Only show the end-of-list label if we expanded past the initial
+    // page — no point telling someone with 3 rows that they\'ve seen
+    // them all.
+    footerHtml = '<div style="color:var(--text-muted);font-size:11px;padding:10px 0;text-align:center;">All ' + rows.length + ' activity items shown</div>';
+  }
+  el.innerHTML = rowsHtml + footerHtml;
+  window._clientActivityShown = nextShown;
+}
+
+function _loadMoreClientActivity(){
+  var el = document.getElementById('cl-activity-log');
+  if (!el) return;
+  _renderClientActivityPage(el, 5);
 }
 
 /* ────────────────────────────────────────────────────────────────────────────

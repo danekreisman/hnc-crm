@@ -1568,7 +1568,56 @@ body:not(.hnc-assistant-user) .assistant-only{display:none!important;}
         </div>
 
         <!-- SETTINGS VIEW -->
-      <div id="view-logs" class="vc"><div style="padding:1.5rem 2rem;"><h2 style="font-size:1.4rem;font-weight:700;color:var(--text-primary);margin-bottom:1.5rem;">System Logs</h2><div style="display:flex;gap:.5rem;margin-bottom:1.5rem;"><button id="logs-tab-activity" onclick="showLogsTab('activity')" style="padding:.5rem 1.25rem;border-radius:8px;border:none;background:var(--brand-500);color:#fff;cursor:pointer;font-weight:600;font-size:.9rem;">Activity</button><button id="logs-tab-errors" onclick="showLogsTab('errors')" style="padding:.5rem 1.25rem;border-radius:8px;border:1px solid var(--border);background:#fff;color:var(--text-secondary);cursor:pointer;font-size:.9rem;">Errors</button></div><div id="logs-content" style="background:#fff;border-radius:12px;border:1px solid var(--border);overflow:hidden;"><div style="padding:2rem;text-align:center;color:var(--text-secondary);">Loading logs...</div></div></div></div>
+      <div id="view-logs" class="vc">
+        <div style="padding:1.5rem 2rem;max-width:1000px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem;">
+            <h2 style="font-size:1.4rem;font-weight:700;color:var(--text-primary);margin:0;">Activity log</h2>
+            <div style="display:flex;gap:.5rem;">
+              <button id="logs-tab-activity" onclick="showLogsTab('activity')" style="padding:.5rem 1.1rem;border-radius:8px;border:none;background:var(--brand-500);color:#fff;cursor:pointer;font-weight:600;font-size:.85rem;">Activity</button>
+              <button id="logs-tab-errors" onclick="showLogsTab('errors')" style="padding:.5rem 1.1rem;border-radius:8px;border:1px solid var(--border);background:#fff;color:var(--text-secondary);cursor:pointer;font-size:.85rem;">Errors</button>
+            </div>
+          </div>
+
+          <!-- Filter bar — visible only on Activity tab. Filters are
+               client-side (already-loaded rows) so changes are instant
+               without re-querying. -->
+          <div id="logs-filters" style="background:#fff;border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:1rem;display:flex;flex-wrap:wrap;gap:14px;align-items:flex-end;">
+            <div style="flex:1;min-width:180px;">
+              <label style="display:block;font-size:11px;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px;">Type</label>
+              <select id="logs-filter-type" onchange="applyLogsFilters()" style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:7px;font-size:13px;background:#fff;color:var(--text);cursor:pointer;">
+                <option value="all">All activity</option>
+                <option value="manual_sends">Manual sends</option>
+                <option value="auto_actions">Auto actions</option>
+                <option value="payments">Payments &amp; cards</option>
+                <option value="failures">Failures only</option>
+              </select>
+            </div>
+            <div style="flex:1;min-width:160px;">
+              <label style="display:block;font-size:11px;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px;">Date range</label>
+              <select id="logs-filter-range" onchange="applyLogsFilters()" style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:7px;font-size:13px;background:#fff;color:var(--text);cursor:pointer;">
+                <option value="all">All time</option>
+                <option value="today">Today</option>
+                <option value="week">Last 7 days</option>
+                <option value="month">Last 30 days</option>
+              </select>
+            </div>
+            <div style="flex:2;min-width:220px;">
+              <label style="display:block;font-size:11px;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px;">Search</label>
+              <input id="logs-filter-search" oninput="applyLogsFilters()" placeholder="Name, email, phone, or message..." style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:7px;font-size:13px;background:#fff;color:var(--text);">
+            </div>
+          </div>
+
+          <!-- Result count + reload -->
+          <div id="logs-status-bar" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;font-size:12px;color:var(--text-muted);">
+            <span id="logs-result-count">&nbsp;</span>
+            <button onclick="loadLogs(_logsCurrentTab||'activity', true)" style="background:transparent;border:none;color:var(--brand-500);cursor:pointer;font-size:12px;font-weight:600;">\u21BB Refresh</button>
+          </div>
+
+          <div id="logs-content" style="background:#fff;border-radius:12px;border:1px solid var(--border);overflow:hidden;min-height:120px;">
+            <div style="padding:2rem;text-align:center;color:var(--text-secondary);">Loading logs...</div>
+          </div>
+        </div>
+      </div>
 <div id="view-settings" class="vc">
 
         <!-- ── Tab bar ─────────────────────────────────────────────────── -->
@@ -25350,57 +25399,252 @@ async function logActivity(action, description, entityType='', entityId='', meta
   try { const { data: { session } } = await db.auth.getSession(); const userEmail = session?.user?.email || 'system'; await db.from('activity_logs').insert({ action, description, user_email: userEmail, entity_type: entityType, entity_id: String(entityId), metadata }); } catch(e) { console.warn('logActivity failed:', e.message); }
 }
 let _logsCurrentTab = 'activity';
+
+// Action-type filter buckets — kept here as a single source of truth
+// so the dropdown and the filter logic stay in sync. Each value is a
+// predicate on the action string.
+const _LOGS_TYPE_BUCKETS = {
+  manual_sends: function(action){ return action.indexOf('manual_') === 0; },
+  auto_actions: function(action){
+    return action.indexOf('auto_assigned') >= 0
+      || action === 'cleaner_invite_auto_assigned'
+      || action === 'lead_to_client_converted'
+      || action === 'policy_agreed'
+      || action.indexOf('gcal') >= 0;
+  },
+  payments: function(action){
+    return action.indexOf('stripe') >= 0
+      || action.indexOf('charge') >= 0
+      || action.indexOf('invoice') >= 0
+      || action.indexOf('card') >= 0;
+  },
+  // failures handled separately via metadata.status
+};
+
 function showLogsTab(tab) {
   _logsCurrentTab = tab;
   const actBtn = document.getElementById('logs-tab-activity'), errBtn = document.getElementById('logs-tab-errors');
   if (!actBtn) return;
-  actBtn.style.background = tab==='activity' ? 'var(--brand-500)' : '#fff'; actBtn.style.color = tab==='activity' ? '#fff' : 'var(--text-secondary)'; actBtn.style.border = tab==='activity' ? 'none' : '1px solid var(--border)';
-  errBtn.style.background = tab==='errors' ? 'var(--brand-500)' : '#fff'; errBtn.style.color = tab==='errors' ? '#fff' : 'var(--text-secondary)'; errBtn.style.border = tab==='errors' ? 'none' : '1px solid var(--border)';
+  actBtn.style.background = tab==='activity' ? 'var(--brand-500)' : '#fff';
+  actBtn.style.color = tab==='activity' ? '#fff' : 'var(--text-secondary)';
+  actBtn.style.border = tab==='activity' ? 'none' : '1px solid var(--border)';
+  errBtn.style.background = tab==='errors' ? 'var(--brand-500)' : '#fff';
+  errBtn.style.color = tab==='errors' ? '#fff' : 'var(--text-secondary)';
+  errBtn.style.border = tab==='errors' ? 'none' : '1px solid var(--border)';
+  // Filter bar only relevant on activity tab.
+  var filtersEl = document.getElementById('logs-filters');
+  if (filtersEl) filtersEl.style.display = tab === 'activity' ? '' : 'none';
   loadLogs(tab);
 }
-async function loadLogs(tab) {
+
+async function loadLogs(tab, forceReload) {
   const container = document.getElementById('logs-content');
   if (!container) {
-    // Panel not in the DOM yet — view just toggled visible. Retry shortly.
     if ((loadLogs._retries = (loadLogs._retries||0) + 1) > 30) return;
-    return setTimeout(() => loadLogs(tab), 50);
+    return setTimeout(() => loadLogs(tab, forceReload), 50);
   }
   loadLogs._retries = 0;
   container.innerHTML = '<div style="padding:2rem;text-align:center;color:var(--text-secondary);">Loading...</div>';
+
   try {
     if (tab === 'activity') {
-      const { data } = await db.from('activity_logs').select('*').order('created_at', {ascending:false}).limit(200);
-      const rows = (data || []).filter(r => r.action !== 'user_login').slice(0, 100);
-      if (!rows.length) { container.innerHTML = '<div style="padding:2rem;text-align:center;color:var(--text-secondary);">No activity yet.</div>'; return; }
-      const esc = (s) => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-      const fmtMeta = (m, desc) => {
-        if (!m || typeof m !== 'object') return '';
-        const parts = [];
-        const seen = new Set();
-        const push = (label, val) => { const k = label+':'+val; if (val==null || val==='' || seen.has(k)) return; seen.add(k); parts.push(label + ': <b>' + esc(val) + '</b>'); };
-        if (m.amount != null && m.amount !== '') push('amount', '$' + parseFloat(m.amount).toFixed(2));
-        if (m.email && !String(desc||'').includes(m.email)) push('to', m.email);
-        if (m.clientName && !String(desc||'').includes(m.clientName)) push('client', m.clientName);
-        if (m.action) push('action', m.action);
-        if (m.count != null) push('count', m.count);
-        if (m.date) push('date', m.date);
-        if (m.mode) push('mode', m.mode);
-        return parts.length ? '<div style="font-size:.75rem;color:var(--text-secondary);margin-top:.25rem;opacity:.85;">' + parts.join(' · ') + '</div>' : '';
-      };
-      const head = '<table style="width:100%;border-collapse:collapse;font-size:.875rem;"><thead><tr style="background:var(--bg-soft);border-bottom:1px solid var(--border);"><th style="padding:.75rem 1rem;text-align:left;font-weight:600;color:var(--text-secondary);">Time</th><th style="padding:.75rem 1rem;text-align:left;font-weight:600;color:var(--text-secondary);">Action</th><th style="padding:.75rem 1rem;text-align:left;font-weight:600;color:var(--text-secondary);">Description</th><th style="padding:.75rem 1rem;text-align:left;font-weight:600;color:var(--text-secondary);">User</th></tr></thead><tbody>';
-      const body = rows.map((r,i) => {
-        const t = new Date(r.created_at).toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
-        const meta = fmtMeta(r.metadata, r.description);
-        return '<tr style="background:'+(i%2===0?'#fff':'var(--bg-soft)')+';border-bottom:1px solid var(--border);vertical-align:top;"><td style="padding:.65rem 1rem;color:var(--text-secondary);white-space:nowrap;">'+t+'</td><td style="padding:.65rem 1rem;"><span style="background:var(--brand-50);color:var(--brand-600);padding:.2rem .5rem;border-radius:4px;font-size:.8rem;font-weight:600;">'+esc(r.action)+'</span></td><td style="padding:.65rem 1rem;color:var(--text-primary);">'+esc(r.description||'')+meta+'</td><td style="padding:.65rem 1rem;color:var(--text-secondary);font-size:.8rem;">'+esc(r.user_email||'')+'</td></tr>';
-      }).join('');
-      container.innerHTML = head + body + '</tbody></table>';
+      const { data, error } = await db.from('activity_logs')
+        .select('id, action, description, created_at, metadata, user_email')
+        .order('created_at', { ascending: false })
+        .limit(500);
+      if (error) throw error;
+      var rows = (data || []).filter(function(r){ return r.action !== 'user_login'; });
+      // Cache for detail modal + filter operations.
+      rows.forEach(function(r){ window._activityRowCache[r.id] = r; });
+      window._logsAllRows = rows;
+      window._logsShown = 0;
+      applyLogsFilters();
     } else {
-      const { data } = await db.from('error_logs').select('*').order('occurred_at', {ascending:false}).limit(100);
-      const rows = data || [];
-      if (!rows.length) { container.innerHTML = '<div style="padding:2rem;text-align:center;color:var(--text-secondary);">No errors. All good!</div>'; return; }
-      container.innerHTML = '<table style="width:100%;border-collapse:collapse;font-size:.875rem;"><thead><tr style="background:var(--bg-soft);border-bottom:1px solid var(--border);"><th style="padding:.75rem 1rem;text-align:left;font-weight:600;color:var(--text-secondary);">Time</th><th style="padding:.75rem 1rem;text-align:left;font-weight:600;color:var(--text-secondary);">Source</th><th style="padding:.75rem 1rem;text-align:left;font-weight:600;color:var(--text-secondary);">Error</th></tr></thead><tbody>' + rows.map((r,i) => { const t = new Date(r.occurred_at).toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}); return '<tr style="background:'+(i%2===0?'#fff':'var(--bg-soft)')+';border-bottom:1px solid var(--border);"><td style="padding:.65rem 1rem;color:var(--text-secondary);white-space:nowrap;">'+t+'</td><td style="padding:.65rem 1rem;"><span style="background:#fef2f2;color:#dc2626;padding:.2rem .5rem;border-radius:4px;font-size:.8rem;font-weight:600;">'+(r.source||'')+'</span></td><td style="padding:.65rem 1rem;color:var(--text-primary);font-size:.8rem;">'+(r.message||'')+'</td></tr>'; }).join('') + '</tbody></table>';
+      // Errors tab — uses error_logs, filtered to exclude the
+      // stripe-charge-success audit rows that intentionally live here.
+      const { data, error } = await db.from('error_logs')
+        .select('id, source, message, stack, context, occurred_at')
+        .not('source', 'like', 'stripe-charge-success%')
+        .order('occurred_at', { ascending: false })
+        .limit(200);
+      if (error) throw error;
+      var errRows = data || [];
+      _renderErrorsList(container, errRows);
+      var countEl = document.getElementById('logs-result-count');
+      if (countEl) countEl.textContent = errRows.length === 0 ? 'No errors.' : (errRows.length + ' error' + (errRows.length === 1 ? '' : 's'));
     }
-  } catch(e) { container.innerHTML = '<div style="padding:2rem;color:#dc2626;">Error: '+e.message+'</div>'; }
+  } catch(e) {
+    container.innerHTML = '<div style="padding:2rem;color:#dc2626;">Error: ' + esc(e.message || 'unknown') + '</div>';
+  }
+}
+
+/* applyLogsFilters — re-renders the activity feed based on the current
+   filter dropdown + search input state. Filters are client-side
+   against window._logsAllRows so changes are instant (no re-query).
+
+   Resets pagination to first page on every filter change. */
+function applyLogsFilters(){
+  var container = document.getElementById('logs-content');
+  if (!container) return;
+  var all = window._logsAllRows || [];
+  var typeSel = (document.getElementById('logs-filter-type') || {}).value || 'all';
+  var rangeSel = (document.getElementById('logs-filter-range') || {}).value || 'all';
+  var search = ((document.getElementById('logs-filter-search') || {}).value || '').trim().toLowerCase();
+
+  // Date threshold.
+  var cutoffMs = null;
+  if (rangeSel === 'today') {
+    var t = new Date(); t.setHours(0,0,0,0);
+    cutoffMs = t.getTime();
+  } else if (rangeSel === 'week') {
+    cutoffMs = Date.now() - 7 * 86400000;
+  } else if (rangeSel === 'month') {
+    cutoffMs = Date.now() - 30 * 86400000;
+  }
+
+  // Type predicate.
+  var typePredicate;
+  if (typeSel === 'failures') {
+    typePredicate = function(r){ return r.metadata && r.metadata.status === 'failed'; };
+  } else if (_LOGS_TYPE_BUCKETS[typeSel]) {
+    typePredicate = function(r){ return _LOGS_TYPE_BUCKETS[typeSel](r.action); };
+  } else {
+    typePredicate = function(){ return true; };
+  }
+
+  // Search predicate — matches description, recipient, names, body.
+  var searchPredicate = function(){ return true; };
+  if (search) {
+    searchPredicate = function(r){
+      var m = r.metadata || {};
+      var haystack = [
+        r.description || '',
+        r.action || '',
+        m.recipient || '',
+        m.to || '',
+        m.email || '',
+        m.phone || '',
+        m.clientName || '',
+        m.cleaner_name || '',
+        m.body || '',
+        m.message || '',
+        r.user_email || '',
+      ].join(' ').toLowerCase();
+      return haystack.indexOf(search) >= 0;
+    };
+  }
+
+  var filtered = all.filter(function(r){
+    if (cutoffMs !== null && new Date(r.created_at).getTime() < cutoffMs) return false;
+    if (!typePredicate(r)) return false;
+    if (!searchPredicate(r)) return false;
+    return true;
+  });
+
+  window._logsFiltered = filtered;
+  window._logsShown = 0;
+
+  // Result count line.
+  var countEl = document.getElementById('logs-result-count');
+  if (countEl) {
+    if (filtered.length === 0) {
+      countEl.textContent = all.length === 0 ? 'No activity yet.' : 'No matches for current filters.';
+    } else {
+      countEl.textContent = filtered.length + ' result' + (filtered.length === 1 ? '' : 's')
+        + (filtered.length < all.length ? ' (filtered from ' + all.length + ')' : '');
+    }
+  }
+
+  if (filtered.length === 0) {
+    container.innerHTML = '<div style="padding:2.5rem 2rem;text-align:center;color:var(--text-muted);font-size:13px;">'
+      + (all.length === 0 ? 'No activity recorded yet.' : 'No activity matches your filters. Try widening the date range or clearing the search.')
+      + '</div>';
+    return;
+  }
+
+  _renderLogsPage(container, 20);
+}
+
+/* Render the next batch of filtered rows. Used by initial filter
+   application (count=20) and the "Load more" button. Re-renders the
+   full visible slice each time so markup stays simple. */
+function _renderLogsPage(container, addCount){
+  var filtered = window._logsFiltered || [];
+  var shown = window._logsShown || 0;
+  var nextShown = Math.min(shown + addCount, filtered.length);
+  var slice = filtered.slice(0, nextShown);
+  var rowsHtml = slice.map(function(r){
+    var meta = r.metadata || {};
+    var isFailed = meta.status === 'failed';
+    var label = _humanizeActivityAction(r.action);
+    var icon = _activityIcon(r.action, meta.status);
+    var time = _activityTimeLabel(r.created_at);
+    var failureLine = isFailed && meta.failure_reason
+      ? '<div style="color:#b91c1c;font-size:11px;margin-top:3px;font-weight:500;">' + esc(meta.failure_reason) + '</div>'
+      : '';
+    var rowStyle = isFailed
+      ? 'background:#fef2f2;border-left:3px solid #dc2626;'
+      : 'background:transparent;border-left:3px solid transparent;';
+
+    // Two-part context line: recipient + actor.
+    var contextParts = [];
+    if (meta.recipient) contextParts.push('to ' + esc(meta.recipient));
+    else if (meta.to) contextParts.push('to ' + esc(meta.to));
+    if (r.user_email && r.user_email !== 'system') contextParts.push('by ' + esc(r.user_email.split('@')[0]));
+    else if (r.user_email === 'system') contextParts.push('automated');
+    var contextLine = contextParts.length
+      ? '<div style="color:var(--text-muted);font-size:11px;margin-top:2px;">' + contextParts.join(' \u00B7 ') + '</div>'
+      : '';
+
+    return '<div onclick="openActivityDetailModal(\'' + r.id + '\')" style="' + rowStyle + 'display:flex;gap:12px;padding:12px 14px;border-bottom:1px solid var(--border);align-items:flex-start;cursor:pointer;transition:background .12s;" onmouseover="this.style.background=\'' + (isFailed ? '#fee2e2' : 'var(--bg-soft)') + '\'" onmouseout="this.style.background=\'' + (isFailed ? '#fef2f2' : 'transparent') + '\'">'
+      + '<span style="font-size:16px;flex-shrink:0;line-height:1.5;">' + icon + '</span>'
+      + '<div style="flex:1;min-width:0;">'
+        + '<div style="color:' + (isFailed ? '#7f1d1d' : 'var(--text)') + ';font-size:13px;font-weight:500;line-height:1.4;">' + esc(label) + '</div>'
+        + '<div style="color:var(--text-muted);font-size:11px;margin-top:2px;">' + esc(time) + '</div>'
+        + contextLine
+        + failureLine
+      + '</div>'
+    + '</div>';
+  }).join('');
+
+  // Load-more or end-of-list label.
+  var remaining = filtered.length - nextShown;
+  var footerHtml;
+  if (remaining > 0) {
+    footerHtml = '<button type="button" onclick="_loadMoreLogs()" style="display:block;width:100%;padding:11px 14px;background:#fff;border:none;color:var(--brand-500);font-size:13px;font-weight:600;cursor:pointer;border-top:1px solid var(--border);transition:background .12s;" onmouseover="this.style.background=\'var(--bg-soft)\'" onmouseout="this.style.background=\'#fff\'">Load ' + Math.min(20, remaining) + ' more (' + remaining + ' remaining)</button>';
+  } else {
+    footerHtml = '<div style="color:var(--text-muted);font-size:11px;padding:12px 0;text-align:center;border-top:1px solid var(--border);">End of results</div>';
+  }
+  container.innerHTML = rowsHtml + footerHtml;
+  window._logsShown = nextShown;
+}
+
+function _loadMoreLogs(){
+  var container = document.getElementById('logs-content');
+  if (container) _renderLogsPage(container, 20);
+}
+
+/* Errors tab — kept as a simpler table since the failure-as-Activity-
+   row pattern from Phase 2 covers the user-meaningful failures. The
+   Errors tab is for raw stack traces / API error bodies / debug data
+   that doesn't fit the activity feed shape. */
+function _renderErrorsList(container, rows){
+  if (rows.length === 0) {
+    container.innerHTML = '<div style="padding:2.5rem 2rem;text-align:center;color:var(--text-muted);font-size:13px;">No errors. All good!</div>';
+    return;
+  }
+  container.innerHTML = rows.map(function(r){
+    var time = _activityTimeLabel(r.occurred_at);
+    var source = r.source || 'unknown';
+    var msg = r.message || '';
+    return '<div style="padding:12px 14px;border-bottom:1px solid var(--border);background:#fef2f2;border-left:3px solid #dc2626;">'
+      + '<div style="display:flex;justify-content:space-between;gap:12px;margin-bottom:4px;">'
+        + '<span style="background:#fee2e2;color:#991b1b;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;">' + esc(source) + '</span>'
+        + '<span style="color:var(--text-muted);font-size:11px;white-space:nowrap;">' + esc(time) + '</span>'
+      + '</div>'
+      + '<div style="color:#7f1d1d;font-size:13px;font-weight:500;word-break:break-word;">' + esc(msg) + '</div>'
+    + '</div>';
+  }).join('');
 }
 // === END ACTIVITY LOGGING ===
 

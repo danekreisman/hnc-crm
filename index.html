@@ -17190,14 +17190,25 @@ function addToInvoiceTable(client, service, amount, terms){
 function openInviteCleaner(){
   if(!currentAppt)return;
   var cd=currentApptData||{};
+  // Resolve the current service to figure out which rate key applies
+  // when displaying per-cleaner rates in the list. Falls back to
+  // 'rate_regular' for any service that doesn't match deep/moveout.
+  var apptService = cd.service || (currentAppt && currentAppt.service) || 'Regular Cleaning';
   // Build job info block
   var info=document.getElementById('invite-job-info');
+  // Bed/bath: pull from cd.beds + cd.baths (the apptData mapper fields).
+  // The earlier `cd.bed` path only existed in static demo data; real
+  // appointments don't populate it — so the row read '—' for every
+  // real invite. Now reads the actual structured fields.
+  var bedBathStr = (cd.beds && cd.baths) ? (cd.beds + ' bed / ' + cd.baths + ' bath')
+                 : (cd.beds ? cd.beds + ' bed' : null);
+  var hrsForDisplay = parseFloat(cd.duration||cd.dur)||3.5;
   info.innerHTML='<div class="info-row"><span class="info-label">Client</span><span class="info-val">'+currentAppt.n+'</span></div>'
-    +'<div class="info-row"><span class="info-label">Service</span><span class="info-val">'+(cd.service||'Standard clean')+'</span></div>'
+    +'<div class="info-row"><span class="info-label">Service</span><span class="info-val">'+apptService+'</span></div>'
     +'<div class="info-row"><span class="info-label">Date & time</span><span class="info-val">'+document.getElementById('ai-date').textContent+' at '+document.getElementById('ai-time').textContent+'</span></div>'
     +'<div class="info-row"><span class="info-label">Address</span><span class="info-val">'+(cd.address||'—')+'</span></div>'
-    +'<div class="info-row"><span class="info-label">Est. duration</span><span class="info-val">'+(cd.dur||'—')+'</span></div>'
-    +'<div class="info-row"><span class="info-label">Bed / bath</span><span class="info-val">'+(cd.bed||'—')+'</span></div>';
+    +'<div class="info-row"><span class="info-label">Est. duration</span><span class="info-val">'+(cd.dur||(hrsForDisplay+' hrs'))+'</span></div>'
+    +'<div class="info-row"><span class="info-label">Bed / bath</span><span class="info-val">'+(bedBathStr||'—')+'</span></div>';
 
   // Build cleaner checkboxes — only show ACTIVE cleaners. Deactivated /
   // on-leave / inactive cleaners are filtered out so they don't get spam-
@@ -17209,12 +17220,22 @@ function openInviteCleaner(){
   Object.entries(cleanerDB).forEach(function(entry){
     var id=entry[0];var c=entry[1];
     if(c.status !== 'Active') return;
+    // Per-cleaner rate for THIS service — same path calcCleanerPay uses
+    // at send time. Surfacing it here lets Dane spot a wrong rate
+    // (e.g., a cleaner who hasn't had their deep-clean rate saved yet)
+    // BEFORE sending the invite. Format: "$30/hr (deep)" so it's clear
+    // which rate column drove the figure.
+    var rateNum = getCleanerRate(c.name, apptService);
+    var rateKey = serviceRateKey(apptService); // 'rate_regular' | 'rate_deep' | 'rate_moveout'
+    var rateLabelTag = rateKey === 'rate_deep' ? ' (deep)' : rateKey === 'rate_moveout' ? ' (moveout)' : '';
+    var rateDisplay = rateNum ? '$' + rateNum + '/hr' + rateLabelTag : '—';
+    var estPay = rateNum ? '$' + Math.round(rateNum * hrsForDisplay) : '—';
     var label=document.createElement('label');
     label.style.cssText='display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--bg-soft);border:1px solid var(--border);border-radius:8px;cursor:pointer;font-size:12px;';
     label.innerHTML='<input type="checkbox" value="'+id+'" style="accent-color:var(--brand-500);width:15px;height:15px;" onchange="updateInvitePreview()">'
       +'<div style="flex:1;">'
         +'<div style="font-weight:600;color:var(--text);">'+c.name+'</div>'
-        +'<div style="color:var(--text-muted);font-size:11px;">'+c.role+' · '+(c.rate_regular||c.rate)+'</div>'
+        +'<div style="color:var(--text-muted);font-size:11px;">'+c.role+' \u00B7 '+rateDisplay+' \u00B7 est pay '+estPay+'</div>'
       +'</div>'
       +'<div style="font-size:11px;color:var(--brand-500);font-weight:500;">'+(id===currentAppt.cleaner.toLowerCase().replace(/[^a-z]/g,'')?'Currently assigned':'Available')+'</div>';
     list.appendChild(label);
@@ -17244,6 +17265,8 @@ function updateInvitePreview(){
   // Default template uses {firstName} and {pay} placeholders that get
   // substituted per-cleaner at send time. All other fields are appointment-
   // level (same for everyone) so they're hardcoded into the template.
+  var bedBathStr = (cd.beds && cd.baths) ? (cd.beds + ' bed / ' + cd.baths + ' bath')
+                 : (cd.beds ? cd.beds + ' bed' : '—');
   var msg='Aloha {firstName}! Would you be able to take this job?\n\n'
     +'Client: '+currentAppt.n+'\n'
     +'Service: '+(cd.service||'Regular Cleaning')+'\n'
@@ -17251,7 +17274,7 @@ function updateInvitePreview(){
     +'Time: '+document.getElementById('ai-time').textContent+'\n'
     +'Address: '+(cd.address||'—')+'\n'
     +'Est. duration: '+(cd.dur||hrs+'h')+'\n'
-    +'Bed/bath: '+(cd.bed||'—')+'\n'
+    +'Bed/bath: '+bedBathStr+'\n'
     +'Your pay: {pay}\n\n'
     +'Reply YES to accept or NO to pass. First YES gets the job!\n— Hawaii Natural Clean';
   tmplEl.value=msg;

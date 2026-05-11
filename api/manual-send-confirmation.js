@@ -118,6 +118,11 @@ export default async function handler(req, res) {
       );
       return res.status(502).json({ error: 'Email service rejected the send. See Recent Errors.' });
     }
+    // Capture Resend's message_id so /api/resend-webhook can find this
+    // activity_logs row when Resend later fires email.bounced or
+    // email.complained events for the same message.
+    const sendData = await sendRes.json().catch(() => ({}));
+    const resendId = sendData && sendData.id ? sendData.id : null;
 
     // Record the audit. If this update fails we still return success —
     // the email went out — but log it so the UI's "last sent" indicator
@@ -134,7 +139,7 @@ export default async function handler(req, res) {
     await logActivity(
       'manual_confirmation_sent',
       `Confirmation email sent to ${client.name || 'client'} (${prettyDate})`,
-      { appointmentId, client_id: appt.client_id, recipient: client.email, sentBy: userId },
+      { appointmentId, client_id: appt.client_id, recipient: client.email, sentBy: userId, resend_id: resendId },
       { user_email: userEmail },
     );
 

@@ -16,23 +16,9 @@ import { createClient } from '@supabase/supabase-js';
 import { fetchWithTimeout, TIMEOUTS } from './utils/with-timeout.js';
 import { validateOrFail, SCHEMAS } from './utils/validate.js';
 import { logError } from './utils/error-logger.js';
+import { logActivity } from './utils/log-activity.js';
 
 const BASE_URL = 'https://hnc-crm.vercel.app';
-
-async function logActivity(action, description, metadata = {}) {
-  try {
-    await fetch(process.env.SUPABASE_URL + '/rest/v1/activity_logs', {
-      method: 'POST',
-      headers: {
-        'apikey': process.env.SUPABASE_SERVICE_ROLE_KEY,
-        'Authorization': 'Bearer ' + process.env.SUPABASE_SERVICE_ROLE_KEY,
-        'Content-Type': 'application/json',
-        'Prefer': 'return=minimal',
-      },
-      body: JSON.stringify({ action, description, user_email: 'system', entity_type: action, metadata }),
-    });
-  } catch (_) { /* non-blocking */ }
-}
 
 function toE164(raw) {
   if (!raw) return null;
@@ -213,8 +199,9 @@ export default async function handler(req, res) {
 
     await logActivity(
       'manual_waiver_sent',
-      `${userEmail} manually sent waiver ${mode === 'reminder' ? 'reminder ' : ''}SMS to ${client.name || 'client'}`,
-      { appointmentId: apptForAudit ? apptForAudit.id : null, clientId: client.id, recipient: phoneE164, svcId, sentBy: userId, source: appointmentId ? 'appointment' : 'client_profile', mode },
+      `Waiver ${mode === 'reminder' ? 'reminder ' : ''}SMS sent to ${client.name || 'client'}`,
+      { appointmentId: apptForAudit ? apptForAudit.id : null, client_id: client.id, recipient: phoneE164, svcId, sentBy: userId, source: appointmentId ? 'appointment' : 'client_profile', mode },
+      { user_email: userEmail },
     );
 
     return res.status(200).json({
@@ -226,6 +213,14 @@ export default async function handler(req, res) {
     });
   } catch (err) {
     await logError('manual-send-waiver', err, { appointmentId, clientId: bodyClientId });
+    try {
+      await logActivity(
+        'manual_waiver_sent',
+        'Waiver SMS send failed',
+        { appointmentId, client_id: bodyClientId || null },
+        { user_email: 'system', status: 'failed', failure_reason: err.message || 'Unknown error' },
+      );
+    } catch (_) {}
     return res.status(500).json({ error: 'Could not send waiver. See Recent Errors.' });
   }
 }

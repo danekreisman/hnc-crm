@@ -17,24 +17,10 @@ import { createClient } from '@supabase/supabase-js';
 import { fetchWithTimeout, TIMEOUTS } from './utils/with-timeout.js';
 import { validateOrFail, SCHEMAS } from './utils/validate.js';
 import { logError } from './utils/error-logger.js';
+import { logActivity } from './utils/log-activity.js';
 
 const BASE_URL = 'https://hnc-crm.vercel.app';
 const ADMIN_PHONE = '+18084685356';
-
-async function logActivity(action, description, metadata = {}) {
-  try {
-    await fetch(process.env.SUPABASE_URL + '/rest/v1/activity_logs', {
-      method: 'POST',
-      headers: {
-        'apikey': process.env.SUPABASE_SERVICE_ROLE_KEY,
-        'Authorization': 'Bearer ' + process.env.SUPABASE_SERVICE_ROLE_KEY,
-        'Content-Type': 'application/json',
-        'Prefer': 'return=minimal',
-      },
-      body: JSON.stringify({ action, description, user_email: 'system', entity_type: action, metadata }),
-    });
-  } catch (_) { /* non-blocking */ }
-}
 
 function toE164(raw) {
   if (!raw) return null;
@@ -205,13 +191,31 @@ export default async function handler(req, res) {
 
     await logActivity(
       'manual_cleaner_job_sent',
-      `${userEmail} manually sent ${mode === 'rescheduled' ? 'reschedule notice' : 'job assignment'} to ${results.filter((r) => r.ok).map((r) => r.name).join(', ')}`,
-      { appointmentId, mode, results, sentBy: userId },
+      `Cleaner job ${mode === 'rescheduled' ? 'reschedule' : 'assignment'} SMS sent to ${results.filter((r) => r.ok).map((r) => r.name).join(', ')}`,
+      {
+        appointmentId,
+        client_id: appt.client_id || null,
+        cleaner_id: appt.cleaner_id || null,
+        cleaner_id_2: appt.cleaner_id_2 || null,
+        cleaner_id_3: appt.cleaner_id_3 || null,
+        mode,
+        results,
+        sentBy: userId,
+      },
+      { user_email: userEmail },
     );
 
     return res.status(200).json({ success: true, sentAt, results });
   } catch (err) {
     await logError('manual-send-cleaner-job', err, { appointmentId });
+    try {
+      await logActivity(
+        'manual_cleaner_job_sent',
+        'Cleaner job SMS send failed',
+        { appointmentId },
+        { user_email: 'system', status: 'failed', failure_reason: err.message || 'Unknown error' },
+      );
+    } catch (_) {}
     return res.status(500).json({ error: 'Could not send cleaner job notification. See Recent Errors.' });
   }
 }

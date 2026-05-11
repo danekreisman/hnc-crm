@@ -19,26 +19,12 @@ import { createClient } from '@supabase/supabase-js';
 import { fetchWithTimeout, TIMEOUTS } from './utils/with-timeout.js';
 import { validateOrFail, SCHEMAS } from './utils/validate.js';
 import { logError } from './utils/error-logger.js';
+import { logActivity } from './utils/log-activity.js';
 
 const BASE_URL = 'https://hnc-crm.vercel.app';
 const BUSINESS_NAME = 'Hawaii Natural Clean';
 const BUSINESS_PHONE = '(808) 468-5356';
 const ADMIN_PHONE = '+18084685356';
-
-async function logActivity(action, description, metadata = {}) {
-  try {
-    await fetch(process.env.SUPABASE_URL + '/rest/v1/activity_logs', {
-      method: 'POST',
-      headers: {
-        'apikey': process.env.SUPABASE_SERVICE_ROLE_KEY,
-        'Authorization': 'Bearer ' + process.env.SUPABASE_SERVICE_ROLE_KEY,
-        'Content-Type': 'application/json',
-        'Prefer': 'return=minimal',
-      },
-      body: JSON.stringify({ action, description, user_email: 'system', entity_type: action, metadata }),
-    });
-  } catch (_) { /* non-blocking */ }
-}
 
 function toE164(raw) {
   if (!raw) return null;
@@ -160,13 +146,22 @@ export default async function handler(req, res) {
 
     await logActivity(
       'manual_reminder_sent',
-      `${userEmail} manually sent day-before reminder for ${client.name || 'client'}`,
-      { appointmentId, clientId: appt.client_id, results, sentBy: userId },
+      `Reminder SMS sent to ${client.name || 'client'}`,
+      { appointmentId, client_id: appt.client_id, results, sentBy: userId },
+      { user_email: userEmail },
     );
 
     return res.status(200).json({ success: true, sentAt, results });
   } catch (err) {
     await logError('manual-send-reminder', err, { appointmentId });
+    try {
+      await logActivity(
+        'manual_reminder_sent',
+        'Reminder SMS send failed',
+        { appointmentId },
+        { user_email: 'system', status: 'failed', failure_reason: err.message || 'Unknown error' },
+      );
+    } catch (_) {}
     return res.status(500).json({ error: 'Could not send reminder. See Recent Errors.' });
   }
 }

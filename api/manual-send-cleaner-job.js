@@ -87,7 +87,7 @@ export default async function handler(req, res) {
     const { data: appt, error: apptErr } = await db
       .from('appointments')
       .select(`
-        id, date, time, service, address, duration_hours, total_price, notes,
+        id, date, time, service, address, duration_hours, total_price, notes, cleaner_notes,
         client_id, cleaner_id, cleaner_id_2, cleaner_id_3,
         cleaner_pay, cleaner_pay_2, cleaner_pay_3,
         clients ( name )
@@ -141,12 +141,21 @@ export default async function handler(req, res) {
         .filter((c) => c.id !== cleaner.id)
         .map((c) => c.name)
         .join(', ');
+      // Notes for the cleaner — prefer the new cleaner_notes field
+      // (per 2026-05-10 split). Fall back to the legacy `notes` column
+      // for appointments created before the split. Cap at 200 chars to
+      // keep the SMS in 1-2 segments. Empty / NULL → omit the line.
+      const rawCleanerNotes = (appt.cleaner_notes || appt.notes || '').trim();
+      const notesLine = rawCleanerNotes
+        ? `Notes: ${rawCleanerNotes.length > 200 ? rawCleanerNotes.slice(0, 197) + '...' : rawCleanerNotes}`
+        : null;
       const baseLines = [
         `Client: ${clientName}`,
         appt.address ? `Address: ${appt.address}` : null,
         duration ? `Duration: ${duration}` : null,
         payLine,
         partners ? `Paired with: ${partners}` : null,
+        notesLine,
         `Questions? Text Dane at ${ADMIN_PHONE}`,
       ].filter(Boolean);
       const headline = mode === 'rescheduled'

@@ -2011,7 +2011,19 @@ Mahalo 🌺</textarea>
               <button type="button" onclick="naRemovePairedCleaner(3)" style="background:none;border:none;color:#e53e3e;cursor:pointer;font-size:18px;line-height:1;padding:0 4px;" title="Remove">\u00D7</button>
             </div>
           </div>
-          <div class="form-row"><label>Notes</label><textarea id="na-notes" style="min-height:60px;" placeholder="Any special instructions or notes..."></textarea></div>
+          <div class="form-row">
+            <label>Cleaner notes</label>
+            <textarea id="na-cleaner-notes" style="min-height:60px;" placeholder="Parking, gate codes, pets, focus areas, allergies — anything the cleaner needs on the ground. THIS is what gets included in the cleaner SMS."></textarea>
+          </div>
+          <div class="form-row">
+            <label>Admin notes <span style="font-size:11px;color:var(--text-muted);font-weight:400;">(internal only)</span></label>
+            <textarea id="na-admin-notes" style="min-height:60px;background:#fffbeb;border-left:3px solid #fbbf24;" placeholder="Referral source, billing context, history — anything Dane should remember but the cleaner shouldn't see."></textarea>
+          </div>
+          <!-- Legacy notes field kept hidden but in-DOM so existing code that
+               reads na-notes (or writes to it on cancel/reset) doesn't break.
+               Will be removed in a future cleanup pass once all callsites
+               read the split fields. -->
+          <textarea id="na-notes" style="display:none;"></textarea>
         </div>
       </details>
       <details class="booking-section" open>
@@ -2192,9 +2204,29 @@ Mahalo 🌺</textarea>
           <div class="info-row"><span class="info-label">Tax (4.712%)</span><span class="info-val" id="ai-tax">—</span></div>
           <div class="info-row"><span class="info-label" style="font-weight:600;">Total</span><span class="info-val" id="ai-total" style="font-size:15px;color:var(--brand-500);">—</span></div>
         </div>
-        <div class="panel-section">Notes</div>
-        <div class="info-block">
-          <div class="info-row"><span class="info-val" id="ai-notes" style="white-space:pre-wrap;color:#444;">—</span></div>
+        <!-- Notes split into cleaner-safe vs admin-internal per Dane's
+             2026-05-10 design call. Renderer (_renderApptNotesSplit
+             called from _openApptInner) decides which sections to show
+             based on populated fields, with a legacy fallback for old
+             appointments that only have data in the deprecated `notes`
+             column. -->
+        <div id="ai-notes-cleaner-section" style="display:none;">
+          <div class="panel-section">Cleaner notes</div>
+          <div class="info-block">
+            <div class="info-row"><span class="info-val" id="ai-cleaner-notes" style="white-space:pre-wrap;color:#444;">—</span></div>
+          </div>
+        </div>
+        <div id="ai-notes-admin-section" style="display:none;">
+          <div class="panel-section">Admin notes</div>
+          <div class="info-block" style="background:#fffbeb;border-left:3px solid #fbbf24;padding-left:11px;">
+            <div class="info-row"><span class="info-val" id="ai-admin-notes" style="white-space:pre-wrap;color:#444;">—</span></div>
+          </div>
+        </div>
+        <div id="ai-notes-legacy-section" style="display:none;">
+          <div class="panel-section">Notes</div>
+          <div class="info-block">
+            <div class="info-row"><span class="info-val" id="ai-notes" style="white-space:pre-wrap;color:#444;">—</span></div>
+          </div>
         </div>
         <!-- Waiver status banner — surfaces when the linked client
              hasn't signed the policies yet. State-aware: text & button
@@ -2347,7 +2379,22 @@ Mahalo 🌺</textarea>
             <input type="number" id="edit-hours-override-val" placeholder="e.g. 4.5" min="0.5" step="0.5" style="width:100px;display:none;" oninput="calcEditPrice()">
           </div>
         </div>
-        <div class="form-row"><label>Notes</label><textarea id="edit-notes" style="min-height:60px;"></textarea></div>
+        <div class="form-row">
+          <label>Cleaner notes</label>
+          <textarea id="edit-cleaner-notes" style="min-height:60px;" placeholder="Parking, gate codes, pets, focus areas, allergies — anything the cleaner needs on the ground. THIS is what gets included in the cleaner SMS."></textarea>
+        </div>
+        <div class="form-row">
+          <label>Admin notes <span style="font-size:11px;color:var(--text-muted);font-weight:400;">(internal only)</span></label>
+          <textarea id="edit-admin-notes" style="min-height:60px;background:#fffbeb;border-left:3px solid #fbbf24;" placeholder="Referral source, billing context, history with this client, AI booking summaries — anything Dane should remember but the cleaner shouldn't see."></textarea>
+        </div>
+        <!-- Legacy notes textarea — kept hidden but in-DOM so old appointments
+             with content only in the deprecated `notes` column are still
+             editable. _renderApptEditFormNotes shows this row only when
+             legacy data exists with no new-field data. -->
+        <div class="form-row" id="edit-notes-legacy-row" style="display:none;">
+          <label>Notes <span style="font-size:11px;color:var(--text-muted);font-weight:400;">(legacy — split into Cleaner / Admin above for new appts)</span></label>
+          <textarea id="edit-notes" style="min-height:60px;"></textarea>
+        </div>
         <!-- Contextual notify panel — each section appears only when the
              relevant field has changed from its original value. Default
              unchecked so saving is non-destructive; user opts in on the
@@ -3162,6 +3209,8 @@ async function dbLoadCleaners(){
     total_price:parseFloat(data.totalPrice)||0,
     cleaner_pay:parseFloat(data.cleanerPay)||0,
     notes:data.notes||null,
+    cleaner_notes: data.cleanerNotes || null,
+    admin_notes:   data.adminNotes   || null,
     recurring:data.recurring||false,
     duration_hours:parseFloat(data.duration)||null,
     tip_amount:Math.max(0,parseFloat(data.tipAmount)||0),
@@ -3283,6 +3332,11 @@ async function dbUpdateAppointment(dbId,data){
     duration_hours:parseFloat(data.duration)||null,
     tip_amount:Math.max(0,parseFloat(data.tipAmount)||0)
   };
+  // Split notes — only write to DB if the caller passed them. Letting
+  // these be undefined in the payload would write `null` and clobber
+  // existing data; instead we only include them when caller meant to set.
+  if (data.cleanerNotes !== undefined) payload.cleaner_notes = data.cleanerNotes || null;
+  if (data.adminNotes   !== undefined) payload.admin_notes   = data.adminNotes   || null;
   var res=await db.from('appointments').update(payload).eq('id',dbId).select();
   if(res.error)console.error('[dbUpdateAppointment] error:',res.error);
   else console.log('[dbUpdateAppointment] synced id='+dbId+' client_id='+clientId+' cleaner='+data.cleanerName+' pay=$'+data.cleanerPay+(data.cleanerPayOverride!=null?' (override=$'+data.cleanerPayOverride+')':''));
@@ -3431,6 +3485,8 @@ function _apptRowToDbEntry(a, opts){
     cleanerPay: a.cleaner_pay||0,
     cleanerPayOverride: a.cleaner_pay_override!=null?a.cleaner_pay_override:null,
     notes: a.notes||'',
+    cleanerNotes: a.cleaner_notes||'',
+    adminNotes: a.admin_notes||'',
     duration: a.duration_hours||null,
     seriesId: a.series_id||null,
     seriesIndex: a.series_index!=null?a.series_index:null,
@@ -5766,6 +5822,56 @@ function changeMonth(d){curMonth+=d;if(curMonth>12){curMonth=1;curYear++;}if(cur
 function openAppt(a,dateKey){
   try{_openApptInner(a,dateKey);}catch(e){console.error('openAppt error:',e);showPaymentToast('Error opening appointment: '+e.message,null,'error');}
 }
+/* ── Notes display split (cleaner / admin / legacy) ───────────────────
+   Decides which of the three notes sections in the appointment view
+   to surface, based on which fields are populated. Three states:
+
+   1. cleaner_notes OR admin_notes populated → show whichever has data,
+      hide the legacy "Notes" section even if a.notes exists (it would
+      be stale/redundant after the split-aware writer ran).
+   2. Both new fields empty, legacy notes populated → show only the
+      legacy "Notes" section (preserves back-compat for old rows).
+   3. All three empty → hide everything; user sees no notes section
+      rather than an empty "—" placeholder.
+
+   a is the in-memory appointment object; cleanerNotes / adminNotes are
+   the camelCase mappings from clientDB hydration. */
+function _renderApptNotesSplit(a){
+  var cleaner = (a && (a.cleanerNotes || a.cleaner_notes)) || '';
+  var admin   = (a && (a.adminNotes   || a.admin_notes))   || '';
+  var legacy  = (a && a.notes) || '';
+  // Trim to detect actually-populated values vs whitespace-only.
+  cleaner = String(cleaner).trim();
+  admin   = String(admin).trim();
+  legacy  = String(legacy).trim();
+
+  var cleanerSection = document.getElementById('ai-notes-cleaner-section');
+  var adminSection   = document.getElementById('ai-notes-admin-section');
+  var legacySection  = document.getElementById('ai-notes-legacy-section');
+  var cleanerEl      = document.getElementById('ai-cleaner-notes');
+  var adminEl        = document.getElementById('ai-admin-notes');
+  var legacyEl       = document.getElementById('ai-notes');
+
+  var hasNew = !!(cleaner || admin);
+  if (hasNew) {
+    if (cleaner) { if (cleanerSection) cleanerSection.style.display = ''; if (cleanerEl) cleanerEl.textContent = cleaner; }
+    else         { if (cleanerSection) cleanerSection.style.display = 'none'; }
+    if (admin)   { if (adminSection) adminSection.style.display = ''; if (adminEl) adminEl.textContent = admin; }
+    else         { if (adminSection) adminSection.style.display = 'none'; }
+    if (legacySection) legacySection.style.display = 'none';
+  } else if (legacy) {
+    if (cleanerSection) cleanerSection.style.display = 'none';
+    if (adminSection)   adminSection.style.display   = 'none';
+    if (legacySection)  legacySection.style.display  = '';
+    if (legacyEl)       legacyEl.textContent = legacy;
+  } else {
+    // Nothing populated — hide all three.
+    if (cleanerSection) cleanerSection.style.display = 'none';
+    if (adminSection)   adminSection.style.display   = 'none';
+    if (legacySection)  legacySection.style.display  = 'none';
+  }
+}
+
 function _openApptInner(a,dateKey){
   var parts=dateKey.split('-');
   var mo=MONTHS[parseInt(parts[1])-1];
@@ -5819,8 +5925,7 @@ function _openApptInner(a,dateKey){
   document.getElementById('ai-disc').textContent='$0';
   document.getElementById('ai-tax').textContent=fmtPrice(a.tax);
   document.getElementById('ai-total').textContent=fmtPrice(a.total||a.totalPrice);
-  var aiNotes=document.getElementById('ai-notes');
-  if(aiNotes)aiNotes.textContent=a.notes||'—';
+  _renderApptNotesSplit(a);
   // Pre-fill edit form fields
   document.getElementById('edit-client').value=a.n;
   // Map service text → value
@@ -5851,9 +5956,24 @@ function _openApptInner(a,dateKey){
   // Address
   var editAddr=document.getElementById('edit-address');
   if(editAddr) editAddr.value=a.address||'';
-  // Notes
-  var editNotes=document.getElementById('edit-notes');
-  if(editNotes) editNotes.value=a.notes||'';
+  // Notes — split into Cleaner / Admin per 2026-05-10. Legacy `notes`
+  // textarea pre-fills its row only when the appointment ONLY has data
+  // in the deprecated column (so editing old appts still works).
+  var editCleanerNotes = document.getElementById('edit-cleaner-notes');
+  var editAdminNotes   = document.getElementById('edit-admin-notes');
+  var editNotes        = document.getElementById('edit-notes');
+  var editNotesLegacyRow = document.getElementById('edit-notes-legacy-row');
+  var hasNewNotes = !!((a.cleanerNotes||a.cleaner_notes||'').trim() || (a.adminNotes||a.admin_notes||'').trim());
+  if (editCleanerNotes) editCleanerNotes.value = a.cleanerNotes || a.cleaner_notes || '';
+  if (editAdminNotes)   editAdminNotes.value   = a.adminNotes   || a.admin_notes   || '';
+  if (editNotes) editNotes.value = a.notes || '';
+  if (editNotesLegacyRow) {
+    // Show the legacy textarea ONLY if there's legacy data and no new
+    // data — otherwise hide it to keep the form clean. Empty rows with
+    // no purpose just confuse the user.
+    var legacyHasData = !!(a.notes || '').trim();
+    editNotesLegacyRow.style.display = (legacyHasData && !hasNewNotes) ? '' : 'none';
+  }
   // Hours override — pre-fill with stored duration but leave unchecked
   var editHoursChk=document.getElementById('edit-hours-override-chk');
   var editHoursVal=document.getElementById('edit-hours-override-val');
@@ -7027,6 +7147,11 @@ async function saveApptEdit(mode){
   else{if(statusVal==='unassigned')statusVal='assigned';}
   var editAddr=(document.getElementById('edit-address')||{}).value||a.address||'';
   var editNotes=(document.getElementById('edit-notes')||{}).value||a.notes||'';
+  // Split notes from the two new textareas. Both default to empty
+  // string (not the legacy notes value) so an empty box explicitly
+  // means "no cleaner-safe info" / "no admin-only info".
+  var editCleanerNotes = (document.getElementById('edit-cleaner-notes')||{}).value||'';
+  var editAdminNotes   = (document.getElementById('edit-admin-notes')||{}).value||'';
   // Tip — always per-instance. Even if user is in 'all' (series) mode, the tip
   // applies only to this one occurrence (matches how status is handled).
   var editTip=Math.max(0,parseFloat((document.getElementById('edit-tip')||{}).value)||0);
@@ -7117,6 +7242,7 @@ async function saveApptEdit(mode){
     cleaner:cleanerVal, service:svcText, freq:freq,
     address:editAddr, beds:editBeds, baths:editBaths,
     sqft:editSqft, condition:editCond, notes:editNotes,
+    cleanerNotes: editCleanerNotes, adminNotes: editAdminNotes,
     duration:editDuration,
     basePrice:editBase, tax:editTax, totalPrice:editTotal,
     base:'$'+editBase.toFixed(2),
@@ -7157,6 +7283,7 @@ async function saveApptEdit(mode){
       basePrice:editBase, tax:editTax, totalPrice:editTotal,
       base:'$'+editBase.toFixed(2), cleanerPay:editCleanerPay,
       cleanerPayOverride:editCleanerPayOverride, notes:editNotes,
+      cleanerNotes: editCleanerNotes, adminNotes: editAdminNotes,
       // Paired cleaners propagate across the series too. Solo edits set
       // these to null which clears existing pairings on every instance.
       cleaner2: _editPair.name2 || null,
@@ -7446,6 +7573,8 @@ async function saveApptEdit(mode){
       cleaner_pay:editCleanerPay,
       cleaner_pay_override:editCleanerPayOverride!=null?editCleanerPayOverride:null,
       notes:editNotes||null, duration_hours:editDuration||null,
+      cleaner_notes: editCleanerNotes || null,
+      admin_notes:   editAdminNotes   || null,
       // Paired cleaners — explicit nulls so removing a pairing actually clears it.
       // Uses _editPair / _editPid2 / _editPid3 hoisted at top of saveApptEdit,
       // pay values auto-computed from each cleaner's rate × duration.
@@ -7572,6 +7701,7 @@ async function saveApptEdit(mode){
         basePrice:editBase, tax:editTax, totalPrice:editTotal,
         cleanerPay:editCleanerPay, cleanerPayOverride:editCleanerPayOverride,
         notes:editNotes, duration:editDuration,
+        cleanerNotes: editCleanerNotes, adminNotes: editAdminNotes,
         tipAmount:editTip
       }).then(function(sbUpdate){
         if(!sbUpdate.error && mode==='single'&&_origARecurring&&a.dbId){
@@ -10119,6 +10249,12 @@ async function saveNewAppt(){
   }
   if(_mdReason && _mdReason.value) apptManualDiscReason = _mdReason.value.trim().slice(0, 200);
   var apptNotes=(document.getElementById('na-notes')||{}).value||'';
+  // 2026-05-10: split notes capture. apptCleanerNotes is operational
+  // info safe for the cleaner; apptAdminNotes is admin-only context.
+  // Legacy apptNotes stays in case some downstream code still reads
+  // it, but new appointments write to the split fields explicitly.
+  var apptCleanerNotes=(document.getElementById('na-cleaner-notes')||{}).value||'';
+  var apptAdminNotes=(document.getElementById('na-admin-notes')||{}).value||'';
   // Tip (optional, customer-arranged at booking time). Per-occurrence — for
   // recurring bookings, applied only to the FIRST occurrence (sidx===0) below.
   var apptTip=Math.max(0,parseFloat((document.getElementById('na-tip')||{}).value)||0);
@@ -10323,6 +10459,7 @@ async function saveNewAppt(){
       beds:apptBeds, baths:apptBaths, sqft:apptSqft, condition:apptCond,
       cleanerName:cleanerName, basePrice:apptBase, tax:apptTax, totalPrice:total,
       cleanerPay:apptCleanerPay, notes:apptNotes, recurring:false, duration:apptDuration,
+      cleanerNotes: apptCleanerNotes, adminNotes: apptAdminNotes,
       cleanerName2:_naPair.name2, cleanerPay2:_naPair2Pay,
       cleanerName3:_naPair.name3, cleanerPay3:_naPair3Pay,
       tipAmount:apptTip,
@@ -10387,6 +10524,8 @@ async function saveNewAppt(){
         base_price:apptBase, tax:apptTax, total_price:total,
         cleaner_pay:apptCleanerPay,
         notes:apptNotes||null, recurring:true,
+        cleaner_notes: apptCleanerNotes || null,
+        admin_notes:   apptAdminNotes   || null,
         duration_hours:apptDuration||null,
         // Tip (booking-form input) only applies to the FIRST occurrence of the
         // recurring series. Subsequent occurrences start with 0 — the customer
@@ -10601,6 +10740,8 @@ function resetNewApptForm(){
   _set('na-time', '08:00');
   _set('na-cleaner', 'unassigned');
   _set('na-notes', '');
+  _set('na-cleaner-notes', '');
+  _set('na-admin-notes', '');
   // Property
   var propSel = document.getElementById('na-property-select');
   if(propSel) propSel.innerHTML = '<option value="new">+ Create New Property</option>';
@@ -18435,7 +18576,16 @@ function scheduleLeadAppointment(){
     var _bathsEl=document.getElementById('na-baths'); if(_bathsEl && lead.baths){ _bathsEl.value = String(lead.baths); }
     var _sqftEl=document.getElementById('na-sqft'); if(_sqftEl && lead.sqft && lead.sqft!=='—'){ _sqftEl.value = String(lead.sqft).replace(/[^0-9]/g,''); }
     var _condEl=document.getElementById('na-cond'); if(_condEl && lead.condition){ _condEl.value = String(lead.condition); }
-    var _notesEl=document.getElementById('na-notes'); if(_notesEl && lead.notes && lead.notes!=='—'){ _notesEl.value = lead.notes; }
+    // Lead notes (collected from the customer-facing lead form) are
+    // operational info from the customer's POV — parking, pets, focus
+    // areas, etc. Per the 2026-05-10 notes split, route them to the
+    // cleaner-notes field by default. Admin can edit after.
+    var _cleanerNotesEl = document.getElementById('na-cleaner-notes');
+    if (_cleanerNotesEl && lead.notes && lead.notes !== '—') {
+      _cleanerNotesEl.value = lead.notes;
+    }
+    // Legacy na-notes left blank — readers fall through to the new
+    // split fields. Kept in DOM so old code paths don't crash.
     // Coming from lead card → genuinely new client. Keep toggle visible, default unchecked.
     var _ncRow = document.getElementById('na-existing-client-row');
     var _ncChk = document.getElementById('na-existing-client');

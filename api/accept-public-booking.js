@@ -132,6 +132,13 @@ export default async function handler(req, res) {
       tax = +(baseGross * TAX_RATE).toFixed(2);
     }
 
+    // Notes split per 2026-05-10 design: route customer-supplied notes
+    // to cleaner_notes (the cleaner needs to see "park behind the
+    // truck", "dog named Koa", etc.) and route booking-context / admin
+    // overrides to admin_notes (rush fee, "booked via public form
+    // review" lineage, Dane's manual overrides). The legacy `notes`
+    // field still gets a combined version for back-compat with any
+    // downstream readers that haven't been migrated.
     const apptNotesParts = [
       'Booked via public form review',
       rushFee > 0 ? `Rush fee: $${rushFee} (${rushFee === 200 ? 'same-day' : rushFee === 100 ? 'next-day' : '2-day'})` : null,
@@ -139,6 +146,16 @@ export default async function handler(req, res) {
       x.customer_notes ? `Customer notes: ${x.customer_notes}` : null,
     ].filter(Boolean);
     const apptNotes = apptNotesParts.join('\n');
+    // Cleaner-safe: only the customer's own notes. The cleaner doesn't
+    // need to see "rush fee" or "booked via public form review."
+    const cleanerNotes = (x.customer_notes || '').trim() || null;
+    // Admin-only: everything except the customer notes. If notesOverride
+    // is set Dane intends it for himself, so it lives here too.
+    const adminNotes = [
+      'Booked via public form review',
+      rushFee > 0 ? `Rush fee: $${rushFee} (${rushFee === 200 ? 'same-day' : rushFee === 100 ? 'next-day' : '2-day'})` : null,
+      notesOverride ? `Admin notes: ${notesOverride}` : null,
+    ].filter(Boolean).join('\n') || null;
 
     // Common appointment payload shape used by both branches below.
     const apptCommon = {
@@ -157,6 +174,8 @@ export default async function handler(req, res) {
       total_price:    totalPost != null ? String(totalPost) : null,
       duration_hours: durationHrs != null ? String(durationHrs) : null,
       notes:          apptNotes,
+      cleaner_notes:  cleanerNotes,
+      admin_notes:    adminNotes,
     };
 
     let appointmentId = null;

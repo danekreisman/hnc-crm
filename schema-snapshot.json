@@ -1018,6 +1018,16 @@
         "column": "charge_followup_sent_by",
         "default": null,
         "nullable": true
+      },
+      {
+        "column": "cleaner_notes",
+        "default": null,
+        "nullable": true
+      },
+      {
+        "column": "admin_notes",
+        "default": null,
+        "nullable": true
       }
     ]
   },

@@ -302,6 +302,40 @@ export default async function handler(req, res) {
       body: JSON.stringify({ status: 'accepted', responded_at: new Date().toISOString() })
     });
 
+    // ── Google Calendar push ──────────────────────────────────────
+    // The frontend's gcal-sync.js wraps dbSaveAppointment /
+    // dbUpdateAppointment to trigger a calendar push on every
+    // frontend-driven save. Our auto-assign bypasses those (we PATCH
+    // Supabase REST directly from the webhook), so we have to fire
+    // the sync endpoint ourselves.
+    //
+    // The /api/google/sync-event endpoint already handles every
+    // edge case gracefully: cleaner has no integration linked →
+    // skips, no error. Cleaner unassigned → deletes. Token expired
+    // → refreshes. So we just fire-and-forget; the endpoint sorts
+    // out whether the push actually happens.
+    //
+    // BASE_URL comes from the same env path the rest of the webhook
+    // uses for internal API calls.
+    try {
+      const baseUrl = process.env.BASE_URL || process.env.NEXT_PUBLIC_BASE_URL || 'https://hnc-crm.vercel.app';
+      const syncRes = await fetch(baseUrl + '/api/google/sync-event', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ appointment_id: target.appointment_id, action: 'upsert' }),
+      });
+      if (!syncRes.ok) {
+        const txt = await syncRes.text().catch(() => '<unreadable>');
+        await logError('openphone-webhook:cleaner-invite-gcal-sync', new Error('sync-event ' + syncRes.status + ': ' + txt.slice(0, 200)), {
+          cleaner_id: cleaner.id, appointment_id: target.appointment_id,
+        });
+      }
+    } catch (e) {
+      await logError('openphone-webhook:cleaner-invite-gcal-sync', e, {
+        cleaner_id: cleaner.id, appointment_id: target.appointment_id,
+      });
+    }
+
     // Look up the other pending invites for this same appointment
     // so we can both update their status and SMS the losers.
     const otherRes = await fetch(

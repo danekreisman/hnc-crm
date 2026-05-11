@@ -10869,6 +10869,14 @@ function sv(view,el){
   document.getElementById('search-results').style.display='none';
   document.getElementById('sec-btn').textContent=secs[view]||'Filter';
   if(view==='messaging')renderInbox();
+  if(view==='logs'){
+    /* Auto-load on view activation — covers page-refresh restoration
+       from sessionStorage. The nav-item click handler also triggers
+       loadLogs but only fires on actual clicks, so refreshing while
+       on the Logs view used to leave it stuck on "Loading..." until
+       Dane clicked away and back. */
+    try { loadLogs(_logsCurrentTab||'activity'); } catch(e) { console.warn('[sv] loadLogs on view init failed:', e); }
+  }
   if(view==='pipeline'){
     /* Re-fetch leads from Supabase on every Pipeline open so the cards
        always reflect current DB state — no reliance on stale leadDB

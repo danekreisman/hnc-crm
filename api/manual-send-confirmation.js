@@ -18,23 +18,9 @@ import { createClient } from '@supabase/supabase-js';
 import { fetchWithTimeout, TIMEOUTS } from './utils/with-timeout.js';
 import { validateOrFail, SCHEMAS } from './utils/validate.js';
 import { logError } from './utils/error-logger.js';
+import { logActivity } from './utils/log-activity.js';
 
 const BASE_URL = 'https://hnc-crm.vercel.app';
-
-async function logActivity(action, description, metadata = {}) {
-  try {
-    await fetch(process.env.SUPABASE_URL + '/rest/v1/activity_logs', {
-      method: 'POST',
-      headers: {
-        'apikey': process.env.SUPABASE_SERVICE_ROLE_KEY,
-        'Authorization': 'Bearer ' + process.env.SUPABASE_SERVICE_ROLE_KEY,
-        'Content-Type': 'application/json',
-        'Prefer': 'return=minimal',
-      },
-      body: JSON.stringify({ action, description, user_email: 'system', entity_type: action, metadata }),
-    });
-  } catch (_) { /* non-blocking */ }
-}
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -123,6 +109,13 @@ export default async function handler(req, res) {
       await logError('manual-send-confirmation', new Error('send-email ' + sendRes.status), {
         appointmentId, status: sendRes.status, body: body.slice(0, 500),
       });
+      // Failure activity log + bell + push.
+      await logActivity(
+        'manual_confirmation_sent',
+        `Confirmation email to ${client.name || 'client'} failed`,
+        { appointmentId, client_id: appt.client_id, recipient: client.email },
+        { user_email: userEmail, status: 'failed', failure_reason: 'Email service error ' + sendRes.status },
+      );
       return res.status(502).json({ error: 'Email service rejected the send. See Recent Errors.' });
     }
 
@@ -140,8 +133,9 @@ export default async function handler(req, res) {
 
     await logActivity(
       'manual_confirmation_sent',
-      `${userEmail} manually sent booking confirmation for ${client.name || 'client'} (${prettyDate})`,
-      { appointmentId, clientId: appt.client_id, recipient: client.email, sentBy: userId },
+      `Confirmation email sent to ${client.name || 'client'} (${prettyDate})`,
+      { appointmentId, client_id: appt.client_id, recipient: client.email, sentBy: userId },
+      { user_email: userEmail },
     );
 
     return res.status(200).json({
@@ -151,6 +145,17 @@ export default async function handler(req, res) {
     });
   } catch (err) {
     await logError('manual-send-confirmation', err, { appointmentId });
+    // Best-effort failure activity log — appt/client may not have
+    // loaded yet, so we guard. The bell/push side-effect from
+    // logActivity still fires for whichever scope it CAN attribute to.
+    try {
+      await logActivity(
+        'manual_confirmation_sent',
+        'Confirmation email send failed',
+        { appointmentId },
+        { user_email: 'system', status: 'failed', failure_reason: err.message || 'Unknown error' },
+      );
+    } catch (_) {}
     return res.status(500).json({ error: 'Could not send confirmation. See Recent Errors.' });
   }
 }

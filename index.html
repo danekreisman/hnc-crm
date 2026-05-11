@@ -17194,6 +17194,12 @@ function openInviteCleaner(){
   // when displaying per-cleaner rates in the list. Falls back to
   // 'rate_regular' for any service that doesn't match deep/moveout.
   var apptService = cd.service || (currentAppt && currentAppt.service) || 'Regular Cleaning';
+  // For deep / moveout jobs, sqft + condition meaningfully affect how
+  // long the job will take and what the cleaner is walking into.
+  // Surface those rows ONLY for these services — regular cleans don't
+  // typically rely on them for scoping.
+  var svcLower = String(apptService).toLowerCase();
+  var isDeepOrMoveout = svcLower.indexOf('deep') >= 0 || svcLower.indexOf('move') >= 0;
   // Build job info block
   var info=document.getElementById('invite-job-info');
   // Bed/bath: pull from cd.beds + cd.baths (the apptData mapper fields).
@@ -17203,12 +17209,35 @@ function openInviteCleaner(){
   var bedBathStr = (cd.beds && cd.baths) ? (cd.beds + ' bed / ' + cd.baths + ' bath')
                  : (cd.beds ? cd.beds + ' bed' : null);
   var hrsForDisplay = parseFloat(cd.duration||cd.dur)||3.5;
+  // Sqft + condition rows — only added when service is deep/moveout AND
+  // the field has data. condition is stored as 1-10; convert to a label.
+  function _condLabel(n){
+    var v = parseInt(n, 10);
+    if (!v) return null;
+    if (v >= 10) return v + ' (Excellent)';
+    if (v >= 8)  return v + ' (Good)';
+    if (v >= 7)  return v + ' (Average)';
+    if (v >= 5)  return v + ' (Below Avg)';
+    if (v >= 3)  return v + ' (Poor)';
+    return v + ' (Needs Work)';
+  }
+  var sqftHtml = (isDeepOrMoveout && cd.sqft)
+    ? '<div class="info-row"><span class="info-label">Sq ft</span><span class="info-val">' + cd.sqft + '</span></div>'
+    : '';
+  var condHtml = '';
+  if (isDeepOrMoveout) {
+    var condLabel = _condLabel(cd.condition);
+    if (condLabel) {
+      condHtml = '<div class="info-row"><span class="info-label">Condition</span><span class="info-val">' + condLabel + '</span></div>';
+    }
+  }
   info.innerHTML='<div class="info-row"><span class="info-label">Client</span><span class="info-val">'+currentAppt.n+'</span></div>'
     +'<div class="info-row"><span class="info-label">Service</span><span class="info-val">'+apptService+'</span></div>'
     +'<div class="info-row"><span class="info-label">Date & time</span><span class="info-val">'+document.getElementById('ai-date').textContent+' at '+document.getElementById('ai-time').textContent+'</span></div>'
     +'<div class="info-row"><span class="info-label">Address</span><span class="info-val">'+(cd.address||'—')+'</span></div>'
     +'<div class="info-row"><span class="info-label">Est. duration</span><span class="info-val">'+(cd.dur||(hrsForDisplay+' hrs'))+'</span></div>'
-    +'<div class="info-row"><span class="info-label">Bed / bath</span><span class="info-val">'+(bedBathStr||'—')+'</span></div>';
+    +'<div class="info-row"><span class="info-label">Bed / bath</span><span class="info-val">'+(bedBathStr||'—')+'</span></div>'
+    + sqftHtml + condHtml;
 
   // Build cleaner checkboxes — only show ACTIVE cleaners. Deactivated /
   // on-leave / inactive cleaners are filtered out so they don't get spam-
@@ -17267,6 +17296,27 @@ function updateInvitePreview(){
   // level (same for everyone) so they're hardcoded into the template.
   var bedBathStr = (cd.beds && cd.baths) ? (cd.beds + ' bed / ' + cd.baths + ' bath')
                  : (cd.beds ? cd.beds + ' bed' : '—');
+  // Sqft + condition rows — only included when service is deep/moveout
+  // AND the field has data. Mirror the visible job-info panel so the
+  // SMS the cleaner gets matches what Dane saw when previewing.
+  var svcLower = String((cd.service||'')).toLowerCase();
+  var isDeepOrMoveout = svcLower.indexOf('deep') >= 0 || svcLower.indexOf('move') >= 0;
+  function _condLabelTmpl(n){
+    var v = parseInt(n, 10);
+    if (!v) return null;
+    if (v >= 10) return v + ' (Excellent)';
+    if (v >= 8)  return v + ' (Good)';
+    if (v >= 7)  return v + ' (Average)';
+    if (v >= 5)  return v + ' (Below Avg)';
+    if (v >= 3)  return v + ' (Poor)';
+    return v + ' (Needs Work)';
+  }
+  var sqftLine = (isDeepOrMoveout && cd.sqft) ? ('Sq ft: ' + cd.sqft + '\n') : '';
+  var condLine = '';
+  if (isDeepOrMoveout) {
+    var _cl = _condLabelTmpl(cd.condition);
+    if (_cl) condLine = 'Condition: ' + _cl + '\n';
+  }
   var msg='Aloha {firstName}! Would you be able to take this job?\n\n'
     +'Client: '+currentAppt.n+'\n'
     +'Service: '+(cd.service||'Regular Cleaning')+'\n'
@@ -17275,6 +17325,8 @@ function updateInvitePreview(){
     +'Address: '+(cd.address||'—')+'\n'
     +'Est. duration: '+(cd.dur||hrs+'h')+'\n'
     +'Bed/bath: '+bedBathStr+'\n'
+    + sqftLine
+    + condLine
     +'Your pay: {pay}\n\n'
     +'Reply YES to accept or NO to pass. First YES gets the job!\n— Hawaii Natural Clean';
   tmplEl.value=msg;

@@ -2502,8 +2502,12 @@ Mahalo 🌺</textarea>
           <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px;">Control which automated messages this client receives.</div>
           <div style="display:flex;flex-direction:column;gap:6px;" id="cl-notif-toggles"></div>
         </div>
-        <!-- Activity log: filtered to this client's email/phone -->
-        <div class="panel-section">Automation log</div>
+        <!-- Activity feed: chronological log of meaningful actions
+             for this client. Filtered by metadata.client_id (with
+             legacy email/phone fallback for pre-Phase-1 rows). Each
+             row clickable → opens openActivityDetailModal with full
+             info (body, recipients, success/failure, related links). -->
+        <div class="panel-section">Activity</div>
         <div id="cl-activity-log" style="font-size:13px;color:var(--text-muted);padding:6px 0 4px;">Loading…</div>
         <div class="panel-section">Notes</div>
         <div class="info-block"><div style="font-size:12px;color:var(--text);line-height:1.6;" id="cl-notes">—</div></div>
@@ -25733,54 +25737,290 @@ document.addEventListener('DOMContentLoaded', function(){ setTimeout(patchSystem
 setTimeout(patchSystemAutoCards, 1500);
 
 /* ────────────────────────────────────────────────────────────────────────────
-   loadClientActivityLog — populates #cl-activity-log on the client profile
-   modal with rows from activity_logs whose metadata.to matches this client's
-   email or phone. Broadcasts use direct Resend and intentionally don't log.
+   loadClientActivityLog — Phase 2 of the per-entity Activity feed.
+
+   Populates #cl-activity-log on the client profile with a chronological
+   list of meaningful actions for this client. Each row clickable to
+   open a detail modal with full info (body, recipients, status,
+   related appointment, raw metadata).
+
+   Source: activity_logs filtered by metadata->>client_id. Falls back
+   to email/phone match for legacy rows written before the Phase 1
+   client_id standardization (kept so historical activity still shows).
+
+   Rendering:
+     - Plain English action label via humanizeActivityAction map
+     - Icon based on action type (📱 SMS, ✉️ email, 💳 payment, ✅
+       auto-action, ⚠️ failure)
+     - Failed rows tinted red with the failure_reason inline
+     - Click row → openActivityDetailModal(row)
    ──────────────────────────────────────────────────────────────────────────── */
+function _humanizeActivityAction(action){
+  var map = {
+    manual_confirmation_sent:    'Confirmation email sent',
+    manual_reminder_sent:        'Reminder SMS sent',
+    manual_waiver_sent:          'Waiver SMS sent',
+    manual_cleaner_job_sent:     'Cleaner job SMS sent',
+    manual_reschedule_sent:      'Reschedule notification sent',
+    manual_invoice_email_sent:   'Invoice email sent',
+    manual_invoice_sms_sent:     'Invoice SMS sent',
+    manual_review_email_sent:    'Review request email sent',
+    manual_review_sms_sent:      'Review request SMS sent',
+    manual_charge_followup_sent: 'Charge follow-up SMS sent',
+    manual_resend_booking_link:  'Booking link resent',
+    stripe_charge_succeeded:     'Card charged',
+    stripe_charge_failed:        'Card charge failed',
+    cleaner_invite_sent:         'Cleaner invite sent',
+    cleaner_invite_auto_assigned:'Cleaner auto-assigned',
+    cards_synced:                'Cards synced from Stripe',
+    policy_agreed:               'Policy signed',
+    lead_to_client_converted:    'Converted from lead',
+    gcal_event_upserted:         'Synced to Google Calendar',
+    // Legacy action types from earlier logging.
+    email_sent_booking_confirmation: 'Confirmation email',
+    email_sent_appointment_reminder: 'Reminder email',
+    email_sent_invoice:              'Invoice email',
+    email_sent_invoice_reminder:     'Invoice reminder email',
+    email_sent_reschedule:           'Reschedule email',
+    email_sent_thankyou:             'Thank-you email',
+    email_sent_reminder:             'Reminder email',
+    email_sent_quote:                'Quote email',
+    email_sent_lead_followup:        'Lead follow-up email',
+    email_sent_cancellation:         'Cancellation email',
+    email_sent_receipt:              'Receipt email',
+    email_sent_va_task:              'VA task email',
+    email_sent_reactivation:         'Reactivation email',
+    email_sent_generic:              'Email',
+    sms_sent:                        'SMS sent',
+  };
+  return map[action] || action.replace(/_/g, ' ');
+}
+
+function _activityIcon(action, status){
+  if (status === 'failed') return '\u26A0\uFE0F'; // ⚠️
+  if (action.indexOf('email') >= 0 || action === 'manual_confirmation_sent' || action === 'manual_invoice_email_sent' || action === 'manual_review_email_sent') return '\u2709\uFE0F'; // ✉️
+  if (action.indexOf('stripe') >= 0 || action.indexOf('charge') >= 0 || action.indexOf('invoice') >= 0 || action.indexOf('card') >= 0) return '\uD83D\uDCB3'; // 💳
+  if (action.indexOf('cleaner_invite_auto_assigned') >= 0 || action === 'lead_to_client_converted' || action === 'policy_agreed') return '\u2705'; // ✅
+  if (action.indexOf('gcal') >= 0) return '\uD83D\uDCC5'; // 📅
+  return '\uD83D\uDCAC'; // 💬
+}
+
+function _activityTimeLabel(iso){
+  var d = new Date(iso);
+  var now = new Date();
+  var diff = now - d;
+  var sameDay = d.toDateString() === now.toDateString();
+  var yesterday = new Date(now); yesterday.setDate(now.getDate() - 1);
+  var isYesterday = d.toDateString() === yesterday.toDateString();
+  var time = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  if (sameDay) {
+    if (diff < 60000) return 'Just now';
+    if (diff < 3600000) return Math.floor(diff/60000) + ' min ago';
+    return 'Today, ' + time;
+  }
+  if (isYesterday) return 'Yesterday, ' + time;
+  if (diff < 7 * 86400000) return d.toLocaleDateString('en-US', { weekday: 'short' }) + ', ' + time;
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + (d.getFullYear() !== now.getFullYear() ? ', ' + d.getFullYear() : '') + ' \u00B7 ' + time;
+}
+
+// Cache rows by id so the detail modal can pick up the full payload
+// without re-querying.
+window._activityRowCache = window._activityRowCache || {};
+
 async function loadClientActivityLog(clientId){
   var el = document.getElementById('cl-activity-log');
   if (!el) return;
   el.textContent = 'Loading\u2026';
   try {
+    // Primary query: rows where metadata.client_id matches. This is the
+    // canonical path post-Phase-1.
+    var primaryRes = await db.from('activity_logs')
+      .select('id, action, description, created_at, metadata, user_email')
+      .eq('metadata->>client_id', clientId)
+      .order('created_at', { ascending: false })
+      .limit(100);
+    var rows = (primaryRes.data || []).slice();
+
+    // Legacy fallback: email + phone match. For rows written before
+    // Phase 1c migrations standardized client_id. De-duped against
+    // the primary set by id.
+    var seen = new Set(rows.map(function(r){ return r.id; }));
     var c = await db.from('clients').select('email,phone').eq('id', clientId).maybeSingle();
-    if (!c.data) { el.innerHTML = '<div style="color:var(--text-muted);padding:8px 0;">No automations sent yet.</div>'; return; }
-    var email = (c.data.email || '').toLowerCase().trim();
-    var phoneDigits = (c.data.phone || '').replace(/[^0-9]/g, '');
-    var phoneE164 = phoneDigits ? ('+1' + phoneDigits.replace(/^1/, '')) : '';
-    var rows = [];
-    if (email) {
-      var r1 = await db.from('activity_logs').select('action, description, created_at, metadata').eq('metadata->>to', email).order('created_at', {ascending:false}).limit(100);
-      if (r1.data) rows = rows.concat(r1.data);
+    if (c.data) {
+      var email = (c.data.email || '').toLowerCase().trim();
+      var phoneDigits = (c.data.phone || '').replace(/[^0-9]/g, '');
+      var phoneE164 = phoneDigits ? ('+1' + phoneDigits.replace(/^1/, '')) : '';
+      if (email) {
+        var r1 = await db.from('activity_logs')
+          .select('id, action, description, created_at, metadata, user_email')
+          .eq('metadata->>to', email)
+          .order('created_at', { ascending: false })
+          .limit(50);
+        (r1.data || []).forEach(function(r){ if (!seen.has(r.id)) { seen.add(r.id); rows.push(r); } });
+      }
+      if (phoneE164) {
+        var r2 = await db.from('activity_logs')
+          .select('id, action, description, created_at, metadata, user_email')
+          .eq('metadata->>to', phoneE164)
+          .order('created_at', { ascending: false })
+          .limit(50);
+        (r2.data || []).forEach(function(r){ if (!seen.has(r.id)) { seen.add(r.id); rows.push(r); } });
+      }
     }
-    if (phoneE164) {
-      var r2 = await db.from('activity_logs').select('action, description, created_at, metadata').eq('metadata->>to', phoneE164).order('created_at', {ascending:false}).limit(100);
-      if (r2.data) rows = rows.concat(r2.data);
-    }
-    rows.sort(function(a,b){ return new Date(b.created_at) - new Date(a.created_at); });
-    var seen = new Set();
-    rows = rows.filter(function(r){ var k = r.action+'|'+r.created_at; if(seen.has(k)) return false; seen.add(k); return true; });
+
+    // Filter out user_login noise + sort all sources together by time.
+    rows = rows.filter(function(r){ return r.action !== 'user_login'; });
+    rows.sort(function(a, b){ return new Date(b.created_at) - new Date(a.created_at); });
+
     if (rows.length === 0) {
-      el.innerHTML = '<div style="color:var(--text-muted);padding:8px 0;">No automations sent yet.</div>';
+      el.innerHTML = '<div style="color:var(--text-muted);padding:12px 0;text-align:center;font-size:13px;">No activity yet.</div>';
       return;
     }
-    var iconMap = {sms_sent:'\ud83d\udcac', email_sent_invoice:'\ud83d\udcb0', email_sent_invoice_reminder:'\u26a0\ufe0f', email_sent_reschedule:'\ud83d\udd04', email_sent_thankyou:'\ud83c\udf3a', email_sent_booking_confirmation:'\u2705', email_sent_reminder:'\u23f0', email_sent_quote:'\ud83d\udccb', email_sent_lead_followup:'\ud83d\udc4b', email_sent_cancellation:'\u274c', email_sent_receipt:'\ud83e\uddfe', email_sent_va_task:'\ud83d\udcdd', email_sent_reactivation:'\ud83d\udc99', email_sent_generic:'\ud83d\udce8'};
-    el.innerHTML = rows.slice(0, 50).map(function(r){
-      var d = new Date(r.created_at);
-      var when = d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) + ' \u00b7 ' + d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
-      var icon = iconMap[r.action] || '\ud83d\udce8';
-      var label = r.action.replace(/^email_sent_/,'').replace(/^sms_sent$/,'SMS').replace(/_/g,' ');
-      var desc = (r.description || '').replace(/[<>]/g,'').slice(0, 110);
-      return '<div style="display:flex;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);align-items:flex-start;">' +
-        '<span style="font-size:15px;flex-shrink:0;line-height:1.5;">' + icon + '</span>' +
-        '<div style="flex:1;min-width:0;">' +
-          '<div style="color:var(--text);font-size:13px;font-weight:500;text-transform:capitalize;">' + label + '</div>' +
-          '<div style="color:var(--text-muted);font-size:11px;margin-top:1px;">' + when + '</div>' +
-          (desc ? '<div style="color:var(--text-muted);font-size:12px;margin-top:3px;line-height:1.4;">' + desc + '</div>' : '') +
-        '</div>' +
-      '</div>';
-    }).join('') + (rows.length > 50 ? '<div style="color:var(--text-muted);font-size:11px;padding:8px 0;text-align:center;">Showing 50 most recent of ' + rows.length + '</div>' : '');
+
+    // Cache rows for the detail modal.
+    rows.forEach(function(r){ window._activityRowCache[r.id] = r; });
+
+    var html = rows.slice(0, 50).map(function(r){
+      var meta = r.metadata || {};
+      var isFailed = meta.status === 'failed';
+      var label = _humanizeActivityAction(r.action);
+      var icon = _activityIcon(r.action, meta.status);
+      var time = _activityTimeLabel(r.created_at);
+      var failureLine = isFailed && meta.failure_reason
+        ? '<div style="color:#b91c1c;font-size:11px;margin-top:3px;font-weight:500;">' + esc(meta.failure_reason) + '</div>'
+        : '';
+      var rowStyle = isFailed
+        ? 'background:#fef2f2;border-left:3px solid #dc2626;'
+        : 'background:transparent;border-left:3px solid transparent;';
+
+      // Concise context: a body snippet or a short recipient line if
+      // we have one. Falls back to nothing — the row itself is the
+      // headline.
+      var contextLine = '';
+      if (meta.recipient) {
+        contextLine = '<div style="color:var(--text-muted);font-size:11px;margin-top:2px;">to ' + esc(meta.recipient) + '</div>';
+      } else if (meta.to) {
+        contextLine = '<div style="color:var(--text-muted);font-size:11px;margin-top:2px;">to ' + esc(meta.to) + '</div>';
+      }
+
+      return '<div onclick="openActivityDetailModal(\'' + r.id + '\')" style="' + rowStyle + 'display:flex;gap:10px;padding:10px 10px;border-bottom:1px solid var(--border);align-items:flex-start;cursor:pointer;transition:background .12s;" onmouseover="this.style.background=\'' + (isFailed ? '#fee2e2' : 'var(--bg-soft)') + '\'" onmouseout="this.style.background=\'' + (isFailed ? '#fef2f2' : 'transparent') + '\'">'
+        + '<span style="font-size:15px;flex-shrink:0;line-height:1.5;">' + icon + '</span>'
+        + '<div style="flex:1;min-width:0;">'
+          + '<div style="color:' + (isFailed ? '#7f1d1d' : 'var(--text)') + ';font-size:13px;font-weight:500;">' + esc(label) + '</div>'
+          + '<div style="color:var(--text-muted);font-size:11px;margin-top:1px;">' + esc(time) + '</div>'
+          + contextLine
+          + failureLine
+        + '</div>'
+      + '</div>';
+    }).join('');
+
+    if (rows.length > 50) {
+      html += '<div style="color:var(--text-muted);font-size:11px;padding:10px 0;text-align:center;">Showing 50 of ' + rows.length + '</div>';
+    }
+    el.innerHTML = html;
   } catch (e) {
-    el.innerHTML = '<div style="color:#dc2626;font-size:12px;padding:8px 0;">Failed to load: ' + (e.message || 'unknown error') + '</div>';
+    el.innerHTML = '<div style="color:#dc2626;font-size:12px;padding:8px 0;">Failed to load: ' + esc(e.message || 'unknown error') + '</div>';
+  }
+}
+
+/* ────────────────────────────────────────────────────────────────────────────
+   openActivityDetailModal — opens a detail overlay showing the full
+   information for a single activity_log row. Reads the cached row by
+   id (populated by loadClientActivityLog) so we don't re-query.
+
+   What we show in the modal:
+     - Plain-English action label as the title
+     - Full timestamp (date + time)
+     - Sent by (user_email)
+     - Recipient (email or phone, depending on the action)
+     - Status (success / failed with reason)
+     - Body if present in metadata
+     - Related entity links (appointment, client, lead, cleaner)
+     - Raw metadata expandable for debugging
+   ──────────────────────────────────────────────────────────────────────────── */
+function openActivityDetailModal(rowId){
+  var row = window._activityRowCache && window._activityRowCache[rowId];
+  if (!row) return;
+  var meta = row.metadata || {};
+  var isFailed = meta.status === 'failed';
+  var label = _humanizeActivityAction(row.action);
+  var icon = _activityIcon(row.action, meta.status);
+  var fullTime = new Date(row.created_at).toLocaleString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
+
+  // Resolve recipient label - actions store recipients in different keys.
+  var recipient = meta.recipient || meta.to || meta.email || meta.phone || null;
+
+  // Body — if metadata includes message text, show it. Various action
+  // types store body under different keys.
+  var bodyText = meta.body || meta.message || meta.html_preview || null;
+
+  // Related entity links.
+  var relatedLinks = [];
+  if (meta.appointmentId || meta.appointment_id) {
+    relatedLinks.push('<a href="javascript:void(0)" onclick="closeOverlay(\'activity-detail-overlay\'); openApptByDbId(\'' + (meta.appointmentId || meta.appointment_id) + '\')" style="color:var(--brand-500);text-decoration:none;font-weight:500;">Open appointment \u2192</a>');
+  }
+
+  // Failure block.
+  var failureBlock = '';
+  if (isFailed) {
+    failureBlock = '<div style="background:#fef2f2;border:1px solid #fca5a5;border-radius:8px;padding:12px;margin-bottom:14px;">'
+      + '<div style="color:#7f1d1d;font-weight:600;font-size:13px;margin-bottom:4px;">\u26A0\uFE0F Failed</div>'
+      + '<div style="color:#991b1b;font-size:12px;">' + esc(meta.failure_reason || 'Unknown error') + '</div>'
+      + '</div>';
+  }
+
+  // Build the modal body.
+  var modalHtml = ''
+    + '<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">'
+      + '<span style="font-size:28px;">' + icon + '</span>'
+      + '<div>'
+        + '<div style="font-size:17px;font-weight:600;color:var(--text);">' + esc(label) + '</div>'
+        + '<div style="font-size:12px;color:var(--text-muted);margin-top:2px;">' + esc(fullTime) + '</div>'
+      + '</div>'
+    + '</div>'
+    + failureBlock
+    + '<div style="background:var(--bg-soft);border:1px solid var(--border);border-radius:8px;padding:14px;font-size:13px;line-height:1.7;">'
+      + (recipient ? '<div><span style="color:var(--text-muted);">To:</span> <strong>' + esc(recipient) + '</strong></div>' : '')
+      + (row.user_email ? '<div><span style="color:var(--text-muted);">By:</span> <strong>' + esc(row.user_email === 'system' ? 'System (automated)' : row.user_email) + '</strong></div>' : '')
+      + (row.description ? '<div style="margin-top:8px;color:var(--text);">' + esc(row.description) + '</div>' : '')
+    + '</div>'
+    + (bodyText
+        ? '<div style="margin-top:14px;"><div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;font-weight:600;">Message body</div>'
+          + '<div style="background:#fff;border:1px solid var(--border);border-radius:8px;padding:12px;font-size:13px;color:var(--text);white-space:pre-wrap;line-height:1.5;">' + esc(bodyText) + '</div></div>'
+        : '')
+    + (relatedLinks.length ? '<div style="margin-top:14px;">' + relatedLinks.join(' &nbsp;\u00B7&nbsp; ') + '</div>' : '')
+    + '<details style="margin-top:18px;"><summary style="font-size:11px;color:var(--text-muted);cursor:pointer;user-select:none;">Show raw metadata</summary>'
+      + '<pre style="font-size:11px;background:var(--bg-soft);padding:10px;border-radius:6px;overflow-x:auto;margin-top:6px;color:var(--text-muted);">' + esc(JSON.stringify(meta, null, 2)) + '</pre>'
+    + '</details>';
+
+  // Render into the overlay (created on demand).
+  var overlay = document.getElementById('activity-detail-overlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'activity-detail-overlay';
+    overlay.className = 'overlay hidden';
+    overlay.onclick = function(e){ if (e.target === overlay) closeOverlay('activity-detail-overlay'); };
+    overlay.innerHTML = '<div class="panel" style="max-width:560px;"><div class="panel-header"><div class="panel-title">Activity detail</div><button class="close-btn" onclick="closeOverlay(\'activity-detail-overlay\')">\u2715</button></div><div id="activity-detail-content" style="padding:18px 22px 22px;"></div></div>';
+    document.body.appendChild(overlay);
+  }
+  document.getElementById('activity-detail-content').innerHTML = modalHtml;
+  openOverlay('activity-detail-overlay');
+}
+
+// Helper to open an appointment from the detail modal's "Open
+// appointment" link. Wraps the in-memory apptData lookup that the
+// existing openAppt requires.
+function openApptByDbId(dbId){
+  if (!dbId || typeof apptData === 'undefined') return;
+  var keys = Object.keys(apptData);
+  for (var i = 0; i < keys.length; i++) {
+    var arr = apptData[keys[i]];
+    for (var j = 0; j < arr.length; j++) {
+      if (arr[j].dbId === dbId) {
+        openAppt(arr[j], keys[i]);
+        return;
+      }
+    }
   }
 }
 

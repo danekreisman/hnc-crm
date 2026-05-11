@@ -10928,7 +10928,17 @@ function sv(view,el){
        loadLogs but only fires on actual clicks, so refreshing while
        on the Logs view used to leave it stuck on "Loading..." until
        Dane clicked away and back. */
-    try { loadLogs(_logsCurrentTab||'activity'); } catch(e) { console.warn('[sv] loadLogs on view init failed:', e); }
+    /* Diagnostic instrumentation (2026-05-11): on caught error, route
+       through _logFrontendError so the error surfaces in the Recent
+       Errors panel instead of being lost to console.warn. If the
+       hypothesized temporal-dead-zone ReferenceError on _logsCurrentTab
+       is real, this is where it'll show. */
+    try { loadLogs(_logsCurrentTab||'activity'); } catch(e) {
+      console.warn('[sv] loadLogs on view init failed:', e);
+      if (typeof _logFrontendError === 'function') {
+        _logFrontendError('sv:loadLogs-on-view-init', String(e && e.message || e), e && e.stack || null, { view: view });
+      }
+    }
   }
   if(view==='pipeline'){
     /* Re-fetch leads from Supabase on every Pipeline open so the cards
@@ -11536,8 +11546,16 @@ function savePayrollSettings(){
 
 renderCal();
 loadAllData();
-// Restore last view from session (so browser refresh keeps user where they were)
-try{var _sv=sessionStorage.getItem('hnc_currentView'); if(_sv && _sv!=='calendar'){var _navItem=Array.from(document.querySelectorAll('.nav-item')).find(function(n){return (n.textContent||'').trim().toLowerCase().indexOf(_sv)>=0;}); sv(_sv, _navItem||null); if(_sv==='payments' && typeof renderPaymentsSection==='function'){setTimeout(renderPaymentsSection, 200);}}}catch(e){console.warn('restore view',e);}
+// Restore last view from session (so browser refresh keeps user where they were).
+// Outer try/catch routes to _logFrontendError so any failure during view-restore
+// surfaces in the Recent Errors panel rather than being lost to console.warn.
+// Diagnostic instrumentation added 2026-05-11.
+try{var _sv=sessionStorage.getItem('hnc_currentView'); if(_sv && _sv!=='calendar'){var _navItem=Array.from(document.querySelectorAll('.nav-item')).find(function(n){return (n.textContent||'').trim().toLowerCase().indexOf(_sv)>=0;}); sv(_sv, _navItem||null); if(_sv==='payments' && typeof renderPaymentsSection==='function'){setTimeout(renderPaymentsSection, 200);}}}catch(e){
+  console.warn('restore view',e);
+  if (typeof _logFrontendError === 'function') {
+    _logFrontendError('view-restore', String(e && e.message || e), e && e.stack || null, { restored_view: (typeof _sv !== 'undefined' ? _sv : null) });
+  }
+}
 
 /* ============================================================
    Background prefetch of secondary view data

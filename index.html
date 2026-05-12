@@ -5427,6 +5427,15 @@ var currentLeadName='';
 // helper's own throttle-check and being silently swallowed by its
 // outer try/catch. Diagnostic instrumentation 2026-05-11.
 var _frontendErrorLastLogged = {};
+// Script-execution markers — diagnostic 2026-05-11 to figure out
+// WHEN setTimeout(0) callbacks fire relative to multi-script-tag
+// parse/execute order. The setTimeout(0) fix at line 10945 didn't
+// work because loadLogs was still undefined when the callback ran;
+// these markers will tell us whether script tag 6 (where loadLogs
+// lives) had finished executing by then.
+window._scriptMarks = [];
+window._scriptMark = function(name){ try { window._scriptMarks.push({ name: name, t: Date.now() }); } catch(_) {} };
+_scriptMark('script1-start');
 
 var apptData={};
 
@@ -10942,6 +10951,21 @@ function sv(view,el){
        callback fires, the entire <script> tag has finished executing
        and loadLogs is defined. */
     setTimeout(function(){
+      // Diagnostic 2026-05-11: log what we can see at the moment this
+      // callback fires. Helps us understand whether all scripts have
+      // executed by now (presence of 'loadLogs-defined' mark) and
+      // whether loadLogs is in scope.
+      try {
+        if (typeof _logFrontendError === 'function') {
+          var marks = (window._scriptMarks || []).map(function(m){return m.name;}).join(',');
+          _logFrontendError('debug:setTimeout-tick-state', 'tick fired', null, {
+            typeof_loadLogs_local: typeof loadLogs,
+            typeof_window_loadLogs: typeof window.loadLogs,
+            script_marks: marks,
+            mark_count: (window._scriptMarks || []).length,
+          });
+        }
+      } catch(_){}
       try { loadLogs(_logsCurrentTab||'activity'); } catch(e) {
         console.warn('[sv] loadLogs on view init failed:', e);
         if (typeof _logFrontendError === 'function') {
@@ -12356,6 +12380,7 @@ function _routeFromHash() {
     console.warn('[hash-route] failed:', e);
   }
 }
+try { _scriptMark('script1-end'); } catch(_){}
 </script>
 
 <!-- NEW LEAD OVERLAY -->
@@ -25520,6 +25545,7 @@ async function loadLogs(tab, forceReload) {
     container.innerHTML = '<div style="padding:2rem;color:#dc2626;">Error: ' + esc(e.message || 'unknown') + '</div>';
   }
 }
+try { if(window._scriptMark) window._scriptMark('loadLogs-defined'); } catch(_){}
 
 /* applyLogsFilters — re-renders the activity feed based on the current
    filter dropdown + search input state. Filters are client-side

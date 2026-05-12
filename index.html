@@ -5420,6 +5420,13 @@ var currentView=(function(){try{var v=sessionStorage.getItem('hnc_currentView');
 var activeChatId=null;
 var currentClientName='';
 var currentLeadName='';
+// Throttle state for _logFrontendError (defined further down in this
+// script at line ~12182). Hoisted here so calls to _logFrontendError
+// from page-init code (e.g., view-restore at line ~11540) can fire
+// instead of throwing 'cannot read property of undefined' inside the
+// helper's own throttle-check and being silently swallowed by its
+// outer try/catch. Diagnostic instrumentation 2026-05-11.
+var _frontendErrorLastLogged = {};
 
 var apptData={};
 
@@ -11550,7 +11557,20 @@ loadAllData();
 // Outer try/catch routes to _logFrontendError so any failure during view-restore
 // surfaces in the Recent Errors panel rather than being lost to console.warn.
 // Diagnostic instrumentation added 2026-05-11.
-try{var _sv=sessionStorage.getItem('hnc_currentView'); if(_sv && _sv!=='calendar'){var _navItem=Array.from(document.querySelectorAll('.nav-item')).find(function(n){return (n.textContent||'').trim().toLowerCase().indexOf(_sv)>=0;}); sv(_sv, _navItem||null); if(_sv==='payments' && typeof renderPaymentsSection==='function'){setTimeout(renderPaymentsSection, 200);}}}catch(e){
+try{
+  var _sv=sessionStorage.getItem('hnc_currentView');
+  // Diagnostic breadcrumb (2026-05-11): log every page-init view-restore
+  // so we can see whether this line fires + what view was restored.
+  // Throttled by _logFrontendError so reload spam is bounded.
+  if (typeof _logFrontendError === 'function') {
+    _logFrontendError('breadcrumb:view-restore-entered', 'sessionStorage view=' + String(_sv), null, { sv: _sv });
+  }
+  if (_sv && _sv!=='calendar'){
+    var _navItem=Array.from(document.querySelectorAll('.nav-item')).find(function(n){return (n.textContent||'').trim().toLowerCase().indexOf(_sv)>=0;});
+    sv(_sv, _navItem||null);
+    if(_sv==='payments' && typeof renderPaymentsSection==='function'){setTimeout(renderPaymentsSection, 200);}
+  }
+}catch(e){
   console.warn('restore view',e);
   if (typeof _logFrontendError === 'function') {
     _logFrontendError('view-restore', String(e && e.message || e), e && e.stack || null, { restored_view: (typeof _sv !== 'undefined' ? _sv : null) });
@@ -12196,7 +12216,9 @@ async function testErrorLogger(){
    Best-effort: if the log write itself fails, we just skip — no error
    handler should ever throw (would loop forever).
    ──────────────────────────────────────────────────────────────────── */
-var _frontendErrorLastLogged = {};
+// _frontendErrorLastLogged is declared at the top of this script
+// (hoisted so it's defined before page-init code that calls
+// _logFrontendError on line ~11540).
 function _logFrontendError(source, message, stack, context){
   try {
     if (!message) return;

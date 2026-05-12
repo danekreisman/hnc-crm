@@ -25580,18 +25580,10 @@ async function loadLogs(tab, forceReload) {
         .limit(500);
       if (error) throw error;
       var rows = (data || []).filter(function(r){
-        // Filter clutter from the default global view:
-        //   - user_login: debug-only noise
-        //   - sms_sent: duplicates the umbrella manual_*_sent rows
-        //     (send-sms.js logs its own per-SMS audit row)
-        //   - broadcast_email_sent: one row per recipient, so a single
-        //     1000-person broadcast would push everything else off the
-        //     top page. Rows stay queryable from per-client/lead feeds
-        //     where they actually belong; bounce webhook still finds
-        //     them by resend_id when needed.
-        return r.action !== 'user_login'
-          && r.action !== 'sms_sent'
-          && r.action !== 'broadcast_email_sent';
+        // user_login is debug-only auth noise — never a meaningful
+        // 'event' worth surfacing in the feed. Every other action
+        // shows so Dane never wonders 'did this happen?'
+        return r.action !== 'user_login';
       });
       // Cache for detail modal + filter operations.
       rows.forEach(function(r){ window._activityRowCache[r.id] = r; });
@@ -26365,7 +26357,7 @@ async function loadClientActivityLog(clientId){
     // we want to see the umbrella event with full context, not each
     // raw SMS twice). Both are excluded from the feed but remain in
     // activity_logs for raw audit/query purposes.
-    rows = rows.filter(function(r){ return r.action !== 'user_login' && r.action !== 'sms_sent'; });
+    rows = rows.filter(function(r){ return r.action !== 'user_login'; });
     rows.sort(function(a, b){ return new Date(b.created_at) - new Date(a.created_at); });
 
     // Cache full set for the detail modal AND for "Load more" expansion.
@@ -26423,7 +26415,7 @@ async function loadLeadActivityLog(leadId){
       }
     }
 
-    rows = rows.filter(function(r){ return r.action !== 'user_login' && r.action !== 'sms_sent'; });
+    rows = rows.filter(function(r){ return r.action !== 'user_login'; });
     rows.sort(function(a, b){ return new Date(b.created_at) - new Date(a.created_at); });
 
     rows.forEach(function(r){ window._activityRowCache[r.id] = r; });
@@ -26491,7 +26483,7 @@ async function loadCleanerActivityLog(cleanerId){
       }
     }
 
-    rows = rows.filter(function(r){ return r.action !== 'user_login' && r.action !== 'sms_sent'; });
+    rows = rows.filter(function(r){ return r.action !== 'user_login'; });
     rows.sort(function(a, b){ return new Date(b.created_at) - new Date(a.created_at); });
 
     rows.forEach(function(r){ window._activityRowCache[r.id] = r; });

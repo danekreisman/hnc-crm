@@ -117,13 +117,13 @@ export default async function handler(req, res) {
           await logError('manual-send-reminder', new Error(t.role + ' send-sms ' + r.status), {
             appointmentId, role: t.role, phone: t.phone, status: r.status, body: body.slice(0, 300),
           });
-          results.push({ role: t.role, name: t.name, phone: t.phone, ok: false, status: r.status });
+          results.push({ role: t.role, name: t.name, phone: t.phone, ok: false, status: r.status, message: t.message });
         } else {
-          results.push({ role: t.role, name: t.name, phone: t.phone, ok: true });
+          results.push({ role: t.role, name: t.name, phone: t.phone, ok: true, message: t.message });
         }
       } catch (err) {
         await logError('manual-send-reminder', err, { appointmentId, role: t.role, phone: t.phone });
-        results.push({ role: t.role, name: t.name, phone: t.phone, ok: false, error: err.message });
+        results.push({ role: t.role, name: t.name, phone: t.phone, ok: false, error: err.message, message: t.message });
       }
     }
 

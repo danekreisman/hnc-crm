@@ -153,24 +153,25 @@ export default async function handler(req, res) {
     const results = [];
     for (const cleaner of eligibleCleaners) {
       const phone = toE164(cleaner.phone);
+      const msg = buildMsg(cleaner);
       try {
         const r = await fetchWithTimeout(`${BASE_URL}/api/send-sms`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ to: phone, message: buildMsg(cleaner) }),
+          body: JSON.stringify({ to: phone, message: msg }),
         }, TIMEOUTS.OPENPHONE);
         if (!r.ok) {
           const body = await r.text().catch(() => '<unreadable>');
           await logError('manual-send-cleaner-job', new Error('send-sms ' + r.status), {
             appointmentId, cleanerId: cleaner.id, status: r.status, body: body.slice(0, 300),
           });
-          results.push({ cleanerId: cleaner.id, name: cleaner.name, phone, ok: false, status: r.status });
+          results.push({ cleanerId: cleaner.id, name: cleaner.name, phone, ok: false, status: r.status, message: msg, role: 'cleaner' });
         } else {
-          results.push({ cleanerId: cleaner.id, name: cleaner.name, phone, ok: true });
+          results.push({ cleanerId: cleaner.id, name: cleaner.name, phone, ok: true, message: msg, role: 'cleaner' });
         }
       } catch (err) {
         await logError('manual-send-cleaner-job', err, { appointmentId, cleanerId: cleaner.id });
-        results.push({ cleanerId: cleaner.id, name: cleaner.name, phone, ok: false, error: err.message });
+        results.push({ cleanerId: cleaner.id, name: cleaner.name, phone, ok: false, error: err.message, message: msg, role: 'cleaner' });
       }
     }
 

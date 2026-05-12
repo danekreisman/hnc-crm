@@ -25652,16 +25652,23 @@ function _renderLogsPage(container, addCount){
       ? 'background:#fef2f2;border-left:3px solid #dc2626;'
       : 'background:transparent;border-left:3px solid transparent;';
 
-    // Two-part context line: recipient + actor.
-    var contextParts = [];
+    // Resolve actor first so we can build the headline with the name
+    // included when known. Recipient name is the most important info
+    // on a row (per Dane 2026-05-11): putting it in the headline makes
+    // the row scannable without clicking through.
     var actor = _resolveActivityActor(meta);
-    if (actor.name) {
-      contextParts.push('to <strong>' + esc(actor.name) + '</strong>' + (actor.identifier ? ' <span style="opacity:.6;">(' + esc(actor.identifier) + ')</span>' : ''));
-    } else if (actor.identifier) {
-      contextParts.push('to ' + esc(actor.identifier));
-    }
+    var headlineLabel = actor.name
+      ? esc(label) + ' to <strong>' + esc(actor.name) + '</strong>'
+      : esc(label);
+
+    // Context line below the time: actor (who fired) + raw identifier
+    // (email/phone) when known. Identifier separates here so it's
+    // available for reference but doesn't clutter the headline.
+    var contextParts = [];
     if (r.user_email && r.user_email !== 'system') contextParts.push('by ' + esc(r.user_email.split('@')[0]));
     else if (r.user_email === 'system') contextParts.push('automated');
+    if (actor.identifier) contextParts.push(esc(actor.identifier));
+    else if (!actor.name && (meta.recipient || meta.to)) contextParts.push('to ' + esc(meta.recipient || meta.to));
     var contextLine = contextParts.length
       ? '<div style="color:var(--text-muted);font-size:11px;margin-top:2px;">' + contextParts.join(' \u00B7 ') + '</div>'
       : '';
@@ -25669,7 +25676,7 @@ function _renderLogsPage(container, addCount){
     return '<div onclick="openActivityDetailModal(\'' + r.id + '\')" style="' + rowStyle + 'display:flex;gap:12px;padding:12px 14px;border-bottom:1px solid var(--border);align-items:flex-start;cursor:pointer;transition:background .12s;" onmouseover="this.style.background=\'' + (isFailed ? '#fee2e2' : 'var(--bg-soft)') + '\'" onmouseout="this.style.background=\'' + (isFailed ? '#fef2f2' : 'transparent') + '\'">'
       + '<span style="font-size:16px;flex-shrink:0;line-height:1.5;">' + icon + '</span>'
       + '<div style="flex:1;min-width:0;">'
-        + '<div style="color:' + (isFailed ? '#7f1d1d' : 'var(--text)') + ';font-size:13px;font-weight:500;line-height:1.4;">' + esc(label) + '</div>'
+        + '<div style="color:' + (isFailed ? '#7f1d1d' : 'var(--text)') + ';font-size:13px;font-weight:500;line-height:1.4;">' + headlineLabel + '</div>'
         + '<div style="color:var(--text-muted);font-size:11px;margin-top:2px;">' + esc(time) + '</div>'
         + contextLine
         + failureLine
@@ -26318,17 +26325,23 @@ function _renderClientActivityPage(el, addCount){
     var rowStyle = isFailed
       ? 'background:#fef2f2;border-left:3px solid #dc2626;'
       : 'background:transparent;border-left:3px solid transparent;';
-    var contextLine = '';
     var actor = _resolveActivityActor(meta);
-    if (actor.name) {
-      contextLine = '<div style="color:var(--text-muted);font-size:11px;margin-top:2px;">to <strong>' + esc(actor.name) + '</strong>' + (actor.identifier ? ' <span style="opacity:.6;">(' + esc(actor.identifier) + ')</span>' : '') + '</div>';
-    } else if (actor.identifier) {
-      contextLine = '<div style="color:var(--text-muted);font-size:11px;margin-top:2px;">to ' + esc(actor.identifier) + '</div>';
+    var headlineLabel = actor.name
+      ? esc(label) + ' to <strong>' + esc(actor.name) + '</strong>'
+      : esc(label);
+
+    // Context line: raw identifier when known. Drop the "to ..." prefix
+    // since the name is already in the headline.
+    var contextLine = '';
+    if (actor.identifier) {
+      contextLine = '<div style="color:var(--text-muted);font-size:11px;margin-top:2px;">' + esc(actor.identifier) + '</div>';
+    } else if (!actor.name && (meta.recipient || meta.to)) {
+      contextLine = '<div style="color:var(--text-muted);font-size:11px;margin-top:2px;">to ' + esc(meta.recipient || meta.to) + '</div>';
     }
     return '<div onclick="openActivityDetailModal(\'' + r.id + '\')" style="' + rowStyle + 'display:flex;gap:10px;padding:10px 10px;border-bottom:1px solid var(--border);align-items:flex-start;cursor:pointer;transition:background .12s;" onmouseover="this.style.background=\'' + (isFailed ? '#fee2e2' : 'var(--bg-soft)') + '\'" onmouseout="this.style.background=\'' + (isFailed ? '#fef2f2' : 'transparent') + '\'">'
       + '<span style="font-size:15px;flex-shrink:0;line-height:1.5;">' + icon + '</span>'
       + '<div style="flex:1;min-width:0;">'
-        + '<div style="color:' + (isFailed ? '#7f1d1d' : 'var(--text)') + ';font-size:13px;font-weight:500;">' + esc(label) + '</div>'
+        + '<div style="color:' + (isFailed ? '#7f1d1d' : 'var(--text)') + ';font-size:13px;font-weight:500;">' + headlineLabel + '</div>'
         + '<div style="color:var(--text-muted);font-size:11px;margin-top:1px;">' + esc(time) + '</div>'
         + contextLine
         + failureLine
@@ -26393,8 +26406,28 @@ function openActivityDetailModal(rowId){
   }
 
   // Body — if metadata includes message text, show it. Various action
-  // types store body under different keys.
+  // types store body under different keys:
+  //   - manual-send-confirmation: not stored (email — comes from template)
+  //   - manual-send-reminder: results[].message (multi-recipient: client + cleaner)
+  //   - others: meta.body / meta.message (single recipient)
   var bodyText = meta.body || meta.message || meta.html_preview || null;
+  var extraBodyNote = '';
+  if (!bodyText && Array.isArray(meta.results) && meta.results.length > 0) {
+    // Multi-recipient send. Show the client message by default since
+    // it's the customer-facing one; note that the cleaner also got
+    // a (different) message if results.length > 1.
+    var clientResult = meta.results.find(function(r){ return r.role === 'client' && r.message; }) || meta.results.find(function(r){ return r.message; });
+    if (clientResult) {
+      bodyText = clientResult.message;
+      var others = meta.results.filter(function(r){ return r !== clientResult && r.message; });
+      if (others.length > 0) {
+        extraBodyNote = '<div style="font-size:11px;color:var(--text-muted);margin-top:6px;font-style:italic;">'
+          + 'A separate message was also sent to: '
+          + others.map(function(r){ return esc((r.name || r.role) + ' (' + r.role + ')'); }).join(', ')
+          + '</div>';
+      }
+    }
+  }
 
   // Related entity links.
   var relatedLinks = [];
@@ -26428,7 +26461,9 @@ function openActivityDetailModal(rowId){
     + '</div>'
     + (bodyText
         ? '<div style="margin-top:14px;"><div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;font-weight:600;">Message body</div>'
-          + '<div style="background:#fff;border:1px solid var(--border);border-radius:8px;padding:12px;font-size:13px;color:var(--text);white-space:pre-wrap;line-height:1.5;">' + esc(bodyText) + '</div></div>'
+          + '<div style="background:#fff;border:1px solid var(--border);border-radius:8px;padding:12px;font-size:13px;color:var(--text);white-space:pre-wrap;line-height:1.5;">' + esc(bodyText) + '</div>'
+          + extraBodyNote
+          + '</div>'
         : '')
     + (relatedLinks.length ? '<div style="margin-top:14px;">' + relatedLinks.join(' &nbsp;\u00B7&nbsp; ') + '</div>' : '')
     + '<details style="margin-top:18px;"><summary style="font-size:11px;color:var(--text-muted);cursor:pointer;user-select:none;">Show raw metadata</summary>'

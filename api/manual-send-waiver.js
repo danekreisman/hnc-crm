@@ -200,7 +200,7 @@ export default async function handler(req, res) {
     await logActivity(
       'manual_waiver_sent',
       `Waiver ${mode === 'reminder' ? 'reminder ' : ''}SMS sent to ${client.name || 'client'}`,
-      { appointmentId: apptForAudit ? apptForAudit.id : null, client_id: client.id, recipient: phoneE164, svcId, sentBy: userId, source: appointmentId ? 'appointment' : 'client_profile', mode },
+      { appointmentId: apptForAudit ? apptForAudit.id : null, client_id: client.id, recipient: phoneE164, svcId, sentBy: userId, source: appointmentId ? 'appointment' : 'client_profile', mode, body: message },
       { user_email: userEmail },
     );
 

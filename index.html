@@ -25515,7 +25515,7 @@ async function loadLogs(tab, forceReload) {
         .order('created_at', { ascending: false })
         .limit(500);
       if (error) throw error;
-      var rows = (data || []).filter(function(r){ return r.action !== 'user_login'; });
+      var rows = (data || []).filter(function(r){ return r.action !== 'user_login' && r.action !== 'sms_sent'; });
       // Cache for detail modal + filter operations.
       rows.forEach(function(r){ window._activityRowCache[r.id] = r; });
       window._logsAllRows = rows;
@@ -26281,8 +26281,13 @@ async function loadClientActivityLog(clientId){
       }
     }
 
-    // Filter + sort.
-    rows = rows.filter(function(r){ return r.action !== 'user_login'; });
+    // Filter + sort. user_login is debug noise; sms_sent is a duplicate
+    // of the umbrella manual_*_sent rows (each manual-send-* endpoint
+    // calls send-sms.js which separately logs its own sms_sent row —
+    // we want to see the umbrella event with full context, not each
+    // raw SMS twice). Both are excluded from the feed but remain in
+    // activity_logs for raw audit/query purposes.
+    rows = rows.filter(function(r){ return r.action !== 'user_login' && r.action !== 'sms_sent'; });
     rows.sort(function(a, b){ return new Date(b.created_at) - new Date(a.created_at); });
 
     // Cache full set for the detail modal AND for "Load more" expansion.
@@ -26409,23 +26414,25 @@ function openActivityDetailModal(rowId){
   // types store body under different keys:
   //   - manual-send-confirmation: not stored (email — comes from template)
   //   - manual-send-reminder: results[].message (multi-recipient: client + cleaner)
+  //   - manual-send-cleaner-job: results[].message (one per cleaner)
   //   - others: meta.body / meta.message (single recipient)
   var bodyText = meta.body || meta.message || meta.html_preview || null;
-  var extraBodyNote = '';
+  var multiBodyHtml = '';
   if (!bodyText && Array.isArray(meta.results) && meta.results.length > 0) {
-    // Multi-recipient send. Show the client message by default since
-    // it's the customer-facing one; note that the cleaner also got
-    // a (different) message if results.length > 1.
-    var clientResult = meta.results.find(function(r){ return r.role === 'client' && r.message; }) || meta.results.find(function(r){ return r.message; });
-    if (clientResult) {
-      bodyText = clientResult.message;
-      var others = meta.results.filter(function(r){ return r !== clientResult && r.message; });
-      if (others.length > 0) {
-        extraBodyNote = '<div style="font-size:11px;color:var(--text-muted);margin-top:6px;font-style:italic;">'
-          + 'A separate message was also sent to: '
-          + others.map(function(r){ return esc((r.name || r.role) + ' (' + r.role + ')'); }).join(', ')
-          + '</div>';
-      }
+    var withMsgs = meta.results.filter(function(r){ return r.message; });
+    if (withMsgs.length === 1) {
+      bodyText = withMsgs[0].message;
+    } else if (withMsgs.length > 1) {
+      // Multi-recipient — render each with a 'To <Role>: <Name>' header
+      // so Dane can see exactly what each person received.
+      multiBodyHtml = withMsgs.map(function(r){
+        var who = r.name || r.phone || (r.role ? r.role : 'recipient');
+        var roleLabel = r.role ? (r.role.charAt(0).toUpperCase() + r.role.slice(1)) : 'Recipient';
+        return '<div style="margin-bottom:10px;">'
+          + '<div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px;font-weight:600;">' + esc(roleLabel) + ': ' + esc(who) + '</div>'
+          + '<div style="background:#fff;border:1px solid var(--border);border-radius:8px;padding:12px;font-size:13px;color:var(--text);white-space:pre-wrap;line-height:1.5;">' + esc(r.message) + '</div>'
+        + '</div>';
+      }).join('');
     }
   }
 
@@ -26462,9 +26469,10 @@ function openActivityDetailModal(rowId){
     + (bodyText
         ? '<div style="margin-top:14px;"><div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;font-weight:600;">Message body</div>'
           + '<div style="background:#fff;border:1px solid var(--border);border-radius:8px;padding:12px;font-size:13px;color:var(--text);white-space:pre-wrap;line-height:1.5;">' + esc(bodyText) + '</div>'
-          + extraBodyNote
           + '</div>'
-        : '')
+        : (multiBodyHtml
+            ? '<div style="margin-top:14px;"><div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;font-weight:600;">Messages sent</div>' + multiBodyHtml + '</div>'
+            : ''))
     + (relatedLinks.length ? '<div style="margin-top:14px;">' + relatedLinks.join(' &nbsp;\u00B7&nbsp; ') + '</div>' : '')
     + '<details style="margin-top:18px;"><summary style="font-size:11px;color:var(--text-muted);cursor:pointer;user-select:none;">Show raw metadata</summary>'
       + '<pre style="font-size:11px;background:var(--bg-soft);padding:10px;border-radius:6px;overflow-x:auto;margin-top:6px;color:var(--text-muted);">' + esc(JSON.stringify(meta, null, 2)) + '</pre>'

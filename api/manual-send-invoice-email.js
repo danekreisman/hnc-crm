@@ -15,21 +15,7 @@ import { createClient } from '@supabase/supabase-js';
 import { fetchWithTimeout, TIMEOUTS } from './utils/with-timeout.js';
 import { validateOrFail, SCHEMAS } from './utils/validate.js';
 import { logError } from './utils/error-logger.js';
-
-async function logActivity(action, description, metadata = {}) {
-  try {
-    await fetch(process.env.SUPABASE_URL + '/rest/v1/activity_logs', {
-      method: 'POST',
-      headers: {
-        'apikey': process.env.SUPABASE_SERVICE_ROLE_KEY,
-        'Authorization': 'Bearer ' + process.env.SUPABASE_SERVICE_ROLE_KEY,
-        'Content-Type': 'application/json',
-        'Prefer': 'return=minimal',
-      },
-      body: JSON.stringify({ action, description, user_email: 'system', entity_type: action, metadata }),
-    });
-  } catch (_) { /* non-blocking */ }
-}
+import { logActivity } from './utils/log-activity.js';
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -135,10 +121,10 @@ export default async function handler(req, res) {
     if (updErr) await logError('manual-send-invoice-email:audit-update', updErr, { clientId });
 
     await logActivity(
-      'manual_invoice_resent',
-      `${userEmail} resent invoice email to ${client.name || 'client'}`,
+      'manual_invoice_email_sent',
+      `Invoice email resent to ${client.name || 'client'}`,
       {
-        clientId,
+        client_id: clientId,
         channel: 'email',
         recipient: client.email,
         invoiceRowId: invoice.id,
@@ -146,6 +132,7 @@ export default async function handler(req, res) {
         invoiceTotal: invoice.total,
         sentBy: userId,
       },
+      { user_email: userEmail },
     );
 
     return res.status(200).json({
@@ -156,6 +143,14 @@ export default async function handler(req, res) {
     });
   } catch (err) {
     await logError('manual-send-invoice-email', err, { clientId });
+    try {
+      await logActivity(
+        'manual_invoice_email_sent',
+        'Invoice email resend failed',
+        { client_id: clientId },
+        { user_email: 'system', status: 'failed', failure_reason: err.message || 'Unknown error' },
+      );
+    } catch (_) {}
     return res.status(500).json({ error: 'Could not resend invoice email. See Recent Errors.' });
   }
 }

@@ -11,24 +11,10 @@ import { createClient } from '@supabase/supabase-js';
 import { fetchWithTimeout, TIMEOUTS } from './utils/with-timeout.js';
 import { validateOrFail, SCHEMAS } from './utils/validate.js';
 import { logError } from './utils/error-logger.js';
+import { logActivity } from './utils/log-activity.js';
 
 const BASE_URL = 'https://hnc-crm.vercel.app';
 const BUSINESS_NAME = 'Hawaii Natural Clean';
-
-async function logActivity(action, description, metadata = {}) {
-  try {
-    await fetch(process.env.SUPABASE_URL + '/rest/v1/activity_logs', {
-      method: 'POST',
-      headers: {
-        'apikey': process.env.SUPABASE_SERVICE_ROLE_KEY,
-        'Authorization': 'Bearer ' + process.env.SUPABASE_SERVICE_ROLE_KEY,
-        'Content-Type': 'application/json',
-        'Prefer': 'return=minimal',
-      },
-      body: JSON.stringify({ action, description, user_email: 'system', entity_type: action, metadata }),
-    });
-  } catch (_) { /* non-blocking */ }
-}
 
 function toE164(raw) {
   if (!raw) return null;
@@ -157,6 +143,12 @@ export default async function handler(req, res) {
       await logError('manual-send-invoice-sms', new Error('send-sms ' + sendRes.status), {
         clientId, status: sendRes.status, body: body.slice(0, 500),
       });
+      await logActivity(
+        'manual_invoice_sms_sent',
+        `Invoice SMS to ${client.name || 'client'} failed`,
+        { client_id: clientId, channel: 'sms', recipient: phoneE164, body: message },
+        { user_email: userEmail, status: 'failed', failure_reason: 'SMS service error ' + sendRes.status },
+      );
       return res.status(502).json({ error: 'SMS service rejected the send. See Recent Errors.' });
     }
 
@@ -168,18 +160,32 @@ export default async function handler(req, res) {
     if (updErr) await logError('manual-send-invoice-sms:audit-update', updErr, { clientId });
 
     await logActivity(
-      'manual_invoice_resent',
-      `${userEmail} resent invoice link via SMS to ${client.name || 'client'}`,
+      'manual_invoice_sms_sent',
+      `Invoice SMS sent to ${client.name || 'client'}`,
       {
-        clientId, channel: 'sms', recipient: phoneE164,
-        invoiceRowId: invoice.id, stripeInvoiceId: invoice.stripe_invoice_id,
-        invoiceTotal: totalDue, sentBy: userId,
+        client_id: clientId,
+        channel: 'sms',
+        recipient: phoneE164,
+        invoiceRowId: invoice.id,
+        stripeInvoiceId: invoice.stripe_invoice_id,
+        invoiceTotal: totalDue,
+        sentBy: userId,
+        body: message,
       },
+      { user_email: userEmail },
     );
 
     return res.status(200).json({ success: true, recipient: phoneE164, sentAt, hostedUrl });
   } catch (err) {
     await logError('manual-send-invoice-sms', err, { clientId });
+    try {
+      await logActivity(
+        'manual_invoice_sms_sent',
+        'Invoice SMS send failed',
+        { client_id: clientId },
+        { user_email: 'system', status: 'failed', failure_reason: err.message || 'Unknown error' },
+      );
+    } catch (_) {}
     return res.status(500).json({ error: 'Could not resend invoice via SMS. See Recent Errors.' });
   }
 }

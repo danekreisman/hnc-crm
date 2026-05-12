@@ -13,23 +13,9 @@ import { createClient } from '@supabase/supabase-js';
 import { fetchWithTimeout, TIMEOUTS } from './utils/with-timeout.js';
 import { validateOrFail, SCHEMAS } from './utils/validate.js';
 import { logError } from './utils/error-logger.js';
+import { logActivity } from './utils/log-activity.js';
 
 const BASE_URL = 'https://hnc-crm.vercel.app';
-
-async function logActivity(action, description, metadata = {}) {
-  try {
-    await fetch(process.env.SUPABASE_URL + '/rest/v1/activity_logs', {
-      method: 'POST',
-      headers: {
-        'apikey': process.env.SUPABASE_SERVICE_ROLE_KEY,
-        'Authorization': 'Bearer ' + process.env.SUPABASE_SERVICE_ROLE_KEY,
-        'Content-Type': 'application/json',
-        'Prefer': 'return=minimal',
-      },
-      body: JSON.stringify({ action, description, user_email: 'system', entity_type: action, metadata }),
-    });
-  } catch (_) { /* non-blocking */ }
-}
 
 function toE164(raw) {
   if (!raw) return null;
@@ -96,6 +82,12 @@ export default async function handler(req, res) {
       await logError('manual-send-charge-followup', new Error('send-sms ' + sendRes.status), {
         appointmentId, clientId: client.id, status: sendRes.status, body: body.slice(0, 500),
       });
+      await logActivity(
+        'manual_charge_followup_sent',
+        `Charge follow-up SMS to ${client.name || 'client'} failed`,
+        { appointmentId, client_id: client.id, recipient: phoneE164, body: message },
+        { user_email: userEmail, status: 'failed', failure_reason: 'SMS service error ' + sendRes.status },
+      );
       return res.status(502).json({ error: 'SMS service rejected the send. See Recent Errors.' });
     }
 
@@ -108,13 +100,22 @@ export default async function handler(req, res) {
 
     await logActivity(
       'manual_charge_followup_sent',
-      `${userEmail} sent post-charge follow-up SMS to ${client.name || 'client'}`,
-      { appointmentId, clientId: client.id, recipient: phoneE164, sentBy: userId, length: message.length },
+      `Charge follow-up SMS sent to ${client.name || 'client'}`,
+      { appointmentId, client_id: client.id, recipient: phoneE164, sentBy: userId, length: message.length, body: message },
+      { user_email: userEmail },
     );
 
     return res.status(200).json({ success: true, recipient: phoneE164, sentAt });
   } catch (err) {
     await logError('manual-send-charge-followup', err, { appointmentId });
+    try {
+      await logActivity(
+        'manual_charge_followup_sent',
+        'Charge follow-up SMS send failed',
+        { appointmentId },
+        { user_email: 'system', status: 'failed', failure_reason: err.message || 'Unknown error' },
+      );
+    } catch (_) {}
     return res.status(500).json({ error: 'Could not send follow-up SMS. See Recent Errors.' });
   }
 }

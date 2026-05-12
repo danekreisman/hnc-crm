@@ -15,24 +15,10 @@ import { createClient } from '@supabase/supabase-js';
 import { fetchWithTimeout, TIMEOUTS } from './utils/with-timeout.js';
 import { validateOrFail, SCHEMAS } from './utils/validate.js';
 import { logError } from './utils/error-logger.js';
+import { logActivity } from './utils/log-activity.js';
 
 const BASE_URL = 'https://hnc-crm.vercel.app';
 const BUSINESS_PHONE = '(808) 468-5356';
-
-async function logActivity(action, description, metadata = {}) {
-  try {
-    await fetch(process.env.SUPABASE_URL + '/rest/v1/activity_logs', {
-      method: 'POST',
-      headers: {
-        'apikey': process.env.SUPABASE_SERVICE_ROLE_KEY,
-        'Authorization': 'Bearer ' + process.env.SUPABASE_SERVICE_ROLE_KEY,
-        'Content-Type': 'application/json',
-        'Prefer': 'return=minimal',
-      },
-      body: JSON.stringify({ action, description, user_email: 'system', entity_type: action, metadata }),
-    });
-  } catch (_) { /* non-blocking */ }
-}
 
 function toE164(raw) {
   if (!raw) return null;
@@ -123,7 +109,13 @@ export default async function handler(req, res) {
             cleaner:    appt.cleaners?.name || null,
           }),
         }, TIMEOUTS.RESEND);
-        sendResults.email = { ok: !!(r && r.ok), status: r ? r.status : null, recipient: client.email };
+        // Capture Resend's message_id so the /api/resend-webhook can
+        // attribute bounces back to this activity_log row.
+        let resendId = null;
+        if (r && r.ok) {
+          try { const d = await r.json(); resendId = d && d.id ? d.id : null; } catch (_) {}
+        }
+        sendResults.email = { ok: !!(r && r.ok), status: r ? r.status : null, recipient: client.email, resend_id: resendId };
         if (!r.ok) {
           const body = await r.text().catch(() => '<unreadable>');
           await logError('manual-send-reschedule:email', new Error('send-email ' + r.status), {
@@ -147,7 +139,7 @@ export default async function handler(req, res) {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ to: phone, message: smsMsg }),
         }, TIMEOUTS.OPENPHONE);
-        sendResults.sms = { ok: !!(r && r.ok), status: r ? r.status : null, recipient: phone };
+        sendResults.sms = { ok: !!(r && r.ok), status: r ? r.status : null, recipient: phone, message: smsMsg };
         if (!r.ok) {
           const body = await r.text().catch(() => '<unreadable>');
           await logError('manual-send-reschedule:sms', new Error('send-sms ' + r.status), {
@@ -155,7 +147,7 @@ export default async function handler(req, res) {
           });
         }
       } catch (err) {
-        sendResults.sms = { ok: false, error: err.message, recipient: phone };
+        sendResults.sms = { ok: false, error: err.message, recipient: phone, message: smsMsg };
         await logError('manual-send-reschedule:sms', err, { appointmentId });
       }
     } else {
@@ -164,6 +156,14 @@ export default async function handler(req, res) {
 
     const anyOk = (sendResults.email && sendResults.email.ok) || (sendResults.sms && sendResults.sms.ok);
     if (!anyOk) {
+      // Both channels failed (or skipped). Fire bell + push notification
+      // via logActivity's status='failed' side-effect.
+      await logActivity(
+        'manual_reschedule_sent',
+        `Reschedule notice to ${client.name || 'client'} failed`,
+        { appointmentId, client_id: appt.client_id, results: sendResults },
+        { user_email: userEmail, status: 'failed', failure_reason: 'Neither email nor SMS could be sent — check Recent Errors' },
+      );
       return res.status(502).json({
         error: 'Reschedule notice could not be sent on any channel. See Recent Errors.',
         results: sendResults,
@@ -179,13 +179,30 @@ export default async function handler(req, res) {
 
     await logActivity(
       'manual_reschedule_sent',
-      `${userEmail} manually sent reschedule notice for ${client.name || 'client'} to ${prettyDate} at ${appt.time || ''}`,
-      { appointmentId, clientId: appt.client_id, results: sendResults, sentBy: userId },
+      `Reschedule notification sent to ${client.name || 'client'}`,
+      {
+        appointmentId,
+        client_id: appt.client_id,
+        results: sendResults,
+        sentBy: userId,
+        // Top-level resend_id from the email channel so the bounce
+        // webhook can find this row directly without parsing results[].
+        resend_id: sendResults.email && sendResults.email.resend_id ? sendResults.email.resend_id : null,
+      },
+      { user_email: userEmail },
     );
 
     return res.status(200).json({ success: true, sentAt, results: sendResults });
   } catch (err) {
     await logError('manual-send-reschedule', err, { appointmentId });
+    try {
+      await logActivity(
+        'manual_reschedule_sent',
+        'Reschedule notification send failed',
+        { appointmentId },
+        { user_email: 'system', status: 'failed', failure_reason: err.message || 'Unknown error' },
+      );
+    } catch (_) {}
     return res.status(500).json({ error: 'Could not send reschedule notice. See Recent Errors.' });
   }
 }

@@ -25580,6 +25580,7 @@ function applyLogsFilters(){
   if (search) {
     searchPredicate = function(r){
       var m = r.metadata || {};
+      var actor = _resolveActivityActor(m);
       var haystack = [
         r.description || '',
         r.action || '',
@@ -25592,6 +25593,8 @@ function applyLogsFilters(){
         m.body || '',
         m.message || '',
         r.user_email || '',
+        actor.name || '',
+        actor.identifier || '',
       ].join(' ').toLowerCase();
       return haystack.indexOf(search) >= 0;
     };
@@ -25651,8 +25654,12 @@ function _renderLogsPage(container, addCount){
 
     // Two-part context line: recipient + actor.
     var contextParts = [];
-    if (meta.recipient) contextParts.push('to ' + esc(meta.recipient));
-    else if (meta.to) contextParts.push('to ' + esc(meta.to));
+    var actor = _resolveActivityActor(meta);
+    if (actor.name) {
+      contextParts.push('to <strong>' + esc(actor.name) + '</strong>' + (actor.identifier ? ' <span style="opacity:.6;">(' + esc(actor.identifier) + ')</span>' : ''));
+    } else if (actor.identifier) {
+      contextParts.push('to ' + esc(actor.identifier));
+    }
     if (r.user_email && r.user_email !== 'system') contextParts.push('by ' + esc(r.user_email.split('@')[0]));
     else if (r.user_email === 'system') contextParts.push('automated');
     var contextLine = contextParts.length
@@ -26130,6 +26137,98 @@ function _activityTimeLabel(iso){
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + (d.getFullYear() !== now.getFullYear() ? ', ' + d.getFullYear() : '') + ' \u00B7 ' + time;
 }
 
+/* _resolveActivityActor — feature addition (visibility), not a bug fix.
+   Maps an activity_log row's metadata to a human-readable name so the
+   feed rows and detail modal can display "to Dane Kreisman" instead of
+   raw "to dane.kreisman@gmail.com" or "+18085551234".
+
+   Resolution order (fastest first):
+     1. Direct ID lookup against clientDB / leadDB / cleanerDB using
+        metadata.client_id / lead_id / cleaner_id. O(1) per call.
+     2. Reverse email match (scan the in-memory DBs for matching .email).
+        O(n) across the three DBs; fine at HNC scale (hundreds of records).
+     3. Reverse phone match (compare last 10 digits) against same DBs.
+     4. Fallback: identifier-only — the raw recipient string.
+
+   Returns: { name, identifier }
+     - name       human-readable name when resolved, else null
+     - identifier the raw email/phone string for context, or null
+
+   Renderers use this to format consistently:
+     - Resolved:    'to <strong>Name</strong> (identifier)'
+     - Unresolved:  'to identifier'
+
+   What won't resolve: rows with no entity ID in metadata AND whose
+   email/phone doesn't match an entity currently loaded in the DBs
+   (deleted clients, test numbers, unmatched leads). Those fall back
+   to identifier-only — same behavior as before this helper existed. */
+function _resolveActivityActor(meta){
+  if (!meta) return { name: null, identifier: null };
+
+  // Step 1: direct ID lookups.
+  if (meta.client_id && typeof clientDB !== 'undefined' && clientDB[meta.client_id]) {
+    return { name: clientDB[meta.client_id].name, identifier: meta.recipient || meta.to || null };
+  }
+  if (meta.lead_id && typeof leadDB !== 'undefined' && leadDB[meta.lead_id]) {
+    return { name: leadDB[meta.lead_id].name, identifier: meta.recipient || meta.to || null };
+  }
+  if (meta.cleaner_id && typeof cleanerDB !== 'undefined' && cleanerDB[meta.cleaner_id]) {
+    return { name: cleanerDB[meta.cleaner_id].name, identifier: meta.recipient || meta.to || null };
+  }
+
+  // Step 2 + 3: reverse lookup from the recipient string.
+  var raw = meta.recipient || meta.to || meta.email || meta.phone || null;
+  if (raw) {
+    var rawStr = String(raw).trim();
+    var rawLower = rawStr.toLowerCase();
+    var isEmail = rawStr.indexOf('@') >= 0;
+    var phoneDigits = isEmail ? null : rawStr.replace(/[^0-9]/g, '').slice(-10);
+
+    if (typeof clientDB !== 'undefined') {
+      var clientMatch = Object.values(clientDB).find(function(c){
+        if (!c) return false;
+        if (isEmail && c.email && c.email.toLowerCase() === rawLower) return true;
+        if (phoneDigits && c.phone) {
+          var d = String(c.phone).replace(/[^0-9]/g, '').slice(-10);
+          if (d === phoneDigits) return true;
+        }
+        return false;
+      });
+      if (clientMatch) return { name: clientMatch.name, identifier: rawStr };
+    }
+
+    if (typeof leadDB !== 'undefined') {
+      var leadMatch = Object.values(leadDB).find(function(l){
+        if (!l) return false;
+        if (isEmail && l.email && l.email.toLowerCase() === rawLower) return true;
+        if (phoneDigits && l.phone) {
+          var d = String(l.phone).replace(/[^0-9]/g, '').slice(-10);
+          if (d === phoneDigits) return true;
+        }
+        return false;
+      });
+      if (leadMatch) return { name: leadMatch.name, identifier: rawStr };
+    }
+
+    if (typeof cleanerDB !== 'undefined') {
+      var cleanerMatch = Object.values(cleanerDB).find(function(c){
+        if (!c) return false;
+        if (isEmail && c.email && c.email.toLowerCase() === rawLower) return true;
+        if (phoneDigits && c.phone) {
+          var d = String(c.phone).replace(/[^0-9]/g, '').slice(-10);
+          if (d === phoneDigits) return true;
+        }
+        return false;
+      });
+      if (cleanerMatch) return { name: cleanerMatch.name, identifier: rawStr };
+    }
+
+    return { name: null, identifier: rawStr };
+  }
+
+  return { name: null, identifier: null };
+}
+
 // Cache rows by id so the detail modal can pick up the full payload
 // without re-querying.
 window._activityRowCache = window._activityRowCache || {};
@@ -26220,10 +26319,11 @@ function _renderClientActivityPage(el, addCount){
       ? 'background:#fef2f2;border-left:3px solid #dc2626;'
       : 'background:transparent;border-left:3px solid transparent;';
     var contextLine = '';
-    if (meta.recipient) {
-      contextLine = '<div style="color:var(--text-muted);font-size:11px;margin-top:2px;">to ' + esc(meta.recipient) + '</div>';
-    } else if (meta.to) {
-      contextLine = '<div style="color:var(--text-muted);font-size:11px;margin-top:2px;">to ' + esc(meta.to) + '</div>';
+    var actor = _resolveActivityActor(meta);
+    if (actor.name) {
+      contextLine = '<div style="color:var(--text-muted);font-size:11px;margin-top:2px;">to <strong>' + esc(actor.name) + '</strong>' + (actor.identifier ? ' <span style="opacity:.6;">(' + esc(actor.identifier) + ')</span>' : '') + '</div>';
+    } else if (actor.identifier) {
+      contextLine = '<div style="color:var(--text-muted);font-size:11px;margin-top:2px;">to ' + esc(actor.identifier) + '</div>';
     }
     return '<div onclick="openActivityDetailModal(\'' + r.id + '\')" style="' + rowStyle + 'display:flex;gap:10px;padding:10px 10px;border-bottom:1px solid var(--border);align-items:flex-start;cursor:pointer;transition:background .12s;" onmouseover="this.style.background=\'' + (isFailed ? '#fee2e2' : 'var(--bg-soft)') + '\'" onmouseout="this.style.background=\'' + (isFailed ? '#fef2f2' : 'transparent') + '\'">'
       + '<span style="font-size:15px;flex-shrink:0;line-height:1.5;">' + icon + '</span>'
@@ -26282,7 +26382,15 @@ function openActivityDetailModal(rowId){
   var fullTime = new Date(row.created_at).toLocaleString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
 
   // Resolve recipient label - actions store recipients in different keys.
-  var recipient = meta.recipient || meta.to || meta.email || meta.phone || null;
+  // Resolve recipient label via the same helper used by the feed rows
+  // so name + identifier render consistently across the UI.
+  var actor = _resolveActivityActor(meta);
+  var recipientLine = '';
+  if (actor.name) {
+    recipientLine = '<strong>' + esc(actor.name) + '</strong>' + (actor.identifier ? ' <span style="color:var(--text-muted);">(' + esc(actor.identifier) + ')</span>' : '');
+  } else if (actor.identifier) {
+    recipientLine = '<strong>' + esc(actor.identifier) + '</strong>';
+  }
 
   // Body — if metadata includes message text, show it. Various action
   // types store body under different keys.
@@ -26314,7 +26422,7 @@ function openActivityDetailModal(rowId){
     + '</div>'
     + failureBlock
     + '<div style="background:var(--bg-soft);border:1px solid var(--border);border-radius:8px;padding:14px;font-size:13px;line-height:1.7;">'
-      + (recipient ? '<div><span style="color:var(--text-muted);">To:</span> <strong>' + esc(recipient) + '</strong></div>' : '')
+      + (recipientLine ? '<div><span style="color:var(--text-muted);">To:</span> ' + recipientLine + '</div>' : '')
       + (row.user_email ? '<div><span style="color:var(--text-muted);">By:</span> <strong>' + esc(row.user_email === 'system' ? 'System (automated)' : row.user_email) + '</strong></div>' : '')
       + (row.description ? '<div style="margin-top:8px;color:var(--text);">' + esc(row.description) + '</div>' : '')
     + '</div>'

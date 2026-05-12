@@ -17,24 +17,10 @@ import { createClient } from '@supabase/supabase-js';
 import { fetchWithTimeout, TIMEOUTS } from './utils/with-timeout.js';
 import { validateOrFail, SCHEMAS } from './utils/validate.js';
 import { logError } from './utils/error-logger.js';
+import { logActivity } from './utils/log-activity.js';
 import crypto from 'crypto';
 
 const BASE_URL = 'https://hnc-crm.vercel.app';
-
-async function logActivity(action, description, metadata = {}) {
-  try {
-    await fetch(process.env.SUPABASE_URL + '/rest/v1/activity_logs', {
-      method: 'POST',
-      headers: {
-        'apikey': process.env.SUPABASE_SERVICE_ROLE_KEY,
-        'Authorization': 'Bearer ' + process.env.SUPABASE_SERVICE_ROLE_KEY,
-        'Content-Type': 'application/json',
-        'Prefer': 'return=minimal',
-      },
-      body: JSON.stringify({ action, description, user_email: 'system', entity_type: action, metadata }),
-    });
-  } catch (_) { /* non-blocking */ }
-}
 
 function toE164(raw) {
   if (!raw) return null;
@@ -122,6 +108,12 @@ export default async function handler(req, res) {
       await logError('manual-resend-booking-link', new Error('send-sms ' + sendRes.status), {
         leadId, status: sendRes.status, body: body.slice(0, 500),
       });
+      await logActivity(
+        'manual_resend_booking_link',
+        `Booking link resend to ${lead.name || 'lead'} failed`,
+        { lead_id: leadId, recipient: phone, body: message },
+        { user_email: userEmail, status: 'failed', failure_reason: 'SMS service error ' + sendRes.status },
+      );
       return res.status(502).json({ error: 'SMS service rejected the send. See Recent Errors.' });
     }
 
@@ -133,14 +125,23 @@ export default async function handler(req, res) {
     if (updErr) await logError('manual-resend-booking-link:audit-update', updErr, { leadId });
 
     await logActivity(
-      'manual_booking_link_resent',
-      `${userEmail} manually resent booking link to ${lead.name || 'lead'}`,
-      { leadId, recipient: phone, mintedToken: !lead.booking_token, sentBy: userId },
+      'manual_resend_booking_link',
+      `Booking link resent to ${lead.name || 'lead'}`,
+      { lead_id: leadId, recipient: phone, mintedToken: !lead.booking_token, sentBy: userId, body: message },
+      { user_email: userEmail },
     );
 
     return res.status(200).json({ success: true, recipient: phone, sentAt });
   } catch (err) {
     await logError('manual-resend-booking-link', err, { leadId });
+    try {
+      await logActivity(
+        'manual_resend_booking_link',
+        'Booking link resend failed',
+        { lead_id: leadId },
+        { user_email: 'system', status: 'failed', failure_reason: err.message || 'Unknown error' },
+      );
+    } catch (_) {}
     return res.status(500).json({ error: 'Could not resend booking link. See Recent Errors.' });
   }
 }

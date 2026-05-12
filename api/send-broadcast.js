@@ -436,12 +436,52 @@ export default async function handler(req, res) {
         );
 
         if (emailRes.ok) {
+          // Capture Resend message_id so the bounce webhook can attribute
+          // a future email.bounced event back to THIS recipient's
+          // activity_log row (and therefore to their profile feed).
+          let _bcastResendId = null;
+          try { const _d = await emailRes.json(); _bcastResendId = _d && _d.id ? _d.id : null; } catch (_) {}
+
           await db.from('broadcast_sends').insert({
             broadcast_id: broadcastId,
             email: r.email,
             recipient_id: r.id,
             recipient_type: r.type,
           });
+
+          // Write a per-recipient activity_log row so this broadcast
+          // shows on the recipient's Activity feed. r.type is either
+          // 'client' or 'lead' (from the recipient query upstream) —
+          // tag the metadata accordingly so the right entity feed
+          // picks it up.
+          try {
+            const _entityMeta = r.type === 'lead'
+              ? { lead_id: r.id }
+              : { client_id: r.id };
+            await fetch(process.env.SUPABASE_URL + '/rest/v1/activity_logs', {
+              method: 'POST',
+              headers: {
+                'apikey': process.env.SUPABASE_SERVICE_ROLE_KEY,
+                'Authorization': 'Bearer ' + process.env.SUPABASE_SERVICE_ROLE_KEY,
+                'Content-Type': 'application/json',
+                'Prefer': 'return=minimal',
+              },
+              body: JSON.stringify({
+                action: 'broadcast_email_sent',
+                description: `Broadcast email sent to ${r.name || r.email}: ${broadcast.subject}`,
+                user_email: 'system',
+                entity_type: 'broadcast',
+                entity_id: broadcastId,
+                metadata: {
+                  ..._entityMeta,
+                  broadcast_id: broadcastId,
+                  recipient: r.email,
+                  subject: broadcast.subject,
+                  resend_id: _bcastResendId,
+                },
+              }),
+            });
+          } catch (_) { /* logging failure must not break the send */ }
           sent++;
         } else {
           const err = await emailRes.json().catch(() => ({}));

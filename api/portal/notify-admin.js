@@ -67,7 +67,13 @@ export default async function handler(req, res) {
             text
           })
         });
-        results.email = { ok: r.ok, status: r.status };
+        // Capture Resend message_id so future bounce-tracking on
+        // admin emails has somewhere to land. Not currently logged
+        // to activity_logs since the recipient is Dane (no client
+        // entity to attribute to), but returned to caller for now.
+        let _adminResendId = null;
+        try { const _d = await r.json(); _adminResendId = _d && _d.id ? _d.id : null; } catch (_) {}
+        results.email = { ok: r.ok, status: r.status, resend_id: _adminResendId };
       } catch (e) { results.email = { ok: false, error: e.message }; }
     }
 

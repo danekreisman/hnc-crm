@@ -219,7 +219,7 @@ export default async function handler(req, res) {
       try {
         const _title = body.title || body.task_title || "Untitled";
         const _due = body.due_date ? new Date(body.due_date).toLocaleDateString("en-US",{month:"long",day:"numeric",year:"numeric"}) : null;
-        await fetchWithTimeout("https://api.resend.com/emails", {
+        const _vaRes = await fetchWithTimeout("https://api.resend.com/emails", {
           method: "POST",
           headers: { "Content-Type": "application/json", "Authorization": "Bearer " + process.env.RESEND_API_KEY },
           body: JSON.stringify({
@@ -229,6 +229,10 @@ export default async function handler(req, res) {
             html: "<div style=\"font-family:Inter,sans-serif;padding:2rem;max-width:500px\"><h2>New Task Assigned</h2><p><strong>Task:</strong> " + _title + "</p>" + (_due ? "<p><strong>Due:</strong> " + _due + "</p>" : "") + (body.notes ? "<p><strong>Notes:</strong> " + body.notes + "</p>" : "") + "<a href=\"https://hnc-crm.vercel.app\" style=\"background:#3BB8E3;color:#fff;padding:.75rem 1.5rem;border-radius:8px;text-decoration:none;display:inline-block;margin-top:1rem\">View in CRM</a></div>"
           })
         }, 10000);
+        // Capture Resend's message_id so the bounce webhook can
+        // attribute later bounce events to this row.
+        let _vaResendId = null;
+        try { const _d = await _vaRes.json(); _vaResendId = _d && _d.id ? _d.id : null; } catch (_) {}
         // Log VA-task email to activity_logs (direct Resend bypasses /api/send-email)
         try {
           await fetch(process.env.SUPABASE_URL + '/rest/v1/activity_logs', {
@@ -245,7 +249,7 @@ export default async function handler(req, res) {
               user_email: 'system',
               entity_type: 'task',
               entity_id: '',
-              metadata: { task_title: body.title || body.task_title, due_date: body.due_date || null },
+              metadata: { task_title: body.title || body.task_title, due_date: body.due_date || null, resend_id: _vaResendId, recipient: 'dane@hawaiinaturalclean.net' },
             }),
           });
         } catch (_) { /* logging failure must not break the send */ }

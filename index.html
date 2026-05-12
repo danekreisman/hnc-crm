@@ -18980,6 +18980,34 @@ async function convertLeadToClient(){
 
   closeOverlay('lead-overlay');
   showPaymentToast(lead.name + ' converted to client successfully!', null, 'success');
+
+  // Write a conversion event to activity_logs so the row appears on
+  // BOTH the lead's Activity feed AND the new client's feed. Phase 1e:
+  // the conversion is a meaningful relationship-history event that
+  // didn't get logged before. Stores both IDs in metadata so the
+  // entity filters on either side pick it up.
+  //
+  // Best-effort: a logging failure here doesn't roll back the
+  // conversion. The toast already confirmed success to the user.
+  try {
+    if(typeof db !== 'undefined') {
+      var sess = await db.auth.getSession();
+      var who = sess && sess.data && sess.data.session && sess.data.session.user ? sess.data.session.user.email : 'system';
+      await db.from('activity_logs').insert([{
+        action: 'lead_to_client_converted',
+        description: lead.name + ' converted from lead to client',
+        user_email: who || 'system',
+        entity_type: 'lead_to_client_converted',
+        metadata: {
+          client_id: id,
+          lead_id: currentLeadId,
+          lead_name: lead.name,
+          lead_value: lead.value || null,
+          status: 'success',
+        },
+      }]);
+    }
+  } catch(e) { console.warn('[convertLeadToClient] activity_logs write failed:', e); }
 }
 
 

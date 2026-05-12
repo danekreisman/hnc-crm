@@ -5,35 +5,23 @@
 
 import { isWebhookProcessed, recordWebhook } from './utils/webhook-idempotency.js';
 import { sendPushToAllSubscribed } from './utils/send-push.js';
+import { logActivity } from './utils/log-activity.js';
 import Stripe from 'stripe';
 
-async function logActivity(action, description, metadata={}) {
+// Helper to look up our internal client_id from a Stripe customer id.
+// Used by activity logs so charge_succeeded rows attribute to the
+// right client's Activity feed. Returns null if no match — webhook
+// still proceeds, the activity row just won't deep-link.
+async function clientIdForStripeCustomer(stripeCustomerId, supabaseUrl, supabaseKey) {
+  if (!stripeCustomerId) return null;
   try {
-    await fetch(process.env.SUPABASE_URL+'/rest/v1/activity_logs',{
-      method:'POST',
-      headers:{'apikey':process.env.SUPABASE_SERVICE_ROLE_KEY,'Authorization':'Bearer '+process.env.SUPABASE_SERVICE_ROLE_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
-      body:JSON.stringify({action,description,user_email:'system',entity_type:action,metadata})
+    const r = await fetch(`${supabaseUrl}/rest/v1/clients?select=id&stripe_customer_id=eq.${encodeURIComponent(stripeCustomerId)}&limit=1`, {
+      headers: { apikey: supabaseKey, Authorization: 'Bearer ' + supabaseKey },
     });
-  } catch(_){}
+    const arr = await r.json();
+    return Array.isArray(arr) && arr[0] ? arr[0].id : null;
+  } catch (_) { return null; }
 }
-
-
-// -- Activity Logger ----------------------------------------------------------
-async function logActivity(action, description, metadata = {}) {
-  try {
-    await fetch(process.env.SUPABASE_URL + '/rest/v1/activity_logs', {
-      method: 'POST',
-      headers: {
-        'apikey': process.env.SUPABASE_SERVICE_ROLE_KEY,
-        'Authorization': 'Bearer ' + process.env.SUPABASE_SERVICE_ROLE_KEY,
-        'Content-Type': 'application/json',
-        'Prefer': 'return=minimal'
-      },
-      body: JSON.stringify({ action, description, user_email: 'system', entity_type: action, metadata })
-    });
-  } catch (_e) { /* non-blocking */ }
-}
-// -----------------------------------------------------------------------------
 
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
@@ -107,7 +95,31 @@ export default async function handler(req, res) {
     const data = event.data.object;
 
     if (eventType === 'charge.succeeded') {
-      // Update invoice payment status if charge succeeded
+      // Resolve our internal client_id from Stripe's customer id so the
+      // activity_log row attributes correctly to the per-client feed.
+      const clientId = await clientIdForStripeCustomer(data.customer, SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+      const amountDollars = data.amount ? (data.amount / 100) : 0;
+      const customerName = (data.billing_details && data.billing_details.name) || (data.metadata && data.metadata.client_name) || null;
+
+      // Always log the charge — even when there's no associated invoice
+      // (one-off charges fired from the unified Charge modal don't carry
+      // an invoice id). The existing 'invoice_paid' log path only fires
+      // when data.invoice is present.
+      await logActivity(
+        'stripe_charge_succeeded',
+        `Card charged $${amountDollars.toFixed(2)}${customerName ? ' — ' + customerName : ''}`,
+        {
+          client_id: clientId,
+          chargeId: data.id,
+          invoiceId: data.invoice || null,
+          paymentIntentId: data.payment_intent || null,
+          amount: amountDollars,
+          customerName,
+          stripeCustomerId: data.customer || null,
+        }
+      );
+
+      // Update invoice payment status if charge was tied to an invoice
       if (data.invoice) {
         await supabaseUpsert('invoices', {
           stripe_invoice_id: data.invoice,
@@ -115,13 +127,22 @@ export default async function handler(req, res) {
           payment_status: 'paid',
           paid_at: new Date(data.created * 1000).toISOString()
         }, 'stripe_invoice_id');
-        await logActivity('invoice_paid','Invoice paid via Stripe',{chargeId:data.id,invoiceId:data.invoice,amount:data.amount?(data.amount/100).toFixed(2):null});
+        await logActivity(
+          'invoice_paid',
+          `Invoice paid via Stripe — $${amountDollars.toFixed(2)}`,
+          {
+            client_id: clientId,
+            chargeId: data.id,
+            invoiceId: data.invoice,
+            amount: amountDollars.toFixed(2),
+            customerName,
+          }
+        );
         // In-app notification (phase 1 of notification system, 2026-05-03).
         // Broadcast to all admins (target_email null). Best-effort — failure
         // here doesn't roll back the payment processing.
         try {
-          var amtDollars = data.amount ? (data.amount/100) : 0;
-          var customerLabel = (data.billing_details && data.billing_details.name) || (data.metadata && data.metadata.client_name) || 'a client';
+          var customerLabel = customerName || 'a client';
           await fetch(`${SUPABASE_URL}/rest/v1/notifications`, {
             method: 'POST',
             headers: {
@@ -132,17 +153,17 @@ export default async function handler(req, res) {
             },
             body: JSON.stringify({
               event_type: 'invoice_paid',
-              title: 'Invoice paid: $' + amtDollars.toFixed(2),
+              title: 'Invoice paid: $' + amountDollars.toFixed(2),
               body: 'Payment received from ' + customerLabel,
               url: '#payments',
-              metadata: { chargeId: data.id, invoiceId: data.invoice, amount: amtDollars }
+              metadata: { chargeId: data.id, invoiceId: data.invoice, amount: amountDollars, client_id: clientId }
             })
           });
           // Phase 2 (push, 2026-05-03): fan out to every subscribed device so
           // the alert reaches Dane's phone home screen even when CRM is closed.
           // Best-effort. Errors logged but don't block the webhook response.
           sendPushToAllSubscribed({
-            title: 'Invoice paid: $' + amtDollars.toFixed(2),
+            title: 'Invoice paid: $' + amountDollars.toFixed(2),
             body: 'Payment received from ' + customerLabel,
             url: '/#payments',
             tag: 'invoice-' + data.id,
@@ -156,9 +177,9 @@ export default async function handler(req, res) {
           // owner wants the redundancy across all channels.
           // Best-effort. SMS failure does not block webhook response.
           var smsThreshold = parseFloat(process.env.SMS_INVOICE_THRESHOLD || '500');
-          if (amtDollars >= smsThreshold) {
+          if (amountDollars >= smsThreshold) {
             var ownerPhone = process.env.OWNER_PHONE || '+18084685356';
-            var smsBody = 'HNC: Invoice paid $' + amtDollars.toFixed(2) + ' from ' + customerLabel + '. View: hnc-crm.vercel.app/#payments';
+            var smsBody = 'HNC: Invoice paid $' + amountDollars.toFixed(2) + ' from ' + customerLabel + '. View: hnc-crm.vercel.app/#payments';
             // Use VERCEL_URL only as last resort — see prior session note about
             // VERCEL_URL returning the deployment-protection wrapper. BASE_URL
             // is the safer default for inter-function calls.
@@ -169,7 +190,7 @@ export default async function handler(req, res) {
               body: JSON.stringify({ to: ownerPhone, message: smsBody })
             }).then(function(r){
               if (!r.ok) console.warn('[stripe-webhook] high-value SMS non-OK:', r.status);
-              else console.log('[stripe-webhook] high-value SMS sent ($' + amtDollars.toFixed(2) + ')');
+              else console.log('[stripe-webhook] high-value SMS sent ($' + amountDollars.toFixed(2) + ')');
             }).catch(function(e){ console.warn('[stripe-webhook] high-value SMS failed:', e && e.message); });
           }
         } catch (notifErr) { console.warn('[stripe-webhook] invoice_paid notify failed:', notifErr && notifErr.message); }
@@ -178,15 +199,40 @@ export default async function handler(req, res) {
     }
 
     if (eventType === 'charge.failed') {
-      // Mark invoice as failed
+      // Resolve our internal client_id for entity filtering.
+      const failedClientId = await clientIdForStripeCustomer(data.customer, SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+      const failedAmount = data.amount ? (data.amount / 100) : 0;
+      const failedReason = data.failure_message || data.outcome?.seller_message || 'Charge failed';
+      const failedCustomerName = (data.billing_details && data.billing_details.name) || (data.metadata && data.metadata.client_name) || null;
+
+      // Always log the failure — even when there's no invoice attached.
+      // status='failed' triggers the bell + push notification side-effect
+      // in logActivity. Dane needs to know about declined cards
+      // immediately (his framing: 'How else am I supposed to know that
+      // a text did not send or a card got declined?').
+      await logActivity(
+        'stripe_charge_failed',
+        `Card charge failed${failedCustomerName ? ' — ' + failedCustomerName : ''}: ${failedReason}`,
+        {
+          client_id: failedClientId,
+          chargeId: data.id,
+          invoiceId: data.invoice || null,
+          paymentIntentId: data.payment_intent || null,
+          amount: failedAmount,
+          customerName: failedCustomerName,
+          stripeCustomerId: data.customer || null,
+        },
+        { status: 'failed', failure_reason: failedReason },
+      );
+
+      // Mark invoice as failed (existing behavior)
       if (data.invoice) {
         await supabaseUpsert('invoices', {
           stripe_invoice_id: data.invoice,
           stripe_charge_id: data.id,
           payment_status: 'failed',
-          payment_error: data.failure_message || 'Charge failed'
+          payment_error: failedReason
         }, 'stripe_invoice_id');
-        await logActivity('charge_failed','Stripe charge failed',{chargeId:data.id,invoiceId:data.invoice});
         console.log('[stripe-webhook] Marked invoice as failed for charge:', data.id);
       }
     }

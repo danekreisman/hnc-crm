@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { logActivity } from './utils/log-activity.js';
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -16,6 +17,16 @@ export default async function handler(req, res) {
     { auth: { persistSession: false } }
   );
 
+  // Look up the client name for a friendlier activity-log description.
+  // Defensive: if this fails for any reason, fall through to a generic
+  // label — we don't want logging quirks to block the policy-agree
+  // operation itself.
+  let clientName = null;
+  try {
+    const { data: c } = await db.from('clients').select('name').eq('id', clientId).maybeSingle();
+    if (c && c.name) clientName = c.name;
+  } catch (_) {}
+
   const { error } = await db
     .from('clients')
     .update({ policies_agreed_at: new Date().toISOString() })
@@ -25,6 +36,17 @@ export default async function handler(req, res) {
     console.error('[policy-agree] error:', JSON.stringify(error));
     return res.status(500).json({ error: error.message });
   }
+
+  // Log the signing event so it shows on the client's Activity feed.
+  // This is an opt-in customer action — they clicked the Agree button
+  // on /agree.html — so user_email is 'system' (the policy page acted
+  // on their click, no admin involved).
+  await logActivity(
+    'policy_agreed',
+    `${clientName || 'Client'} signed the policy waiver`,
+    { client_id: clientId, signed_at: new Date().toISOString() },
+    { user_email: 'system' },
+  );
 
   console.log('[policy-agree] client', clientId, 'agreed to policies');
   return res.status(200).json({ success: true });

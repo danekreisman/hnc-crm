@@ -2743,6 +2743,19 @@ Mahalo 🌺</textarea>
           </div>
           <div id="lead-comms-log-body" style="font-size:12px;color:var(--text-muted);padding:8px 0;">Loading…</div>
         </div>
+
+        <!-- Activity feed (Phase 2b): per-lead timeline of meaningful
+             actions distinct from the Comms log above. Comms log shows
+             AI follow-up runs, cron automations, owner alerts (sourced
+             from /api/lead-comms-log). Activity shows manual sends like
+             booking link resends, stage changes, and the lead→client
+             conversion event (sourced from activity_logs filtered by
+             metadata.lead_id). They're complementary — separate tables,
+             separate concerns. -->
+        <div style="margin-top:18px;">
+          <div class="panel-section">Activity</div>
+          <div id="ld-activity-log" style="font-size:13px;color:var(--text-muted);padding:6px 0 4px;">Loading…</div>
+        </div>
       </div>
       <div id="lead-edit" style="display:none;">
         <div class="panel-section">Edit lead</div>
@@ -2916,6 +2929,15 @@ Mahalo 🌺</textarea>
           <button class="action-btn green full">Log hours manually</button>
           <button class="action-btn red full" onclick="deleteRecord('cleaner')">Delete cleaner</button>
         </div>
+
+        <!-- Activity feed (Phase 2b): per-cleaner timeline of meaningful
+             actions. Filters activity_logs by metadata.cleaner_id (with
+             phone/email reverse-lookup fallback for legacy rows). Same
+             renderer as the per-client feed — _renderClientActivityPage
+             handles both since the only difference is the filter query
+             at load time. Click any row to open the detail modal. -->
+        <div class="panel-section">Activity</div>
+        <div id="cn-activity-log" style="font-size:13px;color:var(--text-muted);padding:6px 0 4px;">Loading…</div>
       </div>
       <div id="cleaner-edit" style="display:none;">
         <div class="panel-section">Edit cleaner</div>
@@ -8529,6 +8551,13 @@ function openLead(id){
   setTimeout(loadLeadSummary, 400);
   setTimeout(loadSuggestedQuote, 400);
   setTimeout(loadLeadCommsLog, 500);
+  // Phase 2b Activity feed — fires shortly after the others so the
+  // overlay is fully laid out by the time we render. Catches its own
+  // errors so a load failure doesn't break the rest of the open flow.
+  setTimeout(function(){
+    try { if(typeof loadLeadActivityLog === 'function' && currentLeadId) loadLeadActivityLog(currentLeadId); }
+    catch(e){ console.warn('loadLeadActivityLog failed:', e); }
+  }, 500);
   try { renderLeadBookingLinkPanel(); } catch(e){ console.warn('renderLeadBookingLinkPanel failed:', e); }
 }
 
@@ -8904,6 +8933,13 @@ function openCleaner(id){
   hideCleanerEdit();
   if(typeof refreshInviteStatus==='function')refreshInviteStatus();
   openOverlay('cleaner-overlay');
+  // Phase 2b Activity feed — fires shortly after overlay opens.
+  // Catches its own errors so a load failure doesn't break the
+  // rest of the open flow.
+  setTimeout(function(){
+    try { if(typeof loadCleanerActivityLog === 'function' && id) loadCleanerActivityLog(id); }
+    catch(e){ console.warn('loadCleanerActivityLog failed:', e); }
+  }, 400);
 }
 
 async function hncInviteCleaner(){
@@ -26295,6 +26331,129 @@ async function loadClientActivityLog(clientId){
     window._clientActivityRows = rows;
     // Reset visible count to the initial page (5) every time we
     // (re)load — covers profile-switch and re-opens.
+    window._clientActivityShown = 0;
+    _renderClientActivityPage(el, 5);
+  } catch (e) {
+    el.innerHTML = '<div style="color:#dc2626;font-size:12px;padding:8px 0;">Failed to load: ' + esc(e.message || 'unknown error') + '</div>';
+  }
+}
+
+/* Phase 2b: per-lead Activity feed. Same shape and behavior as
+   loadClientActivityLog. Differs only in:
+     - Element id: ld-activity-log
+     - Primary filter: metadata.lead_id (not client_id)
+     - Legacy table: leads (for the email/phone reverse-lookup)
+   Reuses the same renderer + state variables since only one
+   profile is open at a time. */
+async function loadLeadActivityLog(leadId){
+  var el = document.getElementById('ld-activity-log');
+  if (!el) return;
+  el.textContent = 'Loading\u2026';
+  try {
+    var primaryRes = await db.from('activity_logs')
+      .select('id, action, description, created_at, metadata, user_email')
+      .eq('metadata->>lead_id', leadId)
+      .order('created_at', { ascending: false })
+      .limit(200);
+    var rows = (primaryRes.data || []).slice();
+
+    var seen = new Set(rows.map(function(r){ return r.id; }));
+    var lead = await db.from('leads').select('email,phone').eq('id', leadId).maybeSingle();
+    if (lead.data) {
+      var email = (lead.data.email || '').toLowerCase().trim();
+      var phoneDigits = (lead.data.phone || '').replace(/[^0-9]/g, '');
+      var phoneE164 = phoneDigits ? ('+1' + phoneDigits.replace(/^1/, '')) : '';
+      if (email) {
+        var r1 = await db.from('activity_logs')
+          .select('id, action, description, created_at, metadata, user_email')
+          .eq('metadata->>to', email)
+          .order('created_at', { ascending: false })
+          .limit(100);
+        (r1.data || []).forEach(function(r){ if (!seen.has(r.id)) { seen.add(r.id); rows.push(r); } });
+      }
+      if (phoneE164) {
+        var r2 = await db.from('activity_logs')
+          .select('id, action, description, created_at, metadata, user_email')
+          .eq('metadata->>to', phoneE164)
+          .order('created_at', { ascending: false })
+          .limit(100);
+        (r2.data || []).forEach(function(r){ if (!seen.has(r.id)) { seen.add(r.id); rows.push(r); } });
+      }
+    }
+
+    rows = rows.filter(function(r){ return r.action !== 'user_login' && r.action !== 'sms_sent'; });
+    rows.sort(function(a, b){ return new Date(b.created_at) - new Date(a.created_at); });
+
+    rows.forEach(function(r){ window._activityRowCache[r.id] = r; });
+    window._clientActivityRows = rows;
+    window._clientActivityShown = 0;
+    _renderClientActivityPage(el, 5);
+  } catch (e) {
+    el.innerHTML = '<div style="color:#dc2626;font-size:12px;padding:8px 0;">Failed to load: ' + esc(e.message || 'unknown error') + '</div>';
+  }
+}
+
+/* Phase 2b: per-cleaner Activity feed. Same shape as the above two.
+   Differs in:
+     - Element id: cn-activity-log
+     - Primary filter: metadata.cleaner_id (or cleaner_id_2/cleaner_id_3
+       for paired cleaner-job sends — handled via .or() filter)
+     - Legacy table: cleaners */
+async function loadCleanerActivityLog(cleanerId){
+  var el = document.getElementById('cn-activity-log');
+  if (!el) return;
+  el.textContent = 'Loading\u2026';
+  try {
+    // Primary: cleaner_id direct match. Plus cleaner_id_2 + cleaner_id_3
+    // for paired-cleaner sends where this cleaner was a secondary.
+    // Three separate queries, deduped — simpler than .or() syntax with
+    // jsonb fields.
+    var queries = await Promise.all([
+      db.from('activity_logs').select('id, action, description, created_at, metadata, user_email')
+        .eq('metadata->>cleaner_id', cleanerId)
+        .order('created_at', { ascending: false }).limit(200),
+      db.from('activity_logs').select('id, action, description, created_at, metadata, user_email')
+        .eq('metadata->>cleaner_id_2', cleanerId)
+        .order('created_at', { ascending: false }).limit(50),
+      db.from('activity_logs').select('id, action, description, created_at, metadata, user_email')
+        .eq('metadata->>cleaner_id_3', cleanerId)
+        .order('created_at', { ascending: false }).limit(50),
+    ]);
+    var seen = new Set();
+    var rows = [];
+    queries.forEach(function(q){
+      (q.data || []).forEach(function(r){ if (!seen.has(r.id)) { seen.add(r.id); rows.push(r); } });
+    });
+
+    // Legacy fallback: email + phone reverse lookup.
+    var cln = await db.from('cleaners').select('email,phone').eq('id', cleanerId).maybeSingle();
+    if (cln.data) {
+      var email = (cln.data.email || '').toLowerCase().trim();
+      var phoneDigits = (cln.data.phone || '').replace(/[^0-9]/g, '');
+      var phoneE164 = phoneDigits ? ('+1' + phoneDigits.replace(/^1/, '')) : '';
+      if (email) {
+        var r1 = await db.from('activity_logs')
+          .select('id, action, description, created_at, metadata, user_email')
+          .eq('metadata->>to', email)
+          .order('created_at', { ascending: false })
+          .limit(100);
+        (r1.data || []).forEach(function(r){ if (!seen.has(r.id)) { seen.add(r.id); rows.push(r); } });
+      }
+      if (phoneE164) {
+        var r2 = await db.from('activity_logs')
+          .select('id, action, description, created_at, metadata, user_email')
+          .eq('metadata->>to', phoneE164)
+          .order('created_at', { ascending: false })
+          .limit(100);
+        (r2.data || []).forEach(function(r){ if (!seen.has(r.id)) { seen.add(r.id); rows.push(r); } });
+      }
+    }
+
+    rows = rows.filter(function(r){ return r.action !== 'user_login' && r.action !== 'sms_sent'; });
+    rows.sort(function(a, b){ return new Date(b.created_at) - new Date(a.created_at); });
+
+    rows.forEach(function(r){ window._activityRowCache[r.id] = r; });
+    window._clientActivityRows = rows;
     window._clientActivityShown = 0;
     _renderClientActivityPage(el, 5);
   } catch (e) {

@@ -155,6 +155,17 @@ export default async function handler(req, res) {
   // Fire bell + push notification — same helpers Phase 1a's logActivity
   // uses on failed paths. Inlined here rather than calling logActivity
   // (which would create a NEW log row) so we don't duplicate the row.
+  //
+  // EXCEPTION: skip the notification for broadcast bounces. A single
+  // 1000-person broadcast with even a 5% bounce rate would fire 50
+  // bell + push notifications, which is unusable. The row still gets
+  // marked failed (red on the recipient's profile feed); broadcast
+  // bounce aggregation can come later if Dane wants it. For
+  // transactional emails (reminders, confirmations, etc.) we want the
+  // immediate ping — those bounce one at a time and matter individually.
+  if (logRow.action === 'broadcast_email_sent') {
+    return res.status(200).json({ ok: true, matched: true, log_id: logRow.id, suppressed_notification: 'broadcast' });
+  }
   await fireFailureNotifications(logRow.action, logRow.description, newMetadata, failure_reason);
 
   return res.status(200).json({ ok: true, matched: true, log_id: logRow.id });

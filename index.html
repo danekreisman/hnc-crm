@@ -25579,7 +25579,20 @@ async function loadLogs(tab, forceReload) {
         .order('created_at', { ascending: false })
         .limit(500);
       if (error) throw error;
-      var rows = (data || []).filter(function(r){ return r.action !== 'user_login' && r.action !== 'sms_sent'; });
+      var rows = (data || []).filter(function(r){
+        // Filter clutter from the default global view:
+        //   - user_login: debug-only noise
+        //   - sms_sent: duplicates the umbrella manual_*_sent rows
+        //     (send-sms.js logs its own per-SMS audit row)
+        //   - broadcast_email_sent: one row per recipient, so a single
+        //     1000-person broadcast would push everything else off the
+        //     top page. Rows stay queryable from per-client/lead feeds
+        //     where they actually belong; bounce webhook still finds
+        //     them by resend_id when needed.
+        return r.action !== 'user_login'
+          && r.action !== 'sms_sent'
+          && r.action !== 'broadcast_email_sent';
+      });
       // Cache for detail modal + filter operations.
       rows.forEach(function(r){ window._activityRowCache[r.id] = r; });
       window._logsAllRows = rows;

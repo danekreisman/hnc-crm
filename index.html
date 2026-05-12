@@ -10939,40 +10939,34 @@ function sv(view,el){
   document.getElementById('sec-btn').textContent=secs[view]||'Filter';
   if(view==='messaging')renderInbox();
   if(view==='logs'){
-    /* Defer the loadLogs call to after the current execution stack
-       completes. Page-refresh path: line ~11540 view-restore -> sv('logs')
-       -> reaches this point BEFORE the loadLogs function declaration
-       at line ~25410 has been processed (despite normal function-
-       hoisting rules — confirmed by diagnostic 2026-05-11 with
-       error 'ReferenceError: loadLogs is not defined' captured via
-       _logFrontendError at frontend:sv:loadLogs-on-view-init).
+    /* Defer the loadLogs call until DOMContentLoaded. Page-refresh path:
+       view-restore at line ~11540 (inside script tag 1) -> sv('logs') ->
+       reaches this point during script tag 1's synchronous execution.
+       loadLogs is declared in script tag 6 (line ~25500) which hasn't
+       parsed yet. setTimeout(0) was tried (commit 8a9428e) but the
+       browser yielded to the task queue BETWEEN script tags, before
+       script 6 ran — confirmed by diagnostic instrumentation showing
+       only 'script1-start,script1-end' marks present at callback time
+       and typeof loadLogs being 'undefined' on both local and window.
 
-       setTimeout(fn, 0) yields to the event loop. By the time the
-       callback fires, the entire <script> tag has finished executing
-       and loadLogs is defined. */
-    setTimeout(function(){
-      // Diagnostic 2026-05-11: log what we can see at the moment this
-      // callback fires. Helps us understand whether all scripts have
-      // executed by now (presence of 'loadLogs-defined' mark) and
-      // whether loadLogs is in scope.
-      try {
-        if (typeof _logFrontendError === 'function') {
-          var marks = (window._scriptMarks || []).map(function(m){return m.name;}).join(',');
-          _logFrontendError('debug:setTimeout-tick-state', 'tick fired', null, {
-            typeof_loadLogs_local: typeof loadLogs,
-            typeof_window_loadLogs: typeof window.loadLogs,
-            script_marks: marks,
-            mark_count: (window._scriptMarks || []).length,
-          });
-        }
-      } catch(_){}
+       DOMContentLoaded fires only after all <script> tags have parsed
+       and executed. Same pattern is used elsewhere in this file (e.g.,
+       lines 12320, 22463, 25258). If the page is ALREADY past DCL by
+       the time sv() is called (i.e., user clicks the nav item after
+       page load), we call immediately. */
+    var runLoadLogs = function(){
       try { loadLogs(_logsCurrentTab||'activity'); } catch(e) {
         console.warn('[sv] loadLogs on view init failed:', e);
         if (typeof _logFrontendError === 'function') {
           _logFrontendError('sv:loadLogs-on-view-init', String(e && e.message || e), e && e.stack || null, { view: view });
         }
       }
-    }, 0);
+    };
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', runLoadLogs, { once: true });
+    } else {
+      runLoadLogs();
+    }
   }
   if(view==='pipeline'){
     /* Re-fetch leads from Supabase on every Pipeline open so the cards

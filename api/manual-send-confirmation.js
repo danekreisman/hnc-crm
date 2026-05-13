@@ -55,10 +55,16 @@ export default async function handler(req, res) {
 
   try {
     // Hydrate appointment + client. Single round-trip via embedded select.
+    // Hourly columns (est_hours_low/high, invoice_hours_billed) are needed so
+    // Deep/Move-out resends render the range or invoiced-hours total, not the
+    // flat total_price field — matches the appointment view, the booking
+    // confirmation email from accept-public-booking.js, and every other
+    // display surface across the app.
     const { data: appt, error: apptErr } = await db
       .from('appointments')
       .select(`
         id, date, time, service, frequency, address, total_price,
+        est_hours_low, est_hours_high, invoice_hours_billed,
         client_id, cleaner_id,
         clients ( name, email ),
         cleaners!cleaner_id ( name )
@@ -83,6 +89,29 @@ export default async function handler(req, res) {
       } catch (_) { return appt.date; }
     })();
 
+    /* Hourly-aware totalLine (2026-05-13): for Deep/Move-out appointments
+       the customer was quoted a range, not a flat number. Three branches
+       matching the appointment view (a55d1b2) and the booking confirmation
+       email path (accept-public-booking.js e439eb0):
+         1. Post-invoice (invoice_hours_billed > 0) → "$X.XX (Y cleaner-hrs)"
+            using invoice_hours_billed × $70 (pre-tax, matches appt view).
+         2. Pre-invoice hourly (est_hours_low + est_hours_high set) →
+            "$A-B (X-Y cleaner-hours)" range, low × 70 to high × 70.
+         3. Flat fallback → "$total_price" (unchanged for regular/airbnb/
+            janitorial). */
+    const HRATE = 70;
+    let totalLine;
+    if (appt.invoice_hours_billed != null && Number(appt.invoice_hours_billed) > 0) {
+      const hrs = Number(appt.invoice_hours_billed);
+      totalLine = `$${(hrs * HRATE).toFixed(2)} (${hrs} cleaner-hrs)`;
+    } else if (appt.est_hours_low != null && appt.est_hours_high != null) {
+      const lo = parseInt(appt.est_hours_low);
+      const hi = parseInt(appt.est_hours_high);
+      totalLine = `$${lo * HRATE}\u2013$${hi * HRATE} (${lo}\u2013${hi} cleaner-hours)`;
+    } else {
+      totalLine = appt.total_price ? `$${appt.total_price}` : null;
+    }
+
     // Send the email via the existing template path. We use the same
     // body shape lead-book.js used to use, so the email renders exactly
     // as the automation would render it.
@@ -91,7 +120,7 @@ export default async function handler(req, res) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         to:         client.email.trim(),
-        subject:    `Booking confirmed — ${prettyDate}`,
+        subject:    `Booking confirmed \u2014 ${prettyDate}`,
         type:       'booking_confirmation',
         clientName: client.name || '',
         date:       prettyDate,
@@ -100,7 +129,7 @@ export default async function handler(req, res) {
         frequency:  appt.frequency || null,
         address:    appt.address || null,
         cleaner:    appt.cleaners?.name || null,
-        total:      appt.total_price ? `$${appt.total_price}` : null,
+        total:      totalLine,
       }),
     }, TIMEOUTS.RESEND);
 

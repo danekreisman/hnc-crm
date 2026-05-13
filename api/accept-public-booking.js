@@ -262,7 +262,46 @@ export default async function handler(req, res) {
     if (sendEmail === true && x.email) {
       let prettyDate = date;
       try { prettyDate = new Date(date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }); } catch (_e) {}
-      const totalLine = totalPost != null ? `$${Number(totalPost).toFixed(2)}` : null;
+
+      /* Hourly-aware totalLine for the booking confirmation email
+         (2026-05-13): for Deep/Move-out leads the customer was quoted a
+         range ($350-560), not a flat number — sending "$416.49" as the
+         total contradicts the quote SMS, the quote email, and the Step 1
+         price card the customer just clicked through. Three-branch chain
+         matching every other display surface:
+           1. Explicit quote_data.is_hourly_range from post-Phase-2 leads
+              → "$A-B (X-Y cleaner-hours)" from range_low/high_*.
+           2. Hourly service (deep/move-out) with only a flat pre-tax
+              total (pre-Phase-2 lead) → derive range using the same
+              formula as api/calculate-quote.js.
+           3. Flat-rate fallback → "$X.XX" from totalPost (unchanged).
+         For the rush-fee note: for hourly bookings the rush fee is added
+         on top of the estimate range, not "included in" a single total,
+         so the wording flips to "has been added to your estimate". */
+      const qd = x.quote_data || {};
+      const svcLower = (x.service || '').toLowerCase();
+      const isHourlyService = svcLower.indexOf('deep') >= 0 || svcLower.indexOf('move') >= 0;
+      let totalLine;
+      let isHourlyDisplay = false;
+      if (qd.is_hourly_range === true && qd.range_low_dollar != null && qd.range_high_dollar != null) {
+        const hoursPart = (qd.range_low_hours != null && qd.range_high_hours != null)
+          ? ` (${qd.range_low_hours}\u2013${qd.range_high_hours} cleaner-hours)` : '';
+        totalLine = `$${qd.range_low_dollar}\u2013$${qd.range_high_dollar}${hoursPart}`;
+        isHourlyDisplay = true;
+      } else if (isHourlyService && x.quote_total_pretax != null) {
+        const raw  = Number(x.quote_total_pretax) / 70;
+        const low  = Math.max(3, Math.round(raw));
+        const high = Math.max(low, Math.ceil(raw * 1.6));
+        totalLine = `$${low*70}\u2013$${high*70} (${low}\u2013${high} cleaner-hours)`;
+        isHourlyDisplay = true;
+      } else {
+        totalLine = totalPost != null ? `$${Number(totalPost).toFixed(2)}` : null;
+      }
+
+      const rushNoteText = rushFee > 0
+        ? `A ${rushFee === 200 ? 'same-day' : rushFee === 100 ? 'next-day' : '2-day'} booking fee of $${rushFee} ${isHourlyDisplay ? 'has been added to your estimate' : 'is included in your total'}.`
+        : null;
+
       let emailSent = false;
       try {
         const r = await fetchWithTimeout(`${BASE_URL}/api/send-email`, {
@@ -270,7 +309,7 @@ export default async function handler(req, res) {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             to:         x.email,
-            subject:    `Booking confirmed — ${prettyDate}`,
+            subject:    `Booking confirmed \u2014 ${prettyDate}`,
             type:       'booking_confirmation',
             clientName: x.name,
             date:       prettyDate,
@@ -279,7 +318,7 @@ export default async function handler(req, res) {
             frequency:  x.frequency || null,
             address:    x.address || null,
             total:      totalLine,
-            rushNote:   rushFee > 0 ? `A ${rushFee === 200 ? 'same-day' : rushFee === 100 ? 'next-day' : '2-day'} booking fee of $${rushFee} is included in your total.` : null,
+            rushNote:   rushNoteText,
           }),
         }, TIMEOUTS.RESEND);
         emailSent = !!(r && r.ok);

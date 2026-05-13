@@ -322,6 +322,22 @@ function renderStep1(){
      disclosure matching the waiver and the quote email. */
   var isHourly  = q.is_hourly_range === true && q.range_low_dollar != null && q.range_high_dollar != null;
 
+  /* Pre-Phase-2 leads: have a quoteTotal but no is_hourly_range. Derive
+     the range on the fly using the same formula as api/calculate-quote.js
+     so old leads booking via their original SMS link still see the new
+     range card with cleaner-hours mention. Service-string match is
+     intentionally permissive ('deep' / 'move' substring) since the
+     service label can come from a few sources (lead form, manual entry,
+     OpenPhone classifier) with slightly different casing/wording. */
+  var _svcLower = (LEAD.service||'').toLowerCase();
+  var _isHourlyService = _svcLower.indexOf('deep') >= 0 || _svcLower.indexOf('move') >= 0;
+  var derivedLow = null, derivedHigh = null;
+  if (!isHourly && _isHourlyService && LEAD.quoteTotal) {
+    var _raw = Number(LEAD.quoteTotal) / 70;
+    derivedLow  = Math.max(3, Math.round(_raw));
+    derivedHigh = Math.max(derivedLow, Math.ceil(_raw * 1.6));
+  }
+
   var subtotal  = q.subtotal != null ? Number(q.subtotal) : (LEAD.quoteTotal ? Number(LEAD.quoteTotal) : null);
   var discount  = Number(q.discount || 0);
   var discPct   = Number(q.discount_pct || 0);
@@ -341,6 +357,14 @@ function renderStep1(){
       +'<div class="price-row"><span>Estimated time</span><span class="amount">'+q.range_low_hours+'\u2013'+q.range_high_hours+' cleaner-hours</span></div>'
       +'<hr class="price-divider">'
       +'<div class="price-total"><span>Estimated range</span><span>$'+q.range_low_dollar+'\u2013$'+q.range_high_dollar+'</span></div>'
+      +'<div style="font-size:12px;color:var(--muted);margin-top:10px;line-height:1.5;">Plus 4.712% Hawaii GET. Final invoice based on actual cleaner-hours worked, never exceeding the high end without your approval.</div>'
+      +'</div>';
+  } else if (derivedLow != null) {
+    priceHtml = '<div class="price-table">'
+      +'<div class="price-row"><span>Rate</span><span class="amount">$70/cleaner-hour</span></div>'
+      +'<div class="price-row"><span>Estimated time</span><span class="amount">'+derivedLow+'\u2013'+derivedHigh+' cleaner-hours</span></div>'
+      +'<hr class="price-divider">'
+      +'<div class="price-total"><span>Estimated range</span><span>$'+(derivedLow*70)+'\u2013$'+(derivedHigh*70)+'</span></div>'
       +'<div style="font-size:12px;color:var(--muted);margin-top:10px;line-height:1.5;">Plus 4.712% Hawaii GET. Final invoice based on actual cleaner-hours worked, never exceeding the high end without your approval.</div>'
       +'</div>';
   } else if(grandTotal != null){
@@ -1110,11 +1134,27 @@ function drawRushFee(ds){
   /* Hourly billing (Phase 3 follow-up, 2026-05-13): rush fee can't be
      rolled into a single "new total with tax" because the final amount
      depends on actual cleaner-hours worked. Frame the fee as added on
-     top of the estimate range instead. */
+     top of the estimate range instead. For pre-Phase-2 leads (no
+     is_hourly_range flag), derive the range from flat quoteTotal — same
+     logic as renderStep1 — so booking flow stays consistent. */
   var isHourly  = q.is_hourly_range === true && q.range_low_dollar != null && q.range_high_dollar != null;
-  var detailLine;
+  var _svcLower = (LEAD.service||'').toLowerCase();
+  var _isHourlyService = _svcLower.indexOf('deep') >= 0 || _svcLower.indexOf('move') >= 0;
+  var rangeLowDollar = null, rangeHighDollar = null;
   if (isHourly) {
-    detailLine = r.label + ' requests require extra scheduling coordination. This fee is added on top of your $' + q.range_low_dollar + '\u2013$' + q.range_high_dollar + ' estimate.';
+    rangeLowDollar  = q.range_low_dollar;
+    rangeHighDollar = q.range_high_dollar;
+  } else if (_isHourlyService && LEAD.quoteTotal) {
+    var _raw = Number(LEAD.quoteTotal) / 70;
+    var _low  = Math.max(3, Math.round(_raw));
+    var _high = Math.max(_low, Math.ceil(_raw * 1.6));
+    rangeLowDollar  = _low  * 70;
+    rangeHighDollar = _high * 70;
+  }
+
+  var detailLine;
+  if (rangeLowDollar != null && rangeHighDollar != null) {
+    detailLine = r.label + ' requests require extra scheduling coordination. This fee is added on top of your $' + rangeLowDollar + '\u2013$' + rangeHighDollar + ' estimate.';
   } else {
     var preTotal  = q.total!=null ? Number(q.total) : (LEAD.quoteTotal ? Number(LEAD.quoteTotal) : null);
     var tax       = preTotal!=null ? +(preTotal*TAX_RATE).toFixed(2) : null;

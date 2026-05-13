@@ -91,6 +91,9 @@ body{background:linear-gradient(160deg,#eaf7fb 0%,#f7fbfc 40%,#eaf7fb 100%)}
 .service-detail{display:none;padding:16px 18px 18px}
 .service-row.open .service-detail{display:block}
 .service-intro{font-size:13px;color:var(--muted);font-style:italic;margin-bottom:14px;padding-bottom:12px;border-bottom:1px dashed var(--border)}
+.service-pricing-block{margin:0 0 14px;padding:12px 14px;background:#eef7fb;border:1.5px solid var(--blue-border);border-radius:8px}
+.service-pricing-heading{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--blue-dark);margin-bottom:8px}
+.service-pricing-body{font-size:12.5px;color:var(--text);line-height:1.6;white-space:pre-line}
 .section-heading{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--blue-dark);margin:14px 0 6px}
 .section-heading:first-of-type{margin-top:0}
 .checklist-items{list-style:none;padding:0}
@@ -832,6 +835,21 @@ function renderChecklistService(svc){
   var emoji = SERVICE_EMOJI[svc.id] || '\u2728';
   var inner = '';
   if (svc.intro) inner += '<div class="service-intro">'+esc(svc.intro)+'</div>';
+
+  /* Pricing block (Phase 1 of hourly-billing transition) — surfaced before
+     sections for hourly-billed services (Deep Clean, Move-out). Reads from
+     the optional `pricing` field on the service object, set by
+     api/get-checklists.js DEFAULTS and the matching settings.service_checklists
+     override row. Plain prose with `white-space: pre-line` so paragraph
+     breaks render. Mirrors the renderer in agree.html (lines ~211-217) so
+     the booking-flow waiver and the standalone agree.html page show the
+     same content. */
+  if (svc.pricing) {
+    inner += '<div class="service-pricing-block">'
+      + '<div class="service-pricing-heading">How this is priced</div>'
+      + '<div class="service-pricing-body">'+esc(svc.pricing)+'</div>'
+      + '</div>';
+  }
 
   // Skip required block — those become policy checkboxes for moveout
   inner += (svc.sections || []).map(function(sec){

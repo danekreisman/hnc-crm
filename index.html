@@ -4257,7 +4257,23 @@ function renderLeadsPipeline(){
       card.dataset.leadId=id;
       var svc=l.service||'Service';
       var badgeCls=svc.toLowerCase().indexOf('commercial')>=0?'bc':'br';
-      var priceDisplay = l.quoteTotal ? '<span style="color:var(--brand-500);font-weight:600;">$'+Number(l.quoteTotal).toFixed(2)+'</span>' : (l.value && l.value!=='TBD' ? '$'+l.value : '<span style="color:var(--text-muted);">No quote yet</span>');
+      /* Price display (Phase 3 follow-up, 2026-05-13): hourly-billed leads
+         (Deep/Move-out with is_hourly_range on quote_data) show the dollar
+         range instead of a single flat total. Falls through to flat-rate
+         display when no range data is present (older leads + non-hourly
+         services). */
+      var _qd = l.quoteData;
+      var _isHourlyLead = _qd && _qd.is_hourly_range === true && _qd.range_low_dollar != null && _qd.range_high_dollar != null;
+      var priceDisplay;
+      if (_isHourlyLead) {
+        priceDisplay = '<span style="color:var(--brand-500);font-weight:600;">$'+_qd.range_low_dollar+'\u2013$'+_qd.range_high_dollar+'</span>';
+      } else if (l.quoteTotal) {
+        priceDisplay = '<span style="color:var(--brand-500);font-weight:600;">$'+Number(l.quoteTotal).toFixed(2)+'</span>';
+      } else if (l.value && l.value !== 'TBD') {
+        priceDisplay = '$'+l.value;
+      } else {
+        priceDisplay = '<span style="color:var(--text-muted);">No quote yet</span>';
+      }
       var freqDisplay = l.frequency ? '<div style="font-size:11px;color:var(--text-muted);margin-top:2px;">'+l.frequency+'</div>' : '';
       // Select-mode checkbox indicator (hidden when not in select mode)
       var checkIndicator = '<div class="bulk-check" data-lead-check="'+id+'" style="display:none;position:absolute;top:8px;right:8px;width:20px;height:20px;border-radius:50%;border:2px solid var(--border-strong);background:#fff;align-items:center;justify-content:center;font-size:12px;line-height:1;color:#fff;font-weight:700;"></div>';
@@ -8565,9 +8581,25 @@ function openLead(id){
   ['contact','phone','email','address','service','sqft','source','date','action','due','assigned','notes'].forEach(function(f){
     var el=document.getElementById('lead-'+f);if(el)el.textContent=d[f]||'—';
   });
-  // Quoted price
+  // Quoted price — hourly-billed leads (Phase 3 follow-up) show
+  // "$A-B (X-Y cleaner-hours)" instead of a single dollar total.
   var valEl=document.getElementById('lead-value');
-  if(valEl) valEl.textContent = d.quoteTotal ? '$'+Number(d.quoteTotal).toFixed(2) : (d.value&&d.value!=='TBD'?'$'+d.value:'No quote yet');
+  if (valEl) {
+    var _qd = d.quoteData;
+    var _isHourly = _qd && _qd.is_hourly_range === true && _qd.range_low_dollar != null && _qd.range_high_dollar != null;
+    if (_isHourly) {
+      var _hoursPart = (_qd.range_low_hours != null && _qd.range_high_hours != null)
+        ? ' ('+_qd.range_low_hours+'\u2013'+_qd.range_high_hours+' cleaner-hours)'
+        : '';
+      valEl.textContent = '$'+_qd.range_low_dollar+'\u2013$'+_qd.range_high_dollar + _hoursPart;
+    } else if (d.quoteTotal) {
+      valEl.textContent = '$'+Number(d.quoteTotal).toFixed(2);
+    } else if (d.value && d.value !== 'TBD') {
+      valEl.textContent = '$'+d.value;
+    } else {
+      valEl.textContent = 'No quote yet';
+    }
+  }
   // Frequency
   var freqEl=document.getElementById('lead-frequency');
   if(freqEl) freqEl.textContent = d.frequency||'—';

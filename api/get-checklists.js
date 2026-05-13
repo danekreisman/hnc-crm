@@ -93,11 +93,11 @@ const DEFAULTS = {
       intro: 'Our most thorough service, designed to meet landlord and property manager move-out standards. We deep-clean every standard surface — counters, floors, appliances inside and out, fixtures, baseboards — plus the move-out specifics below.',
       pricing: 'Billed hourly at $70/cleaner-hour, plus 4.712% Hawaii GET, with a 3-hour minimum.\n\nCleaner-hours = number of cleaners × hours worked (e.g., 2 cleaners × 3 hours = 6 cleaner-hours).\n\nYour quote is an estimate, not a flat fee. If conditions are materially bigger than quoted, we will text you with options before exceeding the high end. Your final invoice never exceeds an amount you have approved.',
       required: [
-        'All personal possessions must be removed from the property — including garage, lanai, storage closets, and outdoor areas. The unit must be completely empty.',
-        'All trash and debris removed from the premises before our arrival (we are not a junk-haul service)',
-        'Fridge and freezer fully defrosted and emptied (frozen-shut freezers cannot be cleaned)',
-        'Utilities (water and electricity) must remain ON during the cleaning',
-        'Oven and stovetop must be operational',
+        'Unit must be completely empty (including garage, lanai, storage, outdoor areas)',
+        'All trash and debris removed before arrival — we are not a junk-haul service',
+        'Fridge and freezer defrosted and emptied',
+        'Water and electricity ON during cleaning',
+        'Oven and stovetop operational',
         'Any active pest infestations disclosed in advance'
       ],
       sections: [

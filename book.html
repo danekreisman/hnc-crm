@@ -839,10 +839,18 @@ async function calcNewQuote(){
 function getStep2Policies(){
   var basePolicies = POLICIES.slice();
   var svcId = serviceLabelToId(LEAD && LEAD.service);
+  /* For moveout, the generic "Home preparation" policy (p2: tidy clutter,
+     do dishes, secure pets) is irrelevant — the unit must be completely
+     empty. Filter it out so we don't show contradictory guidance, then
+     inject the moveout-specific required items as their own policy
+     checkbox below. */
+  if (svcId === 'moveout') {
+    basePolicies = basePolicies.filter(function(p){ return p.id !== 'p2'; });
+  }
   if (svcId === 'moveout' && CHECKLISTS && CHECKLISTS.services) {
     var moveout = CHECKLISTS.services.filter(function(s){return s.id==='moveout';})[0];
     if (moveout && moveout.required && moveout.required.length) {
-      var moDetail = 'Before we arrive, the following must be done. If conditions on arrival do not meet these, we may need to reschedule and a trip fee will apply:\n\n• ' + moveout.required.join('\n• ');
+      var moDetail = 'If these aren\u2019t met on arrival, we may need to reschedule (trip fee may apply):\n\n\u2022 ' + moveout.required.join('\n\u2022 ');
       var moPolicy = {
         id: 'mo_req',
         title: 'Move-out preparation requirements',

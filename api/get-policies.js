@@ -17,7 +17,7 @@ const DEFAULT_POLICIES = [
   { id: 'p4', title: 'Payment terms',
     detail: 'Payment is due on the day of service. We accept ACH bank transfer (free) and credit/debit card (3% processing fee).' },
   { id: 'p5', title: 'Quote accuracy & on-arrival adjustment',
-    detail: 'Your quote was based on the property size and condition you described. If our team arrives and finds the property is materially larger or in worse condition than described — extra rooms, heavier soil, mold, biohazard, hoarding, post-construction debris, or pet damage — we may extend the cleaning time and adjust the price to reflect the actual scope of work. We will always show you photos and confirm the new total with you before starting. You may then proceed at the revised price or cancel the appointment (a trip fee may apply).' },
+    detail: 'If on arrival the property is materially worse than described (extra rooms, heavy soil, mold, hoarding, post-construction debris, pet damage), we will text photos and confirm a revised price before doing extra work. You can approve, cancel, or reschedule (trip fee may apply).' },
   { id: 'p6', title: 'I agree to the terms of service',
     detail: 'By proceeding I authorise Hawaii Natural Clean to perform cleaning services and agree to all policies above.' },
 ];

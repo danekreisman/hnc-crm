@@ -4259,14 +4259,23 @@ function renderLeadsPipeline(){
       var badgeCls=svc.toLowerCase().indexOf('commercial')>=0?'bc':'br';
       /* Price display (Phase 3 follow-up, 2026-05-13): hourly-billed leads
          (Deep/Move-out with is_hourly_range on quote_data) show the dollar
-         range instead of a single flat total. Falls through to flat-rate
-         display when no range data is present (older leads + non-hourly
-         services). */
+         range instead of a single flat total. Pre-Phase-2 leads have a
+         quoteTotal but no is_hourly_range — derive the range on the fly
+         using the same formula as api/calculate-quote.js so the display
+         is consistent for old + new leads. Falls through to flat-rate
+         display for non-hourly services (regular/airbnb/janitorial). */
       var _qd = l.quoteData;
       var _isHourlyLead = _qd && _qd.is_hourly_range === true && _qd.range_low_dollar != null && _qd.range_high_dollar != null;
+      var _svcLower = (l.service||'').toLowerCase();
+      var _isHourlyService = _svcLower.indexOf('deep') >= 0 || _svcLower.indexOf('move') >= 0;
       var priceDisplay;
       if (_isHourlyLead) {
         priceDisplay = '<span style="color:var(--brand-500);font-weight:600;">$'+_qd.range_low_dollar+'\u2013$'+_qd.range_high_dollar+'</span>';
+      } else if (_isHourlyService && l.quoteTotal) {
+        var _raw = Number(l.quoteTotal) / 70;
+        var _low  = Math.max(3, Math.round(_raw));
+        var _high = Math.max(_low, Math.ceil(_raw * 1.6));
+        priceDisplay = '<span style="color:var(--brand-500);font-weight:600;">$'+(_low*70)+'\u2013$'+(_high*70)+'</span>';
       } else if (l.quoteTotal) {
         priceDisplay = '<span style="color:var(--brand-500);font-weight:600;">$'+Number(l.quoteTotal).toFixed(2)+'</span>';
       } else if (l.value && l.value !== 'TBD') {
@@ -8583,15 +8592,25 @@ function openLead(id){
   });
   // Quoted price — hourly-billed leads (Phase 3 follow-up) show
   // "$A-B (X-Y cleaner-hours)" instead of a single dollar total.
+  // For pre-Phase-2 leads (have quoteTotal but no is_hourly_range on
+  // quote_data), derive the range on the fly using the same formula as
+  // api/calculate-quote.js so the display is consistent for old + new leads.
   var valEl=document.getElementById('lead-value');
   if (valEl) {
     var _qd = d.quoteData;
     var _isHourly = _qd && _qd.is_hourly_range === true && _qd.range_low_dollar != null && _qd.range_high_dollar != null;
+    var _svcLower = (d.service||'').toLowerCase();
+    var _isHourlyService = _svcLower.indexOf('deep') >= 0 || _svcLower.indexOf('move') >= 0;
     if (_isHourly) {
       var _hoursPart = (_qd.range_low_hours != null && _qd.range_high_hours != null)
         ? ' ('+_qd.range_low_hours+'\u2013'+_qd.range_high_hours+' cleaner-hours)'
         : '';
       valEl.textContent = '$'+_qd.range_low_dollar+'\u2013$'+_qd.range_high_dollar + _hoursPart;
+    } else if (_isHourlyService && d.quoteTotal) {
+      var _raw = Number(d.quoteTotal) / 70;
+      var _low  = Math.max(3, Math.round(_raw));
+      var _high = Math.max(_low, Math.ceil(_raw * 1.6));
+      valEl.textContent = '$'+(_low*70)+'\u2013$'+(_high*70)+' ('+_low+'\u2013'+_high+' cleaner-hours)';
     } else if (d.quoteTotal) {
       valEl.textContent = '$'+Number(d.quoteTotal).toFixed(2);
     } else if (d.value && d.value !== 'TBD') {

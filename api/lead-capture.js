@@ -305,15 +305,18 @@ export default async function handler(req, res) {
 
   // ── 4. Load quote templates (non-Janitorial) ────────────────────────────
   let customSmsTemplate = null, customEmailSubject = null, customEmailIntro = null;
+  let customHourlySmsTemplate = null;
   try {
-    const [smsRow, subjectRow, introRow] = await Promise.all([
+    const [smsRow, subjectRow, introRow, hourlySmsRow] = await Promise.all([
       db.from('settings').select('value').eq('key','quote_sms_template').maybeSingle(),
       db.from('settings').select('value').eq('key','quote_email_subject').maybeSingle(),
       db.from('settings').select('value').eq('key','quote_email_intro').maybeSingle(),
+      db.from('settings').select('value').eq('key','quote_sms_template_hourly').maybeSingle(),
     ]);
-    if (smsRow.data?.value)     customSmsTemplate  = smsRow.data.value;
-    if (subjectRow.data?.value) customEmailSubject = subjectRow.data.value;
-    if (introRow.data?.value)   customEmailIntro   = introRow.data.value;
+    if (smsRow.data?.value)        customSmsTemplate       = smsRow.data.value;
+    if (subjectRow.data?.value)    customEmailSubject      = subjectRow.data.value;
+    if (introRow.data?.value)      customEmailIntro        = introRow.data.value;
+    if (hourlySmsRow.data?.value)  customHourlySmsTemplate = hourlySmsRow.data.value;
   } catch(err) { console.warn('[lead-capture] failed to load templates:', err.message); }
 
   // ── 5. Calculate quote ──────────────────────────────────────────────────
@@ -341,18 +344,40 @@ export default async function handler(req, res) {
       return res.status(200).json({ success: true, leadId, skipped: 'auto_quote_enabled is FALSE' });
     }
     const isCustom  = quoteResult.custom_quote === true;
+    const isHourly  = quoteResult.is_hourly_range === true;
     const totalStr  = isCustom ? 'custom' : `$${Number(quoteResult.total).toFixed(2)}`;
-    const extraVars = { total: isCustom ? 'custom' : Number(quoteResult.total).toFixed(2) };
+    const rangeStr  = isHourly ? `$${quoteResult.range_low_dollar}-${quoteResult.range_high_dollar}` : '';
+    // For template var substitution: {total} resolves to the range string for hourly quotes
+    // so existing custom templates that only know about {total} still get a reasonable value.
+    const extraVars = {
+      total: isCustom ? 'custom' : (isHourly ? rangeStr : Number(quoteResult.total).toFixed(2)),
+      range_low_hours:   isHourly ? quoteResult.range_low_hours   : '',
+      range_high_hours:  isHourly ? quoteResult.range_high_hours  : '',
+      range_low_dollar:  isHourly ? quoteResult.range_low_dollar  : '',
+      range_high_dollar: isHourly ? quoteResult.range_high_dollar : '',
+      hourly_rate:       isHourly ? quoteResult.hourly_rate       : '',
+    };
 
     const subject = customEmailSubject
       ? applyVars(customEmailSubject, extraVars)
-      : (isCustom ? `Hi ${firstName} — your Hawaii Natural Clean quote` : `Your Hawaii Natural Clean quote: ${totalStr}`);
-
-    const smsBody = customSmsTemplate
-      ? applyVars(customSmsTemplate, extraVars)
       : (isCustom
-          ? `Hi ${firstName}! Thanks for reaching out to Hawaii Natural Clean. Your service requires a custom quote — we'll follow up within 24 hours. Questions? Call/text (808) 468-5356 🌺`
-          : `Aloha ${firstName}! Your Hawaii Natural Clean quote is ${totalStr} for ${d.serviceType || 'cleaning'} 🌺\n\nBook now: https://book.hawaiinaturalclean.com/book?bt=${bookingToken}\n\nQuestions? Reply or call (808) 468-5356.`);
+          ? `Hi ${firstName} — your Hawaii Natural Clean quote`
+          : (isHourly
+              ? `Your Hawaii Natural Clean estimate: ${rangeStr}`
+              : `Your Hawaii Natural Clean quote: ${totalStr}`));
+
+    let smsBody;
+    if (isHourly) {
+      smsBody = customHourlySmsTemplate
+        ? applyVars(customHourlySmsTemplate, extraVars)
+        : `Aloha ${firstName}! For your ${d.serviceType || 'cleaning'}, we charge $${quoteResult.hourly_rate} per hour per cleaner. We estimate this may take ${quoteResult.range_low_hours}-${quoteResult.range_high_hours} hours, so you're looking at ${rangeStr} plus tax. Some pictures of the space would help us get a more accurate estimate 🌺\n\nBook now: https://book.hawaiinaturalclean.com/book?bt=${bookingToken}\n\nQuestions? Reply or call (808) 468-5356.`;
+    } else if (customSmsTemplate) {
+      smsBody = applyVars(customSmsTemplate, extraVars);
+    } else if (isCustom) {
+      smsBody = `Hi ${firstName}! Thanks for reaching out to Hawaii Natural Clean. Your service requires a custom quote — we'll follow up within 24 hours. Questions? Call/text (808) 468-5356 🌺`;
+    } else {
+      smsBody = `Aloha ${firstName}! Your Hawaii Natural Clean quote is ${totalStr} for ${d.serviceType || 'cleaning'} 🌺\n\nBook now: https://book.hawaiinaturalclean.com/book?bt=${bookingToken}\n\nQuestions? Reply or call (808) 468-5356.`;
+    }
 
     const emailIntro = customEmailIntro ? applyVars(customEmailIntro, extraVars) : null;
 

@@ -339,37 +339,50 @@ export default async function handler(req, res) {
       const { quoteData, frequency, bookingUrl, bookingToken, customIntro } = req.body;
       const q = quoteData || {};
       const bk = q.breakdown || {};
+      const isHourly = q.is_hourly_range === true;
 
       // Quote summary table
       const summaryRows = [];
       summaryRows.push(detailRow('Service', service || 'Cleaning'));
-      if (frequency)         summaryRows.push(detailRow('Frequency', frequency));
-      if (q.duration_minutes) summaryRows.push(detailRow('Est. duration', `${q.duration_minutes} min`));
+      if (frequency)              summaryRows.push(detailRow('Frequency', frequency));
+      if (!isHourly && q.duration_minutes) summaryRows.push(detailRow('Est. duration', `${q.duration_minutes} min`));
       const summaryTable = `<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">${summaryRows.join('')}</table>`;
 
-      // Price breakdown table
+      // Price breakdown table — different layout for hourly-range vs flat-rate
       const priceRows = [];
-      if (bk.bedrooms)  priceRows.push(detailRow(bk.bedrooms.tier,  `$${Number(bk.bedrooms.price).toFixed(2)}`));
-      if (bk.bathrooms) priceRows.push(detailRow(bk.bathrooms.tier, `$${Number(bk.bathrooms.price).toFixed(2)}`));
-      if (bk.sqft)      priceRows.push(detailRow(bk.sqft.tier,      `$${Number(bk.sqft.price).toFixed(2)}`));
-      if (bk.condition && bk.condition.surcharge > 0) {
-        priceRows.push(detailRow(`Condition surcharge (${bk.condition.tier})`, `+$${Number(bk.condition.surcharge).toFixed(2)}`));
-      }
-      if (q.subtotal !== q.total) {
-        priceRows.push(`<tr><td colspan="2" style="padding:4px 0;border-top:1px solid ${BRAND.border};"></td></tr>`);
-        priceRows.push(detailRow('Subtotal', `$${Number(q.subtotal).toFixed(2)}`));
-      }
-      if (q.discount_pct > 0) {
+      if (isHourly) {
+        // Hourly-range pricing: show rate + estimated cleaner-hours + range, not a single total.
+        priceRows.push(detailRow('Rate', `$${q.hourly_rate}/hour per cleaner`));
+        priceRows.push(detailRow('Estimated time', `${q.range_low_hours}–${q.range_high_hours} cleaner-hours`));
+        priceRows.push(`<tr><td colspan="2" style="padding:8px 0;border-top:2px solid ${BRAND.text};"></td></tr>`);
         priceRows.push(`<tr>
-          <td style="padding:10px 0;color:${BRAND.primary};font-size:14px;font-weight:500;">${frequency || 'Frequency'} discount (${q.discount_pct}% off)</td>
-          <td style="padding:10px 0;color:${BRAND.primary};font-size:14px;font-weight:600;text-align:right;">−$${Number(q.discount).toFixed(2)}</td>
+          <td style="padding:10px 0;font-size:18px;font-weight:700;color:${BRAND.text};">Estimated range</td>
+          <td style="padding:10px 0;font-size:24px;font-weight:800;color:${BRAND.primary};text-align:right;font-family:Georgia,serif;">$${q.range_low_dollar}–$${q.range_high_dollar}</td>
+        </tr>`);
+        priceRows.push(`<tr><td colspan="2" style="padding:8px 0;font-size:13px;color:${BRAND.muted || '#64748b'};line-height:1.5;">Plus 4.712% GET. Final invoice based on actual cleaner-hours worked, never exceeding the high end without your approval.</td></tr>`);
+      } else {
+        if (bk.bedrooms)  priceRows.push(detailRow(bk.bedrooms.tier,  `$${Number(bk.bedrooms.price).toFixed(2)}`));
+        if (bk.bathrooms) priceRows.push(detailRow(bk.bathrooms.tier, `$${Number(bk.bathrooms.price).toFixed(2)}`));
+        if (bk.sqft)      priceRows.push(detailRow(bk.sqft.tier,      `$${Number(bk.sqft.price).toFixed(2)}`));
+        if (bk.condition && bk.condition.surcharge > 0) {
+          priceRows.push(detailRow(`Condition surcharge (${bk.condition.tier})`, `+$${Number(bk.condition.surcharge).toFixed(2)}`));
+        }
+        if (q.subtotal !== q.total) {
+          priceRows.push(`<tr><td colspan="2" style="padding:4px 0;border-top:1px solid ${BRAND.border};"></td></tr>`);
+          priceRows.push(detailRow('Subtotal', `$${Number(q.subtotal).toFixed(2)}`));
+        }
+        if (q.discount_pct > 0) {
+          priceRows.push(`<tr>
+            <td style="padding:10px 0;color:${BRAND.primary};font-size:14px;font-weight:500;">${frequency || 'Frequency'} discount (${q.discount_pct}% off)</td>
+            <td style="padding:10px 0;color:${BRAND.primary};font-size:14px;font-weight:600;text-align:right;">−$${Number(q.discount).toFixed(2)}</td>
+          </tr>`);
+        }
+        priceRows.push(`<tr><td colspan="2" style="padding:8px 0;border-top:2px solid ${BRAND.text};"></td></tr>`);
+        priceRows.push(`<tr>
+          <td style="padding:10px 0;font-size:18px;font-weight:700;color:${BRAND.text};">Total</td>
+          <td style="padding:10px 0;font-size:24px;font-weight:800;color:${BRAND.primary};text-align:right;font-family:Georgia,serif;">$${Number(q.total).toFixed(2)}</td>
         </tr>`);
       }
-      priceRows.push(`<tr><td colspan="2" style="padding:8px 0;border-top:2px solid ${BRAND.text};"></td></tr>`);
-      priceRows.push(`<tr>
-        <td style="padding:10px 0;font-size:18px;font-weight:700;color:${BRAND.text};">Total</td>
-        <td style="padding:10px 0;font-size:24px;font-weight:800;color:${BRAND.primary};text-align:right;font-family:Georgia,serif;">$${Number(q.total).toFixed(2)}</td>
-      </tr>`);
       const priceTable = `<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">${priceRows.join('')}</table>`;
 
       const finalBookUrl = bookingToken
@@ -385,13 +398,18 @@ export default async function handler(req, res) {
       const photoCardHtml = `<p style="margin:0 0 8px;color:${BRAND.text};font-size:15px;line-height:1.6;">Reply to this email with a few photos of the space and we'll fine-tune your quote based on what we see.</p>
         <p style="margin:0;color:${BRAND.muted || '#64748b'};font-size:13px;line-height:1.6;">Totally optional — your current quote is ready to book as-is.</p>`;
 
+      const breakdownCardTitle = isHourly ? 'Estimate' : 'Price breakdown';
       html = renderBrandedEmail({
-        preheader: `Your quote from ${BUSINESS} — ready to book`,
-        heading: `Your quote is ready 🌺`,
-        intro: customIntro || `Aloha ${firstName} — mahalo for reaching out. Here's your personalized quote.`,
+        preheader: isHourly
+          ? `Your estimate from ${BUSINESS} — ready to book`
+          : `Your quote from ${BUSINESS} — ready to book`,
+        heading: isHourly ? `Your estimate is ready 🌺` : `Your quote is ready 🌺`,
+        intro: customIntro || (isHourly
+          ? `Aloha ${firstName} — mahalo for reaching out. Here's your personalized estimate. For move-out and deep cleans, we bill hourly so the final invoice reflects the actual scope of work.`
+          : `Aloha ${firstName} — mahalo for reaching out. Here's your personalized quote.`),
         bodyHtml:
           card('Service summary', summaryTable) +
-          card('Price breakdown', priceTable) +
+          card(breakdownCardTitle, priceTable) +
           card('Want a more accurate quote?', photoCardHtml),
         ctaText: 'Book now',
         ctaUrl:  finalBookUrl,

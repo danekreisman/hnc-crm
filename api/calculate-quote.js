@@ -101,15 +101,49 @@ export default async function handler(req, res) {
 
       const subtotal = Number(sqftTier.price) + Number(condTier.surcharge);
       const duration = sqftTier.duration_minutes + condTier.duration_minutes;
+      const total = +subtotal.toFixed(2);
+
+      // Hourly-range pricing for Deep + Move-out (2026-05-13):
+      // Low end = current flat-rate implicit hours (total ÷ $70/hr, rounded).
+      // High end = ceil(raw × multiplier). Default multiplier 1.6 (Dane: "5 → 5-8").
+      // Both clamped to a minimum (default 3 hrs). Multiplier and min are tunable
+      // via settings rows; defaults kick in if those rows don't exist.
+      let multiplier = 1.6;
+      let minHours = 3;
+      try {
+        const [mRow, hRow] = await Promise.all([
+          db.from('settings').select('value').eq('key','hourly_range_multiplier').maybeSingle(),
+          db.from('settings').select('value').eq('key','hourly_range_min_hours').maybeSingle(),
+        ]);
+        if (mRow.data?.value != null) {
+          const v = parseFloat(mRow.data.value);
+          if (Number.isFinite(v) && v > 1) multiplier = v;
+        }
+        if (hRow.data?.value != null) {
+          const v = parseInt(hRow.data.value);
+          if (Number.isFinite(v) && v > 0) minHours = v;
+        }
+      } catch (e) { console.warn('[calculate-quote] hourly-range settings load failed:', e.message); }
+
+      const HOURLY_RATE = 70;
+      const rawHours = total / HOURLY_RATE;
+      const rangeLowHours  = Math.max(minHours, Math.round(rawHours));
+      const rangeHighHours = Math.max(rangeLowHours, Math.ceil(rawHours * multiplier));
 
       return res.status(200).json({
         custom_quote: false,
+        is_hourly_range: true,
         service: serviceType,
         subtotal: +subtotal.toFixed(2),
         discount: 0,
         discount_pct: 0,
-        total: +subtotal.toFixed(2),
+        total,
         duration_minutes: duration,
+        hourly_rate: HOURLY_RATE,
+        range_low_hours:   rangeLowHours,
+        range_high_hours:  rangeHighHours,
+        range_low_dollar:  rangeLowHours  * HOURLY_RATE,
+        range_high_dollar: rangeHighHours * HOURLY_RATE,
         breakdown: {
           sqft: { tier: sqftTier.label, price: +sqftTier.price },
           condition: { tier: condTier.label, surcharge: +condTier.surcharge, score: cond }

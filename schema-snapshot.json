@@ -320,11 +320,13 @@
         "nullable": true
       },
       {
+        "type": "timestamp with time zone",
         "column": "booking_link_resent_at",
         "default": null,
         "nullable": true
       },
       {
+        "type": "uuid",
         "column": "booking_link_resent_by",
         "default": null,
         "nullable": true
@@ -548,31 +550,37 @@
         "nullable": true
       },
       {
+        "type": "timestamp with time zone",
         "column": "review_request_sent_at",
         "default": null,
         "nullable": true
       },
       {
+        "type": "uuid",
         "column": "review_request_sent_by",
         "default": null,
         "nullable": true
       },
       {
+        "type": "timestamp with time zone",
         "column": "invoice_resent_at",
         "default": null,
         "nullable": true
       },
       {
+        "type": "uuid",
         "column": "invoice_resent_by",
         "default": null,
         "nullable": true
       },
       {
+        "type": "jsonb",
         "column": "cards",
         "default": "'[]'::jsonb",
         "nullable": true
       },
       {
+        "type": "timestamp with time zone",
         "column": "cards_synced_at",
         "default": null,
         "nullable": true
@@ -960,113 +968,108 @@
         "nullable": true
       },
       {
+        "type": "timestamp with time zone",
         "column": "confirmation_sent_at",
         "default": null,
         "nullable": true
       },
       {
+        "type": "uuid",
         "column": "confirmation_sent_by",
         "default": null,
         "nullable": true
       },
       {
+        "type": "timestamp with time zone",
         "column": "reminder_sent_at",
         "default": null,
         "nullable": true
       },
       {
+        "type": "uuid",
         "column": "reminder_sent_by",
         "default": null,
         "nullable": true
       },
       {
+        "type": "timestamp with time zone",
         "column": "waiver_sent_at",
         "default": null,
         "nullable": true
       },
       {
+        "type": "uuid",
         "column": "waiver_sent_by",
         "default": null,
         "nullable": true
       },
       {
+        "type": "timestamp with time zone",
         "column": "reschedule_sent_at",
         "default": null,
         "nullable": true
       },
       {
+        "type": "uuid",
         "column": "reschedule_sent_by",
         "default": null,
         "nullable": true
       },
       {
+        "type": "timestamp with time zone",
         "column": "cleaner_notified_at",
         "default": null,
         "nullable": true
       },
       {
+        "type": "uuid",
         "column": "cleaner_notified_by",
         "default": null,
         "nullable": true
       },
       {
+        "type": "timestamp with time zone",
         "column": "charge_followup_sent_at",
         "default": null,
         "nullable": true
       },
       {
+        "type": "uuid",
         "column": "charge_followup_sent_by",
         "default": null,
         "nullable": true
       },
       {
+        "type": "text",
         "column": "cleaner_notes",
         "default": null,
         "nullable": true
       },
       {
+        "type": "text",
         "column": "admin_notes",
         "default": null,
         "nullable": true
-      }
-    ],
-    "cleaner_invites": [
-      {
-        "column": "id",
-        "default": "uuid",
-        "nullable": false
       },
       {
-        "column": "appointment_id",
-        "default": null,
-        "nullable": false
-      },
-      {
-        "column": "cleaner_id",
-        "default": null,
-        "nullable": false
-      },
-      {
-        "column": "sent_at",
-        "default": "now",
-        "nullable": false
-      },
-      {
-        "column": "status",
-        "default": "'pending'",
-        "nullable": false
-      },
-      {
-        "column": "responded_at",
+        "type": "smallint",
+        "column": "est_hours_low",
         "default": null,
         "nullable": true
       },
       {
-        "column": "created_at",
-        "default": "now",
-        "nullable": false
+        "type": "smallint",
+        "column": "est_hours_high",
+        "default": null,
+        "nullable": true
+      },
+      {
+        "type": "numeric",
+        "column": "invoice_hours_billed",
+        "default": null,
+        "nullable": true
       }
     ]
   },
-  "generated_at": "2026-05-09 08:05:52.759042+00"
+  "generated_at": "2026-05-13 11:51:49.09033+00"
 }

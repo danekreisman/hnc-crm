@@ -311,6 +311,14 @@ async function loadLead(){
 function renderStep1(){
   setStep(1);
   var q         = LEAD.quoteData || {};
+  /* Hourly billing detection (Phase 3 follow-up, 2026-05-13) — Deep Clean
+     and Move-out leads have is_hourly_range:true on quote_data plus the
+     range_low/high_dollar fields. The booking form's price card swaps
+     from the flat Subtotal/Tax/Total layout to a Rate + cleaner-hours
+     range + estimated dollar range layout, with a "billed on actuals"
+     disclosure matching the waiver and the quote email. */
+  var isHourly  = q.is_hourly_range === true && q.range_low_dollar != null && q.range_high_dollar != null;
+
   var subtotal  = q.subtotal != null ? Number(q.subtotal) : (LEAD.quoteTotal ? Number(LEAD.quoteTotal) : null);
   var discount  = Number(q.discount || 0);
   var discPct   = Number(q.discount_pct || 0);
@@ -324,7 +332,15 @@ function renderStep1(){
   if(LEAD.beds||LEAD.baths) metaHtml += '<div class="quote-meta-item"><div class="label">Property</div><div class="val">'+(LEAD.beds||'?')+' bed / '+(LEAD.baths||'?')+' bath</div></div>';
 
   var priceHtml = '';
-  if(grandTotal != null){
+  if (isHourly) {
+    priceHtml = '<div class="price-table">'
+      +'<div class="price-row"><span>Rate</span><span class="amount">$'+q.hourly_rate+'/cleaner-hour</span></div>'
+      +'<div class="price-row"><span>Estimated time</span><span class="amount">'+q.range_low_hours+'\u2013'+q.range_high_hours+' cleaner-hours</span></div>'
+      +'<hr class="price-divider">'
+      +'<div class="price-total"><span>Estimated range</span><span>$'+q.range_low_dollar+'\u2013$'+q.range_high_dollar+'</span></div>'
+      +'<div style="font-size:12px;color:var(--muted);margin-top:10px;line-height:1.5;">Plus 4.712% Hawaii GET. Final invoice based on actual cleaner-hours worked, never exceeding the high end without your approval.</div>'
+      +'</div>';
+  } else if(grandTotal != null){
     priceHtml = '<div class="price-table">'
       +(subtotal!=null?'<div class="price-row"><span>Subtotal</span><span class="amount">'+fmt(subtotal)+'</span></div>':'')
       +(discPct>0?'<div class="price-row discount"><span>'+discPct+'% frequency discount</span><span class="amount">&minus;'+fmt(discount)+'</span></div>':'')
@@ -1073,14 +1089,26 @@ function drawRushFee(ds){
   if(!r.fee){ rushEl.innerHTML=''; return; }
 
   var q         = LEAD.quoteData || {};
-  var preTotal  = q.total!=null ? Number(q.total) : (LEAD.quoteTotal ? Number(LEAD.quoteTotal) : null);
-  var tax       = preTotal!=null ? +(preTotal*TAX_RATE).toFixed(2) : null;
-  var newTotal  = preTotal!=null && tax!=null ? fmt(preTotal+tax+r.fee) : null;
+  /* Hourly billing (Phase 3 follow-up, 2026-05-13): rush fee can't be
+     rolled into a single "new total with tax" because the final amount
+     depends on actual cleaner-hours worked. Frame the fee as added on
+     top of the estimate range instead. */
+  var isHourly  = q.is_hourly_range === true && q.range_low_dollar != null && q.range_high_dollar != null;
+  var detailLine;
+  if (isHourly) {
+    detailLine = r.label + ' requests require extra scheduling coordination. This fee is added on top of your $' + q.range_low_dollar + '\u2013$' + q.range_high_dollar + ' estimate.';
+  } else {
+    var preTotal  = q.total!=null ? Number(q.total) : (LEAD.quoteTotal ? Number(LEAD.quoteTotal) : null);
+    var tax       = preTotal!=null ? +(preTotal*TAX_RATE).toFixed(2) : null;
+    var newTotal  = preTotal!=null && tax!=null ? fmt(preTotal+tax+r.fee) : null;
+    detailLine = newTotal
+      ? r.label + ' requests require extra scheduling coordination. New total with tax: <strong>' + newTotal + '</strong>'
+      : r.label + ' requests require extra scheduling coordination.';
+  }
 
   rushEl.innerHTML = '<div class="rush-notice '+r.cls+'">'
     +'<div class="rush-fee-label">+'+fmt(r.fee)+' '+r.label+' booking fee</div>'
-    +(newTotal?'<div>'+r.label+' requests require extra scheduling coordination. New total with tax: <strong>'+newTotal+'</strong></div>'
-    :'<div>'+r.label+' requests require extra scheduling coordination.</div>')
+    +'<div>'+detailLine+'</div>'
     +'</div>';
 }
 

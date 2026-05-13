@@ -370,7 +370,7 @@ export default async function handler(req, res) {
     if (isHourly) {
       smsBody = customHourlySmsTemplate
         ? applyVars(customHourlySmsTemplate, extraVars)
-        : `Aloha ${firstName}! For your ${d.serviceType || 'cleaning'}, we charge $${quoteResult.hourly_rate} per hour per cleaner. We estimate this may take ${quoteResult.range_low_hours}-${quoteResult.range_high_hours} hours, so you're looking at ${rangeStr} plus tax. Some pictures of the space would help us get a more accurate estimate 🌺\n\nBook now: https://book.hawaiinaturalclean.com/book?bt=${bookingToken}\n\nQuestions? Reply or call (808) 468-5356.`;
+        : `Aloha ${firstName}! For your ${d.serviceType || 'cleaning'}, we charge $${quoteResult.hourly_rate} per hour per cleaner. We estimate this may take ${quoteResult.range_low_hours}-${quoteResult.range_high_hours} cleaner-hours, so you're looking at ${rangeStr} plus tax. Some pictures of the space would help us get a more accurate estimate 🌺\n\nBook now: https://book.hawaiinaturalclean.com/book?bt=${bookingToken}\n\nQuestions? Reply or call (808) 468-5356.`;
     } else if (customSmsTemplate) {
       smsBody = applyVars(customSmsTemplate, extraVars);
     } else if (isCustom) {

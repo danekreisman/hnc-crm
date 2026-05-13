@@ -860,20 +860,15 @@ function renderChecklistService(svc){
   var inner = '';
   if (svc.intro) inner += '<div class="service-intro">'+esc(svc.intro)+'</div>';
 
-  /* Pricing block (Phase 1 of hourly-billing transition) — surfaced before
-     sections for hourly-billed services (Deep Clean, Move-out). Reads from
-     the optional `pricing` field on the service object, set by
-     api/get-checklists.js DEFAULTS and the matching settings.service_checklists
-     override row. Plain prose with `white-space: pre-line` so paragraph
-     breaks render. Mirrors the renderer in agree.html (lines ~211-217) so
-     the booking-flow waiver and the standalone agree.html page show the
-     same content. */
-  if (svc.pricing) {
-    inner += '<div class="service-pricing-block">'
-      + '<div class="service-pricing-heading">How this is priced</div>'
-      + '<div class="service-pricing-body">'+esc(svc.pricing)+'</div>'
-      + '</div>';
-  }
+  /* Pricing block is intentionally NOT rendered inside the collapsible
+     accordion here — for hourly Deep / Move-out services, renderStep2
+     surfaces an always-visible "How you'll be billed" banner ABOVE the
+     accordion so customers can't miss it. Keeping it only there
+     prevents duplication when the customer expands the service-detail.
+     Note: agree.html's renderService DOES render svc.pricing inside its
+     accordion — that page is informational and customers tend to tap
+     services to read details. The booking flow is a consent step, so
+     the disclosure has to be prominent without requiring interaction. */
 
   // Skip required block — those become policy checkboxes for moveout
   inner += (svc.sections || []).map(function(sec){
@@ -909,6 +904,25 @@ function toggleService(id){
 function renderStep2(){
   setStep(2);
   var svcId = serviceLabelToId(LEAD && LEAD.service);
+
+  /* "How you'll be billed" banner (Phase 1 follow-up, 2026-05-13) — for
+     hourly services (Deep / Move-out) we surface the pricing prose
+     above the checklist accordion so customers see the billing model
+     without needing to expand the service-detail. Reads from the
+     matched service's pricing field, which is set by
+     api/get-checklists.js DEFAULTS and the matching settings override.
+     Renders nothing for services without a pricing field (regular,
+     airbnb, janitorial). */
+  var billingHtml = '';
+  if (CHECKLISTS && CHECKLISTS.services && svcId) {
+    var matched = CHECKLISTS.services.filter(function(s){ return s.id === svcId; })[0];
+    if (matched && matched.pricing) {
+      billingHtml = '<div class="service-pricing-block" style="margin-bottom:20px;">'
+        + '<div class="service-pricing-heading">How you\u2019ll be billed</div>'
+        + '<div class="service-pricing-body">'+esc(matched.pricing)+'</div>'
+        + '</div>';
+    }
+  }
 
   // ---- Checklist (auto-pair Deep+Regular) ----
   var checklistHtml = '';
@@ -949,6 +963,7 @@ function renderStep2(){
     +'<div class="card-head"><h2>Review &amp; agree</h2>'
     +'<p>Here\'s what\'s included in your service and the policies that apply. Please review and check each policy below to continue.</p></div>'
     +'<div class="card-body">'
+    + billingHtml
     + checklistHtml
     + prepHtml
     + items

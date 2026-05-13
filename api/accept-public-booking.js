@@ -178,6 +178,17 @@ export default async function handler(req, res) {
       admin_notes:    adminNotes,
     };
 
+    // Hourly-billing fields (Phase 3, 2026-05-13) — carry the cleaner-hour range
+    // from the lead's quote into the appointment so the detail view can show
+    // the range UI for Deep Clean / Move-out. Null for flat-rate services.
+    // quote_data shape (set by api/calculate-quote.js when is_hourly_range): {
+    //   range_low_hours, range_high_hours, range_low_dollar, range_high_dollar
+    // }
+    if (x.quote_data && x.quote_data.is_hourly_range === true) {
+      if (x.quote_data.range_low_hours  != null) apptCommon.est_hours_low  = parseInt(x.quote_data.range_low_hours);
+      if (x.quote_data.range_high_hours != null) apptCommon.est_hours_high = parseInt(x.quote_data.range_high_hours);
+    }
+
     let appointmentId = null;
     let clientId = null;
     const leadId = x.lead_id || null;

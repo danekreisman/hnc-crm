@@ -3294,7 +3294,13 @@ async function dbLoadCleaners(){
        reasonable length client-side (saveNewAppt slices to 200 chars). */
     manual_discount_amount: (data.manualDiscountAmount != null && parseFloat(data.manualDiscountAmount) > 0)
       ? parseFloat(data.manualDiscountAmount) : null,
-    manual_discount_reason: data.manualDiscountReason || null
+    manual_discount_reason: data.manualDiscountReason || null,
+    /* Hourly-billing fields (Phase 3) — pass through if set on the in-memory
+       data. Manually-created appointments won't have these unless the form
+       writes them; lead-conversion paths pull them from the quote. */
+    est_hours_low:        (data.estHoursLow  != null && data.estHoursLow  !== '') ? parseInt(data.estHoursLow)  : null,
+    est_hours_high:       (data.estHoursHigh != null && data.estHoursHigh !== '') ? parseInt(data.estHoursHigh) : null,
+    invoice_hours_billed: (data.invoiceHoursBilled != null && data.invoiceHoursBilled !== '') ? parseFloat(data.invoiceHoursBilled) : null
   };
   if(data.seriesId) row.series_id=data.seriesId;
   if(data.seriesIndex!=null) row.series_index=data.seriesIndex;
@@ -3412,6 +3418,13 @@ async function dbUpdateAppointment(dbId,data){
   // existing data; instead we only include them when caller meant to set.
   if (data.cleanerNotes !== undefined) payload.cleaner_notes = data.cleanerNotes || null;
   if (data.adminNotes   !== undefined) payload.admin_notes   = data.adminNotes   || null;
+  /* Hourly-billing fields (Phase 3) — same defensive pattern as notes: only
+     write if the caller explicitly passed a value, otherwise leave the
+     existing DB value alone. invoice_hours_billed in particular is written
+     by sendApptInvoice and must NOT be clobbered to null by ordinary edits. */
+  if (data.estHoursLow        !== undefined) payload.est_hours_low        = (data.estHoursLow  === null || data.estHoursLow  === '') ? null : parseInt(data.estHoursLow);
+  if (data.estHoursHigh       !== undefined) payload.est_hours_high       = (data.estHoursHigh === null || data.estHoursHigh === '') ? null : parseInt(data.estHoursHigh);
+  if (data.invoiceHoursBilled !== undefined) payload.invoice_hours_billed = (data.invoiceHoursBilled === null || data.invoiceHoursBilled === '') ? null : parseFloat(data.invoiceHoursBilled);
   var res=await db.from('appointments').update(payload).eq('id',dbId).select();
   if(res.error)console.error('[dbUpdateAppointment] error:',res.error);
   else console.log('[dbUpdateAppointment] synced id='+dbId+' client_id='+clientId+' cleaner='+data.cleanerName+' pay=$'+data.cleanerPay+(data.cleanerPayOverride!=null?' (override=$'+data.cleanerPayOverride+')':''));
@@ -3574,6 +3587,11 @@ function _apptRowToDbEntry(a, opts){
     cleanerPay3: a.cleaner_pay_3!=null?parseFloat(a.cleaner_pay_3):null,
     manualDiscountAmount: a.manual_discount_amount!=null?parseFloat(a.manual_discount_amount):null,
     manualDiscountReason: a.manual_discount_reason||null,
+    /* Hourly-billing fields (Phase 3, 2026-05-13) — only populated for Deep
+       Clean and Move-out appointments. Null for flat-rate services. */
+    estHoursLow:        a.est_hours_low!=null?parseInt(a.est_hours_low):null,
+    estHoursHigh:       a.est_hours_high!=null?parseInt(a.est_hours_high):null,
+    invoiceHoursBilled: a.invoice_hours_billed!=null?parseFloat(a.invoice_hours_billed):null,
   };
 }
 
@@ -6012,10 +6030,36 @@ function _openApptInner(a,dateKey){
   var _tipAmt = parseFloat(a.tipAmount) || 0;
   if(_aiTip) _aiTip.textContent = _tipAmt > 0 ? fmtPrice(_tipAmt) : '\u2014';
   if(_aiTipBtn) _aiTipBtn.textContent = _tipAmt > 0 ? 'Edit' : 'Add tip';
-  document.getElementById('ai-base').textContent=fmtPrice(a.base||a.basePrice);
-  document.getElementById('ai-disc').textContent='$0';
-  document.getElementById('ai-tax').textContent=fmtPrice(a.tax);
-  document.getElementById('ai-total').textContent=fmtPrice(a.total||a.totalPrice);
+  /* Hourly-billing display (Phase 3, 2026-05-13) — for Deep Clean / Move-out
+     appointments with an est_hours_low/high pair, the appointment shows a
+     range ($A-B) and the cleaner-hours range instead of a single price.
+     Flat-rate services unchanged. */
+  var _isHourly = (a.estHoursLow != null && a.estHoursHigh != null);
+  var _HRATE = 70;
+  if (_isHourly) {
+    var _lowDollar  = a.estHoursLow  * _HRATE;
+    var _highDollar = a.estHoursHigh * _HRATE;
+    // Est. duration row → cleaner-hour range
+    document.getElementById('ai-dur').textContent = a.estHoursLow + '\u2013' + a.estHoursHigh + ' cleaner-hours';
+    // Base price → estimate range
+    document.getElementById('ai-base').textContent = '$' + _lowDollar + '\u2013$' + _highDollar + ' (estimate)';
+    // Discount + Tax rows hidden for hourly — no flat-rate discount, and tax
+    // is on the final invoiced amount, not the estimate range.
+    document.getElementById('ai-disc').textContent = '\u2014';
+    document.getElementById('ai-tax').textContent  = '\u2014';
+    // Total → invoiced amount if already billed, otherwise the range
+    if (a.invoiceHoursBilled != null && a.invoiceHoursBilled > 0) {
+      var _billed = a.invoiceHoursBilled * _HRATE;
+      document.getElementById('ai-total').textContent = '$' + _billed.toFixed(2) + ' (' + a.invoiceHoursBilled + ' cleaner-hrs)';
+    } else {
+      document.getElementById('ai-total').textContent = '$' + _lowDollar + '\u2013$' + _highDollar + ' + GET';
+    }
+  } else {
+    document.getElementById('ai-base').textContent=fmtPrice(a.base||a.basePrice);
+    document.getElementById('ai-disc').textContent='$0';
+    document.getElementById('ai-tax').textContent=fmtPrice(a.tax);
+    document.getElementById('ai-total').textContent=fmtPrice(a.total||a.totalPrice);
+  }
   _renderApptNotesSplit(a);
   // Pre-fill edit form fields
   document.getElementById('edit-client').value=a.n;
@@ -16956,16 +17000,50 @@ function openApptInvoice(){
   var cd=currentApptData||{};
   var client=clientDB[Object.keys(clientDB).find(function(k){return clientDB[k].name===currentAppt.n;})];
   var isCommercial=client&&client.type==='Commercial';
+  /* Hourly-billing detection (Phase 3, 2026-05-13). When the appointment
+     has a cleaner-hour range stored, the invoice modal becomes a
+     half-hour-increment hours picker instead of a static dollar amount. */
+  var isHourly = (cd.estHoursLow != null && cd.estHoursHigh != null);
+  var HRATE = 70;
   var info=document.getElementById('appt-invoice-info');
-  info.innerHTML='<div class="info-row"><span class="info-label">Client</span><span class="info-val">'+currentAppt.n+'</span></div>'
-    +'<div class="info-row"><span class="info-label">Service</span><span class="info-val">'+(cd.service||'Standard clean')+'</span></div>'
-    +'<div class="info-row"><span class="info-label">Date</span><span class="info-val">'+document.getElementById('ai-date').textContent+'</span></div>'
-    +'<div class="info-row"><span class="info-label">Amount</span><span class="info-val" style="color:var(--brand-500);font-size:14px;font-weight:700;">'+(cd.totalPrice!=null&&cd.totalPrice!==''?'$'+parseFloat(cd.totalPrice||0).toFixed(2):'—')+'</span></div>'
-    +'<div class="info-row"><span class="info-label">Email on file</span><span class="info-val">'+(client?client.email:'—')+'</span></div>'
-    +'<div class="info-row"><span class="info-label">Phone on file</span><span class="info-val">'+(client?client.phone:'—')+'</span></div>';
+  if (isHourly) {
+    /* Pre-fill: previously-billed hours if invoice was already sent and
+       Dane is re-sending; otherwise default to the high end of the
+       estimate (conservative — assumes the job took the most quoted time). */
+    var defaultHrs = (cd.invoiceHoursBilled != null && cd.invoiceHoursBilled > 0)
+      ? cd.invoiceHoursBilled
+      : cd.estHoursHigh;
+    var defaultAmt = (defaultHrs * HRATE).toFixed(2);
+    info.innerHTML = '<div class="info-row"><span class="info-label">Client</span><span class="info-val">'+currentAppt.n+'</span></div>'
+      +'<div class="info-row"><span class="info-label">Service</span><span class="info-val">'+(cd.service||'Standard clean')+'</span></div>'
+      +'<div class="info-row"><span class="info-label">Date</span><span class="info-val">'+document.getElementById('ai-date').textContent+'</span></div>'
+      +'<div class="info-row"><span class="info-label">Estimate</span><span class="info-val">'+cd.estHoursLow+'\u2013'+cd.estHoursHigh+' cleaner-hrs ($'+(cd.estHoursLow*HRATE)+'\u2013$'+(cd.estHoursHigh*HRATE)+')</span></div>'
+      +'<div class="info-row"><span class="info-label">Cleaner-hours to bill</span><span class="info-val"><input type="number" id="appt-inv-hours" min="0.5" step="0.5" value="'+defaultHrs+'" oninput="_updateApptInvoiceAmount()" style="width:90px;padding:6px 8px;border:1px solid var(--border);border-radius:6px;text-align:right;font-weight:600;"></span></div>'
+      +'<div class="info-row"><span class="info-label">Amount ($'+HRATE+'/cleaner-hr)</span><span class="info-val" id="appt-inv-amount-display" style="color:var(--brand-500);font-size:14px;font-weight:700;">$'+defaultAmt+'</span></div>'
+      +'<div class="info-row"><span class="info-label">Email on file</span><span class="info-val">'+(client?client.email:'\u2014')+'</span></div>'
+      +'<div class="info-row"><span class="info-label">Phone on file</span><span class="info-val">'+(client?client.phone:'\u2014')+'</span></div>';
+  } else {
+    info.innerHTML='<div class="info-row"><span class="info-label">Client</span><span class="info-val">'+currentAppt.n+'</span></div>'
+      +'<div class="info-row"><span class="info-label">Service</span><span class="info-val">'+(cd.service||'Standard clean')+'</span></div>'
+      +'<div class="info-row"><span class="info-label">Date</span><span class="info-val">'+document.getElementById('ai-date').textContent+'</span></div>'
+      +'<div class="info-row"><span class="info-label">Amount</span><span class="info-val" style="color:var(--brand-500);font-size:14px;font-weight:700;">'+(cd.totalPrice!=null&&cd.totalPrice!==''?'$'+parseFloat(cd.totalPrice||0).toFixed(2):'\u2014')+'</span></div>'
+      +'<div class="info-row"><span class="info-label">Email on file</span><span class="info-val">'+(client?client.email:'\u2014')+'</span></div>'
+      +'<div class="info-row"><span class="info-label">Phone on file</span><span class="info-val">'+(client?client.phone:'\u2014')+'</span></div>';
+  }
   var termsSel=document.getElementById('appt-inv-terms');
   termsSel.value=isCommercial?'net30':'now';
   openOverlay('appt-invoice-overlay');
+}
+
+/* Live-update the dollar amount in the invoice modal when Dane edits the
+   cleaner-hours input. Half-hour increments enforced via the input's
+   step="0.5" attribute; this just multiplies by the hourly rate. */
+function _updateApptInvoiceAmount(){
+  var input = document.getElementById('appt-inv-hours');
+  var out   = document.getElementById('appt-inv-amount-display');
+  if (!input || !out) return;
+  var hrs = parseFloat(input.value) || 0;
+  out.textContent = '$' + (hrs * 70).toFixed(2);
 }
 
 async function sendApptInvoice(method){
@@ -16977,8 +17055,33 @@ async function sendApptInvoice(method){
   var clientPhone=client?client.phone:'';
   var clientId=clientKey&&clientKey.length>20?clientKey:null;
   var cd=currentApptData||{};
-  var amountNum=parseFloat(cd.totalPrice||cd.total||cd.basePrice)||0;
-  console.log('[sendApptInvoice] amount resolved:', amountNum, 'from cd:', JSON.stringify({totalPrice:cd.totalPrice, total:cd.total, basePrice:cd.basePrice}));
+  /* Hourly-billing path (Phase 3, 2026-05-13): when the appointment has
+     a cleaner-hour range, amount comes from the modal's hours input
+     (half-hour increments × $70). Otherwise fall back to the flat-rate
+     totalPrice/total/basePrice cascade used for regular/airbnb/janitorial. */
+  var isHourly = (cd.estHoursLow != null && cd.estHoursHigh != null);
+  var hoursToBill = null;
+  var amountNum;
+  if (isHourly) {
+    var hrsInput = document.getElementById('appt-inv-hours');
+    hoursToBill = parseFloat(hrsInput && hrsInput.value) || 0;
+    if (hoursToBill <= 0) {
+      showPaymentToast('Enter cleaner-hours to bill (must be > 0)', null, 'error');
+      return;
+    }
+    /* Enforce half-hour increments client-side. step="0.5" on the input
+       handles up/down arrows, but a paste or manual type could still
+       slip in 0.25, 1.7, etc. — guard explicitly. */
+    if (Math.abs(hoursToBill * 2 - Math.round(hoursToBill * 2)) > 0.001) {
+      showPaymentToast('Cleaner-hours must be in half-hour increments (3, 3.5, 4, 4.5, ...)', null, 'error');
+      return;
+    }
+    amountNum = hoursToBill * 70;
+    console.log('[sendApptInvoice] hourly path — hours:', hoursToBill, '→ amount: $' + amountNum.toFixed(2));
+  } else {
+    amountNum=parseFloat(cd.totalPrice||cd.total||cd.basePrice)||0;
+    console.log('[sendApptInvoice] amount resolved:', amountNum, 'from cd:', JSON.stringify({totalPrice:cd.totalPrice, total:cd.total, basePrice:cd.basePrice}));
+  }
   var apptId=currentAppt.dbId||null;
   var termsRaw=document.getElementById('appt-inv-terms').value;
   var termsMap={'now':'Due now','net15':'NET15','net30':'NET30','net45':'NET45'};
@@ -17059,13 +17162,26 @@ async function sendApptInvoice(method){
 
     // Mark appointment as invoice_sent in Supabase
     if(apptId){
-      var apptRes=await db.from('appointments').update({invoice_sent:true,invoice_url:invoiceUrl}).eq('id',apptId);
+      /* When hourly, also persist invoice_hours_billed so the appointment
+         view can show "$X (Y cleaner-hrs)" instead of the estimate range
+         after invoicing. Flat-rate path skips this field. */
+      var apptUpdatePayload = { invoice_sent:true, invoice_url:invoiceUrl };
+      if (isHourly && hoursToBill > 0) {
+        apptUpdatePayload.invoice_hours_billed = hoursToBill;
+      }
+      var apptRes=await db.from('appointments').update(apptUpdatePayload).eq('id',apptId);
       if(apptRes.error) console.error('[sendApptInvoice] Appointment update error:',apptRes.error);
-      else console.log('[sendApptInvoice] Appointment marked invoice_sent');
+      else console.log('[sendApptInvoice] Appointment marked invoice_sent' + (isHourly?' (invoice_hours_billed='+hoursToBill+')':''));
     }
 
     // Update in-memory appointment
-    if(currentAppt){currentAppt.invoice_sent=true;currentAppt.invoice_url=invoiceUrl;}
+    if(currentAppt){
+      currentAppt.invoice_sent=true;
+      currentAppt.invoice_url=invoiceUrl;
+      if (isHourly && hoursToBill > 0 && currentApptData) {
+        currentApptData.invoiceHoursBilled = hoursToBill;
+      }
+    }
 
     // Send SMS to client phone (always — gives them the payment link)
     if(clientPhone&&clientPhone!=='—'){

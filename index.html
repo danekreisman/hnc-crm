@@ -22840,7 +22840,7 @@ function renderPublicBookingBanner() {
     var rushColor = rushFee >= 200 ? '#b91c1c' : rushFee >= 100 ? '#9a3412' : rushFee > 0 ? '#78350f' : null;
     var pretty = x.requested_date || '';
     try { pretty = new Date(x.requested_date + 'T12:00:00').toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric' }); } catch (_e) {}
-    var totalStr = x.quote_total_with_tax != null ? '$' + Number(x.quote_total_with_tax).toFixed(2) : null;
+    var totalStr = _formatBookingPrice(x);
     var pathLabel = x.path === 'existing_property' ? '\u2713 returning' : 'new lead';
     var pathColor = x.path === 'existing_property' ? '#059669' : '#7c3aed';
 
@@ -23237,6 +23237,39 @@ async function dismissCallLead(taskId) {
 
 function _pbrEsc(s){ return String(s == null ? '' : s).replace(/[&<>"]/g, function(c){ return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c]; }); }
 function _pbrFmt$(n){ return n == null || isNaN(Number(n)) ? '\u2014' : '$' + Number(n).toFixed(2); }
+/* Format the price string for a review_public_booking task's extracted_data.
+   Three branches, in order:
+   1. Explicit hourly range on quote_data (post-Phase-2 Deep/Move-out leads):
+      "$A–B (X–Y cleaner-hrs)" using range_low/high_dollar + range_low/high_hours
+   2. Hourly service (deep/move-out) with only a flat pre-tax total
+      (pre-Phase-2 lead): derive the range using the same formula as
+      api/calculate-quote.js — low = max(3, round(pre/70)), high = max(low,
+      ceil(raw × 1.6)) — and render as "$A–B (X–Y cleaner-hrs)".
+   3. Flat-rate fallback (regular/airbnb/janitorial OR no service info):
+      "$X.XX" from quote_total_with_tax.
+   Returns null if no usable price data. Used by the banner row in
+   renderPublicBookingBanner and by the summary header in
+   openPublicBookingReview so both surfaces stay in sync. */
+function _formatBookingPrice(x){
+  var qd  = x.quote_data || {};
+  var svc = (x.service || '').toLowerCase();
+  var isHourlyService = svc.indexOf('deep') >= 0 || svc.indexOf('move') >= 0;
+  if (qd.is_hourly_range === true && qd.range_low_dollar != null && qd.range_high_dollar != null) {
+    var hoursPart = (qd.range_low_hours != null && qd.range_high_hours != null)
+      ? ' (' + qd.range_low_hours + '\u2013' + qd.range_high_hours + ' cleaner-hrs)' : '';
+    return '$' + qd.range_low_dollar + '\u2013$' + qd.range_high_dollar + hoursPart;
+  }
+  if (isHourlyService && x.quote_total_pretax != null) {
+    var raw  = Number(x.quote_total_pretax) / 70;
+    var low  = Math.max(3, Math.round(raw));
+    var high = Math.max(low, Math.ceil(raw * 1.6));
+    return '$' + (low*70) + '\u2013$' + (high*70) + ' (' + low + '\u2013' + high + ' cleaner-hrs)';
+  }
+  if (x.quote_total_with_tax != null) {
+    return '$' + Number(x.quote_total_with_tax).toFixed(2);
+  }
+  return null;
+}
 function _pbrPrettyDate(iso){
   if (!iso) return '\u2014';
   try { return new Date(iso + 'T12:00:00').toLocaleDateString('en-US', { weekday:'long', month:'long', day:'numeric', year:'numeric' }); }
@@ -23266,11 +23299,15 @@ async function openPublicBookingReview(taskId) {
   document.getElementById('pbr-task-id').value = task.id;
 
   // Top summary banner — date, service, price (this is the "I want to see
-  // what date the customer wanted" fix at-a-glance).
+  // what date the customer wanted" fix at-a-glance). Price now uses the
+  // shared _formatBookingPrice helper so hourly Deep/Move-out bookings
+  // render the range + cleaner-hours, matching the banner row and every
+  // other surface across the app.
+  var _priceStr = _formatBookingPrice(x);
   var summaryHtml = ''
     + '<div style="font-size:15px;font-weight:700;margin-bottom:4px;">' + _pbrEsc(_pbrPrettyDate(x.requested_date)) + ' \u00b7 ' + _pbrEsc(x.requested_time || '') + '</div>'
     + '<div>' + _pbrEsc(x.service || '') + (x.frequency ? ' \u00b7 ' + _pbrEsc(x.frequency) : '')
-    + (x.quote_total_with_tax != null ? ' \u00b7 <strong>' + _pbrFmt$(x.quote_total_with_tax) + '</strong>' : '')
+    + (_priceStr ? ' \u00b7 <strong>' + _priceStr + '</strong>' : '')
     + '</div>';
   document.getElementById('pbr-summary').innerHTML = summaryHtml;
 

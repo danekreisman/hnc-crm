@@ -62,11 +62,15 @@ SET value = jsonb_set(
 WHERE key = 'service_checklists';
 
 -- 2. Trim p5 detail in policy_items
--- The policy_items override stores the policies array as a JSON string in
--- the `value` column (see api/get-policies.js line 47: JSON.parse(data.value)).
--- We need to parse, update, and re-stringify. Postgres handles this via
--- the to_jsonb / jsonb_set chain; the ::text cast at the end is what
--- gets stored.
+-- The `value` column on settings is jsonb. The api/get-policies.js code
+-- has a misleading `JSON.parse(data.value)` that suggests text storage,
+-- but Postgres returns jsonb as jsonb. So we operate on `value` directly
+-- as jsonb — no ::text cast — and produce a jsonb result.
+--
+-- Defensive guard: jsonb_typeof(value) = 'array' filter skips rows that
+-- don't exist, are null, or have an unexpected shape (e.g., string or
+-- object), so this is safe even if the policy_items override row has
+-- never been created.
 UPDATE settings
 SET value = (
   SELECT jsonb_agg(
@@ -79,7 +83,7 @@ SET value = (
       )
       ELSE p
     END
-  )::text
-  FROM jsonb_array_elements(value::jsonb) AS p
+  )
+  FROM jsonb_array_elements(value) AS p
 )
-WHERE key = 'policy_items';
+WHERE key = 'policy_items' AND jsonb_typeof(value) = 'array';

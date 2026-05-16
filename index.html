@@ -429,7 +429,8 @@ tr.clickable:hover td{background:var(--brand-50);cursor:pointer;}
 .job-history-item:last-child{border-bottom:none;}
 .form-row{margin-bottom:10px;}
 .form-row label{display:block;font-size:11px;color:var(--text-muted);margin-bottom:4px;font-weight:500;}
-.form-row input,.form-row select,.form-row textarea{width:100%;padding:7px 10px;border:1px solid var(--border-strong);border-radius:8px;font-size:12px;font-family:inherit;color:var(--text);background:#fff;}
+.form-row input:not([type="checkbox"]):not([type="radio"]),.form-row select,.form-row textarea{width:100%;padding:7px 10px;border:1px solid var(--border-strong);border-radius:8px;font-size:12px;font-family:inherit;color:var(--text);background:#fff;}
+.form-row input[type="checkbox"],.form-row input[type="radio"]{width:auto;padding:0;border:0;background:transparent;flex-shrink:0;vertical-align:middle;}
 .form-row input:focus,.form-row select:focus,.form-row textarea:focus{outline:none;border-color:var(--brand-500);}
 .form-two{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
 .form-three{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;}

@@ -10935,6 +10935,55 @@ async function saveNewAppt(){
 function populateRecurringMonth(yr,mo){
   recurringAppts.forEach(function(r){
     if(!r.active)return;
+    // ── PHANTOM-BLOCK guard, template level (added 2026-05-15) ─────────
+    // populateRecurringMonth is the actual phantom factory. It runs on
+    // every calendar render and inserts missing future occurrences
+    // directly to DB via `db.from('appointments').insert(...)` at the
+    // bottom of this function — bypassing dbSaveAppointment entirely.
+    // The original guard was at dbSaveAppointment so it never saw
+    // these. This guard is at the TEMPLATE level: if `r` has no real
+    // client (no client_id and a fallback 'Unknown' name from the
+    // loader), skip the whole template — no dates generated, no
+    // apptData push, no DB insert. Prevents the self-propagating
+    // loop where phantom rows in DB rebuild phantom templates on
+    // next data load which re-create more phantoms.
+    var _hasRealClient = r.client_id
+      || (r.name && r.name !== 'Unknown' && String(r.name).trim() !== '');
+    if (!_hasRealClient) {
+      if (typeof _logFrontendError === 'function') {
+        _logFrontendError(
+          'PHANTOM_BLOCK_RECUR_TEMPLATE',
+          'populateRecurringMonth skipped phantom recurring template (no client_id, fallback name "Unknown")',
+          (new Error('PHANTOM_BLOCK_RECUR_TEMPLATE')).stack || null,
+          {
+            template: {
+              name: r.name, seriesId: r.seriesId,
+              client_id: r.client_id || null, cleaner_id: r.cleaner_id || null,
+              cleaner: r.cleaner, time: r.timeStr, freq: r.freq,
+              address: r.address, service: r.service, status: r.status
+            },
+            yr: yr, mo: mo,
+            recurringAppts_size: recurringAppts.length
+          }
+        );
+      }
+      try {
+        var _now = Date.now();
+        if (!window._phantomNotifLast || (_now - window._phantomNotifLast) > 5*60*1000) {
+          window._phantomNotifLast = _now;
+          if (typeof _fireNotification === 'function') {
+            _fireNotification({
+              event_type: 'phantom_block',
+              title: '\u{1F6A8} Phantom recurring template blocked',
+              body: 'A recurring template with no client was skipped during calendar render. Check Settings \u2192 Recent errors and tell Claude.',
+              metadata: { source: 'populateRecurringMonth', seriesId: r.seriesId || null, address: r.address || null }
+            });
+          }
+        }
+      } catch(_nerr) { /* never let notification failure leak */ }
+      console.warn('[populateRecurringMonth] PHANTOM TEMPLATE SKIPPED \u2014 seriesId='+(r.seriesId||'null')+' addr='+(r.address||'null'));
+      return; // skip this template; no dates generated, no inserts attempted
+    }
     var start=new Date(r.startYear,r.startMonth-1,r.startDay);
     var monthEnd=new Date(yr,mo,0);
     if(monthEnd<start)return;

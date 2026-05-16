@@ -10598,21 +10598,31 @@ async function saveNewAppt(){
   var apptTip=Math.max(0,parseFloat((document.getElementById('na-tip')||{}).value)||0);
   // Auto-create client if name not in clientDB (booked from calendar with new name)
   var _existingClient=_findClientByName(name);
+  var _clientSavePromise = null; // Set when we're creating a NEW client — awaited
+                                 // just before dbSaveAppointment so the appt INSERT
+                                 // doesn't fire before the client row exists.
   if(!_existingClient){
     var _apptPhone=(document.getElementById('na-phone')||{}).value||'';
     var _apptEmail=(document.getElementById('na-email')||{}).value||'';
     var _autoTempId='tmp-'+Date.now();
     clientDB[_autoTempId]={
       name:name, type:'Residential',
-      phone:_apptPhone||'—', email:_apptEmail||'—', address:apptAddress||'—',
-      payment:'—', since:new Date().toLocaleDateString('en-US',{month:'long',year:'numeric'}),
-      ltv:'$0', mrr:'—', jobs:'0', avg:'—',
-      service:naServiceText, freq:freq, sqft:'—',
+      phone:_apptPhone||'\u2014', email:_apptEmail||'\u2014', address:apptAddress||'\u2014',
+      payment:'\u2014', since:new Date().toLocaleDateString('en-US',{month:'long',year:'numeric'}),
+      ltv:'$0', mrr:'\u2014', jobs:'0', avg:'\u2014',
+      service:naServiceText, freq:freq, sqft:'\u2014',
       bedbath:apptBeds+' bed / '+apptBaths+' bath',
       cleaner:cleanerName, lastjob:'None yet', nextjob:'Not scheduled',
       status:'New', notes:'', history:[], properties:[]
     };
-    var _cRes=await dbSaveClient({
+    // FIRE-AND-FORGET — do NOT await. Previously this was `await dbSaveClient(...)`
+    // which blocked the optimistic UI for 5-10s on the Supabase round-trip,
+    // making "realtime immediate loading" appear broken for new-client bookings
+    // (Dane 2026-05-15). The optimistic insert + renderCal below need to fire
+    // synchronously so the appointment appears immediately. The promise is
+    // awaited just before dbSaveAppointment so we still respect the
+    // client → appointment ordering (the DB insert needs the real client_id).
+    _clientSavePromise = dbSaveClient({
       name:name, type:'Residential',
       phone:_apptPhone, email:_apptEmail, address:apptAddress,
       service:naServiceText, freq:freq, beds:apptBeds, baths:apptBaths,
@@ -10620,23 +10630,25 @@ async function saveNewAppt(){
       // Toggle CHECKED = existing/imported client (pre_existing=true → no first-clean automation).
       // Toggle UNCHECKED (default) = genuinely new client (pre_existing=false → first-clean fires).
       preExisting: !!((document.getElementById('na-existing-client')||{}).checked)
-    });
-    console.log('[saveNewAppt] auto-created client:', _cRes);
-    if(!_cRes.error && _cRes.data && _cRes.data[0]){
-      var _realClientId=_cRes.data[0].id;
-      clientDB[_realClientId]=clientDB[_autoTempId];
-      delete clientDB[_autoTempId];
-      // Add new client row to the clients table
-      var _tbody=document.querySelector('#view-clients tbody');
-      if(_tbody){
-        var _tr=document.createElement('tr');
-        _tr.className='clickable db-row';
-        _tr.setAttribute('data-cid',_realClientId);
-        _tr.innerHTML='<td>'+name+'</td><td><span class="badge br">Residential</span></td><td>—</td><td>—</td><td>'+freq+'</td><td><span class="sd sn"></span>New</td>';
-        _tr.onclick=function(){openClient(this.getAttribute('data-cid'));};
-        _tbody.insertBefore(_tr,_tbody.firstChild);
+    }).then(function(_cRes){
+      console.log('[saveNewAppt] auto-created client:', _cRes);
+      if(!_cRes.error && _cRes.data && _cRes.data[0]){
+        var _realClientId=_cRes.data[0].id;
+        clientDB[_realClientId]=clientDB[_autoTempId];
+        delete clientDB[_autoTempId];
+        // Add new client row to the clients table (visible in Clients view)
+        var _tbody=document.querySelector('#view-clients tbody');
+        if(_tbody){
+          var _tr=document.createElement('tr');
+          _tr.className='clickable db-row';
+          _tr.setAttribute('data-cid',_realClientId);
+          _tr.innerHTML='<td>'+name+'</td><td><span class="badge br">Residential</span></td><td>\u2014</td><td>\u2014</td><td>'+freq+'</td><td><span class="sd sn"></span>New</td>';
+          _tr.onclick=function(){openClient(this.getAttribute('data-cid'));};
+          _tbody.insertBefore(_tr,_tbody.firstChild);
+        }
       }
-    }
+      return _cRes;
+    });
   }
   // Calculate price FIRST so it's in the apptData entry
   var priceEl=document.getElementById('price-val');
@@ -10789,6 +10801,16 @@ async function saveNewAppt(){
   } catch(_legErr){ console.warn('[saveNewAppt] legacy-price persist error:', _legErr); }
 
   // ── STEP 3: Persist to Supabase in background (UI already updated) ──
+  // For new-client bookings we kicked off dbSaveClient as a fire-and-forget
+  // earlier (so the optimistic UI could render instantly). Now we MUST await
+  // it before the appointment INSERT — the row references client_id, and
+  // firing dbSaveAppointment before clientDB has the real id would either
+  // hit an FK violation or attribute the appointment to a stale temp id.
+  // For existing clients _clientSavePromise is null and this is a no-op.
+  if(_clientSavePromise){
+    try { await _clientSavePromise; }
+    catch(_csErr){ console.warn('[saveNewAppt] client save promise rejected:', _csErr); }
+  }
   if(freq==='One-time'){
     dbSaveAppointment({
       clientName:name, service:naServiceText,

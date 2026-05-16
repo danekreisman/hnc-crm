@@ -8117,6 +8117,10 @@ function deleteAppointment(){
   }
   if(!confirm('DELETE this appointment for '+currentAppt.n+'?\n\nThis will permanently remove it from the CRM, the client portal, and Google Calendar. The record will NOT be preserved.\n\nUse Cancel (grey out) if you want to keep a record.')) return;
 
+  _deleteAppointmentImpl();
+}
+
+async function _deleteAppointmentImpl(){
   var dbId = currentAppt.dbId;
   var clientName = currentAppt.n;
 
@@ -8146,6 +8150,9 @@ function deleteAppointment(){
   // (silent failures looked like success). 2026-05-03.
   if(dbId){
     try { if(typeof window.hncSyncGcal === 'function') window.hncSyncGcal(dbId, 'delete'); } catch(e){ console.warn('[deleteAppointment] gcal sync failed', e); }
+    // DELETE-MONITOR (2026-05-15): audit before delete so we have a record of
+    // every removed row. _auditAppointmentDelete is non-blocking on failure.
+    var auditRes = await _auditAppointmentDelete('deleteAppointment', function(q){ return q.eq('id', dbId); });
     db.from('appointments').delete().eq('id', dbId).then(function(res){
       if(res.error){
         console.error('[deleteAppointment] Supabase delete error:', res.error);
@@ -8155,6 +8162,7 @@ function deleteAppointment(){
         return;
       }
       console.log('[deleteAppointment] Supabase deleted dbId '+dbId);
+      _notifyAppointmentDelete('deleteAppointment', auditRes.count); // bulk only (>3); single deletes are silent
       // Success toast fires HERE, after DB confirmed
       if(typeof showToast==='function') showToast('Appointment deleted');
       logActivity('appointment_deleted','Appt deleted: '+(clientName||'Unknown'),'appointment',dbId||'',{date:currentApptKey,dbId:dbId||null});
@@ -8186,6 +8194,10 @@ function deleteEntireSeries(){
   var targetAddress = currentAppt.address || '';
   var targetSeriesId = currentAppt.seriesId || null;
   if(!confirm('HALT the entire recurring series for '+targetName+'?\n\nThis will permanently delete this appointment and ALL future appointments in this series from the CRM, the client portal, and Google Calendar. Other past completed appointments in the series stay as records. This cannot be undone.\n\nUse "Cancel entire series (grey out)" if you want to keep a record.')) return;
+  _deleteEntireSeriesImpl(targetName, targetClientId, targetTime, targetAddress, targetSeriesId);
+}
+
+async function _deleteEntireSeriesImpl(targetName, targetClientId, targetTime, targetAddress, targetSeriesId){
 
   var todayKey = new Date();
   todayKey.setHours(0,0,0,0);
@@ -8245,16 +8257,25 @@ function deleteEntireSeries(){
 
   // Hard-delete future rows from Supabase
   var todayISO = todayKey.getFullYear()+'-'+String(todayKey.getMonth()+1).padStart(2,'0')+'-'+String(todayKey.getDate()).padStart(2,'0');
-  var q;
+  var q, _seriesAuditSource, _seriesAuditFilter;
   if(targetSeriesId){
+    _seriesAuditSource = 'deleteEntireSeries(bySeriesId)';
+    _seriesAuditFilter = function(qb){ return qb.eq('series_id', targetSeriesId).gte('date', todayISO); };
     q = db.from('appointments').delete().eq('series_id', targetSeriesId).gte('date', todayISO);
   } else {
     if(targetClientId){
+      _seriesAuditSource = 'deleteEntireSeries(byClientId)';
+      _seriesAuditFilter = function(qb){ return qb.eq('client_id', targetClientId).eq('recurring', true).gte('date', todayISO); };
       q = db.from('appointments').delete().eq('client_id', targetClientId).eq('recurring', true).gte('date', todayISO);
     } else {
+      _seriesAuditSource = 'deleteEntireSeries(byClientName)';
+      _seriesAuditFilter = function(qb){ return qb.eq('client_name', targetName).eq('recurring', true).gte('date', todayISO); };
       q = db.from('appointments').delete().eq('client_name', targetName).eq('recurring', true).gte('date', todayISO);
     }
   }
+  // DELETE-MONITOR (2026-05-15): audit before delete so the row list is preserved
+  // in error_logs even though Supabase doesn't track deletes natively.
+  var _seriesAudit = await _auditAppointmentDelete(_seriesAuditSource, _seriesAuditFilter);
   q.then(async function(res){
     if(res.error) {
       console.error('[deleteEntireSeries] Supabase delete error:', res.error);
@@ -8263,6 +8284,7 @@ function deleteEntireSeries(){
       return;
     }
     console.log('[deleteEntireSeries] SUCCESS — '+futureDbIds.length+' future rows deleted from Supabase');
+    _notifyAppointmentDelete(_seriesAuditSource, _seriesAudit.count);
     // Belt-and-suspenders: ping every other connected device to re-sync.
     // postgres_changes DELETE events on bulk deletes are unreliable without
     // REPLICA IDENTITY FULL on the table, so this broadcast guarantees
@@ -8275,6 +8297,9 @@ function deleteEntireSeries(){
   // Also hard-delete the clicked appt's row even if it's in the past — user clicked it,
   // user halted the series, user expects this specific appt gone.
   if(clickedDbId){
+    // Audit the single clicked-appt delete too — same source group so it joins the
+    // bulk operation's record in error_logs rather than spawning a separate entry.
+    await _auditAppointmentDelete(_seriesAuditSource + ':clickedAppt', function(qb){ return qb.eq('id', clickedDbId); });
     db.from('appointments').delete().eq('id', clickedDbId).then(function(res){
       if(res.error) console.error('[deleteEntireSeries] clicked-appt delete error:', res.error);
       else console.log('[deleteEntireSeries] clicked appt '+clickedDbId+' deleted');
@@ -12522,6 +12547,102 @@ window.addEventListener('unhandledrejection', function(ev){
     user_url: window.location.href.slice(0, 200),
   });
 });
+
+/* ────────────────────────────────────────────────────────────────────────
+   Appointment delete audit + bulk-delete notification (added 2026-05-15)
+
+   On 2026-05-15 investigation found 3 isolated Jan Kunst appointment rows
+   missing from DB (5/23 Sat, 5/27 Wed, 9/2 Wed) plus a missing Friday
+   series entirely. Cause untraceable — Supabase doesn't log deletes by
+   default, so any row that disappears leaves no breadcrumb. After Dane
+   noticed and asked "are there more bad bugs waiting?", we added this
+   audit layer so any future appointment deletion logs the deleted rows
+   to error_logs BEFORE the DELETE fires. If something silently eats data
+   again, you'll see it within seconds in Settings → Recent errors.
+
+   Two helpers:
+
+   _auditAppointmentDelete(source, filterFn) — pre-fetches up to 50 rows
+     that match the filter and logs them to error_logs via _logFrontendError.
+     Returns { count, rows } so the caller can decide whether to notify.
+     Failures inside the audit NEVER block the actual delete.
+
+   _notifyAppointmentDelete(source, count) — fires a bell+push notification
+     only when count > 3. Single deletes are intentional (user clicked
+     "Delete"); bulk deletes are the surprising case. Caller invokes this
+     AFTER the DELETE succeeds so the notification reflects reality.
+   ──────────────────────────────────────────────────────────────────── */
+async function _auditAppointmentDelete(source, filterFn){
+  try {
+    if (typeof db === 'undefined' || !db || !db.from) return { count: 0, rows: [] };
+
+    // Cheap exact-count first (head:true skips the body, returns just the count)
+    var countRes = await filterFn(db.from('appointments').select('*', { count: 'exact', head: true }));
+    var totalCount = (countRes && countRes.count) || 0;
+    if (totalCount === 0) return { count: 0, rows: [] };
+
+    // Sample up to 50 rows for the audit log. Bigger deletes (e.g. purgeAllTestData
+    // wiping thousands) get a representative sample, not the full set.
+    var sampleRes = await filterFn(db.from('appointments').select(
+      'id,date,time,client_id,client_name,cleaner_id,cleaner_name,series_id,status,base_price,total_price,address,frequency,recurring,created_at'
+    )).limit(50);
+    var rows = (sampleRes && sampleRes.data) || [];
+
+    var rowSummary = rows.map(function(r){
+      return {
+        id: r.id, date: r.date, time: r.time, status: r.status,
+        client_id: r.client_id, client_name: r.client_name,
+        cleaner_id: r.cleaner_id, cleaner_name: r.cleaner_name,
+        series_id: r.series_id, recurring: r.recurring, frequency: r.frequency,
+        base_price: r.base_price, total_price: r.total_price,
+        address: r.address, created_at: r.created_at
+      };
+    });
+
+    var stack = (new Error('APPOINTMENT_DELETE_AUDIT')).stack || '(no stack)';
+
+    if (typeof _logFrontendError === 'function') {
+      _logFrontendError(
+        'APPOINTMENT_DELETE',
+        'Appointment delete initiated (' + source + '): ' + totalCount + ' row(s)',
+        stack,
+        {
+          source: source,
+          total_count: totalCount,
+          sampled_count: rows.length,
+          truncated: totalCount > 50,
+          rows: rowSummary
+        }
+      );
+    }
+
+    return { count: totalCount, rows: rows };
+  } catch(err) {
+    // NEVER let the audit failure block the real delete. Log a warning
+    // and return a zero-result so the caller proceeds normally.
+    console.warn('[_auditAppointmentDelete] audit failed for source=' + source + ':', err);
+    if (typeof _logFrontendError === 'function') {
+      try {
+        _logFrontendError('APPOINTMENT_DELETE_AUDIT_FAILED', String(err && err.message || err), err && err.stack || null, { source: source });
+      } catch(_) {}
+    }
+    return { count: 0, rows: [] };
+  }
+}
+
+function _notifyAppointmentDelete(source, count){
+  if (!count || count <= 3) return; // single + low-volume deletes are usually intentional
+  try {
+    if (typeof _fireNotification === 'function') {
+      _fireNotification({
+        event_type: 'appointment_delete_bulk',
+        title: '\u{1F6A8} Bulk appointment delete: ' + count + ' row' + (count === 1 ? '' : 's'),
+        body: 'Triggered by ' + source + '. If you did not expect this, check Settings \u2192 Communication \u2192 Recent errors for the full row list and tell Claude.',
+        metadata: { source: source, count: count }
+      });
+    }
+  } catch(_nerr) { /* notification failures are never fatal */ }
+}
 
 /* Error badge poller — checks error_logs for recent errors and updates
    the Settings nav badge so Dane sees breakage WITHOUT having to remember
@@ -18068,9 +18189,15 @@ async function deleteRecord(type){
     recurringAppts=recurringAppts.filter(function(r){return r.name!==name;});
     // Delete from Supabase appointments table
     if(id&&id.length>20){
+      // DELETE-MONITOR (2026-05-15): audit before delete. Deleting a client wipes
+      // ALL their appointments, past and future — high-volume operation.
+      var _delClientAudit = await _auditAppointmentDelete('deleteRecord(client)', function(qb){ return qb.eq('client_name', name); });
       var apptDelRes=await db.from('appointments').delete().eq('client_name',name);
       if(apptDelRes.error) console.error('[deleteRecord] appts delete ERROR:', apptDelRes.error);
-      else console.log('[deleteRecord] appointments deleted for client:', name);
+      else {
+        console.log('[deleteRecord] appointments deleted for client:', name);
+        _notifyAppointmentDelete('deleteRecord(client:' + name + ')', _delClientAudit.count);
+      }
     }
     if(apptCount>0) renderCal();
   } else if(type==='lead'){
@@ -22768,8 +22895,11 @@ function showCelebrationToast(title, subtitle) {
     const typed = prompt('This will DELETE all '+(batchId)+' appointments.\\n\\nType UNDO to confirm:');
     if(typed !== 'UNDO'){ alert('Cancelled.'); return; }
     try {
+      // DELETE-MONITOR (2026-05-15): audit before delete. Batch undo can remove many rows.
+      const _undoAudit = await _auditAppointmentDelete('undoImport(' + batchId + ')', function(qb){ return qb.eq('import_batch_id', batchId); });
       const res = await db.from('appointments').delete().eq('import_batch_id', batchId);
       if(res.error) throw res.error;
+      _notifyAppointmentDelete('undoImport(' + batchId + ')', _undoAudit.count);
       alert('Deleted all appointments from batch '+batchId);
       const batches = JSON.parse(localStorage.getItem('hnc_import_batches')||'[]').filter(b => b.id !== batchId);
       localStorage.setItem('hnc_import_batches', JSON.stringify(batches));
@@ -22786,8 +22916,12 @@ function showCelebrationToast(title, subtitle) {
     const typed2 = prompt('Last chance. Type DELETE again to actually run the purge:');
     if(typed2 !== 'DELETE'){ alert('Cancelled — nothing was deleted.'); return; }
     try {
+      // DELETE-MONITOR (2026-05-15): audit before nuke. Sample-limited to 50 rows
+      // in error_logs, but count and bell notification will reflect the full total.
+      const _purgeAudit = await _auditAppointmentDelete('purgeAllTestData', function(qb){ return qb.neq('id', '00000000-0000-0000-0000-000000000000'); });
       const a = await db.from('appointments').delete().neq('id','00000000-0000-0000-0000-000000000000');
       if(a.error) throw a.error;
+      _notifyAppointmentDelete('purgeAllTestData', _purgeAudit.count);
       const c = await db.from('clients').delete().neq('id','00000000-0000-0000-0000-000000000000');
       if(c.error) throw c.error;
       alert('Purge complete. All appointments and clients deleted. Reload the page to see the empty state.');

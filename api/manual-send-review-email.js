@@ -74,6 +74,7 @@ export default async function handler(req, res) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
+        suppressActivityLog: true,
         to:         client.email.trim(),
         subject:    'Mahalo from Hawaii Natural Clean — would you leave a review?',
         type:       'review_request',

@@ -97,6 +97,7 @@ export default async function handler(req, res) {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
+            suppressActivityLog: true,
             to:         client.email.trim(),
             type:       'reschedule',
             clientName: client.name || '',
@@ -137,7 +138,8 @@ export default async function handler(req, res) {
         const r = await fetchWithTimeout(`${BASE_URL}/api/send-sms`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ to: phone, message: smsMsg }),
+          body: JSON.stringify({
+        suppressActivityLog: true, to: phone, message: smsMsg }),
         }, TIMEOUTS.OPENPHONE);
         sendResults.sms = { ok: !!(r && r.ok), status: r ? r.status : null, recipient: phone, message: smsMsg };
         if (!r.ok) {

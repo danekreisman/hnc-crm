@@ -110,7 +110,8 @@ export default async function handler(req, res) {
         const r = await fetchWithTimeout(`${BASE_URL}/api/send-sms`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ to: t.phone, message: t.message }),
+          body: JSON.stringify({
+        suppressActivityLog: true, to: t.phone, message: t.message }),
         }, TIMEOUTS.OPENPHONE);
         if (!r.ok) {
           const body = await r.text().catch(() => '<unreadable>');

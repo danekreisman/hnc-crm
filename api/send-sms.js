@@ -11,7 +11,7 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const { to, message, statusOnly } = req.body;
+  const { to, message, statusOnly, suppressActivityLog } = req.body;
   const QUO_API_KEY = process.env.QUO_API_KEY;
   const QUO_NUMBER  = process.env.QUO_NUMBER;
 
@@ -69,25 +69,34 @@ export default async function handler(req, res) {
     } else {
       // Log every successful SMS send to activity_logs so it shows in the timeline.
       // Broadcasts don't send SMS, so this naturally only catches per-recipient automations.
-      try {
-        await fetch(process.env.SUPABASE_URL + '/rest/v1/activity_logs', {
-          method: 'POST',
-          headers: {
-            'apikey': process.env.SUPABASE_SERVICE_ROLE_KEY,
-            'Authorization': 'Bearer ' + process.env.SUPABASE_SERVICE_ROLE_KEY,
-            'Content-Type': 'application/json',
-            'Prefer': 'return=minimal',
-          },
-          body: JSON.stringify({
-            action: 'sms_sent',
-            description: `SMS to ${phone}: ${(message || '').slice(0, 60)}${(message || '').length > 60 ? '…' : ''}`,
-            user_email: 'system',
-            entity_type: 'client',
-            entity_id: '',
-            metadata: { to: phone, message_length: (message || '').length, openphone_id: data?.id },
-          }),
-        });
-      } catch (_) { /* logging failure must not break the send */ }
+      //
+      // suppressActivityLog (added 2026-05-15): when /api/send-sms is called FROM
+      // a higher-level handler (any /api/manual-send-*-sms) that writes its own
+      // attributed activity_log row, we'd otherwise double-log every send — one
+      // row by 'system' here, one row by the calling user from the wrapper.
+      // Wrappers pass suppressActivityLog:true so only the user-attributed row
+      // remains. Default behavior unchanged for direct callers.
+      if (!suppressActivityLog) {
+        try {
+          await fetch(process.env.SUPABASE_URL + '/rest/v1/activity_logs', {
+            method: 'POST',
+            headers: {
+              'apikey': process.env.SUPABASE_SERVICE_ROLE_KEY,
+              'Authorization': 'Bearer ' + process.env.SUPABASE_SERVICE_ROLE_KEY,
+              'Content-Type': 'application/json',
+              'Prefer': 'return=minimal',
+            },
+            body: JSON.stringify({
+              action: 'sms_sent',
+              description: `SMS to ${phone}: ${(message || '').slice(0, 60)}${(message || '').length > 60 ? '…' : ''}`,
+              user_email: 'system',
+              entity_type: 'client',
+              entity_id: '',
+              metadata: { to: phone, message_length: (message || '').length, openphone_id: data?.id },
+            }),
+          });
+        } catch (_) { /* logging failure must not break the send */ }
+      }
     }
 
     return res.status(200).json({ success: response.ok, status: response.status, data });

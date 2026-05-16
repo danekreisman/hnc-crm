@@ -184,6 +184,7 @@ export default async function handler(req, res) {
     const {
       clientName, amount, service, date, time, cleaner,
       invoiceUrl, terms, notes, bookingUrl, unsubscribeUrl,
+      suppressActivityLog,
     } = req.body;
 
     if (!to || (!subject && !type)) {
@@ -577,25 +578,36 @@ export default async function handler(req, res) {
       // Log every successful send to activity_logs so it shows in the timeline.
       // Broadcasts use Resend directly (not this endpoint), so they're naturally
       // excluded — that's by design per Dane's logging request.
-      try {
-        await fetch(process.env.SUPABASE_URL + '/rest/v1/activity_logs', {
-          method: 'POST',
-          headers: {
-            'apikey': process.env.SUPABASE_SERVICE_ROLE_KEY,
-            'Authorization': 'Bearer ' + process.env.SUPABASE_SERVICE_ROLE_KEY,
-            'Content-Type': 'application/json',
-            'Prefer': 'return=minimal',
-          },
-          body: JSON.stringify({
-            action: `email_sent_${type || 'generic'}`,
-            description: `Email "${subject || '(no subject)'}" → ${clientName ? clientName + ' ' : ''}<${to}>`,
-            user_email: 'system',
-            entity_type: 'client',
-            entity_id: '',
-            metadata: { to, subject, type: type || 'generic', resend_id: data.id, clientName: clientName || null },
-          }),
-        });
-      } catch (_) { /* logging failure must not break the send */ }
+      //
+      // suppressActivityLog (added 2026-05-15): when /api/send-email is called
+      // FROM a higher-level handler (any /api/manual-send-*) that writes its
+      // own attributed activity_log row, we'd otherwise double-log every send —
+      // one row by 'system' here, one row by the calling user from the wrapper.
+      // The activity panel renders both, making one email look like two events
+      // (a 'manual' send AND an 'automated' send). The wrapper passes
+      // suppressActivityLog:true so the high-level row is the sole entry.
+      // Default behavior unchanged — direct callers still get their system log.
+      if (!suppressActivityLog) {
+        try {
+          await fetch(process.env.SUPABASE_URL + '/rest/v1/activity_logs', {
+            method: 'POST',
+            headers: {
+              'apikey': process.env.SUPABASE_SERVICE_ROLE_KEY,
+              'Authorization': 'Bearer ' + process.env.SUPABASE_SERVICE_ROLE_KEY,
+              'Content-Type': 'application/json',
+              'Prefer': 'return=minimal',
+            },
+            body: JSON.stringify({
+              action: `email_sent_${type || 'generic'}`,
+              description: `Email "${subject || '(no subject)'}" → ${clientName ? clientName + ' ' : ''}<${to}>`,
+              user_email: 'system',
+              entity_type: 'client',
+              entity_id: '',
+              metadata: { to, subject, type: type || 'generic', resend_id: data.id, clientName: clientName || null },
+            }),
+          });
+        } catch (_) { /* logging failure must not break the send */ }
+      }
       return res.status(200).json({ success: true, id: data.id });
     } else {
       await logError('send-email', `Resend API error: ${response.status}`, { to, subject, error: data });

@@ -100,7 +100,8 @@ export default async function handler(req, res) {
     const sendRes = await fetchWithTimeout(`${BASE_URL}/api/send-sms`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ to: phone, message }),
+      body: JSON.stringify({
+        suppressActivityLog: true, to: phone, message }),
     }, TIMEOUTS.OPENPHONE);
 
     if (!sendRes.ok) {

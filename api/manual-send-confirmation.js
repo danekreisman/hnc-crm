@@ -119,6 +119,7 @@ export default async function handler(req, res) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
+        suppressActivityLog: true,
         to:         client.email.trim(),
         subject:    `Booking confirmed \u2014 ${prettyDate}`,
         type:       'booking_confirmation',

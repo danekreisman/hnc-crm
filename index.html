@@ -3320,6 +3320,70 @@ async function dbLoadCleaners(){
       row.cleaner_pay_3 = parseFloat(data.cleanerPay3) || 0;
     }
   }
+  // ── PHANTOM-INSERT GUARD (added 2026-05-15) ──────────────────────────
+  // Defends against the silent "Unknown $0 appointment" bug surfaced
+  // 2026-05-15. ~90 phantom rows had been created since 2026-05-03 by
+  // saveApptEdit's tail-regen firing without a real anchor — all $0,
+  // no client_id, no cleaner_id, time '5am', spread across May–Sept
+  // 2026. The bug is silent: the DB insert succeeds, no exception, so
+  // error_logs caught nothing. This guard catches the next attempt
+  // BEFORE the write so we can identify the trigger via stack trace.
+  //
+  // Signature: a real appointment ALWAYS has either a client_id, a
+  // client_name, or a non-zero price (every saveNewAppt path resolves
+  // a client; every legacy import has a price). Only the phantom
+  // pathway produces a row where all four are empty.
+  if (!row.client_id
+      && (!row.client_name || !String(row.client_name).trim())
+      && (!row.base_price  || row.base_price  === 0)
+      && (!row.total_price || row.total_price === 0)) {
+    var _stk = (new Error('PHANTOM_BLOCK')).stack || '(no stack available)';
+    var _ctxBlob = {
+      blocked_row: row,
+      caller_data_keys: data ? Object.keys(data) : [],
+      caller_data_freq: data ? data.freq : null,
+      caller_data_recurring: data ? data.recurring : null,
+      caller_data_seriesId: data ? data.seriesId : null,
+      caller_data_clientName: data ? data.clientName : null,
+      caller_data_cleanerName: data ? data.cleanerName : null,
+      current_appt_key: (typeof currentApptKey !== 'undefined') ? currentApptKey : null,
+      current_appt: (typeof currentAppt !== 'undefined' && currentAppt) ? {
+        n: currentAppt.n, t: currentAppt.t, freq: currentAppt.freq,
+        recurring: currentAppt.recurring, seriesId: currentAppt.seriesId,
+        dbId: currentAppt.dbId, s: currentAppt.s
+      } : null,
+      href: (typeof window !== 'undefined' && window.location) ? String(window.location.href).slice(0, 200) : null
+    };
+    // Always log — every blocked attempt is diagnostic gold. Throttle
+    // inside _logFrontendError dedupes 3s-window repeats but keeps
+    // distinct call-site fingerprints separate.
+    if (typeof _logFrontendError === 'function') {
+      _logFrontendError('PHANTOM_BLOCK', 'dbSaveAppointment blocked phantom write (no client + $0)', _stk, _ctxBlob);
+    }
+    // Notification — throttled to 1 per 5 minutes so a wave of blocks
+    // (regen tries 20–30 inserts at once) doesn't spam the bell.
+    // error_logs still captures every attempt for the full picture.
+    try {
+      var _now = Date.now();
+      if (!window._phantomNotifLast || (_now - window._phantomNotifLast) > 5*60*1000) {
+        window._phantomNotifLast = _now;
+        if (typeof _fireNotification === 'function') {
+          _fireNotification({
+            event_type: 'phantom_block',
+            title: '\u{1F6A8} Phantom appointment blocked',
+            body: 'A silent bug tried to create an appointment with no client. Check Settings \u2192 Communication \u2192 Recent errors for the stack trace and tell Claude.',
+            metadata: { current_appt_key: _ctxBlob.current_appt_key || null }
+          });
+        }
+      }
+    } catch(_nerr) { /* never let notification failure break the guard */ }
+    console.warn('[dbSaveAppointment] PHANTOM BLOCKED \u2014 see Settings \u2192 Recent errors for stack trace');
+    // Return an error-shaped response so callers treat this as a
+    // failed insert (matches Supabase's {data, error} contract).
+    // gcal-sync wrapper reads res.data — null is fine, no sync fires.
+    return { data: null, error: { message: 'PHANTOM_BLOCK: appointment write blocked \u2014 no client and $0', code: 'PHANTOM_BLOCK' } };
+  }
+
   var res=await db.from('appointments').insert([row]).select();
   if(res.error)console.error('Save appointment error:',res.error);
   else console.log('[dbSaveAppointment] saved client_id='+clientId+' client_name='+data.clientName+' duration_hours='+data.duration+(data.seriesId?' series_id='+data.seriesId:'')+(row.cleaner_id_2?' paired with '+(data.cleanerName2||'')+(row.cleaner_id_3?'+'+(data.cleanerName3||''):''):''));

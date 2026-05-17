@@ -620,6 +620,12 @@ textarea{font-family:inherit;}
 .hnc-assistant-user .non-assistant-only{display:none!important;}
 .hnc-assistant-user .admin-only-tip,.hnc-assistant-user .admin-only{display:none!important;}
 body:not(.hnc-assistant-user) .assistant-only{display:none!important;}
+/* Owner-only — visible ONLY to hardcoded OWNER_EMAILS (set in JS as
+   .hnc-owner-user on body). DB-level role='admin' users do NOT pass this
+   gate. Used for user-management UI (Settings → Users) since admins can
+   do everything except modify the user list. Belt-and-suspenders: the
+   actual user-management API endpoints are gated by requireOwner server-side. */
+body:not(.hnc-owner-user) .owner-only{display:none!important;}
 /* === END HNC AUTH === */
 </style>
 </head>
@@ -1628,7 +1634,7 @@ body:not(.hnc-assistant-user) .assistant-only{display:none!important;}
           <button class="stab" onclick="switchSettingsTab('policies',this)">📋 Client Policies</button>
           <button class="stab" onclick="switchSettingsTab('operations',this)">⚙️ Operations</button>
           <button class="stab" onclick="switchSettingsTab('data',this)">📥 Data</button>
-          <button class="stab admin-only" onclick="switchSettingsTab('users',this)">👥 Users</button>
+          <button class="stab admin-only owner-only" onclick="switchSettingsTab('users',this)">👥 Users</button>
           <button class="stab admin-only" onclick="switchSettingsTab('health',this)">🩺 System Health</button>
           <button class="stab" onclick="switchSettingsTab('danger',this)" style="color:#b91c1c;">🔴 Danger Zone</button>
         </div>
@@ -1861,8 +1867,8 @@ Mahalo 🌺</textarea>
           </div>
         </div>
 
-        <!-- ── Users (admin-only allowlist) ────────────────────────────── -->
-        <div id="stab-users" class="stab-panel admin-only" style="display:none;">
+        <!-- ── Users (owner-only allowlist) ────────────────────────────── -->
+        <div id="stab-users" class="stab-panel admin-only owner-only" style="display:none;">
           <div class="settings-card">
             <div class="settings-card-title">User access</div>
             <div class="settings-card-desc">People who can sign in to this CRM. Anyone signing in with an email not on this list (and not on the hardcoded admin fallback) is rejected at the auth layer.</div>
@@ -25000,10 +25006,16 @@ async function _denyAccess(email, reasonMsg) {
 function applyUserRole(email, role) {
   // role is 'admin', 'va', or 'assistant' (from app_users table). Hardcoded
   // ADMIN_EMAILS are always treated as admin even if the DB says otherwise.
-  const isHardcodedAdmin = ADMIN_EMAILS.map(e => e.toLowerCase()).includes((email || '').toLowerCase());
-  const isAdmin = isHardcodedAdmin || role === 'admin';
+  // 2026-05-17: separated "admin" from "owner". Hardcoded ADMIN_EMAILS = owner
+  // (gets hnc-owner-user class, sees user-management UI). DB role='admin' = admin
+  // (no owner class, sees everything else admin-level). VA / assistant unchanged.
+  const isOwner = ADMIN_EMAILS.map(e => e.toLowerCase()).includes((email || '').toLowerCase());
+  const isAdmin = isOwner || role === 'admin';
   const isAssistant = !isAdmin && role === 'assistant';
   const body = document.body;
+  // Owner class — gates the Users tab and any other ownership-level UI.
+  if (isOwner) body.classList.add('hnc-owner-user');
+  else body.classList.remove('hnc-owner-user');
   if (isAdmin) {
     body.classList.remove('hnc-va-user');
     body.classList.remove('hnc-assistant-user');

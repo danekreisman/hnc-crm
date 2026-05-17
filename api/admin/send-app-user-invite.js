@@ -12,7 +12,7 @@
 
 import { fetchWithTimeout, TIMEOUTS } from '../utils/with-timeout.js';
 import { logError } from '../utils/error-logger.js';
-import { requireAdmin } from '../utils/auth-check.js';
+import { requireOwner } from '../utils/auth-check.js';
 import { validate, is } from '../utils/validate.js';
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
@@ -34,8 +34,9 @@ const ROLE_DESCRIPTION = {
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'method_not_allowed' });
 
-  // Admin-only — only existing admins can invite new team members.
-  const user = await requireAdmin(req, res);
+  // Owner-only — only the hardcoded owner can invite new team members.
+  // (DB admins get to do everything else but not modify the user list.)
+  const user = await requireOwner(req, res);
   if (!user) return;
 
   // ─── Validate input ─────────────────────────────────────────────────────

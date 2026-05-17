@@ -25373,6 +25373,18 @@ async function markAllNotifRead() {
 var _hncRealtimeChannels = []; // { channel, name } so we can clean up on signout
 var _hncRealtimeRetryTimers = {}; // tableName → setTimeout handle for reconnect
 var _hncRealtimeStatus = {}; // tableName → 'subscribed'|'error'|'closed'
+// Tracks whether each table has ever been SUBSCRIBED before. First subscribe
+// per table (initial page load) is silent — the page already loaded fresh
+// data at boot. Any SUBSCRIBED transition AFTER that is a reconnect, which
+// means we were disconnected and may have missed events; trigger a catchup
+// sync. Added 2026-05-15 after Dane noticed a phone booking from hours
+// earlier never reached his open desktop tab until manual refresh.
+var _hncRealtimeEverSubscribed = {};
+// Debounce token for catchup syncs across multiple wake/online/reconnect
+// signals firing back-to-back. e.g. coming back from sleep fires
+// visibilitychange + online + several CLOSED→SUBSCRIBED reconnects all
+// at once; we want exactly one sync, not eight.
+var _hncCatchupSyncTimer = null;
 
 // Brief "syncing…" flash so the user can see realtime is working. Appears
 // in the topbar near the bell, fades out after ~900ms.
@@ -25416,6 +25428,16 @@ function _hncSubscribeRealtime(tableName, onChange) {
             clearTimeout(_hncRealtimeRetryTimers[tableName]);
             delete _hncRealtimeRetryTimers[tableName];
           }
+          // GAP 1 FIX (2026-05-15): if this table has been SUBSCRIBED before,
+          // we just RE-subscribed — meaning we were disconnected (sleep, network
+          // drop, idle timeout) and may have missed events while down. Fire a
+          // debounced catchup sync so the tab picks up anything we missed.
+          // First subscribe per page-load is silent; the bootstrap data fetch
+          // already covered it.
+          if (_hncRealtimeEverSubscribed[tableName]) {
+            _hncScheduleCatchupSync('reconnect:' + tableName);
+          }
+          _hncRealtimeEverSubscribed[tableName] = true;
         } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
           console.warn('[realtime] '+tableName+' status:', status, '— scheduling reconnect');
           // Reconnect after 5s. Cleared on next successful subscribe.
@@ -25430,6 +25452,22 @@ function _hncSubscribeRealtime(tableName, onChange) {
   } catch (err) {
     console.warn('[realtime] subscribe failed for '+tableName+':', err);
   }
+}
+
+// Debounced catchup sync — called from reconnect, visibilitychange, online,
+// and focus handlers. Coalesces multiple simultaneous wake signals into
+// exactly one _hncFullSyncFromRealtime call. 300ms is short enough that
+// the catchup feels immediate from the user's perspective but long enough
+// to absorb the typical 3-5 signals fired during wake-from-sleep.
+function _hncScheduleCatchupSync(reason) {
+  if (_hncCatchupSyncTimer) clearTimeout(_hncCatchupSyncTimer);
+  _hncCatchupSyncTimer = setTimeout(function(){
+    _hncCatchupSyncTimer = null;
+    if (typeof _hncFullSyncFromRealtime === 'function') {
+      console.log('[realtime] catchup sync (' + reason + ')');
+      _hncFullSyncFromRealtime('catchup:' + reason);
+    }
+  }, 300);
 }
 
 function _hncTeardownRealtime() {
@@ -25621,6 +25659,30 @@ function startNotifPolling() {
   // takes over within 5s, but polling adds a third safety net.
   if (_notifPollHandle) clearInterval(_notifPollHandle);
   _notifPollHandle = setInterval(loadNotifications, 60000);
+
+  // GAP 2 FIX (2026-05-15): wake/focus/online catchup listeners.
+  // The reconnect-catchup in _hncSubscribeRealtime handles the case where the
+  // websocket clearly went CLOSED / TIMED_OUT and we re-SUBSCRIBED. But there
+  // are cases where the connection is silently dead — laptop sleeps for
+  // hours, OS background-throttles the tab, brief Wi-Fi drop the heartbeat
+  // missed, etc — and the SDK never fires CLOSED. Without a wake-up
+  // catchup, we sit happily "SUBSCRIBED" while events queue and drop on
+  // the Supabase side. These three listeners cover the user-observable
+  // wake events: tab becomes visible, window regains focus, browser
+  // regains network. _hncScheduleCatchupSync is debounced so a typical
+  // wake-from-sleep (which fires visibilitychange + focus + several
+  // reconnect SUBSCRIBED events within ~1 second) coalesces to one sync.
+  //
+  // Idempotency: this whole startNotifPolling block runs on every signin,
+  // so we guard with a window-level flag to avoid stacking listeners.
+  if (!window._hncWakeListenersInstalled) {
+    window._hncWakeListenersInstalled = true;
+    document.addEventListener('visibilitychange', function(){
+      if (!document.hidden) _hncScheduleCatchupSync('visibility');
+    });
+    window.addEventListener('focus', function(){ _hncScheduleCatchupSync('focus'); });
+    window.addEventListener('online',  function(){ _hncScheduleCatchupSync('online'); });
+  }
 
   // One-time check that realtime publication is configured for the tables we
   // need. Surfaces a banner to the user if any are missing — instead of

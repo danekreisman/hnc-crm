@@ -19128,10 +19128,41 @@ async function inviteAppUser() {
     return;
   }
   emailEl.value = '';
-  msgEl.textContent = 'Invited ' + email + ' as ' + role + '. They can now sign in at book.hawaiinaturalclean.com.';
-  msgEl.style.color = '#059669';
+  msgEl.textContent = 'Adding ' + email + ' and sending invite email\u2026';
+  msgEl.style.color = 'var(--text-muted)';
   await loadAppUsers();
   if (typeof logActivity === 'function') logActivity('user_invited', 'Invited ' + email + ' as ' + role, { email, role });
+
+  // Fire the invite email. Soft-fail: if Resend errors, the user is already
+  // on the allowlist and can sign in — we just couldn't notify them.
+  let emailSent = false;
+  let emailErr = '';
+  try {
+    const sess2 = await db.auth.getSession();
+    const token = sess2.data.session && sess2.data.session.access_token;
+    if (token) {
+      const r = await fetch('/api/admin/send-app-user-invite', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+        body: JSON.stringify({ email, role })
+      });
+      const j = await r.json().catch(() => ({}));
+      if (r.ok && j.email_sent) emailSent = true;
+      else emailErr = j.error || ('HTTP ' + r.status);
+    } else {
+      emailErr = 'no session token';
+    }
+  } catch (e) {
+    emailErr = (e && e.message) || String(e);
+  }
+
+  if (emailSent) {
+    msgEl.textContent = 'Invited ' + email + ' as ' + role + ' \u2014 welcome email sent.';
+    msgEl.style.color = '#059669';
+  } else {
+    msgEl.textContent = 'Added ' + email + ' as ' + role + ' to the allowlist, but the invite email failed (' + emailErr + '). They can still sign in at book.hawaiinaturalclean.com \u2014 you may want to let them know.';
+    msgEl.style.color = '#b45309';
+  }
 }
 
 async function setAppUserActive(id, active) {
